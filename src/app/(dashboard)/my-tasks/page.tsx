@@ -2,17 +2,45 @@
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS } from '@/types/bitrix';
 import { Calendar, MessageSquare, Timer, User, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import TaskModal from '@/components/TaskModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
 export default function MyTasksPage() {
-  const { tasks, currentUser, setSelectedTask } = useKanbanStore();
+  const { allTasks, currentUser, setCurrentUser, setSelectedTask, loadAllTasks, isLoadingAllTasks } =
+    useKanbanStore();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isLoadingProfile, setIsLoadingProfile] = useState(!currentUser.id);
 
-  const myTasks = tasks.filter((t) => t.assigneeId === currentUser.id);
+  useEffect(() => {
+    if (currentUser.id) {
+      setIsLoadingProfile(false);
+      return;
+    }
+    void fetch('/api/bitrix/user.current', { method: 'POST' })
+      .then((response) => response.json())
+      .then((data) => {
+        const user = data.result;
+        if (user?.ID || user?.id) {
+          setCurrentUser({
+            id: String(user.ID || user.id),
+            name: `${user.NAME || user.name || ''} ${user.LAST_NAME || user.lastName || ''}`.trim(),
+            photo: user.PERSONAL_PHOTO || user.personalPhoto,
+          });
+        }
+      })
+      .finally(() => setIsLoadingProfile(false));
+  }, [currentUser.id, setCurrentUser]);
+
+  useEffect(() => {
+    if (allTasks.length === 0 && !isLoadingAllTasks) void loadAllTasks();
+  }, [allTasks.length, isLoadingAllTasks, loadAllTasks]);
+
+  const myTasks = allTasks.filter(
+    (task) => String(task.assigneeId) === String(currentUser.id),
+  );
   const filteredTasks =
     statusFilter === 'all' ? myTasks : myTasks.filter((t) => t.status === statusFilter);
 
@@ -28,7 +56,7 @@ export default function MyTasksPage() {
   };
 
   const selectedTask = useKanbanStore((s) =>
-    s.selectedTaskId ? tasks.find((t) => t.id === s.selectedTaskId) : null,
+    s.selectedTaskId ? allTasks.find((task) => task.id === s.selectedTaskId) : null,
   );
 
   return (
@@ -38,7 +66,9 @@ export default function MyTasksPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="pt-2 md:pt-0">
             <h1 className="text-xl font-semibold text-foreground">Мои задачи</h1>
-            <p className="text-sm text-muted-foreground">{currentUser.name}</p>
+            <p className="text-sm text-muted-foreground">
+              Все задачи во всех проектах, где вы исполнитель · {currentUser.name}
+            </p>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0">
@@ -83,7 +113,11 @@ export default function MyTasksPage() {
       {/* Task List */}
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl space-y-3">
-          {filteredTasks.length > 0 ? (
+          {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
+            <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+              Загружаем ваши задачи…
+            </div>
+          ) : filteredTasks.length > 0 ? (
             filteredTasks.map((task) => {
               const isOverdue =
                 task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';

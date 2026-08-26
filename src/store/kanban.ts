@@ -679,8 +679,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   getMyTasks: () => {
-    const { tasks, currentUser } = get();
-    return tasks.filter((t) => t.assigneeId === currentUser.id);
+    const { allTasks, currentUser } = get();
+    return allTasks.filter((task) => String(task.assigneeId) === String(currentUser.id));
   },
 
   getOverdueTasks: () => {
