@@ -97,7 +97,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
+      <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 py-4">
         <div className="space-y-0.5">
           <NavItem href="/" icon={LayoutDashboard} label="Главная" />
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
@@ -148,7 +148,7 @@ export default function Sidebar() {
             placeholder="Найти проект…"
             className="mb-2 h-8"
           />
-          <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
             {isLoading ? (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Загрузка…</div>
             ) : sortedProjects.length > 0 ? (
