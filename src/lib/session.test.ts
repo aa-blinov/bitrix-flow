@@ -17,7 +17,11 @@ describe('signed browser session', () => {
 
   it('rejects a tampered session', async () => {
     const session = await createSession();
-    const tampered = `${session.slice(0, -1)}${session.endsWith('a') ? 'b' : 'a'}`;
+    const [payload, signature] = session.split('.');
+    // Appending a Base64URL character to the signed payload always changes the
+    // HMAC input; mutating a trailing signature character is not deterministic
+    // because unused Base64 bits can decode to the same byte sequence.
+    const tampered = `${payload}a.${signature}`;
 
     expect(await isValidSession(tampered)).toBe(false);
   });
