@@ -334,9 +334,10 @@ export default function TaskGrid({
   const toggleSort = (key: SortKey) => {
     setSorts((current) => {
       const currentSort = current.find((sort) => sort.key === key);
-      const next: Sort = currentSort
-        ? { key, direction: currentSort.direction === 'asc' ? 'desc' : 'asc' }
-        : { key, direction: 'asc' };
+      if (currentSort?.direction === 'desc') {
+        return current.filter((sort) => sort.key !== key);
+      }
+      const next: Sort = { key, direction: currentSort ? 'desc' : 'asc' };
       return [next, ...current.filter((sort) => sort.key !== key)];
     });
   };
