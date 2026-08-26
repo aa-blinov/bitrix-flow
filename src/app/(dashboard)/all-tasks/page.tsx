@@ -8,6 +8,7 @@ import TaskModal from '@/components/TaskModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import TaskGrid from '@/components/TaskGrid';
+import LoadingState from '@/components/LoadingState';
 
 type StatusFilter = 'all' | 'overdue' | 'in_progress' | 'done';
 
@@ -171,9 +172,7 @@ function AllTasksInner() {
 
       <div className="mt-4">
         {isLoadingAllTasks ? (
-          <div className="min-h-[60vh] flex flex-col items-center justify-center text-center text-muted-foreground lg:px-6">
-            Загружаю задачи…
-          </div>
+          <LoadingState label="Загружаем задачи…" className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
             tasks={filteredTasks}
@@ -191,7 +190,7 @@ function AllTasksInner() {
 export default function AllTasksPage() {
   // Suspense вокруг useSearchParams() — Next.js требует этого для статической пререндеринга.
   return (
-    <Suspense fallback={<div className="p-6 text-muted-foreground">Загрузка…</div>}>
+    <Suspense fallback={<LoadingState />}>
       <AllTasksInner />
     </Suspense>
   );

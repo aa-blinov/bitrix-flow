@@ -13,6 +13,7 @@ import {
 import TaskGrid from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import LoadingState from '@/components/LoadingState';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -62,15 +63,7 @@ export default function ProjectPage() {
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
 
   if (projects.length === 0) {
-    return (
-      <div className="min-h-screen space-y-6 p-4 md:p-8 animate-pulse" aria-label="Загрузка проекта">
-        <div className="h-8 w-72 rounded bg-muted" />
-        <div className="h-20 rounded-lg bg-muted" />
-        <div className="grid gap-4 md:grid-cols-4">
-          {[0, 1, 2, 3].map((column) => <div key={column} className="h-72 rounded-lg bg-muted" />)}
-        </div>
-      </div>
-    );
+    return <LoadingState label="Загружаем проект…" className="min-h-screen" />;
   }
 
   if (!currentProject) {

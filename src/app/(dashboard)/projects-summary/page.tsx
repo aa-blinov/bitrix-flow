@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSSE } from '@/hooks/useSSE';
+import LoadingState from '@/components/LoadingState';
 
 type ProjectSummary = {
   id: string;
@@ -193,7 +194,7 @@ export default function ProjectsSummaryPage() {
             {error ? (
               <p className="p-6 text-sm text-destructive">{error}</p>
             ) : isLoading ? (
-              <p className="p-6 text-sm text-muted-foreground">Собираем сводку из Bitrix24…</p>
+              <LoadingState label="Собираем сводку из Bitrix24…" className="min-h-72 bg-transparent" />
             ) : (
               <Table>
                 <TableHeader>

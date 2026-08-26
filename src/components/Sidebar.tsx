@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import Notifications from '@/components/Notifications';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
+import LoadingState from '@/components/LoadingState';
 
 export default function Sidebar() {
   const {
@@ -150,7 +151,7 @@ export default function Sidebar() {
           />
           <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
             {isLoading ? (
-              <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Загрузка…</div>
+              <LoadingState label="Загружаем…" className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (
               <>
                 {activeProjects.map((project) => {

@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import LoadingState from '@/components/LoadingState';
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
@@ -299,7 +300,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                   {isLoadingTask && task.comments.length === 0 ? (
-                    <div className="text-center py-4 text-muted-foreground text-sm">Загрузка…</div>
+                    <LoadingState className="min-h-24 bg-transparent" />
                   ) : (
                     task.comments.map((c) => (
                       <div key={c.id} className="bg-muted rounded-lg p-3">

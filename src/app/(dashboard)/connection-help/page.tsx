@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, CheckCircle2, CircleAlert, Loader2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import LoadingState from '@/components/LoadingState';
 
 export default function ConnectionHelpPage() {
   const [state, setState] = useState<'checking' | 'disconnected'>('checking');
@@ -20,11 +21,7 @@ export default function ConnectionHelpPage() {
   }, []);
 
   if (state === 'checking') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingState label="Проверяем подключение…" className="min-h-screen bg-muted/30" />;
   }
 
   return (

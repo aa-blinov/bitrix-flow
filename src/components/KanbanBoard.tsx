@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import LoadingState from '@/components/LoadingState';
 
 function getStageColor(hex: string): { bg: string; text: string; border: string } {
   // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
@@ -325,14 +326,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   };
 
   if (isLoading && tasks.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-3 border-2 border-muted border-t-primary rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Загрузка задач...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Загружаем задачи…" className="min-h-[60vh] flex-1" />;
   }
 
   return (

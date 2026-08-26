@@ -7,6 +7,7 @@ import TaskModal from '@/components/TaskModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import LoadingState from '@/components/LoadingState';
 
 export default function MyTasksPage() {
   const { allTasks, currentUser, setCurrentUser, setSelectedTask, loadAllTasks, isLoadingAllTasks } =
@@ -114,9 +115,7 @@ export default function MyTasksPage() {
       <div className="p-4 lg:p-6">
         <div className="max-w-3xl space-y-3">
           {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
-            <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
-              Загружаем ваши задачи…
-            </div>
+            <LoadingState label="Загружаем ваши задачи…" className="min-h-[60vh] bg-transparent" />
           ) : filteredTasks.length > 0 ? (
             filteredTasks.map((task) => {
               const isOverdue =

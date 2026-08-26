@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
+import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -59,14 +60,7 @@ export default function DashboardPage() {
   }, [loadProjects, router]);
 
   if (isLoading || !selectedProjectId) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <div className="text-center">
-          <div className="mx-auto mb-3 size-11 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-primary" />
-          <p className="text-sm text-muted-foreground">Синхронизируем данные Bitrix24…</p>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Синхронизируем данные Bitrix24…" className="min-h-screen bg-muted/30" />;
   }
 
   const projectsWithStats = projects.map((p) => {
