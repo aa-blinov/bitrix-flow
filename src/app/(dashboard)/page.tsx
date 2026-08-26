@@ -101,7 +101,7 @@ export default function DashboardPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         {/* Stats */}
-        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="mb-8 grid auto-rows-fr grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard href="/all-tasks?status=attention" icon={AlertTriangle} label="Требуют внимания" value={attentionCount} color="text-amber-700 dark:text-amber-300" bgColor="bg-amber-500/15" />
           <StatCard href="/all-tasks?status=in_progress" icon={ListChecks} label="В работе" value={inProgressCount} color="text-blue-700 dark:text-blue-300" bgColor="bg-blue-500/15" />
           <StatCard href="/all-tasks?status=week" icon={CalendarDays} label="Дедлайн на неделе" value={dueThisWeekCount} color="text-violet-700 dark:text-violet-300" bgColor="bg-violet-500/15" />
@@ -213,9 +213,9 @@ function StatCard({
   href: string;
 }) {
   return (
-    <Link href={href} className="block">
-      <Card className="py-0 transition hover:bg-muted/50" size="sm">
-      <CardContent className="p-4">
+    <Link href={href} className="block h-full">
+      <Card className="h-full py-0 transition hover:bg-muted/50" size="sm">
+      <CardContent className="flex h-24 items-center p-4">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center`}>
             <Icon size={16} className={color} />

@@ -73,7 +73,7 @@ function EditableTitle({ task }: { task: BxTask }) {
             event.currentTarget.blur();
           }
         }}
-        className="h-8 border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
+        className="h-8 max-w-full border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
       />
       <div className="mt-1 flex gap-2 px-1 text-xs text-muted-foreground">
         <a
@@ -94,7 +94,7 @@ function EditableTitle({ task }: { task: BxTask }) {
 function FieldControls({ task, compact = false, readOnly = false, visibleColumns = DEFAULT_COLUMNS }: { task: BxTask; compact?: boolean; readOnly?: boolean; visibleColumns?: ColumnKey[] }) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
   const label = (name: string, child: React.ReactNode) => (
-    <label className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-xs text-muted-foreground">
+    <label className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-xs text-muted-foreground">
       <span>{name}</span>
       {child}
     </label>
@@ -104,13 +104,13 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
     : [{ id: task.stageId, name: task.status === 'done' ? 'Завершена' : 'Без фазы' }];
   const phase = (
     <Select value={task.stageId} onValueChange={(value) => void moveTaskToStage(task.id, value)}>
-      <SelectTrigger className="w-full" aria-label="Фаза"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="w-full min-w-0" aria-label="Фаза"><SelectValue /></SelectTrigger>
       <SelectContent>{stageOptions.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}</SelectContent>
     </Select>
   );
   const assignee = (
     <Select value={task.assigneeId || 'unassigned'} onValueChange={(value) => void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)}>
-      <SelectTrigger className="w-full" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="w-full min-w-0" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value="unassigned">Не назначен</SelectItem>
         {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
@@ -119,7 +119,7 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   );
   const priority = (
     <Select value={task.priority} onValueChange={(value) => void updateTaskField(task.id, 'priority', value)}>
-      <SelectTrigger className="w-full" aria-label="Приоритет"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="w-full min-w-0" aria-label="Приоритет"><SelectValue /></SelectTrigger>
       <SelectContent>
         {Object.entries(PRIORITY_LABELS).filter(([key]) => key !== 'critical').map(([key, item]) => (
           <SelectItem key={key} value={key}>{item.label}</SelectItem>
@@ -513,7 +513,7 @@ export default function TaskGrid({
             {pageTasks.map((task) => (
               <article
                 key={task.id}
-                className={`space-y-3 p-4 ${
+                className={`max-w-full min-w-0 space-y-3 overflow-hidden p-4 ${
                   task.status === 'done'
                     ? 'bg-muted/60 text-muted-foreground'
                     : needsDeadlineAttention(task)
