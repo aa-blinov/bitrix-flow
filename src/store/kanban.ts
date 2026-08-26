@@ -250,7 +250,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     try {
       const { tasks, hasMore } = await fetchTasksByProject(projectId, {
         limit: 50,
-        status: filters.showCompleted ? 'all' : 'active',
+        // The board always retains completed tasks in their original phases.
+        // Hiding them made a fully completed project look empty.
+        status: 'all',
         filter: {
           responsibleId: filters.assigneeId || undefined,
           priority: filters.priority || undefined,
@@ -280,6 +282,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       const { tasks: newTasks, hasMore } = await fetchTasksByProject(selectedProjectId, {
         limit: 50,
         offset: tasks.length,
+        status: 'all',
         filter: {
           responsibleId: filters.assigneeId || undefined,
           priority: filters.priority || undefined,

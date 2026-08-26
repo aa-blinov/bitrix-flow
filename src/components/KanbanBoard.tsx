@@ -603,6 +603,7 @@ function TaskCard({
   isDragging: boolean;
 }) {
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
+  const isCompleted = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
   const dueDate = formatDate(task.dueDate);
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
@@ -614,7 +615,7 @@ function TaskCard({
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
       className={`cursor-pointer gap-0 p-3 transition-all hover:ring-primary/20 hover:shadow-sm ${
-        isDragging ? 'opacity-40 rotate-1' : ''
+        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/50 opacity-60 grayscale' : ''
       }`}
     >
       {/* Tags row */}
@@ -634,7 +635,13 @@ function TaskCard({
       </div>
 
       {/* Title */}
-      <h4 className="text-sm text-gray-900 leading-snug mb-2 line-clamp-2">{task.title}</h4>
+      <h4
+        className={`mb-2 text-sm leading-snug line-clamp-2 ${
+          isCompleted ? 'text-muted-foreground line-through' : 'text-gray-900'
+        }`}
+      >
+        {task.title}
+      </h4>
 
       {/* Description indicator */}
       {task.description && (
