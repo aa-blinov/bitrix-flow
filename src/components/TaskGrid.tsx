@@ -363,10 +363,10 @@ export default function TaskGrid({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Поиск задач…"
-              className="h-8 w-full sm:w-56 lg:w-[32rem] xl:w-[40rem]"
+              className="h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-24" aria-label="Статус"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32" aria-label="Статус"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все статусы</SelectItem>
                 <SelectItem value="overdue">Просрочено</SelectItem>
@@ -374,7 +374,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-              <SelectTrigger className="w-28" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все исполнители</SelectItem>
                 {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
@@ -382,7 +382,7 @@ export default function TaskGrid({
             </Select>
             {showProject && (
               <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="w-32" aria-label="Проект"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-40" aria-label="Проект"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все проекты</SelectItem>
                   {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
@@ -390,7 +390,7 @@ export default function TaskGrid({
               </Select>
             )}
             <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
-              <SelectTrigger className="w-28" aria-label="Группировка"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40" aria-label="Группировка"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без группировки</SelectItem>
                 <SelectItem value="stage">По фазе</SelectItem>
