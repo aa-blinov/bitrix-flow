@@ -7,6 +7,7 @@ export interface BxTask {
   priority: TaskPriority;
   assigneeId?: string;
   assigneeName?: string;
+  assigneeAvatar?: string;
   createdDate: string;
   updatedDate: string;
   dueDate?: string;

@@ -123,6 +123,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     priority: mapBxPriority(bxTask.priority),
     assigneeId: bxTask.responsibleId,
     assigneeName: bxTask.responsibleName,
+    assigneeAvatar: bxTask.responsibleIcon,
     createdDate: bxTask.createdDate,
     updatedDate: bxTask.changedDate,
     dueDate: bxTask.deadline,

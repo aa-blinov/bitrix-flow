@@ -198,6 +198,7 @@ export default function KanbanBoard() {
     s.selectedTaskId ? tasks.find((t) => t.id === s.selectedTaskId) : null,
   );
   const currentProject = projects.find((p) => p.id === selectedProjectId);
+  const avatarByUserId = new Map(users.map((user) => [user.id, user.icon]));
 
   useEffect(() => {
     if (stages.length > 0 && !stages.find((s) => s.id === activeColumn)) {
@@ -478,6 +479,7 @@ export default function KanbanBoard() {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                       onDragStart={handleDragStart}
                       onClick={() => setSelectedTask(task.id)}
                       isDragging={draggedTask === task.id}
@@ -538,6 +540,7 @@ export default function KanbanBoard() {
                   <TaskCard
                     key={task.id}
                     task={task}
+                    avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                     onDragStart={handleDragStart}
                     onClick={() => setSelectedTask(task.id)}
                     isDragging={draggedTask === task.id}
@@ -779,11 +782,13 @@ function InlineAddForm({
 
 function TaskCard({
   task,
+  avatarUrl,
   onDragStart,
   onClick,
   isDragging,
 }: {
   task: BxTask;
+  avatarUrl?: string;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onClick: () => void;
   isDragging: boolean;
@@ -862,12 +867,21 @@ function TaskCard({
         </div>
 
         {task.assigneeName && (
-          <div
-            className={`w-6 h-6 rounded-full ${getAvatarColor(task.assigneeName)} text-white text-[10px] font-semibold flex items-center justify-center ring-2 ring-card shrink-0`}
-            title={task.assigneeName}
-          >
-            {getInitials(task.assigneeName)}
-          </div>
+          avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={task.assigneeName}
+              title={task.assigneeName}
+              className="size-6 shrink-0 rounded-full object-cover ring-2 ring-card"
+            />
+          ) : (
+            <div
+              className={`w-6 h-6 rounded-full ${getAvatarColor(task.assigneeName)} text-white text-[10px] font-semibold flex items-center justify-center ring-2 ring-card shrink-0`}
+              title={task.assigneeName}
+            >
+              {getInitials(task.assigneeName)}
+            </div>
+          )
         )}
       </div>
     </Card>
