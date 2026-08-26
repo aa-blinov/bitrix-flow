@@ -491,8 +491,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         className="hidden overflow-x-auto border-b bg-background lg:block"
       >
         <div className="flex min-w-max gap-4 px-4 py-2 xl:gap-5">
-          {allStages.map((stage) => <div key={stage.id} className="h-px w-[16rem] xl:w-[18rem]" />)}
-          {orphanTasks.length > 0 && <div className="h-px w-[16rem] xl:w-[18rem]" />}
+          {allStages.map((stage) => <div key={stage.id} className="h-px w-[14rem] xl:w-[15rem]" />)}
+          {orphanTasks.length > 0 && <div className="h-px w-[14rem] xl:w-[15rem]" />}
         </div>
       </div>
 
@@ -513,7 +513,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             return (
               <Card
                 key={stage.id}
-                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors lg:w-[16rem] xl:w-[18rem] ${
+                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors lg:w-[14rem] xl:w-[15rem] ${
                   isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
@@ -568,7 +568,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
           {orphanTasks.length > 0 && (
             <Card
-              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 lg:w-[16rem] xl:w-[18rem]"
+              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
               onDragOver={(e) => handleDragOver(e, 'orphan')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => {
