@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import LoadingState from '@/components/LoadingState';
+import BitrixText from '@/components/BitrixText';
+import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
@@ -95,19 +97,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      return new Date(dateStr).toLocaleDateString('ru-RU', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  const formatDate = (dateStr: string) => (dateStr ? formatBitrixDateTime(dateStr) : '');
 
   const priorityOptions = [
     { value: 'low', label: 'Низкий' },
@@ -202,7 +192,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       setEditValue(task.description);
                     }}
                   >
-                    {task.description || (
+                    {task.description ? (
+                      <BitrixText text={task.description} />
+                    ) : (
                       <span className="text-muted-foreground">Добавить описание…</span>
                     )}
                   </div>
@@ -311,25 +303,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           <span className="font-medium text-sm text-foreground">{c.authorName}</span>
                           <span className="text-xs text-muted-foreground">{formatDate(c.createdDate)}</span>
                         </div>
-                        <p className="text-foreground/80 text-sm pl-8">{c.text}</p>
+                        <p className="text-foreground/80 text-sm pl-8"><BitrixText text={c.text} /></p>
                       </div>
                     ))
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex items-end gap-2">
                   <Textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Написать комментарий…"
-                    rows={2}
-                    className="flex-1 resize-none"
+                    rows={4}
+                    className="min-h-32 flex-1 resize-y"
                   />
                   <Button
                     onClick={handleAddComment}
                     disabled={!comment.trim()}
                     size="icon"
-                    className="h-auto"
+                    className="h-10 shrink-0"
                   >
                     <Send size={16} />
                   </Button>
