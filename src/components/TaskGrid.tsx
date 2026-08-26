@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
-import { BxTask, PRIORITY_LABELS } from '@/types/bitrix';
+import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { needsDeadlineAttention } from '@/lib/task-urgency';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
@@ -225,10 +225,12 @@ export default function TaskGrid({
   tasks,
   showProject = false,
   title,
+  initialStatus = 'all',
 }: {
   tasks: BxTask[];
   showProject?: boolean;
   title?: string;
+  initialStatus?: string;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
@@ -246,6 +248,9 @@ export default function TaskGrid({
   );
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -263,7 +268,14 @@ export default function TaskGrid({
     };
     const needle = query.trim().toLocaleLowerCase('ru');
     return tasks
-      .filter((task) => !needle || `${task.title} ${task.id} ${task.description}`.toLocaleLowerCase('ru').includes(needle))
+      .filter((task) => {
+        if (statusFilter === 'overdue') {
+          if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date()) return false;
+        } else if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+        if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
+        if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter) return false;
+        return !needle || `${task.title} ${task.id} ${task.description}`.toLocaleLowerCase('ru').includes(needle);
+      })
       .sort((left, right) => {
         for (const sort of sorts) {
           const leftValue = value(left, sort.key);
@@ -275,7 +287,7 @@ export default function TaskGrid({
         }
         return 0;
       });
-  }, [projectById, query, sorts, tasks]);
+  }, [assigneeFilter, projectById, projectFilter, query, showProject, sorts, statusFilter, tasks]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
@@ -296,10 +308,12 @@ export default function TaskGrid({
     new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
   ).sort((left, right) => left - right);
 
+  useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
+
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [query, sorts, groupBy, tasks]);
+  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, tasks]);
 
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
@@ -361,26 +375,41 @@ export default function TaskGrid({
     <>
       <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
         <CardHeader className="gap-3 border-b bg-muted/30 px-4 py-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Поиск задач…"
-                className="h-8 w-52"
-              />
-              <select
-                value={groupBy}
-                onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}
-                className={controlClass + ' w-auto bg-background'}
-                aria-label="Группировка"
-              >
-                <option value="none">Без группировки</option>
-                <option value="stage">По фазе</option>
-                <option value="assignee">По исполнителю</option>
+          <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Поиск задач…"
+              className="h-8 w-full sm:w-56"
+            />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Статус">
+              <option value="all">Все статусы</option>
+              <option value="overdue">Просрочено</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Исполнитель">
+              <option value="all">Все исполнители</option>
+              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+            </select>
+            {showProject && (
+              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Проект">
+                <option value="all">Все проекты</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
-            </div>
+            )}
+            <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)} className={controlClass + ' w-auto bg-background'} aria-label="Группировка">
+              <option value="none">Без группировки</option>
+              <option value="stage">По фазе</option>
+              <option value="assignee">По исполнителю</option>
+            </select>
+            {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
+              <Button variant="ghost" size="sm" onClick={() => {
+                setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
+              }}>
+                Сбросить
+              </Button>
+            )}
           </div>
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
