@@ -40,6 +40,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     addComment,
     addTimeEntry,
     users,
+    tasks,
     subtasks,
     loadSubtasks,
     createTask,
@@ -72,9 +73,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     }
   };
 
-  const handleAddTime = () => {
+  const handleAddTime = async () => {
     if (timeHours > 0) {
-      addTimeEntry(task.id, timeHours, timeDesc);
+      await addTimeEntry(task.id, timeHours, timeDesc);
       setTimeHours(1);
       setTimeDesc('');
       setShowTimeEntry(false);
@@ -124,7 +125,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     >
       <DialogContent
         showCloseButton={false}
-        className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 lg:top-0 lg:left-auto lg:right-0 lg:h-dvh lg:max-h-none lg:w-[42rem] lg:max-w-none lg:translate-x-0 lg:translate-y-0 lg:rounded-none lg:rounded-l-xl"
+        className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 lg:top-0 lg:left-auto lg:right-0 lg:flex lg:h-dvh lg:max-h-none lg:w-[52rem] lg:max-w-none lg:translate-x-0 lg:translate-y-0 lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-none lg:rounded-l-xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
@@ -152,7 +153,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Main */}
             <div className="md:col-span-2 space-y-4">
@@ -448,6 +449,33 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       )}
                     </div>
 
+                    {/* Parent task */}
+                    <div>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Layers size={12} /> Родительская задача
+                      </label>
+                      <Select
+                        value={task.parentId || 'root'}
+                        onValueChange={(value) =>
+                          void handleUpdateField('parentId', value === 'root' ? '' : value)
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="root">Корневая задача</SelectItem>
+                          {tasks
+                            .filter((candidate) => candidate.id !== task.id)
+                            .map((candidate) => (
+                              <SelectItem key={candidate.id} value={candidate.id}>
+                                {candidate.title}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Estimate */}
                     <div>
                       <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
@@ -459,17 +487,21 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           min="0"
                           step="0.5"
                           className="w-full"
-                          value={task.estimate}
-                          onChange={(e) =>
-                            handleUpdateField('estimate', parseFloat(e.target.value) || 0)
-                          }
-                          onBlur={() => setEditingField(null)}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => handleUpdateField('estimate', parseFloat(editValue) || 0)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void handleUpdateField('estimate', parseFloat(editValue) || 0);
+                          }}
                           autoFocus
                         />
                       ) : (
                         <p
                           className="font-medium text-foreground cursor-pointer hover:bg-muted rounded px-1 -mx-1"
-                          onClick={() => setEditingField('estimate')}
+                          onClick={() => {
+                            setEditValue(String(task.estimate));
+                            setEditingField('estimate');
+                          }}
                         >
                           {task.estimate > 0 ? `${task.estimate} ч` : 'Без оценки'}
                         </p>

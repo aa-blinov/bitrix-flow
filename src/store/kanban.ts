@@ -368,26 +368,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   loadTaskDetails: async (taskId: string) => {
     set({ isLoadingTask: true });
 
-    // Comments are visible immediately after the task modal opens. Do not make
-    // them wait for the slower time-log and subtask requests.
-    try {
-      const comments = await fetchTaskComments(taskId);
-      set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                comments: comments.map((c) => ({ ...c, taskId })),
-              }
-            : t,
-        ),
-        isLoadingTask: false,
-      }));
-    } catch (err: any) {
-      set({ isLoadingTask: false });
-    }
+    // Независимые REST-вызовы запускаем вместе: журнал времени не должен
+    // ждать медленную загрузку комментариев из чата Bitrix24.
+    const commentsPromise = fetchTaskComments(taskId);
+    const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
 
-    void Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)])
+    void detailsPromise
       .then(([timeLog, subtaskList]) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -407,6 +393,28 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         }));
       })
       .catch(() => {});
+
+    try {
+      const comments = await commentsPromise;
+      set((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                comments: comments.map((comment) => ({
+                  ...comment,
+                  taskId,
+                  authorName:
+                    comment.authorName || state.users.find((user) => user.id === comment.authorId)?.name || 'Пользователь',
+                })),
+              }
+            : t,
+        ),
+        isLoadingTask: false,
+      }));
+    } catch {
+      set({ isLoadingTask: false });
+    }
   },
 
   setFilters: (newFilters) => {

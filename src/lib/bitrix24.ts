@@ -498,7 +498,7 @@ export async function fetchTaskComments(taskId: string): Promise<Bx24Comment[]> 
     const comments = (dialog?.messages || []).map((message: any): Bx24Comment => ({
       id: String(message.id || message.ID),
       authorId: String(message.author_id || message.authorId || message.AUTHOR_ID || ''),
-      authorName: message.author_name || message.authorName || 'Unknown',
+      authorName: message.author_name || message.authorName || '',
       text: message.text || message.TEXT || '',
       createdDate: message.date || message.DATE || '',
     }));
@@ -520,7 +520,7 @@ export async function fetchTaskTimeLog(taskId: string): Promise<Bx24TimeEntry[]>
     const entries = (result || []).map((el: any): Bx24TimeEntry => ({
       id: el.ID,
       userId: el.USER_ID,
-      userName: el.USER_NAME || 'Unknown',
+      userName: el.USER_NAME || '',
       date: el.DATE_PLAN || el.CREATED_DATE || '',
       seconds: parseInt(el.SECONDS) || 0,
       description: el.COMMENT_TEXT || '',
