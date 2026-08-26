@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { needsDeadlineAttention } from '@/lib/task-urgency';
+import { getBitrixTaskUrl } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
@@ -64,7 +65,15 @@ function EditableTitle({ task }: { task: BxTask }) {
         className="h-8 border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
       />
       <div className="mt-1 flex gap-2 px-1 text-xs text-muted-foreground">
-        <span>#{task.id}</span>
+        <a
+          href={getBitrixTaskUrl(task.id)}
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-primary hover:underline"
+          onClick={(event) => event.stopPropagation()}
+        >
+          #{task.id}
+        </a>
         {task.parentId && <span>↳ подзадача</span>}
       </div>
     </div>

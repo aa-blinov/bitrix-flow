@@ -34,6 +34,10 @@ export function getProjectColor(name: string): string {
   return PROJECT_COLORS[hashProjectName(name) % PROJECT_COLORS.length];
 }
 
+export function getBitrixTaskUrl(taskId: string): string {
+  return `https://eora.bitrix24.ru/company/personal/user/0/tasks/task/view/${encodeURIComponent(taskId)}/`;
+}
+
 export function getProjectInitials(name: string): string {
   return name
     .split(/\s+/)
