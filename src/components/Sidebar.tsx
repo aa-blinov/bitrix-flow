@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, ListChecks, Search, Menu, Inbox, LogOut, TableProperties } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Search, Menu, Inbox, LogOut, TableProperties, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -27,6 +27,7 @@ export default function Sidebar() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const pathname = usePathname();
 
   const myTasks = getMyTasks();
@@ -39,6 +40,8 @@ export default function Sidebar() {
     .filter((project) =>
       project.name.toLocaleLowerCase('ru').includes(projectQuery.toLocaleLowerCase('ru')),
     );
+  const activeProjects = sortedProjects.filter((project) => !project.isArchived);
+  const archivedProjects = sortedProjects.filter((project) => project.isArchived);
 
   function getInitials(name: string): string {
     return name
@@ -149,32 +152,61 @@ export default function Sidebar() {
             {isLoading ? (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Загрузка…</div>
             ) : sortedProjects.length > 0 ? (
-              sortedProjects.map((project) => {
-                const active = pathname === `/projects/${project.id}`;
-                return (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                      active
-                        ? 'bg-muted text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
-                      aria-hidden="true"
+              <>
+                {activeProjects.map((project) => {
+                  const active = pathname === `/projects/${project.id}`;
+                  return (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                        active
+                          ? 'bg-muted text-foreground font-medium'
+                          : 'text-muted-foreground hover:bg-muted'
+                      }`}
                     >
-                      {getProjectInitials(project.name)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                    {project.isArchived && (
-                      <span className="rounded border px-1 py-0.5 text-[10px] text-muted-foreground">Архив</span>
-                    )}
-                  </Link>
-                );
-              })
+                      <span
+                        className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                        aria-hidden="true"
+                      >
+                        {getProjectInitials(project.name)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    </Link>
+                  );
+                })}
+                {archivedProjects.length > 0 && (
+                  <div className="mt-2 border-t pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setArchiveOpen((open) => !open)}
+                      className="flex w-full items-center gap-1 px-2.5 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronDown className={`size-3 transition-transform ${archiveOpen || projectQuery ? 'rotate-180' : ''}`} />
+                      Архив ({archivedProjects.length})
+                    </button>
+                    {(archiveOpen || projectQuery) && archivedProjects.map((project) => {
+                      const active = pathname === `/projects/${project.id}`;
+                      return (
+                        <Link
+                          key={project.id}
+                          href={`/projects/${project.id}`}
+                          onClick={() => setMobileOpen(false)}
+                          className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
+                            active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <span className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}>
+                            {getProjectInitials(project.name)}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Нет проектов</div>
             )}

@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { getProjectColor, getProjectInitials } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -171,8 +172,11 @@ export default function DashboardPage() {
                   href={`/projects/${project.id}`}
                   className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors group"
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <FolderKanban size={16} className="text-white" />
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${getProjectColor(project.name)}`}
+                    aria-hidden="true"
+                  >
+                    {getProjectInitials(project.name)}
                   </div>
 
                   <div className="flex-1 min-w-0">
