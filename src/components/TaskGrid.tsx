@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { needsDeadlineAttention } from '@/lib/task-urgency';
@@ -243,10 +243,12 @@ export default function TaskGrid({
     [tasks, selectedTaskId],
   );
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
+  const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const orderedTasks = useMemo(() => {
@@ -261,13 +263,16 @@ export default function TaskGrid({
       if (key === 'updated') return task.updatedDate;
       return task.title;
     };
+    const needle = query.trim().toLocaleLowerCase('ru');
     return tasks
       .filter((task) => {
         if (statusFilter === 'overdue') {
           if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date()) return false;
         } else if (statusFilter !== 'all' && task.status !== statusFilter) return false;
         if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
-        return !showProject || projectFilter === 'all' || task.projectId === projectFilter;
+        if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter) return false;
+        const searchText = `${task.title} ${task.id} ${task.description} ${projectById[task.projectId]?.name || ''} ${task.assigneeName || ''} ${stages.find((stage) => stage.id === task.stageId)?.name || ''}`;
+        return !needle || searchText.toLocaleLowerCase('ru').includes(needle);
       })
       .sort((left, right) => {
         for (const sort of sorts) {
@@ -280,10 +285,23 @@ export default function TaskGrid({
         }
         return 0;
       });
-  }, [assigneeFilter, projectFilter, showProject, sorts, statusFilter, tasks]);
+  }, [assigneeFilter, projectById, projectFilter, query, showProject, sorts, stages, statusFilter, tasks]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const groupedPageTasks = useMemo(() => {
+    if (groupBy === 'none') return [{ label: '', tasks: pageTasks }];
+    const labels = groupBy === 'stage'
+      ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
+      : Object.fromEntries(users.map((user) => [user.id, user.name]));
+    return Object.entries(
+      pageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
+        const key = groupBy === 'stage' ? task.stageId : task.assigneeId || '';
+        (groups[labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен')] ||= []).push(task);
+        return groups;
+      }, {}),
+    ).map(([label, groupedTasks]) => ({ label, tasks: groupedTasks }));
+  }, [groupBy, pageTasks, stages, users]);
   const pageNumbers = Array.from(
     new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
   ).sort((left, right) => left - right);
@@ -293,7 +311,7 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [assigneeFilter, projectFilter, sorts, statusFilter, tasks]);
+  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, tasks]);
 
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
@@ -373,6 +391,12 @@ export default function TaskGrid({
         <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Поиск задач…"
+              className="h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
+            />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32" aria-label="Статус"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -397,9 +421,17 @@ export default function TaskGrid({
                 </SelectContent>
               </Select>
             )}
-            {(statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all') && (
+            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
+              <SelectTrigger className="w-40" aria-label="Группировка"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Без группировки</SelectItem>
+                <SelectItem value="stage">По фазе</SelectItem>
+                <SelectItem value="assignee">По исполнителю</SelectItem>
+              </SelectContent>
+            </Select>
+            {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
               <Button variant="ghost" size="sm" onClick={() => {
-                setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all');
+                setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
               }}>
                 Сбросить
               </Button>
@@ -508,7 +540,16 @@ export default function TaskGrid({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pageTasks.map((task) => (
+                {groupedPageTasks.map((group) => (
+                  <Fragment key={group.label || 'all'}>
+                    {groupBy !== 'none' && (
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell colSpan={showProject ? 10 : 9} className="font-medium text-foreground">
+                          {group.label} · {group.tasks.length}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {group.tasks.map((task) => (
                       <TableRow
                         key={task.id}
                         className={
@@ -542,6 +583,8 @@ export default function TaskGrid({
                           <TaskActions task={task} />
                         </TableCell>
                       </TableRow>
+                    ))}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
@@ -550,7 +593,7 @@ export default function TaskGrid({
         {pageCount > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
-              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, orderedTasks.length)} из {orderedTasks.length}
+              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из {tasks.length}
             </p>
             <div className="flex items-center gap-1" aria-label="Пагинация">
               <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}>
