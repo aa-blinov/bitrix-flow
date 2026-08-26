@@ -46,6 +46,9 @@ export default function DashboardPage() {
           void loadProjects(true).then(() => {
             const firstProject = useKanbanStore.getState().projects[0];
             if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
+            // Глобальные счётчики в сайдбаре (Просрочено/В работе/Готово)
+            // должны считаться по всем проектам — грузим в фоне.
+            void useKanbanStore.getState().loadAllTasks();
           });
         } else {
           router.replace('/connection-help');

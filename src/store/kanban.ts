@@ -101,6 +101,7 @@ interface KanbanStore {
   getDashboardStats: () => DashboardStats;
   getMyTasks: () => BxTask[];
   getOverdueTasks: () => BxTask[];
+  getGlobalCounts: () => { overdue: number; in_progress: number; done: number };
 }
 
 function convertBxTask(bxTask: Bx24Task): BxTask {
@@ -303,6 +304,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       );
       const mapped = results.flatMap((r) => r.tasks.map(convertBxTask));
       set({ allTasks: mapped, isLoadingAllTasks: false });
+      // Stale-while-revalidate: кладём в localStorage, чтобы после F5
+      // счётчики в сайдбаре показались мгновенно из кэша.
+      persist.saveToStorage({
+        allTasks: mapped,
+        allTasksCachedAt: Date.now(),
+      });
     } catch (err: any) {
       set({ error: err.message, isLoadingAllTasks: false });
     }
@@ -585,11 +592,17 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     if (typeof window === 'undefined') return;
     try {
       const data = persist.loadFromStorage();
+      // Stale-while-revalidate: поднимаем allTasks из localStorage сразу,
+      // чтобы счётчики в сайдбаре не показывали 0 пока идёт фоновая загрузка.
+      const cachedAt = data.allTasksCachedAt ?? 0;
+      const staleMs = Date.now() - cachedAt;
+      const allTasks = staleMs < 10 * 60 * 1000 ? data.allTasks || [] : [];
       set({
         projects: data.projects || [],
         users: data.users || [],
         currentUser: data.currentUser || get().currentUser,
         stages: data.stages ? (Object.values(data.stages).flat() as any[]) : [],
+        allTasks,
         // Route navigation may select a project before the layout effect restores
         // warm cache. Never let an old cache clear the active route selection.
         selectedProjectId: get().selectedProjectId || data.selectedProjectId || null,
@@ -663,10 +676,33 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       return new Date(t.dueDate) < new Date();
     });
   },
+
+  // Глобальные счётчики по всем доступным задачам (allTasks).
+  // Используются в сайдбаре, чтобы статусы «Просрочено / В работе / Готово»
+  // совпадали с тем, что видит пользователь на /all-tasks.
+  getGlobalCounts: () => {
+    const now = new Date();
+    const all = get().allTasks;
+    return {
+      overdue: all.filter(
+        (t) => t.dueDate && t.status !== 'done' && new Date(t.dueDate) < now,
+      ).length,
+      in_progress: all.filter((t) => t.status === 'in_progress').length,
+      done: all.filter((t) => t.status === 'done').length,
+    };
+  },
 }));
 
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     useKanbanStore.getState().loadProjects();
   }, 100);
+  // Если в localStorage нет свежего кэша allTasks — догружаем сразу,
+  // иначе loadProjects().then() в (dashboard)/page.tsx сам подтянет свежее.
+  setTimeout(() => {
+    const state = useKanbanStore.getState();
+    if (state.projects.length > 0 && state.allTasks.length === 0) {
+      void state.loadAllTasks();
+    }
+  }, 300);
 }

@@ -164,7 +164,7 @@ export default function MyTasksPage() {
               );
             })
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center text-muted-foreground py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
                 <CheckCircle2 size={32} className="text-muted-foreground/70" />
               </div>

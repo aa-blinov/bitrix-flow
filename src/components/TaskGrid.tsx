@@ -66,7 +66,7 @@ function EditableTitle({ task }: { task: BxTask }) {
   );
 }
 
-function FieldControls({ task, compact = false }: { task: BxTask; compact?: boolean }) {
+function FieldControls({ task, compact = false, readOnly = false }: { task: BxTask; compact?: boolean; readOnly?: boolean }) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
   const label = (name: string, child: React.ReactNode) => (
     <label className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-xs text-muted-foreground">
@@ -154,6 +154,20 @@ function FieldControls({ task, compact = false }: { task: BxTask; compact?: bool
       </span>
     </div>
   );
+  if (readOnly) {
+    return (
+      <>
+        <TableCell className="text-muted-foreground">
+          {task.stageId === '0' ? '—' : `#${task.stageId}`}
+        </TableCell>
+        <TableCell>{assignee}</TableCell>
+        <TableCell>{priority}</TableCell>
+        <TableCell>{deadline}</TableCell>
+        <TableCell className="text-muted-foreground">{task.estimate} ч</TableCell>
+      </>
+    );
+  }
+
   if (!compact)
     return (
       <>
@@ -205,9 +219,22 @@ function TaskActions({ task }: { task: BxTask }) {
   );
 }
 
-export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
+export default function TaskGrid({
+  tasks,
+  showProject = false,
+  title,
+}: {
+  tasks: BxTask[];
+  showProject?: boolean;
+  title?: string;
+}) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
+  const projects = useKanbanStore((state) => state.projects);
+  const projectById = useMemo(
+    () => Object.fromEntries(projects.map((p) => [p.id, p])),
+    [projects],
+  );
   const selectedTask = useMemo(
     () => tasks.find((task) => task.id === selectedTaskId),
     [tasks, selectedTaskId],
@@ -220,19 +247,22 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
             <Circle className="size-6" />
           </div>
           <div>
-            <h2 className="font-semibold">В этой выборке нет задач</h2>
+            <h2 className="font-semibold">Нет задач</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Измените фильтры или создайте первую задачу на доске.
+              {showProject
+                ? 'По выбранным фильтрам ничего не найдено.'
+                : 'Измените фильтры или создайте первую задачу на доске.'}
             </p>
           </div>
         </CardContent>
       </Card>
     );
+  const isReadOnly = showProject;
   return (
     <>
       <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
         <CardHeader className="border-b bg-muted/30 px-4 py-4 sm:px-6">
-          <CardTitle className="text-base">Задачи проекта</CardTitle>
+          <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
@@ -257,10 +287,15 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
                   </Button>
                   <div className="min-w-0 flex-1">
                     <EditableTitle task={task} />
+                    {showProject && (
+                      <div className="mt-1 px-1 text-xs text-muted-foreground">
+                        {projectById[task.projectId]?.name ?? '—'}
+                      </div>
+                    )}
                   </div>
                   <TaskActions task={task} />
                 </div>
-                <FieldControls task={task} compact />
+                <FieldControls task={task} compact readOnly={isReadOnly} />
               </article>
             ))}
           </div>
@@ -269,6 +304,7 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-72">Задача</TableHead>
+                  {showProject && <TableHead>Проект</TableHead>}
                   <TableHead>Фаза</TableHead>
                   <TableHead>Исполнитель</TableHead>
                   <TableHead>Приоритет</TableHead>
@@ -289,7 +325,12 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
                     <TableCell>
                       <EditableTitle task={task} />
                     </TableCell>
-                    <FieldControls task={task} />
+                    {showProject && (
+                      <TableCell className="text-muted-foreground max-w-48 truncate">
+                        {projectById[task.projectId]?.name ?? `—`}
+                      </TableCell>
+                    )}
+                    <FieldControls task={task} readOnly={isReadOnly} />
                     <TableCell className="text-muted-foreground">
                       {task.actualTime || 0} ч
                     </TableCell>
