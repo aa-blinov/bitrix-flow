@@ -28,6 +28,7 @@ import {
 const controlClass =
   'h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-input focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30';
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
+const PAGE_SIZE = 50;
 
 function EditableTitle({ task }: { task: BxTask }) {
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
@@ -239,6 +240,18 @@ export default function TaskGrid({
     () => tasks.find((task) => task.id === selectedTaskId),
     [tasks, selectedTaskId],
   );
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageTasks = tasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageNumbers = Array.from(
+    new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
+  ).sort((left, right) => left - right);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tasks]);
+
   if (tasks.length === 0)
     return (
       <Card className="mx-4 mt-5 border-dashed sm:mx-6">
@@ -266,7 +279,7 @@ export default function TaskGrid({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
-            {tasks.map((task) => (
+            {pageTasks.map((task) => (
               <article
                 key={task.id}
                 className={`space-y-3 p-4 ${task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}`}
@@ -317,7 +330,7 @@ export default function TaskGrid({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((task) => (
+                {pageTasks.map((task) => (
                   <TableRow
                     key={task.id}
                     className={task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}
@@ -343,6 +356,38 @@ export default function TaskGrid({
             </Table>
           </div>
         </CardContent>
+        {pageCount > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
+            <p className="text-sm text-muted-foreground">
+              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из {tasks.length}
+            </p>
+            <div className="flex items-center gap-1" aria-label="Пагинация">
+              <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}>
+                Первая
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((value) => value - 1)} disabled={page === 1}>
+                Назад
+              </Button>
+              {pageNumbers.map((number) => (
+                <Button
+                  key={number}
+                  variant={number === page ? 'default' : 'outline'}
+                  size="sm"
+                  className="w-9 px-0"
+                  onClick={() => setPage(number)}
+                >
+                  {number}
+                </Button>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setPage((value) => value + 1)} disabled={page === pageCount}>
+                Вперёд
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(pageCount)} disabled={page === pageCount}>
+                Последняя
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
       {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
     </>
