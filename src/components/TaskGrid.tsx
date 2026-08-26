@@ -9,6 +9,7 @@ import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,49 +83,29 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
     ? stages
     : [{ id: task.stageId, name: task.status === 'done' ? 'Завершена' : 'Без фазы' }];
   const phase = (
-    <select
-      aria-label="Фаза"
-      value={task.stageId}
-      onChange={(event) => void moveTaskToStage(task.id, event.target.value)}
-      className={controlClass}
-    >
-      {stageOptions.map((stage) => (
-        <option key={stage.id} value={stage.id}>
-          {stage.name}
-        </option>
-      ))}
-    </select>
+    <Select value={task.stageId} onValueChange={(value) => void moveTaskToStage(task.id, value)}>
+      <SelectTrigger className="w-full" aria-label="Фаза"><SelectValue /></SelectTrigger>
+      <SelectContent>{stageOptions.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}</SelectContent>
+    </Select>
   );
   const assignee = (
-    <select
-      aria-label="Исполнитель"
-      value={task.assigneeId || ''}
-      onChange={(event) => void updateTaskField(task.id, 'assigneeId', event.target.value)}
-      className={controlClass}
-    >
-      <option value="">Не назначен</option>
-      {users.map((user) => (
-        <option key={user.id} value={user.id}>
-          {user.name}
-        </option>
-      ))}
-    </select>
+    <Select value={task.assigneeId || 'unassigned'} onValueChange={(value) => void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)}>
+      <SelectTrigger className="w-full" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="unassigned">Не назначен</SelectItem>
+        {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
   const priority = (
-    <select
-      aria-label="Приоритет"
-      value={task.priority}
-      onChange={(event) => void updateTaskField(task.id, 'priority', event.target.value)}
-      className={controlClass}
-    >
-      {Object.entries(PRIORITY_LABELS)
-        .filter(([key]) => key !== 'critical')
-        .map(([key, item]) => (
-          <option key={key} value={key}>
-            {item.label}
-          </option>
+    <Select value={task.priority} onValueChange={(value) => void updateTaskField(task.id, 'priority', value)}>
+      <SelectTrigger className="w-full" aria-label="Приоритет"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {Object.entries(PRIORITY_LABELS).filter(([key]) => key !== 'critical').map(([key, item]) => (
+          <SelectItem key={key} value={key}>{item.label}</SelectItem>
         ))}
-    </select>
+      </SelectContent>
+    </Select>
   );
   const deadline = (
     <Input
@@ -384,26 +365,38 @@ export default function TaskGrid({
               placeholder="Поиск задач…"
               className="h-8 w-full sm:w-56 lg:w-[32rem] xl:w-[40rem]"
             />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass + ' w-24 truncate bg-background'} aria-label="Статус">
-              <option value="all">Все статусы</option>
-              <option value="overdue">Просрочено</option>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className={controlClass + ' w-28 truncate bg-background'} aria-label="Исполнитель">
-              <option value="all">Все исполнители</option>
-              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-            </select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-24" aria-label="Статус"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все статусы</SelectItem>
+                <SelectItem value="overdue">Просрочено</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+              <SelectTrigger className="w-28" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все исполнители</SelectItem>
+                {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
             {showProject && (
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className={controlClass + ' w-32 truncate bg-background'} aria-label="Проект">
-                <option value="all">Все проекты</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger className="w-32" aria-label="Проект"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все проекты</SelectItem>
+                  {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             )}
-            <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)} className={controlClass + ' w-28 truncate bg-background'} aria-label="Группировка">
-              <option value="none">Без группировки</option>
-              <option value="stage">По фазе</option>
-              <option value="assignee">По исполнителю</option>
-            </select>
+            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
+              <SelectTrigger className="w-28" aria-label="Группировка"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Без группировки</SelectItem>
+                <SelectItem value="stage">По фазе</SelectItem>
+                <SelectItem value="assignee">По исполнителю</SelectItem>
+              </SelectContent>
+            </Select>
             {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
               <Button variant="ghost" size="sm" onClick={() => {
                 setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
@@ -415,26 +408,18 @@ export default function TaskGrid({
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
               <span className="font-medium">Выбрано: {selectedIds.size}</span>
-              <select
-                defaultValue=""
-                onChange={(event) => event.target.value && applyBulk('assigneeId', event.target.value)}
-                className={controlClass + ' w-auto bg-background'}
-                aria-label="Назначить исполнителя"
-              >
-                <option value="" disabled>Назначить исполнителя…</option>
-                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-              </select>
-              <select
-                defaultValue=""
-                onChange={(event) => event.target.value && applyBulk('status', event.target.value)}
-                className={controlClass + ' w-auto bg-background'}
-                aria-label="Сменить статус"
-              >
-                <option value="" disabled>Сменить статус…</option>
-                <option value="new">Новая</option>
-                <option value="in_progress">В работе</option>
-                <option value="done">Готово</option>
-              </select>
+              <Select onValueChange={(value) => applyBulk('assigneeId', value)}>
+                <SelectTrigger className="w-44" aria-label="Назначить исполнителя"><SelectValue placeholder="Назначить…" /></SelectTrigger>
+                <SelectContent>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select onValueChange={(value) => applyBulk('status', value)}>
+                <SelectTrigger className="w-40" aria-label="Сменить статус"><SelectValue placeholder="Сменить статус…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">Новая</SelectItem>
+                  <SelectItem value="in_progress">В работе</SelectItem>
+                  <SelectItem value="done">Готово</SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Снять выбор</Button>
             </div>
           )}
