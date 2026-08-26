@@ -6,6 +6,88 @@ import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 
+// ponytail: чтение/запись MongoDB-кэша задач прямо из прокси-роута.
+// Клиентский fetchTasksByProject (в src/lib/bitrix24.ts) тоже ходит в tasksCacheGet,
+// но в браузере это пустая трата — пусть proxy отдаёт кэш из MongoDB напрямую.
+async function mongoTasksCacheRead(
+  method: string,
+  params: Record<string, string>,
+): Promise<any | null> {
+  if (method !== 'tasks.task.list') return null;
+  // "Активные задачи" или любые другие фильтры — скип, кэш только полный список.
+  if (params['filter[!STATUS]']) return null;
+
+  const groupId = params['filter[GROUP_ID]'] || params['filter%5BGROUP_ID%5D'];
+  if (!groupId) return null;
+
+  const since = params['filter[>=CHANGED_DATE]'] || params['filter%5B%3E%3DCHANGED_DATE%5D'];
+  console.log(`[mongo-cache-read] ${method} groupId=${groupId} since=${since ?? '-'}`);
+
+  try {
+    const db = await getDb();
+    if (since) {
+      const docs = await db.collection('tasks').find({ groupId }).toArray();
+      console.log(`  → ${docs.length} docs in mongo for ${groupId}`);
+      if (docs.length === 0) return null;
+      const sinceDate = new Date(since);
+      const tasks = docs
+        .map((d) => d.data)
+        .filter((t: any) => {
+          const changed = t.changedDate || t.CHANGED_DATE;
+          return changed && new Date(changed) >= sinceDate;
+        });
+      console.log(`  → ${tasks.length} tasks after date filter`);
+      return { tasks, next: undefined, total: tasks.length };
+    }
+    const docs = await db.collection('tasks').find({ groupId }).toArray();
+    console.log(`  → ${docs.length} docs in mongo for ${groupId}`);
+    if (docs.length === 0) return null;
+    return {
+      tasks: docs.map((d) => d.data),
+      next: undefined,
+      total: docs.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function mongoTasksCacheWrite(
+  method: string,
+  params: Record<string, string>,
+  data: any,
+): Promise<void> {
+  if (method !== 'tasks.task.list') return;
+  // Если стоит filter[!STATUS]=5 — это запрос "только активные", его
+  // кэшировать нельзя (любая мутация может перевести задачу в done).
+  if (params['filter[!STATUS]']) return;
+
+  const groupId = params['filter[GROUP_ID]'] || params['filter%5BGROUP_ID%5D'];
+  if (!groupId) return; // без проекта — неклассифицированные задачи, скип
+
+  const tasks = data?.tasks || (Array.isArray(data) ? data : []);
+  if (!Array.isArray(tasks) || tasks.length === 0) return;
+
+  try {
+    const db = await getDb();
+    const ops = tasks.map((t: any) => {
+      const id = String(t.id ?? t.ID);
+      return {
+        updateOne: {
+          filter: { groupId, id },
+          update: {
+            $set: { groupId, id, data: t, updated_at: new Date() },
+          },
+          upsert: true,
+        },
+      };
+    });
+    await db.collection('tasks').bulkWrite(ops, { ordered: false });
+  } catch (e) {
+    console.error('[mongo-cache-write] failed', e);
+  }
+}
+
 // ТОЛЬКО OAuth. Webhook полностью убран.
 // + Server-side in-memory cache (30 сек на запрос, 5 мин на projects/users)
 
@@ -183,16 +265,31 @@ async function handleRequest(req: NextRequest, method: string) {
       result = await callBitrix24(token, method, params);
       invalidateByPrefix(`${memberId}:`);
     } else {
-      const cacheKey = `${memberId}:${method}:${JSON.stringify(params)}`;
-      result = await serverCache(
-        cacheKey,
-        async () => {
-          return await callBitrix24(token, method, params);
-        },
-        getCacheTtl(method),
-      );
-    }
-  } catch (error) {
+      // ponytail: на холодном старте serverCache пуст, и каждый запрос летит
+      // в Битрикс напрямую (10+ проектов × 200-800мс = секунды на первый рендер).
+      // Сначала проверяем MongoDB-кэш (он переживает рестарт) — если данные есть,
+      // Битрикс вообще не трогаем. Это и есть причина медленного первого апдейта.
+      console.log(`[proxy] handleRequest method=${method} params=${JSON.stringify(params)}`);
+      const t0 = Date.now();
+      const cached = await mongoTasksCacheRead(method, params);
+      if (cached) {
+        console.log(`[proxy] ${method} HIT mongo ${cached.tasks?.length ?? '?'} tasks (${Date.now() - t0}ms)`);
+        result = cached;
+      } else {
+        console.log(`[proxy] ${method} MISS mongo, going to serverCache/bitrix`);
+        const cacheKey = `${memberId}:${method}:${JSON.stringify(params)}`;
+        result = await serverCache(
+          cacheKey,
+          async () => {
+            const data = await callBitrix24(token, method, params);
+            // Фоновая запись в MongoDB — чтобы следующий запрос попал в кэш
+            void mongoTasksCacheWrite(method, params, data).catch(() => {});
+            return data;
+          },
+          getCacheTtl(method),
+        );
+      }
+    }  } catch (error) {
     const message = error instanceof Error ? error.message : 'Bitrix24 request failed';
     const timedOut = message === 'BITRIX24_TIMEOUT';
     return NextResponse.json(

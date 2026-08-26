@@ -288,6 +288,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   // суммарно чтобы не задушить Битрикс.
   loadAllTasks: async () => {
     const { projects } = get();
+    console.log(`[loadAllTasks] starting, projects=${projects.length}`);
     if (projects.length === 0) {
       set({ allTasks: [], isLoadingAllTasks: false });
       return;
@@ -301,12 +302,18 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           fetchTasksByProject(p.id, {
             limit: 50,
             status: 'all',
-          }).catch(() => ({ tasks: [], hasMore: false, total: 0 })),
+          }).catch((e) => {
+            console.error(`[loadAllTasks] fetch failed for ${p.id}:`, e);
+            return { tasks: [], hasMore: false, total: 0 };
+          }),
         ),
       );
+      const counts = results.map((r, i) => `${projects[i].id}=${r.tasks.length}`).join(',');
+      console.log(`[loadAllTasks] done, total=${results.reduce((s, r) => s + r.tasks.length, 0)} (${counts})`);
       const mapped = results.flatMap((r) => r.tasks.map(convertBxTask));
       set({ allTasks: mapped, isLoadingAllTasks: false });
     } catch (err: any) {
+      console.error('[loadAllTasks] error:', err);
       set({ error: err.message, isLoadingAllTasks: false });
     }
   },
