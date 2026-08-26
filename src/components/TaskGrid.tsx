@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, ExternalLink, MoreHorizontal, Minus, Plus } from 'lucide-react';
+import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
@@ -134,23 +134,18 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
     />
   );
   const estimate = (
-    <div className="flex items-center">
-      <Input
-        aria-label="План, часы"
-        type="number"
-        min="0"
-        step="0.5"
-        value={task.estimate || ''}
-        onChange={(event) => void updateTaskField(task.id, 'estimate', Number(event.target.value) || 0)}
-        className={controlClass + ' rounded-r-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'}
-      />
-      <Button variant="outline" size="icon-sm" className="rounded-none border-l-0" aria-label="Уменьшить план" onClick={() => void updateTaskField(task.id, 'estimate', Math.max(0, task.estimate - 0.5))}>
-        <Minus />
-      </Button>
-      <Button variant="outline" size="icon-sm" className="rounded-l-none border-l-0" aria-label="Увеличить план" onClick={() => void updateTaskField(task.id, 'estimate', task.estimate + 0.5)}>
-        <Plus />
-      </Button>
-    </div>
+    <Input
+      aria-label="План, часы"
+      type="number"
+      min="0"
+      step="0.5"
+      value={task.estimate || ''}
+      onChange={(event) => {
+        const value = event.currentTarget.valueAsNumber;
+        if (Number.isFinite(value) && value >= 0) void updateTaskField(task.id, 'estimate', value);
+      }}
+      className={controlClass}
+    />
   );
   if (readOnly) {
     return (
