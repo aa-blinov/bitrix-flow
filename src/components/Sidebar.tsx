@@ -68,7 +68,7 @@ export default function Sidebar() {
         href={href}
         onClick={() => setMobileOpen(false)}
         className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-          active ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50'
+          active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
         }`}
       >
         <Icon size={16} className={active ? 'text-gray-700' : 'text-gray-400'} />
@@ -85,7 +85,7 @@ export default function Sidebar() {
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <span className="text-white font-bold text-sm">B</span>
         </div>
-        <span className="ml-2.5 font-semibold text-gray-900 text-sm">Bitrix24 PM</span>
+        <span className="ml-2.5 text-sm font-semibold text-foreground">Bitrix24 PM</span>
       </div>
 
       {/* Navigation */}
@@ -143,8 +143,8 @@ export default function Sidebar() {
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
                     pathname === `/projects/${project.id}`
-                      ? 'bg-gray-100 text-gray-900 font-medium'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   <div
@@ -174,7 +174,7 @@ export default function Sidebar() {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
+            <p className="truncate text-sm font-medium text-foreground">{currentUser.name}</p>
           </div>
           <Notifications />
           <ThemeToggle />

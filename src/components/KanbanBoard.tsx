@@ -154,6 +154,12 @@ export default function KanbanBoard() {
   const allStages = (stages.length > 0 ? stages : defaultStages)
     .slice()
     .sort((a, b) => a.sort - b.sort);
+  const newStageId = allStages.find((stage) => stage.systemType === 'NEW')?.id;
+  // Older Bitrix tasks may retain stage "0" after a project switches to
+  // custom stages. Render them in the project's system "New" phase instead
+  // of dropping them from the board.
+  const displayedStageId = (task: BxTask) =>
+    task.stageId === '0' && newStageId ? newStageId : task.stageId;
 
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -281,9 +287,9 @@ export default function KanbanBoard() {
   }
 
   return (
-    <div className="flex flex-col bg-white">
+    <div className="flex flex-col bg-background">
       {/* Header */}
-      <header className="px-6 py-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+      <header className="sticky top-0 z-10 border-b bg-background px-6 py-4">
         <div className="flex items-center justify-end gap-2">
           <Button
             variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
@@ -306,7 +312,7 @@ export default function KanbanBoard() {
 
         {/* Filters panel */}
         {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 animate-slideUp">
+          <div className="mt-3 animate-slideUp rounded-lg border bg-muted/50 p-3">
             <div className="flex flex-wrap gap-2">
               <Select
                 value={filters.assigneeId}
@@ -396,10 +402,10 @@ export default function KanbanBoard() {
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto bg-gray-50">
+      <div className="flex-1 overflow-x-auto bg-muted/30">
         <div className="flex gap-3 p-6 min-w-max h-full">
           {allStages.map((stage: any) => {
-            const colTasks = filteredTasks.filter((t) => t.stageId === stage.id);
+            const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
             const colors = getStageColor(stage.color);
             const isDragOver = dragOverColumn === stage.id;
 
@@ -407,17 +413,19 @@ export default function KanbanBoard() {
               <Card
                 key={stage.id}
                 className={`w-72 flex-shrink-0 gap-0 py-0 transition-colors ${
-                  isDragOver ? 'border-blue-400 bg-blue-50/30' : 'border-gray-200'
+                  isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, stage.id)}
               >
                 {/* Column header */}
-                <div className="px-3 py-2.5 flex items-center gap-2 border-b border-gray-100">
+                <div className="flex items-center gap-2 border-b px-3 py-2.5">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
-                  <h3 className="text-sm font-semibold text-gray-700 flex-1">{stage.name}</h3>
-                  <span className="text-xs text-gray-500 font-medium">{colTasks.length}</span>
+                  <h3 className="flex-1 text-sm font-semibold text-foreground">{stage.name}</h3>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {colTasks.length}
+                  </span>
                   <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
                     <MoreHorizontal size={14} />
                   </Button>

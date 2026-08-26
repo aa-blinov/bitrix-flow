@@ -72,7 +72,7 @@ export default function ProjectPage() {
     projectTasks.length > 0 || (!isLoading && selectedProjectId === projectId);
   if (projects.length === 0 || !hasCurrentProjectData) {
     return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-3 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Загружаем проекты…</p>
@@ -83,7 +83,7 @@ export default function ProjectPage() {
 
   if (!currentProject) {
     return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Проект не найден</p>
           <Button onClick={() => router.push('/')} className="px-4">
@@ -95,7 +95,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30" suppressHydrationWarning>
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
       {/* Project Header */}
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
         <div className="px-4 lg:px-6 pt-3 pb-2">

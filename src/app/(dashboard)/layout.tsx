@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [rehydrate, setMemberId]);
 
   return (
-    <div className="bg-white min-h-screen" suppressHydrationWarning>
+    <div className="min-h-screen bg-background" suppressHydrationWarning>
       <Sidebar />
       <main className="md:pl-64 min-h-screen">{children}</main>
     </div>
