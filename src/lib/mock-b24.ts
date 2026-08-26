@@ -469,6 +469,34 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return { tasks, next: undefined, total: tasks.length };
     }
 
+    case 'tasks.task.add': {
+      // Мок-режим: создаём задачу локально и возвращаем id, чтобы фича
+      // inline-добавления была тестируема без реального Битрикса.
+      const fields = JSON.parse(params.fields || '{}');
+      const id = `mock-${Date.now()}`;
+      const task = {
+        id,
+        title: fields.TITLE || 'Новая задача',
+        description: fields.DESCRIPTION || '',
+        status: '2',
+        subStatus: '-1',
+        priority: fields.PRIORITY || '1',
+        createdDate: new Date().toISOString(),
+        changedDate: new Date().toISOString(),
+        timeEstimate: '0',
+        timeSpentInLogs: '0',
+        groupId: String(fields.GROUP_ID || '0'),
+        responsibleId: String(fields.RESPONSIBLE_ID || '0'),
+        creatorId: '1',
+        commentsCount: '0',
+        stageId: fields.STAGE_ID || '0',
+      };
+      const groupId = String(fields.GROUP_ID || '0');
+      if (!ALL_TASKS[groupId]) ALL_TASKS[groupId] = [];
+      ALL_TASKS[groupId].push(task);
+      return { task: { id } };
+    }
+
     case 'tasks.task.get': {
       const id = params.taskId || params['filter[ID]'];
       const all = Object.values(ALL_TASKS).flat();

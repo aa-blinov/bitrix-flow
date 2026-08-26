@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { PRIORITY_LABELS, BxTask } from '@/types/bitrix';
+import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
 import { useState, useEffect, useRef } from 'react';
 import TaskModal from './TaskModal';
 import {
@@ -191,6 +191,8 @@ export default function KanbanBoard() {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [activeColumn, setActiveColumn] = useState<string>(stages[0]?.id || 'new');
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  // Inline "+ задача" в колонке: stageId открытой формы. null = нигде не открыта.
+  const [inlineAddStage, setInlineAddStage] = useState<string | null>(null);
 
   const selectedTask = useKanbanStore((s) =>
     s.selectedTaskId ? tasks.find((t) => t.id === s.selectedTaskId) : null,
@@ -276,6 +278,22 @@ export default function KanbanBoard() {
         setShowAddModal(false);
       }
     }
+  };
+
+  // Inline-add: создать задачу прямо в указанной колонке. Не показывает
+  // модалку, форма появляется прямо в колонке. После успеха возвращает true,
+  // чтобы InlineAddForm очистил input и остался открытым (для batch-добавления).
+  const handleInlineAdd = async (
+    stageId: string,
+    data: { title: string; assigneeId: string; priority: string },
+  ): Promise<boolean> => {
+    const created = await createTask({
+      title: data.title,
+      responsibleId: data.assigneeId || currentUser.id || users[0]?.id || '',
+      priority: data.priority,
+      stageId,
+    });
+    return !!created;
   };
 
   const openAddDialog = () => {
@@ -466,17 +484,31 @@ export default function KanbanBoard() {
                     />
                   ))}
 
-                  {colTasks.length === 0 && !isLoading && (
+                  {inlineAddStage === stage.id && (
+                    <InlineAddForm
+                      stageId={stage.id}
+                      defaultAssigneeId={currentUser.id}
+                      users={users}
+                      onSubmit={(data) => handleInlineAdd(stage.id, data)}
+                      onCancel={() => setInlineAddStage(null)}
+                    />
+                  )}
+                </div>
+
+                {/* Column footer — inline add button (visible всегда) */}
+                {inlineAddStage !== stage.id && (
+                  <div className="border-t p-1.5">
                     <Button
-                      onClick={openAddDialog}
-                      variant="outline"
-                      className="h-auto w-full border-2 border-dashed py-6 text-muted-foreground"
+                      onClick={() => setInlineAddStage(stage.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start gap-1.5 text-muted-foreground hover:text-foreground"
                     >
                       <Plus size={14} />
                       Добавить задачу
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
               </Card>
             );
           })}
@@ -652,6 +684,95 @@ export default function KanbanBoard() {
       </Dialog>
 
       {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+    </div>
+  );
+}
+
+function InlineAddForm({
+  stageId,
+  onSubmit,
+  onCancel,
+  users,
+  defaultAssigneeId,
+}: {
+  stageId: string;
+  onSubmit: (data: { title: string; assigneeId: string; priority: string }) => Promise<boolean>;
+  onCancel: () => void;
+  users: Bx24User[];
+  defaultAssigneeId?: string;
+}) {
+  const [title, setTitle] = useState('');
+  const [assigneeId, setAssigneeId] = useState(defaultAssigneeId || '');
+  const [priority, setPriority] = useState('medium');
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const submit = async () => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    const ok = await onSubmit({ title: trimmed, assigneeId, priority });
+    setSubmitting(false);
+    if (ok) {
+      setTitle('');
+      inputRef.current?.focus();
+    }
+  };
+
+  return (
+    <div className="rounded-md border bg-background p-2 shadow-sm">
+      <Input
+        ref={inputRef}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            void submit();
+          }
+          if (e.key === 'Escape') onCancel();
+        }}
+        placeholder="Название задачи…"
+        className="h-8 text-sm"
+        disabled={submitting}
+      />
+      <div className="mt-2 flex items-center gap-1">
+        <select
+          value={assigneeId}
+          onChange={(e) => setAssigneeId(e.target.value)}
+          className="h-7 flex-1 rounded border bg-background px-2 text-xs text-foreground"
+          disabled={submitting}
+          aria-label="Исполнитель"
+        >
+          <option value="">Без исполнителя</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className="h-7 w-24 rounded border bg-background px-2 text-xs text-foreground"
+          aria-label="Приоритет"
+        >
+          <option value="low">Низкий</option>
+          <option value="medium">Обычный</option>
+          <option value="high">Высокий</option>
+        </select>
+      </div>
+      <div className="mt-2 flex items-center justify-end gap-1">
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={submitting}>
+          Отмена
+        </Button>
+        <Button size="sm" onClick={() => void submit()} disabled={!title.trim() || submitting}>
+          {submitting ? '…' : 'Создать'}
+        </Button>
+      </div>
     </div>
   );
 }
