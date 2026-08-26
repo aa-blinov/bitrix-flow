@@ -42,6 +42,10 @@ interface KanbanStore {
   selectedTaskId: string | null;
   currentUser: { id: string; name: string; photo?: string };
 
+  // Все задачи по всем доступным проектам (для /all-tasks)
+  allTasks: BxTask[];
+  isLoadingAllTasks: boolean;
+
   // Фильтры
   filters: TaskFilters;
 
@@ -65,6 +69,7 @@ interface KanbanStore {
   loadProjects: (force?: boolean) => Promise<void>;
   loadStages: (entityId: string) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
+  loadAllTasks: () => Promise<void>;
   loadMoreTasks: () => Promise<void>;
   loadSubtasks: (parentId: string) => Promise<void>;
   loadTaskDetails: (taskId: string) => Promise<void>;
@@ -145,6 +150,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   selectedProjectId: null,
   selectedTaskId: null,
   currentUser: { id: '', name: 'Не определён' },
+  allTasks: [],
+  isLoadingAllTasks: false,
   filters: defaultFilters,
   searchQuery: '',
   searchResults: [],
@@ -272,6 +279,32 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       });
     } catch (err: any) {
       set({ error: err.message, isLoading: false, isLoadingMore: false });
+    }
+  },
+
+  // Загружает задачи по всем доступным проектам (для /all-tasks).
+  // Прогоняем проекты параллельно, лимит per-project=50, обрезаем до ~500
+  // суммарно чтобы не задушить Битрикс.
+  loadAllTasks: async () => {
+    const { projects } = get();
+    if (projects.length === 0) {
+      set({ allTasks: [], isLoadingAllTasks: false });
+      return;
+    }
+    set({ isLoadingAllTasks: true });
+    try {
+      const results = await Promise.all(
+        projects.map((p) =>
+          fetchTasksByProject(p.id, {
+            limit: 50,
+            status: 'all',
+          }).catch(() => ({ tasks: [], hasMore: false, total: 0 })),
+        ),
+      );
+      const mapped = results.flatMap((r) => r.tasks.map(convertBxTask));
+      set({ allTasks: mapped, isLoadingAllTasks: false });
+    } catch (err: any) {
+      set({ error: err.message, isLoadingAllTasks: false });
     }
   },
 

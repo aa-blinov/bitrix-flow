@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, Search, Menu, Inbox, LogOut, TableProperties } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Search, Menu, Inbox, LogOut, TableProperties } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -96,30 +96,32 @@ export default function Sidebar() {
           <NavItem href="/" icon={LayoutDashboard} label="Главная" />
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
           <NavItem href="/my-tasks" icon={Inbox} label="Мои задачи" badge={myTasks.length} />
+          <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
           <NavItem href="/search" icon={Search} label="Поиск" />
         </div>
 
-        {/* Quick stats */}
+        {/* Quick stats — кликабельные, ведут на /all-tasks с фильтром по статусу */}
         <div>
           <h3 className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Статус
           </h3>
           <div className="space-y-0.5 rounded-lg bg-muted/50 p-1">
-            <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="flex-1 text-muted-foreground">Просрочено</span>
-              <span className="text-xs text-muted-foreground font-medium">{overdueTasks.length}</span>
-            </div>
-            <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
-              <div className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="flex-1 text-muted-foreground">В работе</span>
-              <span className="text-xs text-muted-foreground font-medium">{inProgress}</span>
-            </div>
-            <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="flex-1 text-muted-foreground">Готово</span>
-              <span className="text-xs text-muted-foreground font-medium">{completed}</span>
-            </div>
+            {([
+              { href: '/all-tasks?status=overdue', dot: 'bg-red-500', label: 'Просрочено', value: overdueTasks.length },
+              { href: '/all-tasks?status=in_progress', dot: 'bg-blue-500', label: 'В работе', value: inProgress },
+              { href: '/all-tasks?status=done', dot: 'bg-green-500', label: 'Готово', value: completed },
+            ] as const).map((row) => (
+              <Link
+                key={row.label}
+                href={row.href}
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 px-2 py-1.5 text-sm rounded transition-colors hover:bg-muted/80"
+              >
+                <div className={`w-2 h-2 rounded-full ${row.dot}`} />
+                <span className="flex-1 text-muted-foreground">{row.label}</span>
+                <span className="text-xs text-muted-foreground font-medium">{row.value}</span>
+              </Link>
+            ))}
           </div>
         </div>
 
