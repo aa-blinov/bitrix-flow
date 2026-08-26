@@ -21,13 +21,11 @@ async function mongoTasksCacheRead(
   if (!groupId) return null;
 
   const since = params['filter[>=CHANGED_DATE]'] || params['filter%5B%3E%3DCHANGED_DATE%5D'];
-  console.log(`[mongo-cache-read] ${method} groupId=${groupId} since=${since ?? '-'}`);
 
   try {
     const db = await getDb();
     if (since) {
       const docs = await db.collection('tasks').find({ groupId }).toArray();
-      console.log(`  → ${docs.length} docs in mongo for ${groupId}`);
       if (docs.length === 0) return null;
       const sinceDate = new Date(since);
       const tasks = docs
@@ -36,11 +34,9 @@ async function mongoTasksCacheRead(
           const changed = t.changedDate || t.CHANGED_DATE;
           return changed && new Date(changed) >= sinceDate;
         });
-      console.log(`  → ${tasks.length} tasks after date filter`);
       return { tasks, next: undefined, total: tasks.length };
     }
     const docs = await db.collection('tasks').find({ groupId }).toArray();
-    console.log(`  → ${docs.length} docs in mongo for ${groupId}`);
     if (docs.length === 0) return null;
     return {
       tasks: docs.map((d) => d.data),
@@ -269,14 +265,10 @@ async function handleRequest(req: NextRequest, method: string) {
       // в Битрикс напрямую (10+ проектов × 200-800мс = секунды на первый рендер).
       // Сначала проверяем MongoDB-кэш (он переживает рестарт) — если данные есть,
       // Битрикс вообще не трогаем. Это и есть причина медленного первого апдейта.
-      console.log(`[proxy] handleRequest method=${method} params=${JSON.stringify(params)}`);
-      const t0 = Date.now();
       const cached = await mongoTasksCacheRead(method, params);
       if (cached) {
-        console.log(`[proxy] ${method} HIT mongo ${cached.tasks?.length ?? '?'} tasks (${Date.now() - t0}ms)`);
         result = cached;
       } else {
-        console.log(`[proxy] ${method} MISS mongo, going to serverCache/bitrix`);
         const cacheKey = `${memberId}:${method}:${JSON.stringify(params)}`;
         result = await serverCache(
           cacheKey,
@@ -289,7 +281,8 @@ async function handleRequest(req: NextRequest, method: string) {
           getCacheTtl(method),
         );
       }
-    }  } catch (error) {
+    }
+  } catch (error) {
     const message = error instanceof Error ? error.message : 'Bitrix24 request failed';
     const timedOut = message === 'BITRIX24_TIMEOUT';
     return NextResponse.json(
@@ -302,8 +295,6 @@ async function handleRequest(req: NextRequest, method: string) {
   }
 
   // Маппим ответы для совместимости с UI (lowercase keys)
-  console.log('[proxy] method:', method, 'isArray:', Array.isArray(result), 'type:', typeof result);
-
   if (method === 'task.stages.get') {
     const stages = Array.isArray(result) ? result : Object.values(result || {});
     const mapped = stages.map((s: any) => ({

@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
 import {
@@ -24,7 +24,6 @@ export default function ProjectPage() {
   const projectId = (params?.id as string) || '0';
   const notificationTaskId = searchParams.get('task');
   const [view, setView] = useState('kanban');
-  const hasRequestedFreshData = useRef(false);
 
   const {
     projects,
@@ -32,17 +31,15 @@ export default function ProjectPage() {
     setSelectedProject,
     setSelectedTask,
     tasks,
-    loadProjects,
-    isLoading,
+    isRehydrated,
   } = useKanbanStore();
 
-  // Always refresh after navigation. Cached data is kept only as a warm cache;
-  // the page remains covered by one loader until the current project is ready.
   useEffect(() => {
-    if (hasRequestedFreshData.current) return;
-    hasRequestedFreshData.current = true;
-    void loadProjects(true);
-  }, [loadProjects]);
+    const state = useKanbanStore.getState();
+    if (isRehydrated && state.projects.length === 0 && !state.isLoading) {
+      void state.loadProjects();
+    }
+  }, [isRehydrated]);
 
   useEffect(() => {
     if (projectId && projectId !== selectedProjectId) {
@@ -67,15 +64,13 @@ export default function ProjectPage() {
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
 
-  // Wait for projects to load
-  const hasCurrentProjectData =
-    projectTasks.length > 0 || (!isLoading && selectedProjectId === projectId);
-  if (projects.length === 0 || !hasCurrentProjectData) {
+  if (projects.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-3 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Загружаем проекты…</p>
+      <div className="min-h-screen space-y-6 p-4 md:p-8 animate-pulse" aria-label="Загрузка проекта">
+        <div className="h-8 w-72 rounded bg-muted" />
+        <div className="h-20 rounded-lg bg-muted" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[0, 1, 2, 3].map((column) => <div key={column} className="h-72 rounded-lg bg-muted" />)}
         </div>
       </div>
     );

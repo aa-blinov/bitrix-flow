@@ -27,7 +27,7 @@ export function loadFromStorage(): CacheData {
 export function saveToStorage(data: CacheData) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadFromStorage(), ...data }));
   } catch {}
 }
 

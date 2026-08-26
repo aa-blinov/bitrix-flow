@@ -26,31 +26,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [rehydrate, setMemberId]);
 
-  // Фоновая подписка на серверный SSE — когда бэкграунд-синк (src/lib/background-sync.ts)
-  // обновляет задачи в MongoDB, сервер пушит сюда 'tasks-changed', и мы тихо
-  // догружаем свежие данные в стор, без рефреша страницы.
-  useEffect(() => {
-    if (!memberId) return;
-    let cancelled = false;
-    const handleEvent = (event: any) => {
-      if (cancelled) return;
-      if (event?.type === 'tasks-changed') {
-        void useKanbanStore.getState().loadAllTasks();
-      }
-    };
-    // Лёгкий пуллер прямо в браузере (страховка на случай если SSE не подключился)
-    const interval = setInterval(() => {
-      if (!cancelled) void useKanbanStore.getState().loadAllTasks();
-    }, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [memberId]);
-
   useSSE(memberId, (event) => {
     if (event?.type === 'tasks-changed') {
-      void useKanbanStore.getState().loadAllTasks();
+      const state = useKanbanStore.getState();
+      if (!state.isLoadingAllTasks) void state.loadAllTasks();
     }
   });
 

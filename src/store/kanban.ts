@@ -66,6 +66,7 @@ interface KanbanStore {
   isLoading: boolean;
   isLoadingMore: boolean;
   isLoadingTask: boolean;
+  isRehydrated: boolean;
   error: string | null;
 
   // Actions
@@ -147,7 +148,8 @@ const defaultFilters: TaskFilters = {
   showCompleted: true, // По умолчанию показываем завершённые
 };
 
-// Загружаем из localStorage только на клиенте через rehydrate() чтобы избежать hydration mismatch
+// Кэш поднимается в DashboardLayout после гидратации. Не читаем localStorage
+// при инициализации стора: сервер и первый клиентский рендер должны совпадать.
 export const useKanbanStore = create<KanbanStore>((set, get) => ({
   projects: [],
   tasks: [],
@@ -168,6 +170,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   isLoading: false,
   isLoadingMore: false,
   isLoadingTask: false,
+  isRehydrated: false,
   error: null,
 
   setSelectedProject: (id) => {
@@ -195,13 +198,6 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
   loadProjects: async (force = false) => {
     const { projects } = get();
-    console.log(
-      '[STORE] loadProjects START',
-      'projects=',
-      projects.length,
-      'memberId=',
-      typeof window !== 'undefined' ? localStorage.getItem('bitrix_member_id') : 'no-window',
-    );
 
     // Защита от дублирующих вызовов
     if (!force && projects.length > 0) return;
@@ -596,8 +592,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         // Route navigation may select a project before the layout effect restores
         // warm cache. Never let an old cache clear the active route selection.
         selectedProjectId: get().selectedProjectId || data.selectedProjectId || null,
+        isRehydrated: true,
       });
-    } catch {}
+    } catch {
+      set({ isRehydrated: true });
+    }
   },
 
   setMemberId: (id: string) => {
@@ -682,9 +681,3 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     };
   },
 }));
-
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    useKanbanStore.getState().loadProjects();
-  }, 100);
-}
