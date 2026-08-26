@@ -294,6 +294,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
     set({ isLoadingAllTasks: true });
     try {
+      // fetchTasksByProject берёт данные из серверного кэша MongoDB
+      // (tasksCacheGet), а при miss-е сам фетчит из Битрикса и кладёт обратно.
       const results = await Promise.all(
         projects.map((p) =>
           fetchTasksByProject(p.id, {
@@ -304,12 +306,6 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       );
       const mapped = results.flatMap((r) => r.tasks.map(convertBxTask));
       set({ allTasks: mapped, isLoadingAllTasks: false });
-      // Stale-while-revalidate: кладём в localStorage, чтобы после F5
-      // счётчики в сайдбаре показались мгновенно из кэша.
-      persist.saveToStorage({
-        allTasks: mapped,
-        allTasksCachedAt: Date.now(),
-      });
     } catch (err: any) {
       set({ error: err.message, isLoadingAllTasks: false });
     }
@@ -592,17 +588,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     if (typeof window === 'undefined') return;
     try {
       const data = persist.loadFromStorage();
-      // Stale-while-revalidate: поднимаем allTasks из localStorage сразу,
-      // чтобы счётчики в сайдбаре не показывали 0 пока идёт фоновая загрузка.
-      const cachedAt = data.allTasksCachedAt ?? 0;
-      const staleMs = Date.now() - cachedAt;
-      const allTasks = staleMs < 10 * 60 * 1000 ? data.allTasks || [] : [];
       set({
         projects: data.projects || [],
         users: data.users || [],
         currentUser: data.currentUser || get().currentUser,
         stages: data.stages ? (Object.values(data.stages).flat() as any[]) : [],
-        allTasks,
         // Route navigation may select a project before the layout effect restores
         // warm cache. Never let an old cache clear the active route selection.
         selectedProjectId: get().selectedProjectId || data.selectedProjectId || null,
@@ -697,12 +687,4 @@ if (typeof window !== 'undefined') {
   setTimeout(() => {
     useKanbanStore.getState().loadProjects();
   }, 100);
-  // Если в localStorage нет свежего кэша allTasks — догружаем сразу,
-  // иначе loadProjects().then() в (dashboard)/page.tsx сам подтянет свежее.
-  setTimeout(() => {
-    const state = useKanbanStore.getState();
-    if (state.projects.length > 0 && state.allTasks.length === 0) {
-      void state.loadAllTasks();
-    }
-  }, 300);
 }

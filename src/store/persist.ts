@@ -1,8 +1,8 @@
-// Persistent store для projects, users и задач через localStorage.
-// Стратегия stale-while-revalidate: на старте мгновенно показываем то,
-// что было в кэше (счётчики не мигают «0»); в фоне догружаем свежее из API.
+// Persistent store для projects и users через localStorage.
+// Задачи НЕ кэшируем здесь — для них есть серверный кэш в MongoDB
+// (см. tasksCacheGet/Set в src/lib/mongo.ts), который живёт дольше и
+// разделяется между всеми клиентами одного портала.
 const STORAGE_KEY = 'bitrix-kanban-cache';
-const ALL_TASKS_TTL_MS = 10 * 60 * 1000; // 10 минут — после этого кэш считаем устаревшим
 
 interface CacheData {
   projects?: any[];
@@ -10,10 +10,6 @@ interface CacheData {
   currentUser?: { id: string; name: string; photo?: string };
   stages?: Record<string, any[]>;
   selectedProjectId?: string;
-  // Кэш задач по всем доступным проектам — для мгновенного отображения
-  // счётчиков и /all-tasks после F5.
-  allTasks?: any[];
-  allTasksCachedAt?: number;
 }
 
 export function loadFromStorage(): CacheData {
