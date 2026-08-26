@@ -29,7 +29,13 @@ import {
   mapBxPriority,
   secondsToHours,
   hoursToSeconds,
+  getMemberId,
 } from '@/lib/bitrix24';
+
+function getMemberIdHeader(): Record<string, string> {
+  const id = getMemberId();
+  return id ? { 'X-Member-Id': id } : {};
+}
 
 interface KanbanStore {
   // Данные
@@ -287,33 +293,20 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   // Прогоняем проекты параллельно, лимит per-project=50, обрезаем до ~500
   // суммарно чтобы не задушить Битрикс.
   loadAllTasks: async () => {
-    const { projects } = get();
-    console.log(`[loadAllTasks] starting, projects=${projects.length}`);
-    if (projects.length === 0) {
-      set({ allTasks: [], isLoadingAllTasks: false });
-      return;
-    }
     set({ isLoadingAllTasks: true });
     try {
-      // fetchTasksByProject берёт данные из серверного кэша MongoDB
-      // (tasksCacheGet), а при miss-е сам фетчит из Битрикса и кладёт обратно.
-      const results = await Promise.all(
-        projects.map((p) =>
-          fetchTasksByProject(p.id, {
-            limit: 50,
-            status: 'all',
-          }).catch((e) => {
-            console.error(`[loadAllTasks] fetch failed for ${p.id}:`, e);
-            return { tasks: [], hasMore: false, total: 0 };
-          }),
-        ),
-      );
-      const counts = results.map((r, i) => `${projects[i].id}=${r.tasks.length}`).join(',');
-      console.log(`[loadAllTasks] done, total=${results.reduce((s, r) => s + r.tasks.length, 0)} (${counts})`);
-      const mapped = results.flatMap((r) => r.tasks.map(convertBxTask));
+      // Один server-side endpoint: сервер сначала читает MongoDB, для
+      // отсутствующих проектов параллельно фетчит из Битрикса, пишет обратно.
+      // На прогретом кэше — мгновенный read без обращения к Битриксу.
+      const res = await fetch('/api/tasks/all', {
+        headers: getMemberIdHeader(),
+      });
+      if (!res.ok) throw new Error(`tasks/all HTTP ${res.status}`);
+      const data = await res.json();
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const mapped = tasks.map(convertBxTask);
       set({ allTasks: mapped, isLoadingAllTasks: false });
     } catch (err: any) {
-      console.error('[loadAllTasks] error:', err);
       set({ error: err.message, isLoadingAllTasks: false });
     }
   },

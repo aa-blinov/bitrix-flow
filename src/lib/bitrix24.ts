@@ -212,7 +212,7 @@ export function hoursToSeconds(hours: number): number {
 }
 
 // Получить member_id текущего пользователя из localStorage или URL
-function getMemberId(): string {
+export function getMemberId(): string {
   if (typeof window === 'undefined') return '';
   try {
     const urlParams = new URLSearchParams(window.location.search);
