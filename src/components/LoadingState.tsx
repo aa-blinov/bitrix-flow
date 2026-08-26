@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LoadingState({
@@ -13,7 +14,7 @@ export default function LoadingState({
       className={cn('flex min-h-[60vh] items-center justify-center bg-background', className)}
     >
       <div className="text-center">
-        <div className="mx-auto mb-3 size-10 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-primary" />
+        <Loader2 className="mx-auto mb-3 size-10 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">{label}</p>
       </div>
     </div>
