@@ -18,8 +18,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn('font-sans', geist.variable)}>
-      <body className="h-full antialiased">{children}</body>
+    <html lang="en" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
+      <body className="h-full antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { try { const saved = localStorage.getItem('bitrix-flow-theme'); const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.classList.toggle('dark', dark); } catch {} })()`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

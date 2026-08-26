@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import Notifications from '@/components/Notifications';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function Sidebar() {
   const {
@@ -176,6 +177,7 @@ export default function Sidebar() {
             <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
           </div>
           <Notifications />
+          <ThemeToggle />
           <Button variant="ghost" size="icon-sm" onClick={logout} title="Выйти" aria-label="Выйти">
             <LogOut size={16} />
           </Button>

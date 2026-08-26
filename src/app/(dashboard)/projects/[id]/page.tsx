@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
 import {
   FolderKanban,
@@ -20,12 +20,21 @@ import { Button } from '@/components/ui/button';
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = (params?.id as string) || '0';
+  const notificationTaskId = searchParams.get('task');
   const [view, setView] = useState('kanban');
   const hasRequestedFreshData = useRef(false);
 
-  const { projects, selectedProjectId, setSelectedProject, tasks, loadProjects, isLoading } =
-    useKanbanStore();
+  const {
+    projects,
+    selectedProjectId,
+    setSelectedProject,
+    setSelectedTask,
+    tasks,
+    loadProjects,
+    isLoading,
+  } = useKanbanStore();
 
   // Always refresh after navigation. Cached data is kept only as a warm cache;
   // the page remains covered by one loader until the current project is ready.
@@ -48,6 +57,11 @@ export default function ProjectPage() {
     () => tasks.filter((t) => t.projectId === projectId),
     [tasks, projectId],
   );
+  useEffect(() => {
+    if (notificationTaskId && projectTasks.some((task) => task.id === notificationTaskId)) {
+      setSelectedTask(notificationTaskId);
+    }
+  }, [notificationTaskId, projectTasks, setSelectedTask]);
   const visibleTasks = getFilteredTasks();
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);

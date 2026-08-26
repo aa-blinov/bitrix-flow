@@ -96,7 +96,11 @@ export default function Notifications() {
             items.map((item) => (
               <Link
                 key={item.id}
-                href={item.projectId ? `/projects/${item.projectId}` : '/search'}
+                href={
+                  item.projectId && item.taskId
+                    ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
+                    : '/search'
+                }
                 onClick={() => setOpen(false)}
                 className="flex gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
               >
