@@ -32,6 +32,7 @@ import {
   hoursToSeconds,
   getMemberId,
 } from '@/lib/bitrix24';
+import { mapBitrixTaskStatus } from '@/lib/task-status';
 
 function getMemberIdHeader(): Record<string, string> {
   const id = getMemberId();
@@ -119,9 +120,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     projectId: bxTask.groupId,
     title: bxTask.title,
     description: bxTask.description,
-    // REST v2 returns the completed task status as "5", while the UI uses
-    // semantic status names for counters and filters.
-    status: bxTask.status === '5' ? 'done' : (bxTask.status as TaskStatus),
+    status: mapBitrixTaskStatus(bxTask.status),
     priority: mapBxPriority(bxTask.priority),
     assigneeId: bxTask.responsibleId,
     assigneeName: bxTask.responsibleName,
