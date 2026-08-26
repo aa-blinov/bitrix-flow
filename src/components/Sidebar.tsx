@@ -20,10 +20,7 @@ export default function Sidebar() {
     setSelectedProject,
     currentUser,
     isLoading,
-    allTasks,
-    isLoadingAllTasks,
     getMyTasks,
-    getGlobalCounts,
   } = useKanbanStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -32,10 +29,6 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   const myTasks = getMyTasks();
-  const { overdue: overdueCount, in_progress: inProgress, done: completed } = getGlobalCounts();
-  // Пока кэш allTasks пуст и данные в полёте — показываем «—», чтобы
-  // счётчик не врал «0» пока задачи ещё грузятся из Битрикса.
-  const countsPending = isLoadingAllTasks && allTasks.length === 0;
   const sortedProjects = [...projects]
     .sort((left, right) => left.name.localeCompare(right.name, 'ru', { sensitivity: 'base' }))
     .filter((project) =>
@@ -106,36 +99,6 @@ export default function Sidebar() {
           <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
         </div>
 
-        {/* Quick stats — кликабельные, ведут на /all-tasks с фильтром по статусу */}
-        <div>
-          <h3 className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Статус
-          </h3>
-          <div className="space-y-0.5 rounded-lg bg-muted/50 p-1">
-            {([
-              { href: '/all-tasks?status=overdue', dot: 'bg-red-500', label: 'Просрочено', value: overdueCount },
-              { href: '/all-tasks?status=in_progress', dot: 'bg-blue-500', label: 'В работе', value: inProgress },
-              { href: '/all-tasks?status=done', dot: 'bg-green-500', label: 'Готово', value: completed },
-            ] as const).map((row) => (
-              <Link
-                key={row.label}
-                href={row.href}
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2.5 px-2 py-1.5 text-sm rounded transition-colors hover:bg-muted/80"
-              >
-                <div className={`w-2 h-2 rounded-full ${row.dot}`} />
-                <span className="flex-1 text-muted-foreground">{row.label}</span>
-                <span
-                  className={`text-xs font-medium tabular-nums ${
-                    countsPending ? 'text-muted-foreground/50' : 'text-muted-foreground'
-                  }`}
-                >
-                  {countsPending ? '—' : row.value}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
 
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">

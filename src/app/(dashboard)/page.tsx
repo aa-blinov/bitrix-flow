@@ -19,7 +19,7 @@ import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, allTasks, loadProjects, isLoading, selectedProjectId, setSelectedProject } =
+  const { projects, allTasks, loadProjects, loadAllTasks, isLoading, selectedProjectId, setSelectedProject } =
     useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
   const hasBootstrapped = useRef(false);
@@ -48,16 +48,16 @@ export default function DashboardPage() {
           void loadProjects(true).then(() => {
             const firstProject = useKanbanStore.getState().projects[0];
             if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
-            // Не запускаем здесь loadAllTasks(): на холодном сервере это
-            // отправляло десятки запросов в Bitrix24 одновременно и задерживало
-            // первую доску. Счётчики обновит серверный sync/SSE.
+            // Список уже отдаётся из Mongo/task_mirror, поэтому не создаёт
+            // Bitrix fan-out и заполняет сводные карточки после доски.
+            void loadAllTasks();
           });
         } else {
           router.replace('/connection-help');
         }
       })
       .catch(() => router.replace('/connection-help'));
-  }, [loadProjects, router]);
+  }, [loadAllTasks, loadProjects, router]);
 
   if (isLoading || !selectedProjectId) {
     return <LoadingState label="Синхронизируем данные Bitrix24…" className="min-h-screen bg-muted/30" />;
