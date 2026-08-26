@@ -199,7 +199,11 @@ export default function Sidebar() {
       </Button>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-[86vw] max-w-sm p-0 md:hidden">
+        <SheetContent
+          side="left"
+          className="w-[86vw] max-w-sm p-0 md:hidden"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+        >
           <SidebarContent />
         </SheetContent>
       </Sheet>

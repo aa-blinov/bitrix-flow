@@ -4,6 +4,7 @@ import { Bell, CheckCircle2, MessageSquareText, Pencil, Trash2 } from 'lucide-re
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,8 @@ type Notice = {
   type: string;
   title: string;
   message: string;
+  taskId?: string;
+  projectId?: string;
   created_at?: string;
   createdAt?: string;
 };
@@ -91,16 +94,18 @@ export default function Notifications() {
         <div className="max-h-96 overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => (
-              <div
+              <Link
                 key={item.id}
-                className="flex gap-2 rounded-md px-2 py-2.5 text-sm hover:bg-muted"
+                href={item.projectId ? `/projects/${item.projectId}` : '/search'}
+                onClick={() => setOpen(false)}
+                className="flex gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
               >
                 <span className="mt-0.5">{icon(item.type)}</span>
                 <div className="min-w-0">
                   <p className="font-medium">{item.title}</p>
                   <p className="line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <p className="px-3 py-8 text-center text-sm text-muted-foreground">

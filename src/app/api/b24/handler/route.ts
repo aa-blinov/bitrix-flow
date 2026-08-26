@@ -86,9 +86,10 @@ async function enrichTaskTitle(memberId: string, details: ReturnType<typeof even
     const task = await bx24OAuth(memberId, 'tasks.task.get', { taskId: details.taskId });
     const taskTitle = task?.title || task?.TITLE;
     if (!taskTitle) return details;
+    const projectId = String(task?.group?.id || task?.groupId || task?.group_id || '');
     return details.type === 'comment_added'
-      ? { ...details, title: `Комментарий · ${taskTitle}` }
-      : { ...details, message: taskTitle };
+      ? { ...details, title: `Комментарий · ${taskTitle}`, projectId }
+      : { ...details, message: taskTitle, projectId };
   } catch {
     return details;
   }

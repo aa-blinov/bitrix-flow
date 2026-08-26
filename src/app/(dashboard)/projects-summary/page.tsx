@@ -31,9 +31,6 @@ type ProjectSummary = {
   comments: number;
   plannedHours: number;
   actualHours: number;
-  varianceHours: number;
-  decompositionWarnings: number;
-  decompositionVarianceHours: number;
   progress: number;
   changedAt: string | null;
 };
@@ -114,7 +111,7 @@ export default function ProjectsSummaryPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Сводка по проектам</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              План, факт и операционные риски по исполнительским задачам
+              План, факт и операционный статус по задачам проектов
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={isLoading}>
@@ -129,8 +126,7 @@ export default function ProjectsSummaryPage() {
               <div>
                 <CardTitle>Проекты</CardTitle>
                 <CardDescription>
-                  Полная история задач. План берётся из оценённых подзадач; если они не оценены — из
-                  родительской задачи.
+                  Полная история задач. План учитывает оценку задачи или её оценённых подзадач.
                 </CardDescription>
               </div>
               <Input
@@ -229,25 +225,16 @@ export default function ProjectsSummaryPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
-                          {hours(project.plannedHours)} / {hours(project.actualHours)}
+                        <div className="grid gap-0.5 text-sm">
+                          <span>
+                            <span className="text-muted-foreground">План: </span>
+                            <span className="font-medium">{hours(project.plannedHours)}</span>
+                          </span>
+                          <span>
+                            <span className="text-muted-foreground">Факт: </span>
+                            <span className="font-medium">{hours(project.actualHours)}</span>
+                          </span>
                         </div>
-                        <div
-                          className={
-                            project.varianceHours > 0
-                              ? 'text-xs text-destructive'
-                              : 'text-xs text-muted-foreground'
-                          }
-                        >
-                          {project.varianceHours > 0 ? '+' : ''}
-                          {hours(project.varianceHours)} отклонение
-                        </div>
-                        {project.decompositionWarnings > 0 && (
-                          <div className="mt-1 text-xs text-amber-700">
-                            Декомпозиция: {project.decompositionWarnings} ·{' '}
-                            {hours(project.decompositionVarianceHours)}
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex min-w-28 items-center gap-2">
