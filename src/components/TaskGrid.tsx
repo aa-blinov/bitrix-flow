@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { CheckCircle2, Circle, ExternalLink, MoreHorizontal, Minus, Plus } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
@@ -10,6 +10,7 @@ import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
@@ -129,21 +130,22 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
     />
   );
   const estimate = (
-    <div className="relative">
+    <div className="flex items-center">
       <Input
         aria-label="План, часы"
         type="number"
         min="0"
         step="0.5"
         value={task.estimate || ''}
-        onChange={(event) =>
-          void updateTaskField(task.id, 'estimate', Number(event.target.value) || 0)
-        }
-        className={controlClass + ' pr-7'}
+        onChange={(event) => void updateTaskField(task.id, 'estimate', Number(event.target.value) || 0)}
+        className={controlClass + ' rounded-r-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'}
       />
-      <span className="pointer-events-none absolute right-2 top-2 text-xs text-muted-foreground">
-        ч
-      </span>
+      <Button variant="outline" size="icon-sm" className="rounded-none border-l-0" aria-label="Уменьшить план" onClick={() => void updateTaskField(task.id, 'estimate', Math.max(0, task.estimate - 0.5))}>
+        <Minus />
+      </Button>
+      <Button variant="outline" size="icon-sm" className="rounded-l-none border-l-0" aria-label="Увеличить план" onClick={() => void updateTaskField(task.id, 'estimate', task.estimate + 0.5)}>
+        <Plus />
+      </Button>
     </div>
   );
   if (readOnly) {
@@ -188,12 +190,16 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
 function TaskActions({ task }: { task: BxTask }) {
   const { setSelectedTask, moveTask } = useKanbanStore();
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Действия для ${task.title}`}>
-          <MoreHorizontal className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
+    <div className="flex items-center">
+      <Button variant="ghost" size="icon" aria-label={`Открыть карточку ${task.title}`} title="Открыть карточку" onClick={() => setSelectedTask(task.id)}>
+        <ExternalLink className="size-4" />
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label={`Действия для ${task.title}`}>
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Быстрые действия</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => setSelectedTask(task.id)}>
@@ -206,8 +212,9 @@ function TaskActions({ task }: { task: BxTask }) {
           {task.status === 'done' ? <Circle /> : <CheckCircle2 />}
           {task.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной'}
         </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -447,12 +454,11 @@ export default function TaskGrid({
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedIds.has(task.id)}
-                    onChange={() => toggleSelected(task.id)}
+                    onCheckedChange={() => toggleSelected(task.id)}
                     aria-label={`Выбрать задачу ${task.title}`}
-                    className="mt-2 size-4 shrink-0 accent-primary"
+                    className="mt-2"
                   />
                   <Button
                     variant="ghost"
@@ -486,12 +492,10 @@ export default function TaskGrid({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={pageTasks.length > 0 && pageTasks.every((task) => selectedIds.has(task.id))}
-                      onChange={togglePage}
+                      onCheckedChange={togglePage}
                       aria-label="Выбрать задачи на странице"
-                      className="size-4 accent-primary"
                     />
                   </TableHead>
                   {sortableHead('title', 'Задача', 'min-w-72')}
@@ -502,7 +506,7 @@ export default function TaskGrid({
                   {sortableHead('deadline', 'Дедлайн')}
                   {sortableHead('estimate', 'План')}
                   {sortableHead('actual', 'Факт')}
-                  <TableHead className="w-12">
+                  <TableHead className="w-20">
                     <span className="sr-only">Действия</span>
                   </TableHead>
                 </TableRow>
@@ -529,12 +533,10 @@ export default function TaskGrid({
                         }
                       >
                         <TableCell>
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedIds.has(task.id)}
-                            onChange={() => toggleSelected(task.id)}
+                            onCheckedChange={() => toggleSelected(task.id)}
                             aria-label={`Выбрать задачу ${task.title}`}
-                            className="size-4 accent-primary"
                           />
                         </TableCell>
                         <TableCell>
