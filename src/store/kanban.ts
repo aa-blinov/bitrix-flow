@@ -174,18 +174,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   error: null,
 
   setSelectedProject: (id) => {
+    const cachedStages = id ? get().stages.filter((stage) => stage.entityId === id) : [];
     set({
       selectedProjectId: id,
       tasks: [],
       hasMoreTasks: false,
       filters: defaultFilters,
-      stages: [],
+      stages: cachedStages,
       isLoading: Boolean(id),
     });
     if (id) {
-      // Stages first, then tasks: otherwise the first render shows the
-      // fallback columns and every task briefly looks orphan.
-      void get().loadStages(id).then(() => get().loadTasks(id, true));
+      // При F5 этапы уже есть в localStorage: не ждём повторный запрос к Bitrix24.
+      if (cachedStages.length > 0) void get().loadTasks(id, true);
+      else void get().loadStages(id).then(() => get().loadTasks(id, true));
     }
   },
 

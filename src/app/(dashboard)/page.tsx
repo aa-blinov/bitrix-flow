@@ -46,9 +46,9 @@ export default function DashboardPage() {
           void loadProjects(true).then(() => {
             const firstProject = useKanbanStore.getState().projects[0];
             if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
-            // Глобальные счётчики в сайдбаре (Просрочено/В работе/Готово)
-            // должны считаться по всем проектам — грузим в фоне.
-            void useKanbanStore.getState().loadAllTasks();
+            // Не запускаем здесь loadAllTasks(): на холодном сервере это
+            // отправляло десятки запросов в Bitrix24 одновременно и задерживало
+            // первую доску. Счётчики обновит серверный sync/SSE.
           });
         } else {
           router.replace('/connection-help');

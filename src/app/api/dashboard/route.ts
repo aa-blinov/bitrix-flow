@@ -106,6 +106,27 @@ export async function GET(req: NextRequest) {
         }
       : null;
 
+    // Фоновый sync и /api/tasks/all берут проекты из MongoDB. Без этой записи
+    // после рестарта им нечего прогревать, и первый открывший приложение
+    // пользователь ждёт полный обход Bitrix24.
+    if (projects.length > 0) {
+      try {
+        const db = await getDb();
+        await db.collection('projects').bulkWrite(
+          projects.map((project: any) => ({
+            updateOne: {
+              filter: { id: project.id },
+              update: { $set: { ...project, member_id: memberId, updated_at: new Date() } },
+              upsert: true,
+            },
+          })),
+          { ordered: false },
+        );
+      } catch {
+        // Кэш не должен мешать открыть доску, если MongoDB временно недоступна.
+      }
+    }
+
     return NextResponse.json({ projects, users, currentUser });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

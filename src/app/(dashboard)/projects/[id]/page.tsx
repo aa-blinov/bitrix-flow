@@ -42,10 +42,10 @@ export default function ProjectPage() {
   }, [isRehydrated]);
 
   useEffect(() => {
-    if (projectId && projectId !== selectedProjectId) {
+    if (isRehydrated && projectId && projectId !== selectedProjectId) {
       setSelectedProject(projectId);
     }
-  }, [projectId, selectedProjectId]);
+  }, [isRehydrated, projectId, selectedProjectId, setSelectedProject]);
 
   // Computed values
   const currentProject = projects.find((p) => p.id === projectId);

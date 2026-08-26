@@ -48,8 +48,9 @@ export function startBackgroundSync(): void {
   const state = getState();
   if (state.intervalId) return; // идемпотентно — singleton уже идёт
 
-  // Первый прогон сразу, без ожидания интервала
-  void syncOnce().catch((e) => console.error('[task-sync] initial failed', e));
+  // Не конкурируем с первым открытием приложения после рестарта: Bitrix24
+  // ограничивает параллельные REST-вызовы, а немедленный полный обход проектов
+  // задерживал загрузку первой доски. Первый sync начнётся через минуту.
   state.intervalId = setInterval(() => {
     void syncOnce().catch((e) => console.error('[task-sync] iteration failed', e));
   }, POLL_INTERVAL_MS);
