@@ -141,20 +141,35 @@ export default function ProjectPage() {
       </div>
 
       <Tabs value={view} onValueChange={setView} className="pb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-5 sm:px-6">
-          <TabsList>
-            <TabsTrigger value="kanban">
-              <Columns3 className="size-4" />
-              Канбан
-            </TabsTrigger>
-            <TabsTrigger value="grid">
-              <TableProperties className="size-4" />
-              Таблица
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="kanban" className="mt-4">
-          <KanbanBoard />
+        {view === 'grid' && (
+          <div className="px-4 pt-5 sm:px-6">
+            <TabsList>
+              <TabsTrigger value="kanban">
+                <Columns3 className="size-4" />
+                Канбан
+              </TabsTrigger>
+              <TabsTrigger value="grid">
+                <TableProperties className="size-4" />
+                Таблица
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        )}
+        <TabsContent value="kanban" className="mt-0">
+          <KanbanBoard
+            toolbar={
+              <TabsList>
+                <TabsTrigger value="kanban">
+                  <Columns3 className="size-4" />
+                  Канбан
+                </TabsTrigger>
+                <TabsTrigger value="grid">
+                  <TableProperties className="size-4" />
+                  Таблица
+                </TabsTrigger>
+              </TabsList>
+            }
+          />
         </TabsContent>
         <TabsContent value="grid" className="mt-0">
           <TaskGrid tasks={visibleTasks} />

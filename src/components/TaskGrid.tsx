@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
@@ -231,7 +231,10 @@ export default function TaskGrid({
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
+  const updateTaskField = useKanbanStore((state) => state.updateTaskField);
   const projects = useKanbanStore((state) => state.projects);
+  const users = useKanbanStore((state) => state.users);
+  const stages = useKanbanStore((state) => state.stages);
   const projectById = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p])),
     [projects],
@@ -241,16 +244,60 @@ export default function TaskGrid({
     [tasks, selectedTaskId],
   );
   const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  const [sortBy, setSortBy] = useState<'updated' | 'deadline' | 'priority' | 'title'>('updated');
+  const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const orderedTasks = useMemo(
+    () =>
+      [...tasks].sort((left, right) => {
+        if (sortBy === 'title') return left.title.localeCompare(right.title, 'ru');
+        if (sortBy === 'priority') return right.priority.localeCompare(left.priority);
+        if (sortBy === 'deadline') return (left.dueDate || '9999').localeCompare(right.dueDate || '9999');
+        return right.updatedDate.localeCompare(left.updatedDate);
+      }),
+    [tasks, sortBy],
+  );
+  const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
-  const pageTasks = tasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const groupedPageTasks = useMemo(() => {
+    if (groupBy === 'none') return [{ label: '', tasks: pageTasks }];
+    const labels = groupBy === 'stage'
+      ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
+      : Object.fromEntries(users.map((user) => [user.id, user.name]));
+    return Object.entries(
+      pageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
+        const key = groupBy === 'stage' ? task.stageId : task.assigneeId || '';
+        (groups[labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен')] ||= []).push(task);
+        return groups;
+      }, {}),
+    ).map(([label, groupedTasks]) => ({ label, tasks: groupedTasks }));
+  }, [groupBy, pageTasks, stages, users]);
   const pageNumbers = Array.from(
     new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
   ).sort((left, right) => left - right);
 
   useEffect(() => {
     setPage(1);
-  }, [tasks]);
+    setSelectedIds(new Set());
+  }, [tasks, sortBy, groupBy]);
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const togglePage = () =>
+    setSelectedIds((current) =>
+      pageTasks.every((task) => current.has(task.id))
+        ? new Set([...current].filter((id) => !pageTasks.some((task) => task.id === id)))
+        : new Set([...current, ...pageTasks.map((task) => task.id)]),
+    );
+  const applyBulk = (field: 'assigneeId' | 'status', value: string) => {
+    void Promise.all([...selectedIds].map((id) => updateTaskField(id, field, value)));
+    setSelectedIds(new Set());
+  };
 
   if (tasks.length === 0)
     return (
@@ -274,8 +321,59 @@ export default function TaskGrid({
   return (
     <>
       <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
-        <CardHeader className="border-b bg-muted/30 px-4 py-4 sm:px-6">
-          <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
+        <CardHeader className="gap-3 border-b bg-muted/30 px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={groupBy}
+                onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}
+                className={controlClass + ' w-auto bg-background'}
+                aria-label="Группировка"
+              >
+                <option value="none">Без группировки</option>
+                <option value="stage">По фазе</option>
+                <option value="assignee">По исполнителю</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+                className={controlClass + ' w-auto bg-background'}
+                aria-label="Сортировка"
+              >
+                <option value="updated">По обновлению</option>
+                <option value="deadline">По дедлайну</option>
+                <option value="priority">По приоритету</option>
+                <option value="title">По названию</option>
+              </select>
+            </div>
+          </div>
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
+              <span className="font-medium">Выбрано: {selectedIds.size}</span>
+              <select
+                defaultValue=""
+                onChange={(event) => event.target.value && applyBulk('assigneeId', event.target.value)}
+                className={controlClass + ' w-auto bg-background'}
+                aria-label="Назначить исполнителя"
+              >
+                <option value="" disabled>Назначить исполнителя…</option>
+                {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </select>
+              <select
+                defaultValue=""
+                onChange={(event) => event.target.value && applyBulk('status', event.target.value)}
+                className={controlClass + ' w-auto bg-background'}
+                aria-label="Сменить статус"
+              >
+                <option value="" disabled>Сменить статус…</option>
+                <option value="new">Новая</option>
+                <option value="in_progress">В работе</option>
+                <option value="done">Готово</option>
+              </select>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Снять выбор</Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
@@ -285,6 +383,13 @@ export default function TaskGrid({
                 className={`space-y-3 p-4 ${task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}`}
               >
                 <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(task.id)}
+                    onChange={() => toggleSelected(task.id)}
+                    aria-label={`Выбрать задачу ${task.title}`}
+                    className="mt-2 size-4 shrink-0 accent-primary"
+                  />
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -316,6 +421,15 @@ export default function TaskGrid({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={pageTasks.length > 0 && pageTasks.every((task) => selectedIds.has(task.id))}
+                      onChange={togglePage}
+                      aria-label="Выбрать задачи на странице"
+                      className="size-4 accent-primary"
+                    />
+                  </TableHead>
                   <TableHead className="min-w-72">Задача</TableHead>
                   {showProject && <TableHead>Проект</TableHead>}
                   <TableHead>Фаза</TableHead>
@@ -330,27 +444,47 @@ export default function TaskGrid({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pageTasks.map((task) => (
-                  <TableRow
-                    key={task.id}
-                    className={task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}
-                  >
-                    <TableCell>
-                      <EditableTitle task={task} />
-                    </TableCell>
-                    {showProject && (
-                      <TableCell className="text-muted-foreground max-w-48 truncate">
-                        {projectById[task.projectId]?.name ?? `—`}
-                      </TableCell>
+                {groupedPageTasks.map((group) => (
+                  <Fragment key={group.label || 'all'}>
+                    {groupBy !== 'none' && (
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell colSpan={showProject ? 10 : 9} className="font-medium text-foreground">
+                          {group.label} · {group.tasks.length}
+                        </TableCell>
+                      </TableRow>
                     )}
-                    <FieldControls task={task} readOnly={isReadOnly} />
-                    <TableCell className="text-muted-foreground">
-                      {task.actualTime || 0} ч
-                    </TableCell>
-                    <TableCell>
-                      <TaskActions task={task} />
-                    </TableCell>
-                  </TableRow>
+                    {group.tasks.map((task) => (
+                      <TableRow
+                        key={task.id}
+                        className={task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}
+                      >
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(task.id)}
+                            onChange={() => toggleSelected(task.id)}
+                            aria-label={`Выбрать задачу ${task.title}`}
+                            className="size-4 accent-primary"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <EditableTitle task={task} />
+                        </TableCell>
+                        {showProject && (
+                          <TableCell className="max-w-48 truncate text-muted-foreground">
+                            {projectById[task.projectId]?.name ?? `—`}
+                          </TableCell>
+                        )}
+                        <FieldControls task={task} readOnly={isReadOnly} />
+                        <TableCell className="text-muted-foreground">
+                          {task.actualTime || 0} ч
+                        </TableCell>
+                        <TableCell>
+                          <TaskActions task={task} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

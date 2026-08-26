@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import TaskModal from './TaskModal';
 import {
   Plus,
@@ -118,7 +118,7 @@ function formatDate(dateStr: string | undefined): string {
   }
 }
 
-export default function KanbanBoard() {
+export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const {
     tasks,
     stages,
@@ -339,9 +339,11 @@ export default function KanbanBoard() {
     <div className="flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background px-6 py-4">
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {toolbar}
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
             onClick={() => setShowFilters(!showFilters)}
           >
             <Filter size={14} />
@@ -353,15 +355,16 @@ export default function KanbanBoard() {
             )}
           </Button>
 
-          <Button variant="outline" onClick={() => setShowStageDialog(true)}>
-            <Plus size={14} />
-            <span>Фаза</span>
-          </Button>
+            <Button variant="outline" onClick={() => setShowStageDialog(true)}>
+              <Plus size={14} />
+              <span>Фаза</span>
+            </Button>
 
-          <Button onClick={openAddDialog}>
-            <Plus size={14} />
-            <span>Добавить задачу</span>
-          </Button>
+            <Button onClick={openAddDialog}>
+              <Plus size={14} />
+              <span>Добавить задачу</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filters panel */}
