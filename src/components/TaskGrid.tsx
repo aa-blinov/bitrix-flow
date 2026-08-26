@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS } from '@/types/bitrix';
+import { needsDeadlineAttention } from '@/lib/task-urgency';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,8 @@ const controlClass =
   'h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-input focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30';
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
+type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated';
+type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 
 function EditableTitle({ task }: { task: BxTask }) {
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
@@ -131,9 +134,7 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
       onChange={(event) => void updateTaskField(task.id, 'deadline', event.target.value || null)}
       className={
         controlClass +
-        (task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done'
-          ? ' text-destructive'
-          : '')
+        (needsDeadlineAttention(task) ? ' bg-yellow-500/15 text-yellow-800 dark:text-yellow-200' : '')
       }
     />
   );
@@ -244,19 +245,37 @@ export default function TaskGrid({
     [tasks, selectedTaskId],
   );
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState<'updated' | 'deadline' | 'priority' | 'title'>('updated');
+  const [query, setQuery] = useState('');
+  const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const orderedTasks = useMemo(
-    () =>
-      [...tasks].sort((left, right) => {
-        if (sortBy === 'title') return left.title.localeCompare(right.title, 'ru');
-        if (sortBy === 'priority') return right.priority.localeCompare(left.priority);
-        if (sortBy === 'deadline') return (left.dueDate || '9999').localeCompare(right.dueDate || '9999');
-        return right.updatedDate.localeCompare(left.updatedDate);
-      }),
-    [tasks, sortBy],
-  );
+  const orderedTasks = useMemo(() => {
+    const value = (task: BxTask, key: SortKey) => {
+      if (key === 'project') return projectById[task.projectId]?.name || '';
+      if (key === 'stage') return task.stageId;
+      if (key === 'assignee') return task.assigneeName || '';
+      if (key === 'priority') return ['low', 'medium', 'high', 'critical'].indexOf(task.priority);
+      if (key === 'deadline') return task.dueDate || '9999-12-31';
+      if (key === 'estimate') return task.estimate;
+      if (key === 'actual') return task.actualTime;
+      if (key === 'updated') return task.updatedDate;
+      return task.title;
+    };
+    const needle = query.trim().toLocaleLowerCase('ru');
+    return tasks
+      .filter((task) => !needle || `${task.title} ${task.id} ${task.description}`.toLocaleLowerCase('ru').includes(needle))
+      .sort((left, right) => {
+        for (const sort of sorts) {
+          const leftValue = value(left, sort.key);
+          const rightValue = value(right, sort.key);
+          const result = typeof leftValue === 'number' && typeof rightValue === 'number'
+            ? leftValue - rightValue
+            : String(leftValue).localeCompare(String(rightValue), 'ru');
+          if (result) return sort.direction === 'asc' ? result : -result;
+        }
+        return 0;
+      });
+  }, [projectById, query, sorts, tasks]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
@@ -280,7 +299,7 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [tasks, sortBy, groupBy]);
+  }, [query, sorts, groupBy, tasks]);
 
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
@@ -298,6 +317,26 @@ export default function TaskGrid({
     void Promise.all([...selectedIds].map((id) => updateTaskField(id, field, value)));
     setSelectedIds(new Set());
   };
+  const toggleSort = (key: SortKey) => {
+    setSorts((current) => {
+      const currentSort = current.find((sort) => sort.key === key);
+      const next: Sort = currentSort
+        ? { key, direction: currentSort.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' };
+      return [next, ...current.filter((sort) => sort.key !== key)];
+    });
+  };
+  const sortLabel = (key: SortKey) => {
+    const index = sorts.findIndex((sort) => sort.key === key);
+    return index < 0 ? '' : `${sorts[index].direction === 'asc' ? '↑' : '↓'}${sorts.length > 1 ? index + 1 : ''}`;
+  };
+  const sortableHead = (key: SortKey, label: string, className?: string) => (
+    <TableHead className={className}>
+      <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 hover:text-foreground">
+        {label}<span className="min-w-3 text-xs">{sortLabel(key)}</span>
+      </button>
+    </TableHead>
+  );
 
   if (tasks.length === 0)
     return (
@@ -325,6 +364,12 @@ export default function TaskGrid({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
             <div className="flex flex-wrap gap-2">
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Поиск задач…"
+                className="h-8 w-52"
+              />
               <select
                 value={groupBy}
                 onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}
@@ -334,17 +379,6 @@ export default function TaskGrid({
                 <option value="none">Без группировки</option>
                 <option value="stage">По фазе</option>
                 <option value="assignee">По исполнителю</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
-                className={controlClass + ' w-auto bg-background'}
-                aria-label="Сортировка"
-              >
-                <option value="updated">По обновлению</option>
-                <option value="deadline">По дедлайну</option>
-                <option value="priority">По приоритету</option>
-                <option value="title">По названию</option>
               </select>
             </div>
           </div>
@@ -380,7 +414,13 @@ export default function TaskGrid({
             {pageTasks.map((task) => (
               <article
                 key={task.id}
-                className={`space-y-3 p-4 ${task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}`}
+                className={`space-y-3 p-4 ${
+                  task.status === 'done'
+                    ? 'bg-muted/60 text-muted-foreground'
+                    : needsDeadlineAttention(task)
+                      ? 'bg-yellow-500/10 hover:bg-yellow-500/15'
+                      : ''
+                }`}
               >
                 <div className="flex items-start gap-2">
                   <input
@@ -430,14 +470,14 @@ export default function TaskGrid({
                       className="size-4 accent-primary"
                     />
                   </TableHead>
-                  <TableHead className="min-w-72">Задача</TableHead>
-                  {showProject && <TableHead>Проект</TableHead>}
-                  <TableHead>Фаза</TableHead>
-                  <TableHead>Исполнитель</TableHead>
-                  <TableHead>Приоритет</TableHead>
-                  <TableHead>Дедлайн</TableHead>
-                  <TableHead>План</TableHead>
-                  <TableHead>Факт</TableHead>
+                  {sortableHead('title', 'Задача', 'min-w-72')}
+                  {showProject && sortableHead('project', 'Проект')}
+                  {sortableHead('stage', 'Фаза')}
+                  {sortableHead('assignee', 'Исполнитель')}
+                  {sortableHead('priority', 'Приоритет')}
+                  {sortableHead('deadline', 'Дедлайн')}
+                  {sortableHead('estimate', 'План')}
+                  {sortableHead('actual', 'Факт')}
                   <TableHead className="w-12">
                     <span className="sr-only">Действия</span>
                   </TableHead>
@@ -456,7 +496,13 @@ export default function TaskGrid({
                     {group.tasks.map((task) => (
                       <TableRow
                         key={task.id}
-                        className={task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}
+                        className={
+                          task.status === 'done'
+                            ? 'bg-muted/60 text-muted-foreground'
+                            : needsDeadlineAttention(task)
+                              ? 'bg-yellow-500/10 hover:bg-yellow-500/15'
+                              : ''
+                        }
                       >
                         <TableCell>
                           <input

@@ -1,16 +1,13 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { PRIORITY_LABELS } from '@/types/bitrix';
-import { Calendar, MessageSquare, Timer, User, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import TaskModal from '@/components/TaskModal';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import LoadingState from '@/components/LoadingState';
+import TaskGrid from '@/components/TaskGrid';
 
 export default function MyTasksPage() {
-  const { allTasks, currentUser, setCurrentUser, setSelectedTask, loadAllTasks, isLoadingAllTasks } =
+  const { allTasks, currentUser, setCurrentUser, loadAllTasks, isLoadingAllTasks } =
     useKanbanStore();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isLoadingProfile, setIsLoadingProfile] = useState(!currentUser.id);
@@ -55,10 +52,6 @@ export default function MyTasksPage() {
       return new Date(t.dueDate) < new Date();
     }).length,
   };
-
-  const selectedTask = useKanbanStore((s) =>
-    s.selectedTaskId ? allTasks.find((task) => task.id === s.selectedTaskId) : null,
-  );
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -111,108 +104,11 @@ export default function MyTasksPage() {
         </div>
       )}
 
-      {/* Task List */}
-      <div className="p-4 lg:p-6">
-        <div className="max-w-3xl space-y-3">
-          {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
-            <LoadingState label="Загружаем ваши задачи…" className="min-h-[60vh] bg-transparent" />
-          ) : filteredTasks.length > 0 ? (
-            filteredTasks.map((task) => {
-              const isOverdue =
-                task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
-
-              return (
-                <Card
-                  key={task.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedTask(task.id)}
-                  onKeyDown={(event) => event.key === 'Enter' && setSelectedTask(task.id)}
-                  className={`w-full cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm ${
-                    isOverdue
-                      ? 'border-l-4 border-l-red-500 border-t-red-100 border-b-red-100'
-                      : 'border-border'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`w-3 h-3 rounded-full mt-1.5 ${
-                        task.status === 'done'
-                          ? 'bg-green-500'
-                          : task.status === 'in_progress'
-                            ? 'bg-blue-500'
-                            : task.status === 'testing'
-                              ? 'bg-yellow-500'
-                              : 'bg-gray-400'
-                      }`}
-                    />
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <h3
-                          className={`font-medium ${task.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}
-                        >
-                          {task.title}
-                        </h3>
-                        <Badge
-                          variant="secondary"
-                          className={`whitespace-nowrap ${PRIORITY_LABELS[task.priority]?.bgColor} ${PRIORITY_LABELS[task.priority]?.color}`}
-                        >
-                          {PRIORITY_LABELS[task.priority]?.label}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span className="font-mono">#{task.id}</span>
-
-                        {task.dueDate && (
-                          <span
-                            className={`flex items-center gap-1 ${isOverdue ? 'text-red-500' : ''}`}
-                          >
-                            <Calendar size={12} />
-                            {new Date(task.dueDate).toLocaleDateString('ru-RU', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </span>
-                        )}
-
-                        {task.actualTime > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Timer size={12} />
-                            {task.actualTime} ч
-                          </span>
-                        )}
-
-                        {task.comments.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <MessageSquare size={12} />
-                            {task.comments.length}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })
-          ) : (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center text-muted-foreground py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                <CheckCircle2 size={32} className="text-muted-foreground/70" />
-              </div>
-              <p className="text-lg font-medium">Нет задач</p>
-              <p className="text-sm">
-                {statusFilter === 'all'
-                  ? 'У вас нет назначенных задач'
-                  : `Нет задач со статусом «${statusFilter}»`}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+      {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
+        <LoadingState label="Загружаем ваши задачи…" className="min-h-[60vh] bg-transparent" />
+      ) : (
+        <TaskGrid tasks={filteredTasks} showProject title={`Мои задачи · ${filteredTasks.length}`} />
+      )}
     </div>
   );
 }
