@@ -62,7 +62,7 @@ export default function MyTasksPage() {
       {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
         <LoadingState className="min-h-[60vh] bg-transparent" />
       ) : (
-        <TaskGrid tasks={myTasks} showProject title={null} />
+        <TaskGrid tasks={myTasks} showProject viewScope="my" title={null} />
       )}
     </div>
   );

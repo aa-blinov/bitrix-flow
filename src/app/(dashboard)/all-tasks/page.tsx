@@ -47,6 +47,7 @@ function AllTasksInner() {
             tasks={allTasks}
             showProject
             initialStatus={initialStatus}
+            viewScope="all"
             title="Задачи"
           />
         )}

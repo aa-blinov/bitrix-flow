@@ -15,11 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -35,6 +37,10 @@ const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
 type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
+type ColumnKey = Exclude<SortKey, 'updated'>;
+type SavedView = { id: string; name: string; config: { statusFilter: string; assigneeFilter: string; projectFilter: string; groupBy: 'none' | 'stage' | 'assignee'; sorts: Sort[]; visibleColumns: ColumnKey[] } };
+const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'priority', 'deadline', 'estimate', 'actual'];
+const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт' };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 320, project: 180, stage: 160, assignee: 180, priority: 130,
   deadline: 150, estimate: 180, actual: 80, updated: 160,
@@ -85,7 +91,7 @@ function EditableTitle({ task }: { task: BxTask }) {
   );
 }
 
-function FieldControls({ task, compact = false, readOnly = false }: { task: BxTask; compact?: boolean; readOnly?: boolean }) {
+function FieldControls({ task, compact = false, readOnly = false, visibleColumns = DEFAULT_COLUMNS }: { task: BxTask; compact?: boolean; readOnly?: boolean; visibleColumns?: ColumnKey[] }) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
   const label = (name: string, child: React.ReactNode) => (
     <label className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-xs text-muted-foreground">
@@ -150,13 +156,11 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
   if (readOnly) {
     return (
       <>
-        <TableCell className="text-muted-foreground">
-          {task.stageId === '0' ? '—' : `#${task.stageId}`}
-        </TableCell>
-        <TableCell>{assignee}</TableCell>
-        <TableCell>{priority}</TableCell>
-        <TableCell>{deadline}</TableCell>
-        <TableCell>{estimate}</TableCell>
+        {visibleColumns.includes('stage') && <TableCell className="text-muted-foreground">{task.stageId === '0' ? '—' : `#${task.stageId}`}</TableCell>}
+        {visibleColumns.includes('assignee') && <TableCell>{assignee}</TableCell>}
+        {visibleColumns.includes('priority') && <TableCell>{priority}</TableCell>}
+        {visibleColumns.includes('deadline') && <TableCell>{deadline}</TableCell>}
+        {visibleColumns.includes('estimate') && <TableCell>{estimate}</TableCell>}
       </>
     );
   }
@@ -164,11 +168,11 @@ function FieldControls({ task, compact = false, readOnly = false }: { task: BxTa
   if (!compact)
     return (
       <>
-        <TableCell>{phase}</TableCell>
-        <TableCell>{assignee}</TableCell>
-        <TableCell>{priority}</TableCell>
-        <TableCell>{deadline}</TableCell>
-        <TableCell>{estimate}</TableCell>
+        {visibleColumns.includes('stage') && <TableCell>{phase}</TableCell>}
+        {visibleColumns.includes('assignee') && <TableCell>{assignee}</TableCell>}
+        {visibleColumns.includes('priority') && <TableCell>{priority}</TableCell>}
+        {visibleColumns.includes('deadline') && <TableCell>{deadline}</TableCell>}
+        {visibleColumns.includes('estimate') && <TableCell>{estimate}</TableCell>}
       </>
     );
   return (
@@ -222,11 +226,13 @@ export default function TaskGrid({
   showProject = false,
   title,
   initialStatus = 'all',
+  viewScope,
 }: {
   tasks: BxTask[];
   showProject?: boolean;
   title?: string | null;
   initialStatus?: string;
+  viewScope?: 'all' | 'my';
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
@@ -251,6 +257,11 @@ export default function TaskGrid({
   const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [activeViewId, setActiveViewId] = useState('');
+  const [saveViewOpen, setSaveViewOpen] = useState(false);
+  const [viewName, setViewName] = useState('');
   const orderedTasks = useMemo(() => {
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
@@ -315,10 +326,31 @@ export default function TaskGrid({
   useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
 
   useEffect(() => {
+    if (!viewScope) return;
+    void fetch(`/api/task-views?scope=${viewScope}`).then((response) => response.json()).then((data) => setViews(data.views || []));
+  }, [viewScope]);
+
+  useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
   }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, tasks]);
 
+  const applyView = (id: string) => {
+    setActiveViewId(id);
+    const view = views.find((item) => item.id === id);
+    if (!view) return;
+    const config = view.config;
+    setStatusFilter(config.statusFilter); setAssigneeFilter(config.assigneeFilter); setProjectFilter(config.projectFilter);
+    setGroupBy(config.groupBy); setSorts(config.sorts); setVisibleColumns(config.visibleColumns);
+  };
+  const saveView = async () => {
+    const name = viewName.trim();
+    if (!name || !viewScope) return;
+    const config = { statusFilter, assigneeFilter, projectFilter, groupBy, sorts, visibleColumns };
+    const response = await fetch('/api/task-views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, scope: viewScope, config }) });
+    const { view } = await response.json();
+    if (view) { setViews((items) => [...items, view]); setActiveViewId(view.id); setSaveViewOpen(false); setViewName(''); }
+  };
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -397,6 +429,17 @@ export default function TaskGrid({
         <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
+            {viewScope && <Select value={activeViewId} onValueChange={applyView}>
+              <SelectTrigger className="w-40" aria-label="Представление"><SelectValue placeholder="Представление" /></SelectTrigger>
+              <SelectContent>{views.map((view) => <SelectItem key={view.id} value={view.id}>{view.name}</SelectItem>)}</SelectContent>
+            </Select>}
+            {viewScope && <Button variant="outline" size="sm" onClick={() => setSaveViewOpen(true)}>Сохранить вид</Button>}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Поля</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {DEFAULT_COLUMNS.filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -516,14 +559,14 @@ export default function TaskGrid({
             <Table className="min-w-max table-fixed">
               <colgroup>
                 <col className="w-10" />
-                <col style={{ width: columnWidths.title }} />
-                {showProject && <col style={{ width: columnWidths.project }} />}
-                <col style={{ width: columnWidths.stage }} />
-                <col style={{ width: columnWidths.assignee }} />
-                <col style={{ width: columnWidths.priority }} />
-                <col style={{ width: columnWidths.deadline }} />
-                <col style={{ width: columnWidths.estimate }} />
-                <col style={{ width: columnWidths.actual }} />
+                {visibleColumns.includes('title') && <col style={{ width: columnWidths.title }} />}
+                {showProject && visibleColumns.includes('project') && <col style={{ width: columnWidths.project }} />}
+                {visibleColumns.includes('stage') && <col style={{ width: columnWidths.stage }} />}
+                {visibleColumns.includes('assignee') && <col style={{ width: columnWidths.assignee }} />}
+                {visibleColumns.includes('priority') && <col style={{ width: columnWidths.priority }} />}
+                {visibleColumns.includes('deadline') && <col style={{ width: columnWidths.deadline }} />}
+                {visibleColumns.includes('estimate') && <col style={{ width: columnWidths.estimate }} />}
+                {visibleColumns.includes('actual') && <col style={{ width: columnWidths.actual }} />}
                 <col className="w-20" />
               </colgroup>
               <TableHeader>
@@ -535,14 +578,14 @@ export default function TaskGrid({
                       aria-label="Выбрать задачи на странице"
                     />
                   </TableHead>
-                  {sortableHead('title', 'Задача')}
-                  {showProject && sortableHead('project', 'Проект')}
-                  {sortableHead('stage', 'Фаза')}
-                  {sortableHead('assignee', 'Исполнитель')}
-                  {sortableHead('priority', 'Приоритет')}
-                  {sortableHead('deadline', 'Дедлайн')}
-                  {sortableHead('estimate', 'План')}
-                  {sortableHead('actual', 'Факт')}
+                  {visibleColumns.includes('title') && sortableHead('title', 'Задача')}
+                  {showProject && visibleColumns.includes('project') && sortableHead('project', 'Проект')}
+                  {visibleColumns.includes('stage') && sortableHead('stage', 'Фаза')}
+                  {visibleColumns.includes('assignee') && sortableHead('assignee', 'Исполнитель')}
+                  {visibleColumns.includes('priority') && sortableHead('priority', 'Приоритет')}
+                  {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
+                  {visibleColumns.includes('estimate') && sortableHead('estimate', 'План')}
+                  {visibleColumns.includes('actual') && sortableHead('actual', 'Факт')}
                   <TableHead className="w-20">
                     <span className="sr-only">Действия</span>
                   </TableHead>
@@ -576,18 +619,10 @@ export default function TaskGrid({
                             aria-label={`Выбрать задачу ${task.title}`}
                           />
                         </TableCell>
-                        <TableCell>
-                          <EditableTitle task={task} />
-                        </TableCell>
-                        {showProject && (
-                          <TableCell className="max-w-48 truncate text-muted-foreground">
-                            {projectById[task.projectId]?.name ?? `—`}
-                          </TableCell>
-                        )}
-                        <FieldControls task={task} readOnly={isReadOnly} />
-                        <TableCell className="text-muted-foreground">
-                          {task.actualTime || 0} ч
-                        </TableCell>
+                        {visibleColumns.includes('title') && <TableCell><EditableTitle task={task} /></TableCell>}
+                        {showProject && visibleColumns.includes('project') && <TableCell className="max-w-48 truncate text-muted-foreground">{projectById[task.projectId]?.name ?? `—`}</TableCell>}
+                        <FieldControls task={task} readOnly={isReadOnly} visibleColumns={visibleColumns} />
+                        {visibleColumns.includes('actual') && <TableCell className="text-muted-foreground">{task.actualTime || 0} ч</TableCell>}
                         <TableCell>
                           <TaskActions task={task} />
                         </TableCell>
@@ -632,6 +667,13 @@ export default function TaskGrid({
           </div>
         )}
       </Card>
+      <Dialog open={saveViewOpen} onOpenChange={setSaveViewOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Сохранить представление</DialogTitle></DialogHeader>
+          <Input value={viewName} onChange={(event) => setViewName(event.target.value)} placeholder="Название вида" autoFocus onKeyDown={(event) => event.key === 'Enter' && void saveView()} />
+          <DialogFooter><Button onClick={() => void saveView()} disabled={!viewName.trim()}>Сохранить</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
     </>
   );
