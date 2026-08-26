@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   const { projects, allTasks, loadProjects, loadAllTasks, isLoading, selectedProjectId, setSelectedProject } =
     useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const hasBootstrapped = useRef(false);
 
   useEffect(() => {
@@ -85,9 +87,10 @@ export default function DashboardPage() {
     };
   });
 
-  const filteredProjects = searchQuery
-    ? projectsWithStats.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : projectsWithStats;
+  const filteredProjects = projectsWithStats.filter((project) =>
+    (archiveFilter === 'all' || (archiveFilter === 'archived') === Boolean(project.isArchived)) &&
+    project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
+  );
 
   const totalTasks = allTasks.length;
   const totalCompleted = allTasks.filter((t) => t.status === 'done').length;
@@ -144,13 +147,23 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between border-b">
             <CardTitle>Проекты</CardTitle>
-            <Input
-              type="text"
-              placeholder="Поиск…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-40 sm:w-64"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                placeholder="Поиск…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-40 sm:w-64"
+              />
+              <Select value={archiveFilter} onValueChange={(value) => setArchiveFilter(value as typeof archiveFilter)}>
+                <SelectTrigger className="w-28" aria-label="Проекты"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Активные</SelectItem>
+                  <SelectItem value="archived">Архив</SelectItem>
+                  <SelectItem value="all">Все</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
 
           <div className="divide-y divide-gray-100">
@@ -176,7 +189,7 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="truncate text-sm font-medium text-foreground">{project.name}</h3>
                     <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{project.taskCount} задач</span>
+                      <span>Всего: {project.taskCount} задач</span>
                       {project.overdue > 0 && (
                         <span className="font-medium text-destructive">
                           Просрочено: {project.overdue}
