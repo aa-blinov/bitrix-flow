@@ -102,6 +102,8 @@ const MUTATION_METHODS = new Set([
   'task.elapseditem.add',
   'task.elapseditem.update',
   'task.elapseditem.delete',
+  'task.stages.add',
+  'task.stages.delete',
 ]);
 const JSON_PAYLOAD_METHODS = new Set(['tasks.task.list', 'tasks.task.add', 'tasks.task.update']);
 

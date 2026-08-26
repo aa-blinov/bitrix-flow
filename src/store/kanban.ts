@@ -18,6 +18,7 @@ import {
   searchTasks,
   fetchUsers,
   fetchProjectStages,
+  createProjectStage,
   updateTaskStatus as bxUpdateStatus,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
@@ -75,6 +76,7 @@ interface KanbanStore {
   setCurrentUser: (user: { id: string; name: string; photo?: string }) => void;
   loadProjects: (force?: boolean) => Promise<void>;
   loadStages: (entityId: string) => Promise<void>;
+  createStage: (title: string) => Promise<boolean>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: () => Promise<void>;
   loadMoreTasks: () => Promise<void>;
@@ -251,6 +253,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       }
     } catch (err) {
       console.error('Failed to load stages:', err);
+    }
+  },
+
+  createStage: async (title) => {
+    const { selectedProjectId, stages } = get();
+    if (!selectedProjectId || !title.trim()) return false;
+    try {
+      await createProjectStage(selectedProjectId, title.trim(), stages.at(-1)?.id);
+      await get().loadStages(selectedProjectId);
+      return true;
+    } catch (error) {
+      console.error('Create stage failed:', error);
+      return false;
     }
   },
 

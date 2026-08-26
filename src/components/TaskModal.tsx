@@ -122,7 +122,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         if (!open) onClose();
       }}
     >
-      <DialogContent showCloseButton={false} className="max-h-[90vh] max-w-4xl overflow-y-auto p-0">
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 lg:top-0 lg:left-auto lg:right-0 lg:h-dvh lg:max-h-none lg:w-[42rem] lg:max-w-none lg:translate-x-0 lg:translate-y-0 lg:rounded-none lg:rounded-l-xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
           <div className="flex items-center gap-3 min-w-0">

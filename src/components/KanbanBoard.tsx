@@ -12,7 +12,6 @@ import {
   Timer,
   Eye,
   Clock,
-  MoreHorizontal,
   AlignLeft,
   Paperclip,
   MessageSquare,
@@ -127,6 +126,7 @@ export default function KanbanBoard() {
     moveTaskToStage,
     setSelectedTask,
     createTask,
+    createStage,
     isLoading,
     filters,
     setFilters,
@@ -193,6 +193,11 @@ export default function KanbanBoard() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   // Inline "+ задача" в колонке: stageId открытой формы. null = нигде не открыта.
   const [inlineAddStage, setInlineAddStage] = useState<string | null>(null);
+  const [showStageDialog, setShowStageDialog] = useState(false);
+  const [stageName, setStageName] = useState('');
+  const [isCreatingStage, setIsCreatingStage] = useState(false);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
 
   const selectedTask = useKanbanStore((s) =>
     s.selectedTaskId ? tasks.find((t) => t.id === s.selectedTaskId) : null,
@@ -310,6 +315,15 @@ export default function KanbanBoard() {
     setShowAddModal(true);
   };
 
+  const handleCreateStage = async () => {
+    setIsCreatingStage(true);
+    if (await createStage(stageName)) {
+      setStageName('');
+      setShowStageDialog(false);
+    }
+    setIsCreatingStage(false);
+  };
+
   if (isLoading && tasks.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
@@ -337,6 +351,11 @@ export default function KanbanBoard() {
                 {activeFiltersCount}
               </Badge>
             )}
+          </Button>
+
+          <Button variant="outline" onClick={() => setShowStageDialog(true)}>
+            <Plus size={14} />
+            <span>Фаза</span>
           </Button>
 
           <Button onClick={openAddDialog}>
@@ -415,6 +434,29 @@ export default function KanbanBoard() {
         )}
       </header>
 
+      <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Новая фаза</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={stageName}
+            onChange={(event) => setStageName(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && void handleCreateStage()}
+            placeholder="Например, На согласовании"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStageDialog(false)}>
+              Отмена
+            </Button>
+            <Button onClick={() => void handleCreateStage()} disabled={!stageName.trim() || isCreatingStage}>
+              {isCreatingStage ? 'Создаём…' : 'Создать'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Columns already scroll horizontally on small screens; a second stage
           navigation row duplicated them and made labels overlap. */}
       <div className="hidden">
@@ -443,9 +485,29 @@ export default function KanbanBoard() {
         </div>
       </div>
 
+      {/* Верхний scrollbar — только desktop; синхронизирован с доской ниже. */}
+      <div
+        ref={topScrollRef}
+        onScroll={(event) => {
+          if (boardScrollRef.current) boardScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+        }}
+        className="hidden overflow-x-auto border-b bg-background lg:block"
+      >
+        <div className="flex min-w-max gap-4 px-4 py-2 xl:gap-5">
+          {allStages.map((stage) => <div key={stage.id} className="h-px w-[26rem] xl:w-[28rem]" />)}
+          {orphanTasks.length > 0 && <div className="h-px w-[26rem] xl:w-[28rem]" />}
+        </div>
+      </div>
+
       {/* Board */}
-      <div className="flex-1 overflow-x-auto bg-muted/30">
-        <div className="flex gap-4 px-4 py-6 min-w-max h-full xl:gap-5">
+      <div
+        ref={boardScrollRef}
+        onScroll={(event) => {
+          if (topScrollRef.current) topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+        }}
+        className="flex-1 overflow-x-auto bg-muted/30"
+      >
+        <div className="flex h-full min-w-max gap-4 px-4 py-6 xl:gap-5">
           {allStages.map((stage: any) => {
             const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
             const colors = getStageColor(stage.color);
@@ -454,7 +516,7 @@ export default function KanbanBoard() {
             return (
               <Card
                 key={stage.id}
-                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors sm:w-80 xl:w-[22rem] ${
+                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors lg:w-[26rem] xl:w-[28rem] ${
                   isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
@@ -468,8 +530,14 @@ export default function KanbanBoard() {
                   <span className="text-xs font-medium text-muted-foreground">
                     {colTasks.length}
                   </span>
-                  <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
-                    <MoreHorizontal size={14} />
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground"
+                    onClick={() => setInlineAddStage(stage.id)}
+                    aria-label={`Добавить задачу в фазу ${stage.name}`}
+                  >
+                    <Plus size={15} />
                   </Button>
                 </div>
 
@@ -497,27 +565,13 @@ export default function KanbanBoard() {
                   )}
                 </div>
 
-                {/* Column footer — inline add button (visible всегда) */}
-                {inlineAddStage !== stage.id && (
-                  <div className="border-t p-1.5">
-                    <Button
-                      onClick={() => setInlineAddStage(stage.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start gap-1.5 text-muted-foreground hover:text-foreground"
-                    >
-                      <Plus size={14} />
-                      Добавить задачу
-                    </Button>
-                  </div>
-                )}
               </Card>
             );
           })}
 
           {orphanTasks.length > 0 && (
             <Card
-              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 sm:w-80 xl:w-[22rem]"
+              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 lg:w-[26rem] xl:w-[28rem]"
               onDragOver={(e) => handleDragOver(e, 'orphan')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => {
@@ -805,7 +859,7 @@ function TaskCard({
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
-      className={`cursor-pointer gap-0 p-3 transition-all hover:ring-primary/20 hover:shadow-sm ${
+      className={`cursor-pointer gap-0 p-3 lg:p-4 transition-all hover:ring-primary/20 hover:shadow-sm ${
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
@@ -827,7 +881,7 @@ function TaskCard({
 
       {/* Title */}
       <h4
-        className={`mb-2 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
+        className={`mb-2 text-sm leading-snug line-clamp-2 lg:text-base xl:line-clamp-3 ${
           isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
         }`}
       >

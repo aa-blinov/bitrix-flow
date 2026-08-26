@@ -9,11 +9,8 @@ import {
   ChevronRight,
   Columns3,
   TableProperties,
-  Clock3,
-  CheckCircle2,
 } from 'lucide-react';
 import TaskGrid from '@/components/TaskGrid';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
@@ -155,16 +152,6 @@ export default function ProjectPage() {
               Таблица
             </TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="secondary" className="gap-1">
-              <CheckCircle2 className="size-3.5" />
-              {completedTasks} готовы
-            </Badge>
-            <Badge variant="outline" className="gap-1">
-              <Clock3 className="size-3.5" />
-              {visibleTasks.length} в выборке
-            </Badge>
-          </div>
         </div>
         <TabsContent value="kanban" className="mt-4">
           <KanbanBoard />

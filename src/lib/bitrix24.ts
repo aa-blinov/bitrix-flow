@@ -295,6 +295,16 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
   return projects;
 }
 
+export async function createProjectStage(entityId: string, title: string, afterId?: string): Promise<void> {
+  await bx24('task.stages.add', {
+    'fields[TITLE]': title,
+    'fields[COLOR]': '47D1E2',
+    'fields[AFTER_ID]': afterId || '0',
+    'fields[ENTITY_ID]': entityId,
+  });
+  memoryCache.delete(`stages:${entityId}`);
+}
+
 // Стадии проекта - кеш 10 минут
 export async function fetchProjectStages(entityId: string): Promise<Bx24Stage[]> {
   const cached = await stagesCacheGet(entityId);
