@@ -623,7 +623,7 @@ function TaskCard({
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
       className={`cursor-pointer gap-0 p-3 transition-all hover:ring-primary/20 hover:shadow-sm ${
-        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/50 opacity-60 grayscale' : ''
+        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
       {/* Tags row */}

@@ -264,7 +264,7 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
             {tasks.map((task) => (
               <article
                 key={task.id}
-                className={`space-y-3 p-4 ${task.status === 'done' ? 'bg-muted/40 opacity-65' : ''}`}
+                className={`space-y-3 p-4 ${task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}`}
               >
                 <div className="flex items-start gap-2">
                   <Button
@@ -309,7 +309,7 @@ export default function TaskGrid({ tasks }: { tasks: BxTask[] }) {
                 {tasks.map((task) => (
                   <TableRow
                     key={task.id}
-                    className={task.status === 'done' ? 'bg-muted/40 opacity-65' : ''}
+                    className={task.status === 'done' ? 'bg-muted/60 text-muted-foreground' : ''}
                   >
                     <TableCell>
                       <EditableTitle task={task} />
