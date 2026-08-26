@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, ListChecks, Search, Menu, Inbox, LogOut, TableProperties, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Menu, Inbox, LogOut, TableProperties, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -104,7 +104,6 @@ export default function Sidebar() {
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
           <NavItem href="/my-tasks" icon={Inbox} label="Мои задачи" badge={myTasks.length} />
           <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
-          <NavItem href="/search" icon={Search} label="Поиск" />
         </div>
 
         {/* Quick stats — кликабельные, ведут на /all-tasks с фильтром по статусу */}
