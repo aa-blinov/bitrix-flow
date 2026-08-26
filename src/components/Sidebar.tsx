@@ -11,6 +11,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import Notifications from '@/components/Notifications';
 import ThemeToggle from '@/components/ThemeToggle';
+import { getProjectColor, getProjectInitials } from '@/lib/utils';
 
 export default function Sidebar() {
   const {
@@ -148,25 +149,29 @@ export default function Sidebar() {
             {isLoading ? (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Загрузка…</div>
             ) : sortedProjects.length > 0 ? (
-              sortedProjects.map((project) => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                    pathname === `/projects/${project.id}`
-                      ? 'bg-muted text-foreground font-medium'
-                      : 'text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  <div
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      pathname === `/projects/${project.id}` ? 'bg-blue-500' : 'bg-muted-foreground/40'
+              sortedProjects.map((project) => {
+                const active = pathname === `/projects/${project.id}`;
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                      active
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted'
                     }`}
-                  />
-                  <span className="truncate">{project.name}</span>
-                </Link>
-              ))
+                  >
+                    <span
+                      className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                      aria-hidden="true"
+                    >
+                      {getProjectInitials(project.name)}
+                    </span>
+                    <span className="truncate">{project.name}</span>
+                  </Link>
+                );
+              })
             ) : (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Нет проектов</div>
             )}

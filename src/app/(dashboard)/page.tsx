@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, tasks, loadProjects, isLoading, selectedProjectId, setSelectedProject } =
+  const { projects, allTasks, loadProjects, isLoading, selectedProjectId, setSelectedProject } =
     useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
   const hasBootstrapped = useRef(false);
@@ -69,7 +69,7 @@ export default function DashboardPage() {
   }
 
   const projectsWithStats = projects.map((p) => {
-    const projectTasks = tasks.filter((t) => t.projectId === p.id);
+    const projectTasks = allTasks.filter((t) => t.projectId === p.id);
     const completed = projectTasks.filter((t) => t.status === 'done').length;
     const inProgress = projectTasks.filter((t) => t.status === 'in_progress').length;
     const overdue = projectTasks.filter((t) => {
@@ -94,14 +94,14 @@ export default function DashboardPage() {
     ? projectsWithStats.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : projectsWithStats;
 
-  const totalTasks = tasks.length;
-  const totalCompleted = tasks.filter((t) => t.status === 'done').length;
-  const totalOverdue = tasks.filter((t) => {
+  const totalTasks = allTasks.length;
+  const totalCompleted = allTasks.filter((t) => t.status === 'done').length;
+  const totalOverdue = allTasks.filter((t) => {
     if (!t.dueDate || t.status === 'done') return false;
     return new Date(t.dueDate) < new Date();
   }).length;
-  const totalEstimate = tasks.reduce((sum, t) => sum + t.estimate, 0);
-  const totalActual = tasks.reduce((sum, t) => sum + t.actualTime, 0);
+  const totalEstimate = allTasks.reduce((sum, t) => sum + t.estimate, 0);
+  const totalActual = allTasks.reduce((sum, t) => sum + t.actualTime, 0);
 
   return (
     <div className="min-h-full bg-muted/20">
