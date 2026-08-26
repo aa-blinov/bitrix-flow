@@ -60,7 +60,7 @@ export default function MyTasksPage() {
       )}
 
       {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
-        <LoadingState label="Загружаем ваши задачи…" className="min-h-[60vh] bg-transparent" />
+        <LoadingState className="min-h-[60vh] bg-transparent" />
       ) : (
         <TaskGrid tasks={myTasks} showProject title={null} />
       )}

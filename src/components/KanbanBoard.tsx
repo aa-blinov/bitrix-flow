@@ -326,7 +326,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   };
 
   if (isLoading && tasks.length === 0) {
-    return <LoadingState label="Загружаем задачи…" className="min-h-[60vh] flex-1" />;
+    return <LoadingState className="min-h-[60vh] flex-1" />;
   }
 
   return (

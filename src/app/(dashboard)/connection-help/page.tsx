@@ -21,7 +21,7 @@ export default function ConnectionHelpPage() {
   }, []);
 
   if (state === 'checking') {
-    return <LoadingState label="Проверяем подключение…" className="min-h-screen bg-muted/30" />;
+    return <LoadingState className="min-h-screen bg-muted/30" />;
   }
 
   return (

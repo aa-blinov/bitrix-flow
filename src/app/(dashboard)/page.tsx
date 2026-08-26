@@ -60,7 +60,7 @@ export default function DashboardPage() {
   }, [loadAllTasks, loadProjects, router]);
 
   if (isLoading || !selectedProjectId) {
-    return <LoadingState label="Синхронизируем данные Bitrix24…" className="min-h-screen bg-muted/30" />;
+    return <LoadingState className="min-h-screen bg-muted/30" />;
   }
 
   const projectsWithStats = projects.map((p) => {

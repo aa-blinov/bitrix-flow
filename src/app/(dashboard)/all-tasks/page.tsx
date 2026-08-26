@@ -41,7 +41,7 @@ function AllTasksInner() {
 
       <div className="mt-4">
         {isLoadingAllTasks ? (
-          <LoadingState label="Загружаем задачи…" className="min-h-[60vh] bg-transparent lg:px-6" />
+          <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
             tasks={allTasks}

@@ -63,7 +63,7 @@ export default function ProjectPage() {
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
 
   if (projects.length === 0) {
-    return <LoadingState label="Загружаем проект…" className="min-h-screen" />;
+    return <LoadingState className="min-h-screen" />;
   }
 
   if (!currentProject) {

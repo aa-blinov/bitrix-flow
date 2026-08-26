@@ -194,7 +194,7 @@ export default function ProjectsSummaryPage() {
             {error ? (
               <p className="p-6 text-sm text-destructive">{error}</p>
             ) : isLoading ? (
-              <LoadingState label="Собираем сводку из Bitrix24…" className="min-h-72 bg-transparent" />
+              <LoadingState className="min-h-72 bg-transparent" />
             ) : (
               <Table>
                 <TableHeader>

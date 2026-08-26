@@ -113,7 +113,7 @@ export default function Sidebar() {
           />
           <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
             {isLoading ? (
-              <LoadingState label="Загружаем…" className="min-h-24 bg-transparent" />
+              <LoadingState className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (
               <>
                 {activeProjects.map((project) => {
