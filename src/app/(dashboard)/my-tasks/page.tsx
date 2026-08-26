@@ -107,7 +107,7 @@ export default function MyTasksPage() {
       {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
         <LoadingState label="Загружаем ваши задачи…" className="min-h-[60vh] bg-transparent" />
       ) : (
-        <TaskGrid tasks={filteredTasks} showProject title={`Мои задачи · ${filteredTasks.length}`} />
+        <TaskGrid tasks={filteredTasks} showProject title={null} />
       )}
     </div>
   );

@@ -229,7 +229,7 @@ export default function TaskGrid({
 }: {
   tasks: BxTask[];
   showProject?: boolean;
-  title?: string;
+  title?: string | null;
   initialStatus?: string;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
@@ -376,29 +376,29 @@ export default function TaskGrid({
       <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
         <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
-            <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
+            {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Поиск задач…"
               className="h-8 w-full sm:w-56 lg:w-80 xl:w-96"
             />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Статус">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass + ' w-32 truncate bg-background'} aria-label="Статус">
               <option value="all">Все статусы</option>
               <option value="overdue">Просрочено</option>
               {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Исполнитель">
+            <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className={controlClass + ' w-36 truncate bg-background'} aria-label="Исполнитель">
               <option value="all">Все исполнители</option>
               {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
             </select>
             {showProject && (
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Проект">
+              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className={controlClass + ' w-44 truncate bg-background'} aria-label="Проект">
                 <option value="all">Все проекты</option>
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
             )}
-            <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)} className={controlClass + ' w-auto bg-background'} aria-label="Группировка">
+            <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)} className={controlClass + ' w-36 truncate bg-background'} aria-label="Группировка">
               <option value="none">Без группировки</option>
               <option value="stage">По фазе</option>
               <option value="assignee">По исполнителю</option>
