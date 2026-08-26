@@ -53,7 +53,7 @@ export default function SearchPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tasks by title..."
+            placeholder="Поиск задач по названию…"
             className="h-11 pl-12 pr-12"
             autoFocus
           />
@@ -120,7 +120,7 @@ export default function SearchPage() {
                       {task.dueDate && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
-                          {new Date(task.dueDate).toLocaleDateString()}
+                          {new Date(task.dueDate).toLocaleDateString('ru-RU')}
                         </span>
                       )}
                       {task.comments.length > 0 && (
@@ -136,9 +136,9 @@ export default function SearchPage() {
             ))}
           </div>
         ) : query ? (
-          <div className="text-center py-8 text-gray-400">No tasks found for "{query}"</div>
+          <div className="text-center py-8 text-gray-400">Задачи по запросу «{query}» не найдены</div>
         ) : (
-          <div className="text-center py-8 text-gray-400">Start typing to search tasks</div>
+          <div className="text-center py-8 text-gray-400">Начните вводить текст для поиска</div>
         )}
       </div>
 

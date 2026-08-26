@@ -71,7 +71,7 @@ export default function Sidebar() {
           active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
         }`}
       >
-        <Icon size={16} className={active ? 'text-gray-700' : 'text-gray-400'} />
+        <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
         <span className="flex-1 truncate">{label}</span>
         {badge !== undefined && badge > 0 && <Badge variant="secondary">{badge}</Badge>}
       </Link>
@@ -79,7 +79,9 @@ export default function Sidebar() {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    // ponytail: w-full + min-w-0 — без этого flex-child растягивается по
+    // самому широкому контенту (поиск проектов) и вылезает за w-64 родителя.
+    <div className="flex h-full w-full min-w-0 flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -89,7 +91,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+      <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
         <div className="space-y-0.5">
           <NavItem href="/" icon={LayoutDashboard} label="Главная" />
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
@@ -106,23 +108,23 @@ export default function Sidebar() {
             <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
               <div className="w-2 h-2 rounded-full bg-red-500" />
               <span className="flex-1 text-muted-foreground">Просрочено</span>
-              <span className="text-xs text-gray-500 font-medium">{overdueTasks.length}</span>
+              <span className="text-xs text-muted-foreground font-medium">{overdueTasks.length}</span>
             </div>
             <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
               <div className="w-2 h-2 rounded-full bg-blue-500" />
               <span className="flex-1 text-muted-foreground">В работе</span>
-              <span className="text-xs text-gray-500 font-medium">{inProgress}</span>
+              <span className="text-xs text-muted-foreground font-medium">{inProgress}</span>
             </div>
             <div className="flex items-center gap-2.5 px-2 py-1.5 text-sm">
               <div className="w-2 h-2 rounded-full bg-green-500" />
               <span className="flex-1 text-muted-foreground">Готово</span>
-              <span className="text-xs text-gray-500 font-medium">{completed}</span>
+              <span className="text-xs text-muted-foreground font-medium">{completed}</span>
             </div>
           </div>
         </div>
 
-        {/* Projects */}
-        <div>
+        {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
+        <div className="flex min-h-0 flex-1 flex-col">
           <h3 className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Проекты ({projects.length})
           </h3>
@@ -132,7 +134,7 @@ export default function Sidebar() {
             placeholder="Найти проект…"
             className="mb-2 h-8"
           />
-          <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Загрузка…</div>
             ) : sortedProjects.length > 0 ? (
@@ -149,7 +151,7 @@ export default function Sidebar() {
                 >
                   <div
                     className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      pathname === `/projects/${project.id}` ? 'bg-blue-500' : 'bg-gray-300'
+                      pathname === `/projects/${project.id}` ? 'bg-blue-500' : 'bg-muted-foreground/40'
                     }`}
                   />
                   <span className="truncate">{project.name}</span>
@@ -162,10 +164,10 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* User */}
+      {/* User — двухстрочный бар: имя сверху, действия снизу */}
       <div className="p-3">
         <Separator className="mb-3" />
-        <div className="flex items-center gap-2.5 px-2.5 py-1.5">
+        <div className="flex items-center gap-2.5 px-1 mb-2">
           {currentUser.photo ? (
             <img src={currentUser.photo} alt="" className="size-8 rounded-full object-cover" />
           ) : (
@@ -173,9 +175,11 @@ export default function Sidebar() {
               {getInitials(currentUser.name)}
             </div>
           )}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">{currentUser.name}</p>
           </div>
+        </div>
+        <div className="flex items-center justify-end gap-1">
           <Notifications />
           <ThemeToggle />
           <Button variant="ghost" size="icon-sm" onClick={logout} title="Выйти" aria-label="Выйти">

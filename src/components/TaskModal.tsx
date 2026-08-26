@@ -1,5 +1,5 @@
 'use client';
-import { BxTask, PRIORITY_LABELS, TaskStatus } from '@/types/bitrix';
+import { BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import { useState } from 'react';
 import {
@@ -96,7 +96,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     try {
-      return new Date(dateStr).toLocaleDateString('en', {
+      return new Date(dateStr).toLocaleDateString('ru-RU', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -108,9 +108,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   };
 
   const priorityOptions = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
+    { value: 'low', label: 'Низкий' },
+    { value: 'medium', label: 'Обычный' },
+    { value: 'high', label: 'Высокий' },
   ];
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
@@ -124,9 +124,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     >
       <DialogContent showCloseButton={false} className="max-h-[90vh] max-w-4xl overflow-y-auto p-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 flex-shrink-0 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm text-gray-400 font-mono">#{task.id}</span>
+            <span className="text-sm text-muted-foreground font-mono">#{task.id}</span>
             <Select
               value={task.status}
               onValueChange={(value) => handleUpdateField('status', value)}
@@ -137,7 +137,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               <SelectContent>
                 {['new', 'in_progress', 'testing', 'done'].map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s}
+                    {STATUS_LABELS[s] || s}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -166,7 +166,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   />
                 ) : (
                   <h2
-                    className="text-lg font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 rounded-lg px-4 py-2 -mx-4"
+                    className="text-lg font-semibold text-foreground cursor-pointer hover:bg-muted rounded-lg px-4 py-2 -mx-4"
                     onClick={() => {
                       setEditingField('title');
                       setEditValue(task.title);
@@ -179,7 +179,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
               {/* Description */}
               <div>
-                <h3 className="text-xs uppercase text-gray-400 font-medium mb-2">Description</h3>
+                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-2">Описание</h3>
                 {editingField === 'description' ? (
                   <Textarea
                     className="min-h-24 resize-none"
@@ -191,13 +191,15 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   />
                 ) : (
                   <div
-                    className="text-gray-600 cursor-pointer hover:bg-gray-100 rounded-lg p-3 min-h-[50px]"
+                    className="text-foreground/80 cursor-pointer hover:bg-muted rounded-lg p-3 min-h-[50px]"
                     onClick={() => {
                       setEditingField('description');
                       setEditValue(task.description);
                     }}
                   >
-                    {task.description || <span className="text-gray-400">Add description...</span>}
+                    {task.description || (
+                      <span className="text-muted-foreground">Добавить описание…</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -210,9 +212,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   className="h-auto w-full justify-between rounded-none px-4 py-3"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckSquare size={16} className="text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">
-                      Subtasks ({taskSubtasks.length})
+                    <CheckSquare size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">
+                      Подзадачи ({taskSubtasks.length})
                     </span>
                   </div>
                   {showSubtasks ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -223,9 +225,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     {taskSubtasks.map((sub) => (
                       <div
                         key={sub.id}
-                        className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"
+                        className="flex items-center gap-3 p-2 bg-muted rounded-lg"
                       >
-                        <GripVertical size={14} className="text-gray-300" />
+                        <GripVertical size={14} className="text-muted-foreground/70" />
                         <Button
                           onClick={() => moveTask(sub.id, sub.status === 'done' ? 'new' : 'done')}
                           variant="ghost"
@@ -239,22 +241,22 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           )}
                         </Button>
                         <span
-                          className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-gray-400' : 'text-gray-700'}`}
+                          className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}
                         >
                           {sub.title}
                         </span>
-                        <span className="text-xs text-gray-400">#{sub.id}</span>
+                        <span className="text-xs text-muted-foreground">#{sub.id}</span>
                       </div>
                     ))}
 
                     {showSubtaskAdd ? (
-                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                        <Square size={16} className="text-gray-300" />
+                      <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                        <Square size={16} className="text-muted-foreground/70" />
                         <Input
                           type="text"
                           value={newSubtaskTitle}
                           onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                          placeholder="Subtask title..."
+                          placeholder="Название подзадачи…"
                           className="h-8 flex-1 text-sm"
                           autoFocus
                           onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
@@ -277,7 +279,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className="w-full justify-start text-muted-foreground"
                       >
                         <Plus size={14} />
-                        Add subtask
+                        Добавить подзадачу
                       </Button>
                     )}
                   </div>
@@ -286,25 +288,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
               {/* Comments */}
               <div>
-                <h3 className="text-xs uppercase text-gray-400 font-medium mb-3 flex items-center gap-2">
+                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-3 flex items-center gap-2">
                   <MessageSquare size={14} />
-                  Comments ({task.comments.length})
+                  Комментарии ({task.comments.length})
                 </h3>
 
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                   {isLoadingTask && task.comments.length === 0 ? (
-                    <div className="text-center py-4 text-gray-400 text-sm">Loading...</div>
+                    <div className="text-center py-4 text-muted-foreground text-sm">Загрузка…</div>
                   ) : (
                     task.comments.map((c) => (
-                      <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                      <div key={c.id} className="bg-muted rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center font-medium">
+                          <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs flex items-center justify-center font-medium">
                             {c.authorName.charAt(0)}
                           </div>
-                          <span className="font-medium text-sm text-gray-800">{c.authorName}</span>
-                          <span className="text-xs text-gray-400">{formatDate(c.createdDate)}</span>
+                          <span className="font-medium text-sm text-foreground">{c.authorName}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(c.createdDate)}</span>
                         </div>
-                        <p className="text-gray-600 text-sm pl-8">{c.text}</p>
+                        <p className="text-foreground/80 text-sm pl-8">{c.text}</p>
                       </div>
                     ))
                   )}
@@ -314,7 +316,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   <Textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Write a comment..."
+                    placeholder="Написать комментарий…"
                     rows={2}
                     className="flex-1 resize-none"
                   />
@@ -340,8 +342,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   className="h-auto w-full justify-between rounded-none px-4 py-3"
                 >
                   <div className="flex items-center gap-2">
-                    <Layers size={16} className="text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Details</span>
+                    <Layers size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Детали</span>
                   </div>
                   {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </Button>
@@ -350,8 +352,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   <div className="p-4 space-y-4">
                     {/* Assignee */}
                     <div>
-                      <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-                        <User size={12} /> Assignee
+                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                        <User size={12} /> Исполнитель
                       </label>
                       {editingField === 'assigneeId' ? (
                         <Select
@@ -364,7 +366,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            <SelectItem value="unassigned">Не назначен</SelectItem>
                             {users.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
                                 {u.name}
@@ -374,18 +376,18 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         </Select>
                       ) : (
                         <p
-                          className="font-medium text-gray-800 cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1"
+                          className="font-medium text-foreground cursor-pointer hover:bg-muted rounded px-1 -mx-1"
                           onClick={() => setEditingField('assigneeId')}
                         >
-                          {task.assigneeName || 'Unassigned'}
+                          {task.assigneeName || 'Не назначен'}
                         </p>
                       )}
                     </div>
 
                     {/* Priority */}
                     <div>
-                      <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-                        <Flag size={12} /> Priority
+                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                        <Flag size={12} /> Приоритет
                       </label>
                       {editingField === 'priority' ? (
                         <Select
@@ -405,7 +407,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         </Select>
                       ) : (
                         <p
-                          className={`font-medium cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 ${PRIORITY_LABELS[task.priority]?.color}`}
+                          className={`font-medium cursor-pointer hover:bg-muted rounded px-1 -mx-1 ${PRIORITY_LABELS[task.priority]?.color}`}
                           onClick={() => setEditingField('priority')}
                         >
                           {PRIORITY_LABELS[task.priority]?.label}
@@ -415,8 +417,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                     {/* Deadline */}
                     <div>
-                      <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-                        <Calendar size={12} /> Due Date
+                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                        <Calendar size={12} /> Дедлайн
                       </label>
                       {editingField === 'deadline' ? (
                         <Input
@@ -434,10 +436,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         />
                       ) : (
                         <p
-                          className={`font-medium cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 ${isOverdue ? 'text-red-500' : 'text-gray-800'}`}
+                          className={`font-medium cursor-pointer hover:bg-muted rounded px-1 -mx-1 ${isOverdue ? 'text-red-500' : 'text-foreground'}`}
                           onClick={() => setEditingField('deadline')}
                         >
-                          {task.dueDate ? formatDate(task.dueDate) : 'No deadline'}
+                          {task.dueDate ? formatDate(task.dueDate) : 'Без дедлайна'}
                           {isOverdue && <AlertTriangle size={12} className="inline ml-1" />}
                         </p>
                       )}
@@ -445,8 +447,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                     {/* Estimate */}
                     <div>
-                      <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-                        <Timer size={12} /> Estimate
+                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                        <Timer size={12} /> Оценка
                       </label>
                       {editingField === 'estimate' ? (
                         <Input
@@ -463,10 +465,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         />
                       ) : (
                         <p
-                          className="font-medium text-gray-800 cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1"
+                          className="font-medium text-foreground cursor-pointer hover:bg-muted rounded px-1 -mx-1"
                           onClick={() => setEditingField('estimate')}
                         >
-                          {task.estimate > 0 ? `${task.estimate}h` : 'Not estimated'}
+                          {task.estimate > 0 ? `${task.estimate} ч` : 'Без оценки'}
                         </p>
                       )}
                     </div>
@@ -482,8 +484,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   className="h-auto w-full justify-between rounded-none px-4 py-3"
                 >
                   <div className="flex items-center gap-2">
-                    <Clock size={16} className="text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Time</span>
+                    <Clock size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Время</span>
                   </div>
                   {showTimeEntry ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </Button>
@@ -494,48 +496,48 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       type="number"
                       step="0.5"
                       min="0.5"
-                      placeholder="Hours"
+                      placeholder="Часы"
                       value={timeHours}
                       onChange={(e) => setTimeHours(Number(e.target.value))}
                       className="w-full"
                     />
                     <Input
                       type="text"
-                      placeholder="What did you do?"
+                      placeholder="Что вы сделали?"
                       value={timeDesc}
                       onChange={(e) => setTimeDesc(e.target.value)}
                       className="w-full"
                     />
                     <Button onClick={handleAddTime} className="w-full">
-                      Log Time
+                      Записать время
                     </Button>
                   </div>
                 )}
 
                 <div className="px-4 pb-4 space-y-2">
                   {task.timeEntries.slice(0, 3).map((entry) => (
-                    <div key={entry.id} className="text-sm bg-gray-50 rounded-lg p-2">
+                    <div key={entry.id} className="text-sm bg-muted rounded-lg p-2">
                       <div className="flex justify-between">
-                        <span className="font-medium text-blue-600">{entry.hours}h</span>
-                        <span className="text-gray-400 text-xs">{entry.date}</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">{entry.hours} ч</span>
+                        <span className="text-muted-foreground text-xs">{entry.date}</span>
                       </div>
                       {entry.description && (
-                        <p className="text-gray-500 text-xs mt-1">{entry.description}</p>
+                        <p className="text-muted-foreground text-xs mt-1">{entry.description}</p>
                       )}
                     </div>
                   ))}
 
                   <div className="pt-2 border-t space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Estimated:</span>
-                      <span className="font-medium">{task.estimate}h</span>
+                      <span className="text-muted-foreground">План:</span>
+                      <span className="font-medium">{task.estimate} ч</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Spent:</span>
+                      <span className="text-muted-foreground">Затрачено:</span>
                       <span
                         className={`font-medium ${task.actualTime > task.estimate ? 'text-red-500' : 'text-green-600'}`}
                       >
-                        {task.actualTime}h
+                        {task.actualTime} ч
                       </span>
                     </div>
                   </div>

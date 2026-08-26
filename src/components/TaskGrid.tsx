@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, Clock3, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
@@ -14,9 +14,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -183,7 +180,7 @@ function FieldControls({ task, compact = false }: { task: BxTask; compact?: bool
 }
 
 function TaskActions({ task }: { task: BxTask }) {
-  const { stages, setSelectedTask, moveTask, moveTaskToStage } = useKanbanStore();
+  const { setSelectedTask, moveTask } = useKanbanStore();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -203,28 +200,6 @@ function TaskActions({ task }: { task: BxTask }) {
           {task.status === 'done' ? <Circle /> : <CheckCircle2 />}
           {task.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной'}
         </DropdownMenuItem>
-        {stages.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Clock3 />
-                Переместить в фазу
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {stages.map((item) => (
-                  <DropdownMenuItem
-                    key={item.id}
-                    disabled={item.id === task.stageId}
-                    onClick={() => void moveTaskToStage(task.id, item.id)}
-                  >
-                    {item.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -62,10 +62,35 @@ export const PRIORITY_LABELS: Record<
   TaskPriority,
   { label: string; color: string; bgColor: string }
 > = {
-  low: { label: 'Low', color: 'text-gray-500', bgColor: 'bg-gray-100' },
-  medium: { label: 'Medium', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  high: { label: 'High', color: 'text-orange-600', bgColor: 'bg-orange-100' },
-  critical: { label: 'Critical', color: 'text-red-600', bgColor: 'bg-red-100' },
+  low: {
+    label: 'Низкий',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted',
+  },
+  medium: {
+    label: 'Обычный',
+    color: 'text-blue-700 dark:text-blue-300',
+    bgColor: 'bg-blue-500/15',
+  },
+  high: {
+    label: 'Высокий',
+    color: 'text-orange-700 dark:text-orange-300',
+    bgColor: 'bg-orange-500/15',
+  },
+  critical: {
+    label: 'Критический',
+    color: 'text-red-700 dark:text-red-300',
+    bgColor: 'bg-red-500/15',
+  },
+};
+
+export const STATUS_LABELS: Record<string, string> = {
+  new: 'Новая',
+  in_progress: 'В работе',
+  testing: 'Тестирование',
+  done: 'Готово',
+  deferred: 'Отложена',
+  postponed: 'Отложена',
 };
 
 export interface Bx24Project {

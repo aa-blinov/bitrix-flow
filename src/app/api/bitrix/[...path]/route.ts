@@ -4,6 +4,7 @@ import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
+import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 
 // ТОЛЬКО OAuth. Webhook полностью убран.
 // + Server-side in-memory cache (30 сек на запрос, 5 мин на projects/users)
@@ -46,6 +47,87 @@ function getBitrixResult(method: string, data: any) {
 }
 
 async function handleRequest(req: NextRequest, method: string) {
+  if (isMockEnabled()) {
+    const params: Record<string, string> = {};
+    req.nextUrl.searchParams.forEach((value, key) => {
+      params[key] = value;
+    });
+    try {
+      const body = await req.text();
+      if (body) {
+        const bodyParams = new URLSearchParams(body);
+        bodyParams.forEach((value, key) => {
+          params[key] = value;
+        });
+      }
+    } catch {}
+
+    const result = mockHandle(method, params);
+    if (result === null) {
+      return NextResponse.json({ error: 'NOT_MOCKED', method }, { status: 501 });
+    }
+
+    // Маппинг для совместимости с UI: bitrix-style ответа в result.
+    if (method === 'task.stages.get') {
+      const stages = Array.isArray(result) ? result : Object.values(result || {});
+      const mapped = stages.map((s: any) => ({
+        id: s.ID,
+        name: s.TITLE,
+        color: s.COLOR,
+        sort: parseInt(s.SORT) || 100,
+        systemType: s.SYSTEM_TYPE || '',
+        entityId: s.ENTITY_ID,
+      }));
+      return NextResponse.json({ result: mapped });
+    }
+
+    if (method === 'tasks.task.list') {
+      const taskResult = result as { tasks?: any[]; next?: number; total?: number };
+      const tasksList = taskResult.tasks || (Array.isArray(result) ? result : []);
+      const mapped = tasksList.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description || '',
+        status: t.status,
+        subStatus: t.subStatus,
+        priority: t.priority,
+        createdDate: t.createdDate,
+        changedDate: t.changedDate,
+        deadline: t.deadline || undefined,
+        timeEstimate: parseInt(t.timeEstimate) || 0,
+        timeSpentInLogs: parseInt(t.timeSpentInLogs) || 0,
+        groupId: t.groupId || t.group_id || '0',
+        groupName: t.groupName || t.group_name || 'No Project',
+        responsibleId: t.responsibleId || t.responsible_id || '',
+        responsibleName: t.responsibleName || t.responsible_name || 'Unassigned',
+        responsibleIcon: t.responsibleIcon,
+        creatorId: t.creatorId || t.creator_id || '',
+        creatorName: t.creatorName || t.creator_name || '',
+        commentsCount: parseInt(t.commentsCount) || 0,
+        parentId: t.parentId || undefined,
+        stageId: t.stageId || '0',
+      }));
+      return NextResponse.json({
+        result: {
+          tasks: mapped,
+          next: taskResult.next,
+          total: taskResult.total,
+        },
+      });
+    }
+
+    if (method === 'im.dialog.messages.get') {
+      const r = result as { messages: any[] };
+      return NextResponse.json({ result: r });
+    }
+
+    if (method === 'task.elapseditem.getlist') {
+      return NextResponse.json({ result });
+    }
+
+    return NextResponse.json({ result });
+  }
+
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
 
   if (!memberId) {

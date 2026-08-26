@@ -12,6 +12,7 @@ services:
       MONGO_DB: bitrix_kanban
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      MOCK_B24: ${MOCK_B24:-0}
     depends_on:
       mongodb:
         condition: service_healthy

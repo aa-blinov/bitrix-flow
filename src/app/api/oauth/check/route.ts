@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
+import { isMockEnabled } from '@/lib/mock-b24';
 
 // Проверка статуса OAuth подключения
 export async function GET(req: NextRequest) {
+  if (isMockEnabled()) {
+    return NextResponse.json({ connected: true, member_id: 'mock-member' });
+  }
+
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
 
   if (!memberId) {

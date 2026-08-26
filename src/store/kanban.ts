@@ -166,8 +166,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       isLoading: Boolean(id),
     });
     if (id) {
-      get().loadStages(id);
-      get().loadTasks(id, true);
+      // Stages first, then tasks: otherwise the first render shows the
+      // fallback columns and every task briefly looks orphan.
+      void get().loadStages(id).then(() => get().loadTasks(id, true));
     }
   },
 
@@ -589,6 +590,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const { tasks, filters, selectedProjectId } = get();
     return tasks.filter((t) => {
       if (selectedProjectId && t.projectId !== selectedProjectId) return false;
+      if (!filters.showCompleted && t.status === 'done') return false;
       if (filters.assigneeId && t.assigneeId !== filters.assigneeId) return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.hasDeadline && !t.dueDate) return false;

@@ -137,11 +137,11 @@ export default function ProjectPage() {
             <div className="hidden md:flex gap-4 text-sm">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs">План</p>
-                <p className="font-semibold">{totalEstimate.toFixed(1)}h</p>
+                <p className="font-semibold">{totalEstimate.toFixed(1)} ч</p>
               </div>
               <div className="text-center">
                 <p className="text-muted-foreground text-xs">Факт</p>
-                <p className="font-semibold">{totalActual.toFixed(1)}h</p>
+                <p className="font-semibold">{totalActual.toFixed(1)} ч</p>
               </div>
             </div>
           </div>

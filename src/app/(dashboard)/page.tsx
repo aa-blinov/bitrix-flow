@@ -114,31 +114,31 @@ export default function DashboardPage() {
         <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             icon={FolderKanban}
-            label="Projects"
+            label="Проекты"
             value={projects.length}
-            color="text-gray-700"
-            bgColor="bg-gray-50"
+            color="text-foreground"
+            bgColor="bg-muted"
           />
           <StatCard
             icon={CheckCircle2}
-            label="Completed"
+            label="Готово"
             value={totalCompleted}
-            color="text-green-600"
-            bgColor="bg-green-50"
+            color="text-green-600 dark:text-green-400"
+            bgColor="bg-green-500/15"
           />
           <StatCard
             icon={AlertTriangle}
-            label="Overdue"
+            label="Просрочено"
             value={totalOverdue}
-            color="text-red-600"
-            bgColor="bg-red-50"
+            color="text-red-600 dark:text-red-400"
+            bgColor="bg-red-500/15"
           />
           <StatCard
             icon={Clock}
-            label="Hours"
+            label="Часы"
             value={totalActual.toFixed(1)}
-            color="text-blue-600"
-            bgColor="bg-blue-50"
+            color="text-blue-600 dark:text-blue-400"
+            bgColor="bg-blue-500/15"
           />
         </div>
 
@@ -148,7 +148,7 @@ export default function DashboardPage() {
             <CardTitle>Проекты</CardTitle>
             <Input
               type="text"
-              placeholder="Search..."
+              placeholder="Поиск…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-40 sm:w-64"
@@ -166,7 +166,7 @@ export default function DashboardPage() {
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors group"
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors group"
                 >
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                     <FolderKanban size={16} className="text-white" />
@@ -239,7 +239,7 @@ function StatCard({
             <Icon size={16} className={color} />
           </div>
           <div>
-            <p className="text-xs text-gray-500">{label}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
             <p className={`text-xl font-semibold ${color} mt-0.5`}>{value}</p>
           </div>
         </div>

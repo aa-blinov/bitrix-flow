@@ -4,9 +4,38 @@ import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
+import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 
 // Batch endpoint - загружает все данные для дашборда одним запросом
 export async function GET(req: NextRequest) {
+  if (isMockEnabled()) {
+    const rawProjects = mockHandle('sonet_group.get.json', {}) as any[];
+    const rawUsers = mockHandle('user.get', {}) as any[];
+    const rawCurrentUser = mockHandle('user.current', {}) as any;
+    return NextResponse.json({
+      projects: (rawProjects || []).map((g: any) => ({
+        id: g.ID,
+        name: g.NAME || 'Project',
+        description: g.DESCRIPTION || '',
+        membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
+        image: g.IMAGE || undefined,
+      })),
+      users: (rawUsers || []).map((u: any) => ({
+        id: u.ID,
+        name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
+        email: u.EMAIL,
+        icon: u.PERSONAL_PHOTO,
+      })),
+      currentUser: rawCurrentUser
+        ? {
+            id: rawCurrentUser.ID,
+            name: `${rawCurrentUser.NAME} ${rawCurrentUser.LAST_NAME || ''}`.trim(),
+            photo: undefined,
+          }
+        : null,
+    });
+  }
+
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
 
   if (!memberId) {

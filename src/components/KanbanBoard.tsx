@@ -40,18 +40,20 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 function getStageColor(hex: string): { bg: string; text: string; border: string } {
+  // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
+  // читаются и в светлой, и в тёмной теме без dark: префикса.
   const colors: Record<string, { bg: string; text: string; border: string }> = {
-    '47d1e2': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
-    '75d900': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
-    ffab00: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-    ff5752: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
-    '1eae43': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    '47d1e2': { bg: 'bg-cyan-500/15', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-500/30' },
+    '75d900': { bg: 'bg-green-500/15', text: 'text-green-700 dark:text-green-300', border: 'border-green-500/30' },
+    ffab00: { bg: 'bg-amber-500/15', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-500/30' },
+    ff5752: { bg: 'bg-red-500/15', text: 'text-red-700 dark:text-red-300', border: 'border-red-500/30' },
+    '1eae43': { bg: 'bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-500/30' },
   };
   return (
     colors[hex?.toLowerCase()] || {
-      bg: 'bg-gray-50',
-      text: 'text-gray-700',
-      border: 'border-gray-200',
+      bg: 'bg-muted',
+      text: 'text-muted-foreground',
+      border: 'border-border',
     }
   );
 }
@@ -106,12 +108,12 @@ function formatDate(dateStr: string | undefined): string {
     const d = new Date(dateStr);
     const now = new Date();
     const diff = Math.floor((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Tomorrow';
-    if (diff === -1) return 'Yesterday';
-    if (diff > 1 && diff < 7) return d.toLocaleDateString('en', { weekday: 'short' });
-    if (diff < 0 && diff > -7) return d.toLocaleDateString('en', { weekday: 'short' });
-    return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    if (diff === 0) return 'Сегодня';
+    if (diff === 1) return 'Завтра';
+    if (diff === -1) return 'Вчера';
+    if (diff > 1 && diff < 7) return d.toLocaleDateString('ru-RU', { weekday: 'short' });
+    if (diff < 0 && diff > -7) return d.toLocaleDateString('ru-RU', { weekday: 'short' });
+    return d.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
   } catch {
     return '';
   }
@@ -161,6 +163,20 @@ export default function KanbanBoard() {
   const displayedStageId = (task: BxTask) =>
     task.stageId === '0' && newStageId ? newStageId : task.stageId;
 
+  // Tasks whose stageId does not match any known stage (deleted stage,
+  // permissions error on task.stages.get, project Kanban disabled, …) get
+  // rendered in a dedicated fallback column so they are never silently lost.
+  const knownStageIds = new Set(allStages.map((stage) => stage.id));
+  const orphanTasks = filteredTasks.filter(
+    (task) => !knownStageIds.has(displayedStageId(task)),
+  );
+  if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
+    // ponytail: dev-only — silent in prod, noisy when something is misconfigured.
+    console.warn(
+      `[kanban] ${orphanTasks.length} задач(а) вне известных стадий — проверь task.stages.get`,
+    );
+  }
+
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -189,14 +205,14 @@ export default function KanbanBoard() {
 
   if (!selectedProjectId) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-white">
+      <div className="flex min-h-[60vh] items-center justify-center bg-background">
         <div className="max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50">
-            <Search className="text-gray-300" size={28} />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <Search className="text-muted-foreground" size={28} />
           </div>
-          <h2 className="mb-2 text-xl font-medium text-gray-900">No project selected</h2>
-          <p className="text-sm text-gray-500">
-            Select a project from the sidebar to start viewing tasks
+          <h2 className="mb-2 text-xl font-medium text-foreground">Проект не выбран</h2>
+          <p className="text-sm text-muted-foreground">
+            Выберите проект в боковой панели, чтобы увидеть задачи
           </p>
         </div>
       </div>
@@ -208,7 +224,7 @@ export default function KanbanBoard() {
     filters.priority,
     filters.hasDeadline,
     filters.overdue,
-    filters.showCompleted,
+    !filters.showCompleted,
   ].filter(Boolean).length;
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
@@ -277,10 +293,10 @@ export default function KanbanBoard() {
 
   if (isLoading && tasks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white">
+      <div className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-3 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading tasks...</p>
+          <div className="w-12 h-12 mx-auto mb-3 border-2 border-muted border-t-primary rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Загрузка задач...</p>
         </div>
       </div>
     );
@@ -296,7 +312,7 @@ export default function KanbanBoard() {
             onClick={() => setShowFilters(!showFilters)}
           >
             <Filter size={14} />
-            <span>Filter</span>
+            <span>Фильтр</span>
             {activeFiltersCount > 0 && (
               <Badge variant="secondary" className="ml-0.5 bg-background/20 text-inherit">
                 {activeFiltersCount}
@@ -306,7 +322,7 @@ export default function KanbanBoard() {
 
           <Button onClick={openAddDialog}>
             <Plus size={14} />
-            <span>Add task</span>
+            <span>Добавить задачу</span>
           </Button>
         </div>
 
@@ -319,10 +335,10 @@ export default function KanbanBoard() {
                 onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
               >
                 <SelectTrigger className="min-w-40">
-                  <SelectValue placeholder="All assignees" />
+                  <SelectValue placeholder="Все исполнители" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All assignees</SelectItem>
+                  <SelectItem value="all">Все исполнители</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name}
@@ -335,21 +351,28 @@ export default function KanbanBoard() {
                 variant={filters.priority === 'high' ? 'secondary' : 'outline'}
                 onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
               >
-                High priority
+                Высокий приоритет
               </Button>
 
               <Button
                 variant={filters.overdue ? 'destructive' : 'outline'}
                 onClick={() => setFilters({ overdue: !filters.overdue })}
               >
-                Overdue
+                Просрочено
               </Button>
 
               <Button
                 variant={filters.hasDeadline ? 'secondary' : 'outline'}
                 onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
               >
-                Has deadline
+                С дедлайном
+              </Button>
+
+              <Button
+                variant={!filters.showCompleted ? 'secondary' : 'outline'}
+                onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
+              >
+                {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
               </Button>
 
               {activeFiltersCount > 0 && (
@@ -361,11 +384,11 @@ export default function KanbanBoard() {
                       priority: '',
                       hasDeadline: false,
                       overdue: false,
-                      showCompleted: filters.showCompleted,
+                      showCompleted: true,
                     })
                   }
                 >
-                  Clear
+                  Сбросить
                 </Button>
               )}
             </div>
@@ -386,14 +409,14 @@ export default function KanbanBoard() {
                 variant="ghost"
                 className={`h-auto min-w-[120px] flex-1 rounded-none border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap ${
                   activeColumn === stage.id
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-500'
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground'
                 }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
                   <span>{stage.name}</span>
-                  <span className="text-xs text-gray-400">{count}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
                 </div>
               </Button>
             );
@@ -403,7 +426,7 @@ export default function KanbanBoard() {
 
       {/* Board */}
       <div className="flex-1 overflow-x-auto bg-muted/30">
-        <div className="flex gap-3 p-6 min-w-max h-full">
+        <div className="flex gap-4 px-4 py-6 min-w-max h-full xl:gap-5">
           {allStages.map((stage: any) => {
             const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
             const colors = getStageColor(stage.color);
@@ -412,7 +435,7 @@ export default function KanbanBoard() {
             return (
               <Card
                 key={stage.id}
-                className={`w-72 flex-shrink-0 gap-0 py-0 transition-colors ${
+                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors sm:w-80 xl:w-[22rem] ${
                   isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
@@ -450,13 +473,47 @@ export default function KanbanBoard() {
                       className="h-auto w-full border-2 border-dashed py-6 text-muted-foreground"
                     >
                       <Plus size={14} />
-                      Add task
+                      Добавить задачу
                     </Button>
                   )}
                 </div>
               </Card>
             );
           })}
+
+          {orphanTasks.length > 0 && (
+            <Card
+              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 sm:w-80 xl:w-[22rem]"
+              onDragOver={(e) => handleDragOver(e, 'orphan')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => {
+                // Drop into fallback column: just keep current stage, but the
+                // task is still visible so it can be edited/moved properly.
+                e.preventDefault();
+                setDraggedTask(null);
+                setDragOverColumn(null);
+              }}
+            >
+              <div className="flex items-center gap-2 border-b px-3 py-2.5">
+                <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+                <h3 className="flex-1 text-sm font-semibold text-foreground">Без фазы</h3>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {orphanTasks.length}
+                </span>
+              </div>
+              <div className="flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[200px]">
+                {orphanTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onDragStart={handleDragStart}
+                    onClick={() => setSelectedTask(task.id)}
+                    isDragging={draggedTask === task.id}
+                  />
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -636,16 +693,16 @@ function TaskCard({
           </span>
         )}
         {task.parentId && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-50 text-purple-600">
-            Subtask
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+            Подзадача
           </span>
         )}
       </div>
 
       {/* Title */}
       <h4
-        className={`mb-2 text-sm leading-snug line-clamp-2 ${
-          isCompleted ? 'text-muted-foreground line-through' : 'text-gray-900'
+        className={`mb-2 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
+          isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
         }`}
       >
         {task.title}
@@ -653,31 +710,31 @@ function TaskCard({
 
       {/* Description indicator */}
       {task.description && (
-        <div className="text-gray-400 mb-2">
+        <div className="text-muted-foreground mb-2">
           <AlignLeft size={14} />
         </div>
       )}
 
       {/* Meta footer */}
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-border">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0 flex-1">
           {dueDate && (
             <span
-              className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}
+              className={`flex items-center gap-1 shrink-0 ${isOverdue ? 'text-destructive font-medium' : ''}`}
             >
               <Calendar size={12} />
               {dueDate}
             </span>
           )}
           {task.actualTime > 0 && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 shrink-0">
               <Timer size={12} />
-              {task.actualTime}h
+              {task.actualTime} ч
             </span>
           )}
           {totalSubtasks > 0 && (
-            <span className="flex items-center gap-1">
-              <span className="text-gray-400">☐</span>
+            <span className="flex items-center gap-1 shrink-0">
+              <span>☐</span>
               {completedSubtasks}/{totalSubtasks}
             </span>
           )}
@@ -685,7 +742,7 @@ function TaskCard({
 
         {task.assigneeName && (
           <div
-            className={`w-6 h-6 rounded-full ${getAvatarColor(task.assigneeName)} text-white text-[10px] font-semibold flex items-center justify-center ring-2 ring-white`}
+            className={`w-6 h-6 rounded-full ${getAvatarColor(task.assigneeName)} text-white text-[10px] font-semibold flex items-center justify-center ring-2 ring-card shrink-0`}
             title={task.assigneeName}
           >
             {getInitials(task.assigneeName)}

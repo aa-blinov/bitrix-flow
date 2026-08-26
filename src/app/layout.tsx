@@ -1,13 +1,19 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Geist } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { cn } from '@/lib/utils';
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+// Inter: профессиональный современный шрифт с полной поддержкой кириллицы.
+// Используем display=swap, чтобы текст не блокировал первый рендер.
+const inter = Inter({
+  subsets: ['latin', 'cyrillic', 'cyrillic-ext'],
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'Bitrix24 Project Manager',
-  description: 'Professional project management interface for Bitrix24',
+  title: 'Bitrix24 PM',
+  description: 'Управление проектами и задачами Bitrix24',
 };
 
 export const viewport: Viewport = {
@@ -18,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
+    <html lang="ru" className={cn('font-sans', inter.variable)} suppressHydrationWarning>
       <body className="h-full antialiased">
         <script
           dangerouslySetInnerHTML={{

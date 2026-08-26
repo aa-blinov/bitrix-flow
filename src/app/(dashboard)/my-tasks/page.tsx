@@ -46,25 +46,25 @@ export default function MyTasksPage() {
               variant={statusFilter === 'all' ? 'default' : 'outline'}
               onClick={() => setStatusFilter('all')}
             >
-              All ({stats.total})
+              Все ({stats.total})
             </Button>
             <Button
               variant={statusFilter === 'new' ? 'default' : 'outline'}
               onClick={() => setStatusFilter('new')}
             >
-              New ({stats.new})
+              Новые ({stats.new})
             </Button>
             <Button
               variant={statusFilter === 'in_progress' ? 'default' : 'outline'}
               onClick={() => setStatusFilter('in_progress')}
             >
-              In Progress ({stats.inProgress})
+              В работе ({stats.inProgress})
             </Button>
             <Button
               variant={statusFilter === 'done' ? 'default' : 'outline'}
               onClick={() => setStatusFilter('done')}
             >
-              Done ({stats.done})
+              Готово ({stats.done})
             </Button>
           </div>
         </div>
@@ -74,7 +74,9 @@ export default function MyTasksPage() {
       {stats.overdue > 0 && (
         <div className="px-4 lg:px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-red-600">
           <CheckCircle2 size={16} />
-          <span className="text-sm font-medium">{stats.overdue} overdue tasks need attention</span>
+          <span className="text-sm font-medium">
+            {stats.overdue} просроченных задач требуют внимания
+          </span>
         </div>
       )}
 
@@ -96,7 +98,7 @@ export default function MyTasksPage() {
                   className={`w-full cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm ${
                     isOverdue
                       ? 'border-l-4 border-l-red-500 border-t-red-100 border-b-red-100'
-                      : 'border-gray-100'
+                      : 'border-border'
                   }`}
                 >
                   <div className="flex items-start gap-4">
@@ -115,7 +117,7 @@ export default function MyTasksPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <h3
-                          className={`font-medium ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'}`}
+                          className={`font-medium ${task.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}
                         >
                           {task.title}
                         </h3>
@@ -127,7 +129,7 @@ export default function MyTasksPage() {
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <span className="font-mono">#{task.id}</span>
 
                         {task.dueDate && (
@@ -135,7 +137,7 @@ export default function MyTasksPage() {
                             className={`flex items-center gap-1 ${isOverdue ? 'text-red-500' : ''}`}
                           >
                             <Calendar size={12} />
-                            {new Date(task.dueDate).toLocaleDateString('en', {
+                            {new Date(task.dueDate).toLocaleDateString('ru-RU', {
                               month: 'short',
                               day: 'numeric',
                             })}
@@ -145,7 +147,7 @@ export default function MyTasksPage() {
                         {task.actualTime > 0 && (
                           <span className="flex items-center gap-1">
                             <Timer size={12} />
-                            {task.actualTime}h
+                            {task.actualTime} ч
                           </span>
                         )}
 
@@ -162,15 +164,15 @@ export default function MyTasksPage() {
               );
             })
           ) : (
-            <div className="text-center py-12 text-gray-400">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                <CheckCircle2 size={32} className="text-gray-300" />
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                <CheckCircle2 size={32} className="text-muted-foreground/70" />
               </div>
-              <p className="text-lg font-medium">No tasks</p>
+              <p className="text-lg font-medium">Нет задач</p>
               <p className="text-sm">
                 {statusFilter === 'all'
-                  ? 'You have no assigned tasks'
-                  : `No ${statusFilter.replace('_', ' ')} tasks`}
+                  ? 'У вас нет назначенных задач'
+                  : `Нет задач со статусом «${statusFilter}»`}
               </p>
             </div>
           )}
