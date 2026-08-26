@@ -35,6 +35,10 @@ const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
 type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
+const COLUMN_WIDTHS: Record<SortKey, number> = {
+  title: 320, project: 180, stage: 160, assignee: 180, priority: 130,
+  deadline: 150, estimate: 180, actual: 80, updated: 160,
+};
 
 function EditableTitle({ task }: { task: BxTask }) {
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
@@ -251,6 +255,7 @@ export default function TaskGrid({
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const orderedTasks = useMemo(() => {
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
@@ -271,7 +276,8 @@ export default function TaskGrid({
         } else if (statusFilter !== 'all' && task.status !== statusFilter) return false;
         if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
         if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter) return false;
-        return !needle || `${task.title} ${task.id} ${task.description}`.toLocaleLowerCase('ru').includes(needle);
+        const searchText = `${task.title} ${task.id} ${task.description} ${projectById[task.projectId]?.name || ''} ${task.assigneeName || ''} ${stages.find((stage) => stage.id === task.stageId)?.name || ''}`;
+        return !needle || searchText.toLocaleLowerCase('ru').includes(needle);
       })
       .sort((left, right) => {
         for (const sort of sorts) {
@@ -284,7 +290,7 @@ export default function TaskGrid({
         }
         return 0;
       });
-  }, [assigneeFilter, projectById, projectFilter, query, showProject, sorts, statusFilter, tasks]);
+  }, [assigneeFilter, projectById, projectFilter, query, showProject, sorts, stages, statusFilter, tasks]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
@@ -342,11 +348,26 @@ export default function TaskGrid({
     const index = sorts.findIndex((sort) => sort.key === key);
     return index < 0 ? '' : `${sorts[index].direction === 'asc' ? '↑' : '↓'}${sorts.length > 1 ? index + 1 : ''}`;
   };
-  const sortableHead = (key: SortKey, label: string, className?: string) => (
-    <TableHead className={className}>
-      <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1 hover:text-foreground">
+  const resizeColumn = (key: SortKey, startX: number, startWidth: number) => {
+    const move = (event: PointerEvent) => setColumnWidths((widths) => ({ ...widths, [key]: Math.max(80, startWidth + event.clientX - startX) }));
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+  };
+  const sortableHead = (key: SortKey, label: string) => (
+    <TableHead className="relative p-0" style={{ width: columnWidths[key] }}>
+      <button type="button" onClick={() => toggleSort(key)} className="flex h-10 w-full items-center gap-1 px-4 text-left hover:text-foreground">
         {label}<span className="min-w-3 text-xs">{sortLabel(key)}</span>
       </button>
+      <span
+        role="separator"
+        aria-label={`Изменить ширину столбца ${label}`}
+        onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); resizeColumn(key, event.clientX, columnWidths[key]); }}
+        className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-primary"
+      />
     </TableHead>
   );
 
@@ -488,7 +509,19 @@ export default function TaskGrid({
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <Table>
+            <Table className="min-w-max table-fixed">
+              <colgroup>
+                <col className="w-10" />
+                <col style={{ width: columnWidths.title }} />
+                {showProject && <col style={{ width: columnWidths.project }} />}
+                <col style={{ width: columnWidths.stage }} />
+                <col style={{ width: columnWidths.assignee }} />
+                <col style={{ width: columnWidths.priority }} />
+                <col style={{ width: columnWidths.deadline }} />
+                <col style={{ width: columnWidths.estimate }} />
+                <col style={{ width: columnWidths.actual }} />
+                <col className="w-20" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
@@ -498,7 +531,7 @@ export default function TaskGrid({
                       aria-label="Выбрать задачи на странице"
                     />
                   </TableHead>
-                  {sortableHead('title', 'Задача', 'min-w-72')}
+                  {sortableHead('title', 'Задача')}
                   {showProject && sortableHead('project', 'Проект')}
                   {sortableHead('stage', 'Фаза')}
                   {sortableHead('assignee', 'Исполнитель')}
