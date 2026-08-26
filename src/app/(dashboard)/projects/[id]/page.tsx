@@ -113,6 +113,9 @@ export default function ProjectPage() {
                   <FolderKanban size={20} />
                 </span>
                 {currentProject.name}
+                {currentProject.isArchived && (
+                  <span className="rounded border px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Архив</span>
+                )}
               </h1>
               <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">

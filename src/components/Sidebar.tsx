@@ -168,7 +168,10 @@ export default function Sidebar() {
                     >
                       {getProjectInitials(project.name)}
                     </span>
-                    <span className="truncate">{project.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    {project.isArchived && (
+                      <span className="rounded border px-1 py-0.5 text-[10px] text-muted-foreground">Архив</span>
+                    )}
                   </Link>
                 );
               })

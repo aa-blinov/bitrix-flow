@@ -121,6 +121,7 @@ export interface Bx24Project {
   description: string;
   membersCount: number;
   image?: string;
+  isArchived?: boolean;
 }
 
 export interface Bx24Stage {
@@ -284,6 +285,7 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
         description: g.DESCRIPTION || '',
         membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
         image: g.IMAGE || undefined,
+        isArchived: g.CLOSED === 'Y',
       });
     }
   } catch (e) {

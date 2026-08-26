@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         description: g.DESCRIPTION || '',
         membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
         image: g.IMAGE || undefined,
+        isArchived: g.CLOSED === 'Y',
       })),
       users: (rawUsers || []).map((u: any) => ({
         id: u.ID,
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
       description: g.DESCRIPTION || '',
       membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
       image: g.IMAGE || undefined,
+      isArchived: g.CLOSED === 'Y',
     }));
 
     const users = (rawUsers || []).map((u: any) => ({

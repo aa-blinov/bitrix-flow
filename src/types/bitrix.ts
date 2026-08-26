@@ -100,6 +100,7 @@ export interface Bx24Project {
   description: string;
   membersCount: number;
   image?: string;
+  isArchived?: boolean;
 }
 
 export interface Bx24User {
