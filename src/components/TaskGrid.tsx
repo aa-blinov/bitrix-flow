@@ -374,14 +374,14 @@ export default function TaskGrid({
   return (
     <>
       <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
-        <CardHeader className="gap-3 border-b bg-muted/30 px-4 py-4 sm:px-6">
-          <CardTitle className="text-base">{title ?? 'Задачи проекта'}</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
+        <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
+            <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Поиск задач…"
-              className="h-8 w-full sm:w-56"
+              className="h-8 w-full sm:w-56 lg:w-80 xl:w-96"
             />
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass + ' w-auto bg-background'} aria-label="Статус">
               <option value="all">Все статусы</option>
