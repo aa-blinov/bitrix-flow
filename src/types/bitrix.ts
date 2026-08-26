@@ -91,7 +91,6 @@ export const STATUS_LABELS: Record<string, string> = {
   testing: 'Тестирование',
   done: 'Готово',
   deferred: 'Отложена',
-  postponed: 'Отложена',
 };
 
 export interface Bx24Project {
