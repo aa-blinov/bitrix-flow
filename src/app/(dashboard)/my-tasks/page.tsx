@@ -60,9 +60,6 @@ export default function MyTasksPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="pt-2 md:pt-0">
             <h1 className="text-xl font-semibold text-foreground">Мои задачи</h1>
-            <p className="text-sm text-muted-foreground">
-              Все задачи во всех проектах, где вы исполнитель · {currentUser.name}
-            </p>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 lg:pb-0">
