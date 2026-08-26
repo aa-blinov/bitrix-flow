@@ -1,0 +1,169 @@
+'use client';
+import { useKanbanStore } from '@/store/kanban';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import KanbanBoard from '@/components/KanbanBoard';
+import {
+  FolderKanban,
+  Users,
+  ChevronRight,
+  Columns3,
+  TableProperties,
+  Clock3,
+  CheckCircle2,
+} from 'lucide-react';
+import TaskGrid from '@/components/TaskGrid';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+
+export default function ProjectPage() {
+  const params = useParams();
+  const router = useRouter();
+  const projectId = (params?.id as string) || '0';
+  const [view, setView] = useState('kanban');
+  const hasRequestedFreshData = useRef(false);
+
+  const { projects, selectedProjectId, setSelectedProject, tasks, loadProjects, isLoading } =
+    useKanbanStore();
+
+  // Always refresh after navigation. Cached data is kept only as a warm cache;
+  // the page remains covered by one loader until the current project is ready.
+  useEffect(() => {
+    if (hasRequestedFreshData.current) return;
+    hasRequestedFreshData.current = true;
+    void loadProjects(true);
+  }, [loadProjects]);
+
+  useEffect(() => {
+    if (projectId && projectId !== selectedProjectId) {
+      setSelectedProject(projectId);
+    }
+  }, [projectId, selectedProjectId]);
+
+  // Computed values
+  const currentProject = projects.find((p) => p.id === projectId);
+  const getFilteredTasks = useKanbanStore((state) => state.getFilteredTasks);
+  const projectTasks = useMemo(
+    () => tasks.filter((t) => t.projectId === projectId),
+    [tasks, projectId],
+  );
+  const visibleTasks = getFilteredTasks();
+  const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
+  const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
+  const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
+
+  // Wait for projects to load
+  const hasCurrentProjectData =
+    projectTasks.length > 0 || (!isLoading && selectedProjectId === projectId);
+  if (projects.length === 0 || !hasCurrentProjectData) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-3 border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Загружаем проекты…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Проект не найден</p>
+          <Button onClick={() => router.push('/')} className="px-4">
+            На главную
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-muted/30" suppressHydrationWarning>
+      {/* Project Header */}
+      <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+        <div className="px-4 lg:px-6 pt-3 pb-2">
+          <div className="flex items-center gap-1 text-xs text-gray-500 overflow-x-auto scrollbar-hide">
+            <Button
+              variant="link"
+              size="xs"
+              onClick={() => router.push('/')}
+              className="h-auto p-0 text-muted-foreground no-underline hover:text-foreground hover:no-underline"
+            >
+              Главная
+            </Button>
+            <ChevronRight size={12} />
+            <span className="text-foreground font-medium">{currentProject.name}</span>
+          </div>
+        </div>
+
+        <div className="px-4 lg:px-6 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <span className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <FolderKanban size={20} />
+                </span>
+                {currentProject.name}
+              </h1>
+              <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Users size={14} />
+                  {currentProject.membersCount || 0} участников
+                </span>
+                <span>•</span>
+                <span>{projectTasks.length} задач</span>
+                <span>•</span>
+                <span className="text-emerald-600">{completedTasks} завершено</span>
+              </div>
+            </div>
+
+            <div className="hidden md:flex gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-muted-foreground text-xs">План</p>
+                <p className="font-semibold">{totalEstimate.toFixed(1)}h</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground text-xs">Факт</p>
+                <p className="font-semibold">{totalActual.toFixed(1)}h</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Tabs value={view} onValueChange={setView} className="pb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-5 sm:px-6">
+          <TabsList>
+            <TabsTrigger value="kanban">
+              <Columns3 className="size-4" />
+              Канбан
+            </TabsTrigger>
+            <TabsTrigger value="grid">
+              <TableProperties className="size-4" />
+              Таблица
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="secondary" className="gap-1">
+              <CheckCircle2 className="size-3.5" />
+              {completedTasks} готовы
+            </Badge>
+            <Badge variant="outline" className="gap-1">
+              <Clock3 className="size-3.5" />
+              {visibleTasks.length} в выборке
+            </Badge>
+          </div>
+        </div>
+        <TabsContent value="kanban" className="mt-4">
+          <KanbanBoard />
+        </TabsContent>
+        <TabsContent value="grid" className="mt-0">
+          <TaskGrid tasks={visibleTasks} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

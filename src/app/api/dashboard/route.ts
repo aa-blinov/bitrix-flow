@@ -1,0 +1,148 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getDb } from '@/lib/mongo';
+import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
+import { postBitrixJson } from '@/lib/bitrix-request';
+import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { sessionCookie } from '@/lib/session';
+
+// Batch endpoint - загружает все данные для дашборда одним запросом
+export async function GET(req: NextRequest) {
+  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+
+  if (!memberId) {
+    return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+  }
+
+  let token;
+  try {
+    const db = await getDb();
+    token = await db.collection('user_tokens').findOne({ member_id: memberId });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+
+  if (!token?.access_token) {
+    return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
+  }
+
+  // Параллельно загружаем все что нужно для дашборда
+  const PROJECTS_TTL = 5 * 60 * 1000;
+
+  try {
+    const [rawProjects, rawUsers, rawCurrentUser] = await Promise.all([
+      serverCache(
+        `${memberId}:projects:all`,
+        () => callBitrix24(token, 'sonet_group.get.json', {}),
+        PROJECTS_TTL,
+      ),
+      serverCache(
+        `${memberId}:users:all`,
+        () => callBitrix24(token, 'user.get', { ACTIVE: 'true' }),
+        PROJECTS_TTL,
+      ),
+      serverCache(
+        `${memberId}:user:current`,
+        () => callBitrix24(token, 'user.current', {}),
+        PROJECTS_TTL,
+      ),
+    ]);
+
+    // Маппим в формат нашего store (id, name, etc.)
+    const projects = (rawProjects || []).map((g: any) => ({
+      id: g.ID,
+      name: g.NAME || 'Project',
+      description: g.DESCRIPTION || '',
+      membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
+      image: g.IMAGE || undefined,
+    }));
+
+    const users = (rawUsers || []).map((u: any) => ({
+      id: u.ID,
+      name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
+      email: u.EMAIL,
+      icon: u.PERSONAL_PHOTO,
+    }));
+
+    const currentUser = rawCurrentUser
+      ? {
+          id: rawCurrentUser.ID || rawCurrentUser.id || '',
+          name:
+            `${rawCurrentUser.NAME || rawCurrentUser.name || ''} ${rawCurrentUser.LAST_NAME || rawCurrentUser.lastName || ''}`.trim() ||
+            'Неизвестный пользователь',
+          photo:
+            rawCurrentUser.PERSONAL_PHOTO ||
+            rawCurrentUser.personalPhoto ||
+            rawCurrentUser.photo ||
+            undefined,
+        }
+      : null;
+
+    return NextResponse.json({ projects, users, currentUser });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+async function callBitrix24(
+  token: any,
+  method: string,
+  params: Record<string, string>,
+): Promise<any> {
+  const data = await callBitrix24WithToken(token, method, params);
+  if (data.error === 'expired_token' || data.error === 'invalid_token') {
+    const refreshedToken = await refreshToken(token);
+    if (!refreshedToken) throw new Error('TOKEN_REFRESH_FAILED');
+    const refreshedData = await callBitrix24WithToken(
+      { ...token, access_token: refreshedToken },
+      method,
+      params,
+    );
+    if (refreshedData.error)
+      throw new Error(`${refreshedData.error}: ${refreshedData.error_description}`);
+    return refreshedData.result;
+  }
+  if (data.error) throw new Error(`${data.error}: ${data.error_description}`);
+  return data.result;
+}
+
+async function callBitrix24WithToken(token: any, method: string, params: Record<string, string>) {
+  const url = token.domain
+    ? `https://${token.domain}/rest/${method}?auth=${token.access_token}`
+    : `https://eora.bitrix24.ru/rest/${method}?auth=${token.access_token}`;
+  return postBitrixJson(url, params);
+}
+
+async function refreshToken(token: any): Promise<string | null> {
+  if (!token.refresh_token) return null;
+  const clientId = process.env.BITRIX24_CLIENT_ID;
+  const clientSecret = process.env.BITRIX24_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  const response = await fetch('https://oauth.bitrix.info/oauth/token/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: token.refresh_token,
+    }),
+  });
+  const result = await response.json();
+  if (result.error || !result.access_token) return null;
+
+  const db = await getDb();
+  await db.collection('user_tokens').updateOne(
+    { member_id: token.member_id },
+    {
+      $set: {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+        expires_in: result.expires_in,
+        updated_at: new Date(),
+      },
+    },
+  );
+  invalidateByPrefix(`${token.member_id}:`);
+  return result.access_token;
+}

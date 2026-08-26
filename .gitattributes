@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Keep scripts usable in Linux CI and Docker.
+*.sh text eol=lf
