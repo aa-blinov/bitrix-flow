@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
-import { needsDeadlineAttention } from '@/lib/task-urgency';
+import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
@@ -268,6 +268,12 @@ export default function TaskGrid({
       .filter((task) => {
         if (statusFilter === 'overdue') {
           if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date()) return false;
+        } else if (statusFilter === 'attention') {
+          if (!needsDeadlineAttention(task)) return false;
+        } else if (statusFilter === 'week') {
+          if (!isDueThisWeek(task)) return false;
+        } else if (statusFilter === 'no_deadline') {
+          if (task.dueDate || task.status === 'done') return false;
         } else if (statusFilter !== 'all' && task.status !== statusFilter) return false;
         if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
         if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter) return false;
@@ -400,7 +406,10 @@ export default function TaskGrid({
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32" aria-label="Статус"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Все статусы</SelectItem>
+                <SelectItem value="all">Все задачи</SelectItem>
+                <SelectItem value="attention">Требуют внимания</SelectItem>
+                <SelectItem value="week">Дедлайн на неделе</SelectItem>
+                <SelectItem value="no_deadline">Без дедлайна</SelectItem>
                 <SelectItem value="overdue">Просрочено</SelectItem>
                 {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
               </SelectContent>

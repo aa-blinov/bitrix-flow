@@ -2,20 +2,13 @@
 import { useKanbanStore } from '@/store/kanban';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import {
-  FolderKanban,
-  Users,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowRight,
-  Plus,
-} from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarDays, CalendarOff, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
+import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
@@ -92,14 +85,10 @@ export default function DashboardPage() {
     project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
   );
 
-  const totalTasks = allTasks.length;
-  const totalCompleted = allTasks.filter((t) => t.status === 'done').length;
-  const totalOverdue = allTasks.filter((t) => {
-    if (!t.dueDate || t.status === 'done') return false;
-    return new Date(t.dueDate) < new Date();
-  }).length;
-  const totalEstimate = allTasks.reduce((sum, t) => sum + t.estimate, 0);
-  const totalActual = allTasks.reduce((sum, t) => sum + t.actualTime, 0);
+  const attentionCount = allTasks.filter((task) => needsDeadlineAttention(task)).length;
+  const inProgressCount = allTasks.filter((task) => task.status === 'in_progress').length;
+  const dueThisWeekCount = allTasks.filter((task) => isDueThisWeek(task)).length;
+  const noDeadlineCount = allTasks.filter((task) => task.status !== 'done' && !task.dueDate).length;
 
   return (
     <div className="min-h-full bg-muted/20">
@@ -113,34 +102,10 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         {/* Stats */}
         <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard
-            icon={FolderKanban}
-            label="Проекты"
-            value={projects.length}
-            color="text-foreground"
-            bgColor="bg-muted"
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label="Готово"
-            value={totalCompleted}
-            color="text-green-600 dark:text-green-400"
-            bgColor="bg-green-500/15"
-          />
-          <StatCard
-            icon={AlertTriangle}
-            label="Просрочено"
-            value={totalOverdue}
-            color="text-red-600 dark:text-red-400"
-            bgColor="bg-red-500/15"
-          />
-          <StatCard
-            icon={Clock}
-            label="Часы"
-            value={totalActual.toFixed(1)}
-            color="text-blue-600 dark:text-blue-400"
-            bgColor="bg-blue-500/15"
-          />
+          <StatCard href="/all-tasks?status=attention" icon={AlertTriangle} label="Требуют внимания" value={attentionCount} color="text-amber-700 dark:text-amber-300" bgColor="bg-amber-500/15" />
+          <StatCard href="/all-tasks?status=in_progress" icon={ListChecks} label="В работе" value={inProgressCount} color="text-blue-700 dark:text-blue-300" bgColor="bg-blue-500/15" />
+          <StatCard href="/all-tasks?status=week" icon={CalendarDays} label="Дедлайн на неделе" value={dueThisWeekCount} color="text-violet-700 dark:text-violet-300" bgColor="bg-violet-500/15" />
+          <StatCard href="/all-tasks?status=no_deadline" icon={CalendarOff} label="Без дедлайна" value={noDeadlineCount} color="text-muted-foreground" bgColor="bg-muted" />
         </div>
 
         {/* Projects list */}
@@ -238,15 +203,18 @@ function StatCard({
   value,
   color,
   bgColor,
+  href,
 }: {
   icon: any;
   label: string;
   value: number | string;
   color: string;
   bgColor: string;
+  href: string;
 }) {
   return (
-    <Card className="py-0" size="sm">
+    <Link href={href} className="block">
+      <Card className="py-0 transition hover:bg-muted/50" size="sm">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center`}>
@@ -258,6 +226,7 @@ function StatCard({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   );
 }
