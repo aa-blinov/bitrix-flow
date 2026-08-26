@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useKanbanStore } from '@/store/kanban';
-import { AlertTriangle } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import TaskGrid from '@/components/TaskGrid';
@@ -25,15 +24,6 @@ function AllTasksInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const counts = useMemo(() => {
-    const now = new Date();
-    return {
-      overdue: allTasks.filter(
-        (t) => t.dueDate && t.status !== 'done' && new Date(t.dueDate) < now,
-      ).length,
-    };
-  }, [allTasks]);
-
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
@@ -48,14 +38,6 @@ function AllTasksInner() {
         </div>
       </header>
 
-      {counts.overdue > 0 && initialStatus === 'all' && (
-        <div className="mx-4 mt-4 px-3 py-2 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 text-destructive lg:mx-6">
-          <AlertTriangle size={16} />
-          <span className="text-sm font-medium">
-            {counts.overdue} просроченных задач по всем проектам
-          </span>
-        </div>
-      )}
 
       <div className="mt-4">
         {isLoadingAllTasks ? (
