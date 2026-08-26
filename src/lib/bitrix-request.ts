@@ -76,3 +76,9 @@ export async function postBitrixJson(
 
   throw lastError instanceof Error ? lastError : new Error('BITRIX24_REQUEST_FAILED');
 }
+
+
+// Запускаем фоновый поллер задач сразу при первом импорте —
+// модуль-синглтон (через globalThis), стартует ровно один раз.
+import { startBackgroundSync } from "./background-sync";
+startBackgroundSync();
