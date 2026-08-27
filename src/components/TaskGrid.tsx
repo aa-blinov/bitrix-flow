@@ -699,7 +699,15 @@ export default function TaskGrid({
           <DialogFooter><Button onClick={() => void saveView()} disabled={!viewName.trim()}>Сохранить</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          onClose={() => {
+            setSelectedTask(null);
+            clearTransientTask();
+          }}
+        />
+      )}
     </>
   );
 }

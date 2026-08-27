@@ -22,6 +22,8 @@ function MyTasksContent() {
     loadAllTasks,
     isLoadingAllTasks,
     setSelectedTask,
+    openTransientTask,
+    selectedTransientTask,
   } = useKanbanStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,8 +62,15 @@ function MyTasksContent() {
       const next = new URL(window.location.href);
       next.searchParams.delete('task');
       router.replace(`${next.pathname}${next.search ? `?${next.searchParams.toString()}` : ''}`);
+      return;
     }
-  }, [notificationTaskId, allTasks, setSelectedTask, router]);
+    // Задача ещё не в локальном зеркале: подтянем её одним запросом и
+    // покажем в модалке, чтобы уведомление не висело «без ответа».
+    void openTransientTask(notificationTaskId);
+    const next = new URL(window.location.href);
+    next.searchParams.delete('task');
+    router.replace(`${next.pathname}${next.search ? `?${next.searchParams.toString()}` : ''}`);
+  }, [notificationTaskId, allTasks, setSelectedTask, openTransientTask, router]);
 
   const myTasks = allTasks.filter(
     (task) => String(task.assigneeId) === String(currentUser.id),
@@ -91,7 +100,13 @@ function MyTasksContent() {
       {isLoadingProfile || (isLoadingAllTasks && allTasks.length === 0) ? (
         <LoadingState className="min-h-[60vh] bg-transparent" />
       ) : (
-        <TaskGrid tasks={myTasks} showProject viewScope="my" title={null} />
+        <TaskGrid
+          tasks={myTasks}
+          transientTask={selectedTransientTask}
+          showProject
+          viewScope="my"
+          title={null}
+        />
       )}
     </div>
   );

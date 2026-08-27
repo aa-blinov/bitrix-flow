@@ -24,6 +24,7 @@ import {
   fetchUsers,
   fetchProjectStages,
   createProjectStage,
+  fetchSingleTask,
   updateTaskStatus as bxUpdateStatus,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
@@ -53,6 +54,9 @@ interface KanbanStore {
   stages: Bx24Stage[];
   selectedProjectId: string | null;
   selectedTaskId: string | null;
+  selectedTransientTask: BxTask | null;
+  openTransientTask: (taskId: string) => Promise<void>;
+  clearTransientTask: () => void;
   currentUser: { id: string; name: string; photo?: string };
 
   // Все задачи по всем доступным проектам (для /all-tasks)
@@ -175,6 +179,22 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   stages: [],
   selectedProjectId: null,
   selectedTaskId: null,
+  selectedTransientTask: null,
+  openTransientTask: async (taskId) => {
+    const transient = get().selectedTransientTask;
+    if (transient && transient.id === taskId) {
+      set({ selectedTaskId: taskId });
+      return;
+    }
+    try {
+      const task = await fetchSingleTask(taskId);
+      if (!task) return;
+      set({ selectedTransientTask: task, selectedTaskId: taskId });
+    } catch (error) {
+      console.error('Failed to fetch transient task', error);
+    }
+  },
+  clearTransientTask: () => set({ selectedTransientTask: null }),
   currentUser: { id: '', name: 'Не определён' },
   allTasks: [],
   isLoadingAllTasks: false,
