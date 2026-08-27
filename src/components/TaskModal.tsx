@@ -66,6 +66,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [parentQuery, setParentQuery] = useState('');
 
   const taskSubtasks = subtasks[task.id] || [];
 
@@ -479,26 +480,24 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Layers size={12} /> Родительская задача
                       </label>
-                      <Select
-                        value={task.parentId || 'root'}
-                        onValueChange={(value) =>
-                          void handleUpdateField('parentId', value === 'root' ? '' : value)
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="root">Корневая задача</SelectItem>
-                          {tasks
-                            .filter((candidate) => candidate.id !== task.id)
-                            .map((candidate) => (
-                              <SelectItem key={candidate.id} value={candidate.id}>
-                                {candidate.title}
-                              </SelectItem>
+                      {task.parentId && (
+                        <div className="mb-1 flex items-center justify-between rounded border bg-muted px-2 py-1 text-sm">
+                          <span className="truncate">{tasks.find((candidate) => candidate.id === task.parentId)?.title || `#${task.parentId}`}</span>
+                          <Button variant="ghost" size="icon-xs" aria-label="Убрать родительскую задачу" onClick={() => void handleUpdateField('parentId', '')}><X /></Button>
+                        </div>
+                      )}
+                      <div className="relative">
+                        <Input value={parentQuery} onChange={(event) => setParentQuery(event.target.value)} placeholder="Найти задачу по названию или ID…" />
+                        {parentQuery && (
+                          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
+                            {tasks.filter((candidate) => candidate.id !== task.id && `${candidate.id} ${candidate.title}`.toLocaleLowerCase('ru').includes(parentQuery.toLocaleLowerCase('ru'))).slice(0, 10).map((candidate) => (
+                              <Button key={candidate.id} variant="ghost" className="h-auto w-full justify-start px-2 py-1.5 text-left" onClick={() => { void handleUpdateField('parentId', candidate.id); setParentQuery(''); }}>
+                                <span className="truncate">#{candidate.id} · {candidate.title}</span>
+                              </Button>
                             ))}
-                        </SelectContent>
-                      </Select>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Estimate */}
