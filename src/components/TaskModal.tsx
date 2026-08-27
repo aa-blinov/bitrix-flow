@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   X,
   User,
+  Users,
+  Eye,
   Flag,
   Calendar,
   Timer,
@@ -76,6 +78,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [task.id, task.comments.length]);
 
   const taskSubtasks = subtasks[task.id] || [];
+  const mentionQuery = comment.match(/(?:^|\s)@([^\s]*)$/)?.[1];
+  const mentionUsers = mentionQuery === undefined ? [] : users.filter((user) => user.name.toLocaleLowerCase('ru').includes(mentionQuery.toLocaleLowerCase('ru'))).slice(0, 5);
 
   const handleUpdateField = async (field: string, value: any) => {
     await updateTaskField(task.id, field, value);
@@ -384,6 +388,28 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       )}
                     </div>
 
+                    <div>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Users size={12} /> Соисполнители</label>
+                      <div className="mb-1 flex flex-wrap gap-1">
+                        {(task.accompliceIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить соисполнителя" onClick={() => void handleUpdateField('accompliceIds', (task.accompliceIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
+                      </div>
+                      <Select onValueChange={(id) => void handleUpdateField('accompliceIds', [...new Set([...(task.accompliceIds || []), id])])}>
+                        <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Добавить соисполнителя…" /></SelectTrigger>
+                        <SelectContent>{users.filter((user) => !(task.accompliceIds || []).includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Eye size={12} /> Наблюдатели</label>
+                      <div className="mb-1 flex flex-wrap gap-1">
+                        {(task.auditorIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить наблюдателя" onClick={() => void handleUpdateField('auditorIds', (task.auditorIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
+                      </div>
+                      <Select onValueChange={(id) => void handleUpdateField('auditorIds', [...new Set([...(task.auditorIds || []), id])])}>
+                        <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Добавить наблюдателя…" /></SelectTrigger>
+                        <SelectContent>{users.filter((user) => !(task.auditorIds || []).includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+
                     {/* Priority */}
                     <div>
                       <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
@@ -594,7 +620,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               ))}
             </div>
             <div className="flex items-end gap-2 border-t p-4">
-              <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий…" rows={4} className="min-h-32 flex-1 resize-y" />
+              <div className="relative flex-1">
+                <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий… Используйте @ для упоминания" rows={4} className="min-h-32 resize-y" />
+                {mentionUsers.length > 0 && <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">{mentionUsers.map((user) => <Button key={user.id} variant="ghost" className="h-auto w-full justify-start px-2 py-1.5" onClick={() => setComment((text) => text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `))}>{user.name}</Button>)}</div>}
+              </div>
               <Button onClick={handleAddComment} disabled={!comment.trim()} size="icon" className="h-10 shrink-0"><Send size={16} /></Button>
             </div>
           </Card>

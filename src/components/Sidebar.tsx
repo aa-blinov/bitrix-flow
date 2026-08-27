@@ -85,9 +85,9 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <span className="text-white font-bold text-sm">B</span>
+          <span className="font-heading text-sm font-bold text-white">B</span>
         </div>
-        <span className="ml-2.5 text-sm font-semibold text-foreground">Bitrix24 PM</span>
+        <span className="ml-2.5 font-heading text-lg font-semibold tracking-tight text-foreground">BitrixFlow</span>
       </div>
 
       {/* Navigation */}

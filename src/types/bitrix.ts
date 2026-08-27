@@ -22,6 +22,8 @@ export interface BxTask {
   subtasks: BxTask[];
   stageId: string;
   chatId?: string;
+  accompliceIds?: string[];
+  auditorIds?: string[];
 }
 
 export type TaskStatus = 'new' | 'in_progress' | 'testing' | 'done' | string;

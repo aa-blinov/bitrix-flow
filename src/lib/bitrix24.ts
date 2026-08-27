@@ -115,6 +115,8 @@ export interface Bx24Task {
   stageId: string;
   stageName: string;
   chatId?: string;
+  accompliceIds?: string[];
+  auditorIds?: string[];
 }
 
 export interface Bx24Project {
@@ -440,6 +442,8 @@ function mapTask(t: any): Bx24Task {
     stageId: t.stageId || '0',
     stageName: '',
     chatId: t.chatId || t.CHAT_ID || undefined,
+    accompliceIds: (t.accomplices || t.ACCOMPLICES || []).map(String),
+    auditorIds: (t.auditors || t.AUDITORS || []).map(String),
   };
 }
 
@@ -568,6 +572,8 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.estimate !== undefined) updateFields.TIME_ESTIMATE = fields.estimate * 3600;
   if (fields.parentId !== undefined) updateFields.PARENT_ID = fields.parentId || 0;
   if (fields.stageId !== undefined) updateFields.STAGE_ID = fields.stageId;
+  if (fields.accompliceIds !== undefined) updateFields.ACCOMPLICES = fields.accompliceIds;
+  if (fields.auditorIds !== undefined) updateFields.AUDITORS = fields.auditorIds;
 
   await bx24('tasks.task.update', {
     taskId,

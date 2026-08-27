@@ -150,6 +150,8 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     subtasks: [],
     stageId: bxTask.stageId || '0',
     chatId: bxTask.chatId,
+    accompliceIds: bxTask.accompliceIds,
+    auditorIds: bxTask.auditorIds,
   };
 }
 
@@ -498,6 +500,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'description') update.description = value;
     else if (field === 'status') update.status = value;
     else if (field === 'parentId') update.parentId = value;
+    else if (field === 'accompliceIds') update.accompliceIds = value;
+    else if (field === 'auditorIds') update.auditorIds = value;
 
     set((state) => ({
       tasks: state.tasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
@@ -513,6 +517,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'title') bxFields.title = value;
     else if (field === 'description') bxFields.description = value;
     else if (field === 'parentId') bxFields.parentId = value || 0;
+    else if (field === 'accompliceIds') bxFields.accompliceIds = value;
+    else if (field === 'auditorIds') bxFields.auditorIds = value;
 
     try {
       if (Object.keys(bxFields).length > 0) await bxUpdateTaskFull(id, bxFields);
