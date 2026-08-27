@@ -14,6 +14,17 @@ export async function GET(req: NextRequest) {
   if (!memberId) {
     return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
   }
+  // Если для авторизованного member_id нет ни Bitrix-токена, ни синхронизированных
+  // задач — это инвалидированное состояние. Очищаем его и отдаём пустой список,
+  // чтобы клиент не видел залежавшиеся данные из старого token.
+  const db0 = await getDb();
+  const token = await db0.collection('user_tokens').findOne({ member_id: memberId }, { projection: { _id: 1 } });
+  if (!token) {
+    await db0.collection('task_mirror').deleteMany({ member_id: memberId });
+    await db0.collection('projects').deleteMany({ member_id: memberId });
+    await db0.collection('tasks').deleteMany({ member_id: memberId });
+    return NextResponse.json({ tasks: [] });
+  }
 
   const db = await getDb();
 

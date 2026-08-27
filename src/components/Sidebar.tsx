@@ -48,6 +48,11 @@ export default function Sidebar() {
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      localStorage.removeItem('bitrix-kanban');
+      localStorage.removeItem('bitrix_member_id');
+      sessionStorage.clear();
+    } catch {}
     window.location.assign('/login');
   }
 

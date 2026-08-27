@@ -55,6 +55,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
   }
 
+  // Sanity: при наличии токена в OAuth-кабинете Bitrix, но пустом состоянии
+  // данных, сбрасываем старые данные этого member_id и заставляем клиента
+  // пересинхронизироваться с нуля.
+  const db2 = await getDb();
+  const hasMirror = await db2.collection('task_mirror').findOne({ member_id: memberId }, { projection: { _id: 1 } });
+  if (!hasMirror) {
+    await db2.collection('task_mirror').deleteMany({ member_id: memberId });
+    await db2.collection('projects').deleteMany({ member_id: memberId });
+    await db2.collection('tasks').deleteMany({ member_id: memberId });
+  }
+
   // Параллельно загружаем все что нужно для дашборда
   const PROJECTS_TTL = 5 * 60 * 1000;
 
