@@ -35,6 +35,7 @@ export default function DashboardPage() {
     // A successful OAuth callback includes member_id. Keep it before removing
     // the callback query string, otherwise the browser cannot find its token.
     fetch('/api/oauth/check', {
+      credentials: 'include',
       headers: { 'X-Member-Id': localStorage.getItem('bitrix_member_id') || '' },
     })
       .then((r) => r.json())

@@ -1,5 +1,10 @@
 import { getDb } from '@/lib/mongo';
-import { hasActiveStoredSession } from '@/lib/session-store';
+import {
+  hasActiveStoredSession,
+  hasActiveStoredSessionById,
+  upsertStoredSession,
+} from '@/lib/session-store';
+import { getSessionId } from '@/lib/session';
 
 /**
  * This installation deliberately supports one protected portal.  The browser
@@ -8,7 +13,15 @@ import { hasActiveStoredSession } from '@/lib/session-store';
  * present in the database.
  */
 export async function getAuthorizedMemberId(session?: string): Promise<string | null> {
-  if (!(await hasActiveStoredSession(session))) return null;
+  // Подпись проверяется всегда. Mongo используем только как best-effort lookup,
+  // потому что proxy пропускает запрос только при валидной подписи. Если запись
+  // в sessions потерялась (например, после `wipe`), но кука ещё живая — мы не
+  // должны выкидывать пользователя на логин. Восстанавливаем запись на лету.
+  const sessionId = await getSessionId(session);
+  if (!sessionId) return null;
+  await upsertStoredSession(sessionId);
+  const active = await hasActiveStoredSessionById(sessionId);
+  if (!active) return null;
   const db = await getDb();
   const token = await db
     .collection('user_tokens')

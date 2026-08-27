@@ -23,6 +23,10 @@ export async function createStoredSession(cookie: string, userAgent: string | nu
 export async function hasActiveStoredSession(cookie: string | undefined): Promise<boolean> {
   const sessionId = await getSessionId(cookie);
   if (!sessionId) return false;
+  return hasActiveStoredSessionById(sessionId);
+}
+
+export async function hasActiveStoredSessionById(sessionId: string): Promise<boolean> {
   const db = await getDb();
   const found = await db
     .collection('sessions')
@@ -32,6 +36,27 @@ export async function hasActiveStoredSession(cookie: string | undefined): Promis
       { returnDocument: 'after' },
     );
   return Boolean(found);
+}
+
+// Создаёт или обновляет запись сессии в Mongo. Используется, когда кука
+// валидна по подписи, но в Mongo её нет (например, после ручной чистки
+// коллекции sessions или миграции). Без этой страховки авторизованные
+// пользователи выкидывались на /login после первого же запроса.
+export async function upsertStoredSession(sessionId: string): Promise<void> {
+  const db = await getDb();
+  const now = new Date();
+  await db.collection('sessions').updateOne(
+    { session_hash: sessionHash(sessionId) },
+    {
+      $set: {
+        session_hash: sessionHash(sessionId),
+        created_at: now,
+        last_seen_at: now,
+        expiresAt: new Date(now.getTime() + 8 * 60 * 60 * 1000),
+      },
+    },
+    { upsert: true },
+  );
 }
 
 export async function revokeStoredSession(cookie: string | undefined) {

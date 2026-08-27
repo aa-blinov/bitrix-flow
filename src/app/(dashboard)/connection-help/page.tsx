@@ -11,9 +11,13 @@ export default function ConnectionHelpPage() {
 
   useEffect(() => {
     const memberId = localStorage.getItem('bitrix_member_id') || '';
-    fetch('/api/oauth/check', { headers: { 'X-Member-Id': memberId } })
+    fetch('/api/oauth/check', { credentials: 'include', headers: { 'X-Member-Id': memberId } })
       .then((response) => response.json())
       .then((data) => {
+        if (data.session === false) {
+          window.location.replace('/login');
+          return;
+        }
         if (data.connected) window.location.replace('/');
         else setState('disconnected');
       })
