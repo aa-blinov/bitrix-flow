@@ -651,6 +651,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       if (selectedProjectId && t.projectId !== selectedProjectId) return false;
       if (!filters.showCompleted && t.status === 'done') return false;
       if (filters.assigneeId && t.assigneeId !== filters.assigneeId) return false;
+      if (filters.search && !`${t.title} ${t.description} ${t.id}`.toLocaleLowerCase('ru').includes(filters.search.toLocaleLowerCase('ru'))) return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.hasDeadline && !t.dueDate) return false;
       if (filters.overdue && t.dueDate) {

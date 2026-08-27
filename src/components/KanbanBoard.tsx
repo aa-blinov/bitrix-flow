@@ -335,6 +335,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
         <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {toolbar}
+          <Input
+            value={filters.search}
+            onChange={(event) => setFilters({ search: event.target.value })}
+            placeholder="Поиск задач…"
+            className="h-8 w-48 shrink-0 bg-background"
+            aria-label="Поиск задач на доске"
+          />
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
@@ -415,8 +422,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   variant="ghost"
                   onClick={() =>
                     setFilters({
+                      search: '',
                       assigneeId: '',
-                      priority: '',
                       hasDeadline: false,
                       overdue: false,
                       showCompleted: true,
