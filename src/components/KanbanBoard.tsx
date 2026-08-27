@@ -333,7 +333,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     <div className="flex min-w-0 flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
-        <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto scrollbar-hide">
+        <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {toolbar}
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
