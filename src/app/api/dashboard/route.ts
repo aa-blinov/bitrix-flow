@@ -5,11 +5,12 @@ import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
+import { getOAuthTokenUrl } from '@/lib/bitrix-oauth-server';
 
 // Batch endpoint - загружает все данные для дашборда одним запросом
 export async function GET(req: NextRequest) {
   if (isMockEnabled()) {
-    const rawProjects = mockHandle('sonet_group.get.json', {}) as any[];
+    const rawProjects = mockHandle('sonet_group.get', {}) as any[];
     const rawUsers = mockHandle('user.get', {}) as any[];
     const rawCurrentUser = mockHandle('user.current', {}) as any;
     return NextResponse.json({
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
     const [rawProjects, rawUsers, rawCurrentUser] = await Promise.all([
       serverCache(
         `${memberId}:projects:all`,
-        () => callBitrix24(token, 'sonet_group.get.json', {}),
+        () => callBitrix24(token, 'sonet_group.get', {}),
         PROJECTS_TTL,
       ),
       serverCache(
@@ -181,7 +182,7 @@ async function refreshToken(token: any): Promise<string | null> {
   const clientSecret = process.env.BITRIX24_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
 
-  const response = await fetch('https://oauth.bitrix.info/oauth/token/', {
+  const response = await fetch(getOAuthTokenUrl(token.oauth_server), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

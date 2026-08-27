@@ -281,7 +281,7 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
   const groupsMap = new Map<string, Bx24Project>();
 
   try {
-    const result = await bx24('sonet_group.get.json', {});
+    const result = await bx24('sonet_group.get', {});
     for (const g of result || []) {
       groupsMap.set(g.ID, {
         id: g.ID,

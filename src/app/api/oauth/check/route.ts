@@ -29,8 +29,9 @@ export async function GET(req: NextRequest) {
       sort: { updated_at: -1, installed_at: -1 },
     });
 
-    if (!token) {
-      // Сессия приложения есть, но Bitrix OAuth не установлен.
+    if (!token || !token.domain || String(token.domain).startsWith('oauth.')) {
+      // Сессия приложения есть, но Bitrix OAuth не установлен или был выдан
+      // OAuth-сервером вместо портала.
       return NextResponse.json({ connected: false, session: true });
     }
 

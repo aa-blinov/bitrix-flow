@@ -25,7 +25,10 @@ export async function getAuthorizedMemberId(session?: string): Promise<string | 
   const db = await getDb();
   const token = await db
     .collection('user_tokens')
-    .find({ access_token: { $type: 'string', $ne: '' } })
+    .find({
+      access_token: { $type: 'string', $ne: '' },
+      domain: { $type: 'string', $not: /^oauth\./ },
+    })
     .sort({ updated_at: -1, installed_at: -1, _id: -1 })
     .limit(1)
     .next();

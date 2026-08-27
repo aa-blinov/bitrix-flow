@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
+import { getOAuthTokenUrl } from '@/lib/bitrix-oauth-server';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
@@ -448,7 +449,7 @@ async function refreshToken(token: any): Promise<string | null> {
   const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
 
   try {
-    const res = await fetch('https://oauth.bitrix.info/oauth/token/', {
+    const res = await fetch(getOAuthTokenUrl(token.oauth_server), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

@@ -1,4 +1,5 @@
 import { getDb } from './mongo';
+import { getOAuthTokenUrl } from './bitrix-oauth-server';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID!;
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET!;
@@ -17,7 +18,7 @@ async function refreshToken(member_id: string): Promise<string> {
   }
 
   // Refresh
-  const res = await fetch('https://oauth.bitrix.info/oauth/token/', {
+  const res = await fetch(getOAuthTokenUrl(token.oauth_server), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

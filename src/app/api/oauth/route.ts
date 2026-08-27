@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
+import { getOAuthServer, getOAuthTokenUrl } from '@/lib/bitrix-oauth-server';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     if (expectedState && state !== expectedState) {
       return NextResponse.json({ error: 'OAUTH_STATE_INVALID' }, { status: 400 });
     }
-    return await handleCallback(code, req);
+    return await handleCallback(code, req, url.searchParams.get('server_domain') || undefined);
   }
 
   // Если есть member_id и auth - это прямая установка из маркетплейса
@@ -45,13 +46,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.redirect(authUrl);
 }
 
-async function handleCallback(code: string, req: NextRequest) {
+async function handleCallback(code: string, req: NextRequest, oauthServer?: string) {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return NextResponse.json({ error: 'OAuth not configured' }, { status: 500 });
   }
 
   // Обмениваем code на токены
-  const tokenRes = await fetch('https://oauth.bitrix.info/oauth/token/', {
+  const tokenRes = await fetch(getOAuthTokenUrl(oauthServer), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -88,6 +89,7 @@ async function handleCallback(code: string, req: NextRequest) {
         scope: tokens.scope,
         domain: tokens.domain,
         application_token: tokens.application_token,
+        oauth_server: getOAuthServer(oauthServer),
         updated_at: new Date(),
       },
     },

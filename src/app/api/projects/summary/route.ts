@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
 
     const calculate = async () => {
       const [rawProjects, tasks] = await Promise.all([
-        callBitrix(token, 'sonet_group.get.json', {}),
+        callBitrix(token, 'sonet_group.get', {}),
         fetchAllTasks(token),
       ]);
       return { rawProjects: rawProjects || [], tasks };
