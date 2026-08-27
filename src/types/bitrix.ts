@@ -16,6 +16,7 @@ export interface BxTask {
   storyPoints?: number;
   comments: BxComment[];
   commentsCount?: number;
+  checklist?: BxChecklistItem[];
   timeEntries: TimeEntry[];
   parentId?: string;
   subtasks: BxTask[];
@@ -25,6 +26,12 @@ export interface BxTask {
 export type TaskStatus = 'new' | 'in_progress' | 'testing' | 'done' | string;
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface BxChecklistItem {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 export interface BxComment {
   id: string;

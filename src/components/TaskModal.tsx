@@ -19,6 +19,7 @@ import {
   Layers,
   AlertTriangle,
   GripVertical,
+  Trash2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     loadSubtasks,
     createTask,
     moveTask,
+    addChecklistItem,
+    setChecklistItemCompleted,
+    deleteChecklistItem,
     isLoadingTask,
   } = useKanbanStore();
 
@@ -61,6 +65,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [editValue, setEditValue] = useState('');
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
 
   const taskSubtasks = subtasks[task.id] || [];
 
@@ -83,6 +88,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       setTimeDesc('');
       setShowTimeEntry(false);
     }
+  };
+
+  const handleAddChecklistItem = async () => {
+    if (!newChecklistItem.trim()) return;
+    await addChecklistItem(task.id, newChecklistItem.trim());
+    setNewChecklistItem('');
   };
 
   const handleAddSubtask = async () => {
@@ -281,6 +292,27 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     )}
                   </div>
                 )}
+              </Card>
+
+              <Card className="gap-0 py-0">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium"><CheckSquare size={16} /> Чек-лист ({task.checklist?.filter((item) => item.completed).length || 0}/{task.checklist?.length || 0})</div>
+                </div>
+                <div className="space-y-1 px-4 pb-3">
+                  {task.checklist?.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted">
+                      <Button variant="ghost" size="icon-xs" aria-label={item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'} onClick={() => void setChecklistItemCompleted(task.id, item.id, !item.completed)}>
+                        {item.completed ? <CheckSquare className="text-primary" /> : <Square />}
+                      </Button>
+                      <span className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}>{item.title}</span>
+                      <Button variant="ghost" size="icon-xs" aria-label="Удалить пункт" onClick={() => void deleteChecklistItem(task.id, item.id)}><Trash2 /></Button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-2">
+                    <Input value={newChecklistItem} onChange={(event) => setNewChecklistItem(event.target.value)} placeholder="Добавить пункт…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
+                    <Button size="sm" onClick={() => void handleAddChecklistItem()} disabled={!newChecklistItem.trim()}>Добавить</Button>
+                  </div>
+                </div>
               </Card>
 
               {/* Comments */}

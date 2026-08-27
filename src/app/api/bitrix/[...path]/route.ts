@@ -104,6 +104,11 @@ const MUTATION_METHODS = new Set([
   'task.elapseditem.delete',
   'task.stages.add',
   'task.stages.delete',
+  'task.checklistitem.add',
+  'task.checklistitem.update',
+  'task.checklistitem.delete',
+  'task.checklistitem.complete',
+  'task.checklistitem.renew',
 ]);
 const JSON_PAYLOAD_METHODS = new Set(['tasks.task.list', 'tasks.task.add', 'tasks.task.update']);
 

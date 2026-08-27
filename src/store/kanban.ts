@@ -15,6 +15,11 @@ import {
   fetchSubtasks,
   fetchTaskComments,
   fetchTaskTimeLog,
+  fetchChecklist,
+  addChecklistItem as bxAddChecklistItem,
+  updateChecklistItem as bxUpdateChecklistItem,
+  setChecklistItemCompleted as bxSetChecklistItemCompleted,
+  deleteChecklistItem as bxDeleteChecklistItem,
   searchTasks,
   fetchUsers,
   fetchProjectStages,
@@ -91,6 +96,10 @@ interface KanbanStore {
   moveTaskToStage: (taskId: string, stageId: string) => Promise<void>;
   addComment: (taskId: string, text: string) => void;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
+  addChecklistItem: (taskId: string, title: string) => Promise<void>;
+  updateChecklistItem: (taskId: string, itemId: string, title: string) => Promise<void>;
+  setChecklistItemCompleted: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
+  deleteChecklistItem: (taskId: string, itemId: string) => Promise<void>;
   createTask: (data: {
     title: string;
     description?: string;
@@ -133,6 +142,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     comments: [],
     commentsCount: bxTask.commentsCount,
     storyPoints: bxTask.storyPoints,
+    checklist: [],
     timeEntries: [],
     // Bitrix represents a root task as the string "0". Keep only a real
     // parent id so root tasks are not visually labelled as subtasks.
@@ -372,10 +382,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     // Независимые REST-вызовы запускаем вместе: журнал времени не должен
     // ждать медленную загрузку комментариев из чата Bitrix24.
     const commentsPromise = fetchTaskComments(taskId);
-    const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
+    const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId), fetchChecklist(taskId)]);
 
     void detailsPromise
-      .then(([timeLog, subtaskList]) => {
+      .then(([timeLog, subtaskList, checklist]) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === taskId
@@ -387,6 +397,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
                     hours: secondsToHours(e.seconds),
                   })),
                   subtasks: subtaskList.map(convertBxTask),
+                  checklist,
                 }
               : t,
           ),
@@ -560,6 +571,27 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         ),
       }));
     }
+  },
+
+  addChecklistItem: async (taskId, title) => {
+    await bxAddChecklistItem(taskId, title);
+    const checklist = await fetchChecklist(taskId);
+    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task) }));
+  },
+
+  updateChecklistItem: async (taskId, itemId, title) => {
+    await bxUpdateChecklistItem(taskId, itemId, title);
+    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, title } : item) } : task) }));
+  },
+
+  setChecklistItemCompleted: async (taskId, itemId, completed) => {
+    await bxSetChecklistItemCompleted(taskId, itemId, completed);
+    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, completed } : item) } : task) }));
+  },
+
+  deleteChecklistItem: async (taskId, itemId) => {
+    await bxDeleteChecklistItem(taskId, itemId);
+    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.filter((item) => item.id !== itemId) } : task) }));
   },
 
   addTimeEntry: async (taskId, hours, description) => {
