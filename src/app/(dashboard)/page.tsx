@@ -40,7 +40,7 @@ export default function DashboardPage() {
       .then((data) => {
         if (data.connected && data.member_id) {
           localStorage.setItem('bitrix_member_id', data.member_id);
-          void loadProjects(true).then(() => {
+          void loadProjects().then(() => {
             const firstProject = useKanbanStore.getState().projects[0];
             if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
             // Список уже отдаётся из Mongo/task_mirror, поэтому не создаёт
