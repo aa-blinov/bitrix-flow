@@ -21,12 +21,13 @@ export async function GET(req: NextRequest) {
     const token = await db.collection('user_tokens').findOne({ member_id: memberId });
 
     if (!token) {
-      return NextResponse.json({ connected: false });
+      // Сессия приложения есть, но Bitrix OAuth не установлен.
+      return NextResponse.json({ connected: false, session: true });
     }
 
     return NextResponse.json({
       connected: true,
-    session: true,
+      session: true,
       member_id: memberId,
       domain: token.domain,
       scope: token.scope,

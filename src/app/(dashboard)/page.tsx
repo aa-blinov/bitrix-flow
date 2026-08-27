@@ -39,7 +39,7 @@ export default function DashboardPage() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.error === 'NOT_AUTHENTICATED' || data.session === false) {
+        if (data.session === false) {
           router.replace('/login');
           return;
         }
@@ -54,10 +54,9 @@ export default function DashboardPage() {
           });
           return;
         }
-        // Сессия есть, но Bitrix ещё не установлен: оставляем пользователя в
-        // ЛК, показывая баннер с кнопкой установки.
-        setShowInstallBanner(true);
-        void loadProjects().catch(() => {});
+        // Сессия есть, но Bitrix ещё не установлен: перекидываем на ЛК-раздел
+        // /connection-help, который проверит состояние и перейдёт в ЛК после установки.
+        router.replace('/connection-help');
       })
       .catch(() => router.replace('/login'));
   }, [loadAllTasks, loadProjects, router]);

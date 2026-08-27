@@ -7,6 +7,7 @@ const PUBLIC_PATHS = new Set([
   '/api/auth/logout',
   '/api/b24/handler',
   '/api/oauth',
+  '/api/oauth/check',
   '/install',
 ]);
 
