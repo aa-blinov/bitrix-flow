@@ -1,0 +1,16 @@
+{
+    email admin@bitrix-flow.duckdns.org
+    admin off
+}
+
+bitrix-flow.duckdns.org {
+    tls {
+        dns duckdns {env.DUCKDNS_TOKEN}
+    }
+    reverse_proxy app:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    encode gzip zstd
+}

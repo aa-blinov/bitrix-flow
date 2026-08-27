@@ -3,8 +3,6 @@ services:
     build:
       context: .
     restart: unless-stopped
-    ports:
-      - '3000:3000'
     env_file:
       - .env.local
     environment:
@@ -13,9 +11,29 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3000
       MOCK_B24: ${MOCK_B24:-0}
+    expose:
+      - '3000'
     depends_on:
       mongodb:
         condition: service_healthy
+
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DUCKDNS_TOKEN: DUCKDNS_TOKEN_REDACTED
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_started
 
   mongodb:
     image: mongo:7
@@ -31,3 +49,5 @@ services:
 
 volumes:
   mongodb_data:
+  caddy_data:
+  caddy_config:
