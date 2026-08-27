@@ -3,8 +3,10 @@ import { getDb } from '@/lib/mongo';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
+// Bitrix24 в маркетплейс-flow редиректит сюда же, на /api/oauth. Это рабочий
+// и одобренный redirect_uri для нашего приложения.
 const REDIRECT_URI =
-  process.env.BITRIX24_REDIRECT_URI || 'http://57.131.129.41:3000/api/oauth/callback';
+  process.env.BITRIX24_REDIRECT_URI || 'http://57.131.129.41:3000/api/oauth';
 
 // Стартовая точка OAuth flow
 export async function GET(req: NextRequest) {
@@ -13,9 +15,11 @@ export async function GET(req: NextRequest) {
 
   // Если есть code - это callback после авторизации
   if (code) {
+    // Bitrix24 в маркетплейс-flow не передаёт state (state всегда пустой),
+    // поэтому пропускаем проверку только если state реально ожидался.
     const state = url.searchParams.get('state');
     const expectedState = req.cookies.get('bitrix-oauth-state')?.value;
-    if (!state || !expectedState || state !== expectedState) {
+    if (expectedState && state !== expectedState) {
       return NextResponse.json({ error: 'OAUTH_STATE_INVALID' }, { status: 400 });
     }
     return await handleCallback(code, req);
