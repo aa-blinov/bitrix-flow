@@ -1,5 +1,11 @@
 import { lookup } from 'node:dns';
-import { request } from 'node:https';
+import { Agent, request } from 'node:https';
+
+// Pin every REST call to IPv4. The Bitrix portal publishes several AAAA
+// records that are silently unreachable from this server; Node's default
+// Happy-Eyeballs selection then times out the TLS handshake for the whole
+// request. Forcing IPv4 makes every call deterministic and fast.
+const ipv4Agent = new Agent({ family: 4, keepAlive: true, maxSockets: 8 });
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 3;
@@ -12,7 +18,7 @@ function rotatingLookup(
   options: { all?: boolean },
   callback: (...args: any[]) => void,
 ) {
-  lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
+  lookup(hostname, { all: true, family: 4, verbatim: true }, (error, addresses) => {
     if (error || addresses.length === 0) {
       callback(error || new Error(`No IPv4 address for ${hostname}`));
       return;
@@ -42,6 +48,7 @@ export async function postBitrixJson(
           url,
           {
             method: 'POST',
+            agent: ipv4Agent,
             lookup: rotatingLookup,
             timeout: CONNECT_TIMEOUT_MS,
             headers: {
