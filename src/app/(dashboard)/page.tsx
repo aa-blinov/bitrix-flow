@@ -17,6 +17,7 @@ export default function DashboardPage() {
     useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const hasBootstrapped = useRef(false);
 
   useEffect(() => {
@@ -38,6 +39,10 @@ export default function DashboardPage() {
     })
       .then((r) => r.json())
       .then((data) => {
+        if (data.error === 'NOT_AUTHENTICATED' || data.session === false) {
+          router.replace('/login');
+          return;
+        }
         if (data.connected && data.member_id) {
           localStorage.setItem('bitrix_member_id', data.member_id);
           void loadProjects().then(() => {
@@ -47,14 +52,17 @@ export default function DashboardPage() {
             // Bitrix fan-out и заполняет сводные карточки после доски.
             void loadAllTasks();
           });
-        } else {
-          router.replace('/connection-help');
+          return;
         }
+        // Сессия есть, но Bitrix ещё не установлен: оставляем пользователя в
+        // ЛК, показывая баннер с кнопкой установки.
+        setShowInstallBanner(true);
+        void loadProjects().catch(() => {});
       })
-      .catch(() => router.replace('/connection-help'));
+      .catch(() => router.replace('/login'));
   }, [loadAllTasks, loadProjects, router]);
 
-  if (isLoading || !selectedProjectId) {
+  if (isLoading || !selectedProjectId && !showInstallBanner) {
     return <LoadingState className="min-h-screen bg-muted/30" />;
   }
 
@@ -92,6 +100,14 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-full bg-muted/20">
+      {showInstallBanner && (
+        <div className="mx-auto mt-4 max-w-6xl px-4 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span>Вход выполнен, но подключение к Битрикс24 ещё не настроено. Без него список задач останется пустым.</span>
+            <a href="/api/oauth" className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">Подключить Битрикс24</a>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-5 backdrop-blur sm:px-8">
         <div className="max-w-6xl mx-auto">
