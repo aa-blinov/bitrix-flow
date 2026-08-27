@@ -1,7 +1,7 @@
 'use client';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   X,
   User,
@@ -67,6 +67,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [showDetails, setShowDetails] = useState(true);
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [parentQuery, setParentQuery] = useState('');
+  const commentsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = commentsRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [task.id, task.comments.length]);
 
   const taskSubtasks = subtasks[task.id] || [];
 
@@ -323,7 +329,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   Комментарии ({task.comments.length})
                 </h3>
 
-                <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                <div ref={commentsRef} className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                   {isLoadingTask && task.comments.length === 0 ? (
                     <LoadingState className="min-h-24 bg-transparent" />
                   ) : (

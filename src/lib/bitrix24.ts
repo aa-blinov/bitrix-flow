@@ -499,13 +499,15 @@ export async function fetchTaskComments(taskId: string): Promise<Bx24Comment[]> 
       DIALOG_ID: `chat${chatId}`,
       LIMIT: '50',
     });
-    const comments = (dialog?.messages || []).map((message: any): Bx24Comment => ({
-      id: String(message.id || message.ID),
-      authorId: String(message.author_id || message.authorId || message.AUTHOR_ID || ''),
-      authorName: message.author_name || message.authorName || '',
-      text: message.text || message.TEXT || '',
-      createdDate: message.date || message.DATE || '',
-    }));
+    const comments = (dialog?.messages || [])
+      .map((message: any): Bx24Comment => ({
+        id: String(message.id || message.ID),
+        authorId: String(message.author_id || message.authorId || message.AUTHOR_ID || ''),
+        authorName: message.author_name || message.authorName || '',
+        text: message.text || message.TEXT || '',
+        createdDate: message.date || message.DATE || '',
+      }))
+      .sort((left: Bx24Comment, right: Bx24Comment) => (Date.parse(left.createdDate) || 0) - (Date.parse(right.createdDate) || 0));
     await cacheSet(key, comments, 60);
     return comments;
   } catch {
