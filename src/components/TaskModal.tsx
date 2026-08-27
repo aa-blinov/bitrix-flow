@@ -567,11 +567,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             </div>
           </div>
 
-          <div className="mt-6">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
-              <MessageSquare size={14} /> Комментарии ({task.comments.length})
-            </h3>
-            <div ref={commentsRef} className="mb-4 max-h-60 space-y-3 overflow-y-auto">
+          <Card className="mt-6 gap-0 py-0">
+            <div className="border-b px-4 py-3">
+              <h3 className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                <MessageSquare size={14} /> Комментарии ({task.comments.length})
+              </h3>
+            </div>
+            <div ref={commentsRef} className="m-4 max-h-60 space-y-3 overflow-y-auto">
               {isLoadingTask && task.comments.length === 0 ? <LoadingState className="min-h-24 bg-transparent" /> : task.comments.map((commentItem) => (
                 <div key={commentItem.id} className="rounded-lg bg-muted p-3">
                   <div className="mb-2 flex items-center gap-2">
@@ -583,11 +585,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 </div>
               ))}
             </div>
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 border-t p-4">
               <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий…" rows={4} className="min-h-32 flex-1 resize-y" />
               <Button onClick={handleAddComment} disabled={!comment.trim()} size="icon" className="h-10 shrink-0"><Send size={16} /></Button>
             </div>
-          </div>
+          </Card>
         </div>
       </DialogContent>
     </Dialog>
