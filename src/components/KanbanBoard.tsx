@@ -330,12 +330,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   }
 
   return (
-    <div className="flex flex-col bg-background">
+    <div className="flex min-w-0 flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background px-6 py-4">
-        <div className="flex min-w-max items-center gap-3 overflow-x-auto">
+      <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
+        <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto">
           {toolbar}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
             onClick={() => setShowFilters(!showFilters)}
