@@ -5,8 +5,9 @@ const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
 // Bitrix24 в маркетплейс-flow редиректит сюда же, на /api/oauth. Это рабочий
 // и одобренный redirect_uri для нашего приложения.
+const APP_URL = process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org';
 const REDIRECT_URI =
-  process.env.BITRIX24_REDIRECT_URI || 'http://57.131.129.41:3000/api/oauth';
+  process.env.BITRIX24_REDIRECT_URI || `${APP_URL}/api/oauth`;
 
 // Стартовая точка OAuth flow
 export async function GET(req: NextRequest) {
@@ -111,7 +112,7 @@ async function handleCallback(code: string, req: NextRequest) {
   }
 
   // Редирект в приложение
-  const successUrl = new URL('/', req.url);
+  const successUrl = new URL('/', APP_URL);
   successUrl.searchParams.set('oauth', 'success');
   successUrl.searchParams.set('member_id', tokens.member_id);
   return NextResponse.redirect(successUrl);
@@ -122,7 +123,7 @@ async function handleInstall(memberId: string, url: URL, req: NextRequest) {
   const domain = url.searchParams.get('DOMAIN') || '';
 
   if (!auth) {
-    return NextResponse.redirect(new URL(`/api/oauth`, req.url));
+    return NextResponse.redirect(new URL('/api/oauth', APP_URL));
   }
 
   // Сохраняем токен установки
@@ -142,7 +143,7 @@ async function handleInstall(memberId: string, url: URL, req: NextRequest) {
     { upsert: true },
   );
 
-  const successUrl = new URL('/', req.url);
+  const successUrl = new URL('/', APP_URL);
   successUrl.searchParams.set('install', 'success');
   successUrl.searchParams.set('member_id', memberId);
   return NextResponse.redirect(successUrl);

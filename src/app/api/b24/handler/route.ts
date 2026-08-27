@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     // бывает, когда в кабинете приложения перепутан «Путь для первоначальной
     // установки» и «Путь вашего обработчика»), перенаправляем код на основной
     // /api/oauth, чтобы обмен токеном прошёл там.
-    const target = new URL('/api/oauth', url);
+    const target = new URL('/api/oauth', process.env.BITRIX24_APP_URL);
     target.searchParams.set('code', code);
     for (const key of ['state', 'domain', 'member_id', 'scope', 'server_domain']) {
       const value = url.searchParams.get(key);

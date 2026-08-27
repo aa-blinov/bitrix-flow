@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
   if (!memberId) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
   // Never allow a request to turn the app into an event forwarder to an
   // attacker-controlled URL. The registered target is this application only.
-  const handlerUrl = new URL('/api/b24/handler', req.nextUrl.origin).toString();
+  const handlerUrl = new URL(
+    '/api/b24/handler',
+    process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org',
+  ).toString();
 
   const events = ['OnTaskAdd', 'OnTaskUpdate', 'OnTaskDelete', 'OnTaskCommentAdd'];
 
