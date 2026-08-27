@@ -2,12 +2,22 @@
 import { useKanbanStore } from '@/store/kanban';
 import { CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import LoadingState from '@/components/LoadingState';
 import TaskGrid from '@/components/TaskGrid';
 
 export default function MyTasksPage() {
-  const { allTasks, currentUser, setCurrentUser, loadAllTasks, isLoadingAllTasks } =
-    useKanbanStore();
+  const {
+    allTasks,
+    currentUser,
+    setCurrentUser,
+    loadAllTasks,
+    isLoadingAllTasks,
+    setSelectedTask,
+  } = useKanbanStore();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const notificationTaskId = searchParams.get('task');
   const [isLoadingProfile, setIsLoadingProfile] = useState(!currentUser.id);
 
   useEffect(() => {
@@ -33,6 +43,17 @@ export default function MyTasksPage() {
   useEffect(() => {
     if (allTasks.length === 0 && !isLoadingAllTasks) void loadAllTasks();
   }, [allTasks.length, isLoadingAllTasks, loadAllTasks]);
+
+  useEffect(() => {
+    if (!notificationTaskId) return;
+    if (!allTasks.length) return;
+    if (allTasks.some((task) => String(task.id) === String(notificationTaskId))) {
+      setSelectedTask(notificationTaskId);
+      const next = new URL(window.location.href);
+      next.searchParams.delete('task');
+      router.replace(`${next.pathname}${next.search ? `?${next.searchParams.toString()}` : ''}`);
+    }
+  }, [notificationTaskId, allTasks, setSelectedTask, router]);
 
   const myTasks = allTasks.filter(
     (task) => String(task.assigneeId) === String(currentUser.id),
