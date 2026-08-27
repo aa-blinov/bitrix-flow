@@ -400,6 +400,15 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
                 }
               : t,
           ),
+          allTasks: state.allTasks.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  timeEntries: timeLog.map((e) => ({ ...e, taskId, hours: secondsToHours(e.seconds) })),
+                  subtasks: subtaskList.map(convertBxTask),
+                }
+              : t,
+          ),
           subtasks: { ...state.subtasks, [taskId]: subtaskList.map(convertBxTask) },
         }));
       })
@@ -421,11 +430,24 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
               }
             : t,
         ),
+        allTasks: state.allTasks.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                comments: comments.map((comment) => ({
+                  ...comment,
+                  taskId,
+                  authorName: comment.authorName || state.users.find((user) => user.id === comment.authorId)?.name || 'Пользователь',
+                })),
+              }
+            : t,
+        ),
         isLoadingTask: false,
       }));
       void fetchChecklist(taskId)
         .then((checklist) => set((state) => ({
           tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task),
+          allTasks: state.allTasks.map((task) => task.id === taskId ? { ...task, checklist } : task),
         })))
         .catch(() => {});
     } catch {
