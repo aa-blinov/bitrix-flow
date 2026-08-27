@@ -509,7 +509,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         onScroll={(event) => {
           if (topScrollRef.current) topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="flex-1 overflow-x-auto overscroll-contain bg-muted/30 scrollbar-hide"
+        className="flex-1 overflow-x-auto overscroll-x-contain bg-muted/30 scrollbar-hide"
       >
         <div className="flex h-full min-w-max gap-4 px-4 py-6 xl:gap-5">
           {allStages.map((stage: any) => {
