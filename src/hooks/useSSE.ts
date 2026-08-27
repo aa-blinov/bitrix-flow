@@ -3,6 +3,11 @@ import { useEffect, useRef } from 'react';
 // Подписка на real-time события от сервера
 export function useSSE(memberId: string, onEvent: (event: any) => void) {
   const eventSourceRef = useRef<EventSource | null>(null);
+  const onEventRef = useRef(onEvent);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     if (!memberId) return;
@@ -14,21 +19,15 @@ export function useSSE(memberId: string, onEvent: (event: any) => void) {
       try {
         const event = JSON.parse(e.data);
         if (event.type !== 'connected') {
-          onEvent(event);
+          onEventRef.current(event);
         }
       } catch {}
     };
 
-    es.onerror = () => {
-      // Reconnect через 3 секунды
-      setTimeout(() => {
-        es.close();
-        // EventSource auto-reconnect, но на всякий случай
-      }, 3000);
-    };
+    // EventSource сам переподключается. Не закрываем его после ошибки.
 
     return () => {
       es.close();
     };
-  }, [memberId, onEvent]);
+  }, [memberId]);
 }

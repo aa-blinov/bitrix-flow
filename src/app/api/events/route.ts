@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongo';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
@@ -14,11 +15,8 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Отправляем initial connection
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
-
-      // History is loaded through /api/notifications. SSE must only deliver
-      // changes that arrive after this browser connected.
+      // History is loaded through /api/notifications. Snapshot the cursor
+      // before confirming connection so an event cannot be skipped in-between.
       const db = await getDb();
       const latest = await db
         .collection('events_stream')
@@ -26,7 +24,8 @@ export async function GET(req: NextRequest) {
         .sort({ _id: -1 })
         .limit(1)
         .toArray();
-      let lastSentId: string | null = latest[0]?._id.toString() || null;
+      let lastSentId: ObjectId | null = latest[0]?._id || null;
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
 
       // Polling MongoDB каждую секунду для новых событий
       const interval = setInterval(async () => {
@@ -36,7 +35,7 @@ export async function GET(req: NextRequest) {
             .collection('events_stream')
             .find({
               member_id: memberId,
-              ...(lastSentId ? { _id: { $gt: lastSentId as any } } : {}),
+              ...(lastSentId ? { _id: { $gt: lastSentId } } : {}),
             })
             .limit(10)
             .sort({ _id: 1 })
@@ -44,7 +43,7 @@ export async function GET(req: NextRequest) {
 
           for (const e of events) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(e.event)}\n\n`));
-            lastSentId = e._id.toString();
+            lastSentId = e._id;
           }
         } catch (err) {
           console.error('SSE poll error:', err);
