@@ -382,10 +382,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     // Независимые REST-вызовы запускаем вместе: журнал времени не должен
     // ждать медленную загрузку комментариев из чата Bitrix24.
     const commentsPromise = fetchTaskComments(taskId);
-    const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId), fetchChecklist(taskId)]);
+    const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
 
     void detailsPromise
-      .then(([timeLog, subtaskList, checklist]) => {
+      .then(([timeLog, subtaskList]) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === taskId
@@ -397,7 +397,6 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
                     hours: secondsToHours(e.seconds),
                   })),
                   subtasks: subtaskList.map(convertBxTask),
-                  checklist,
                 }
               : t,
           ),
@@ -424,6 +423,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         ),
         isLoadingTask: false,
       }));
+      void fetchChecklist(taskId)
+        .then((checklist) => set((state) => ({
+          tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task),
+        })))
+        .catch(() => {});
     } catch {
       set({ isLoadingTask: false });
     }
