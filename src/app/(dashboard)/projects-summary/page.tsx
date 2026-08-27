@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -140,14 +141,13 @@ export default function ProjectsSummaryPage() {
             <div className="flex flex-wrap items-end gap-2">
               <label className="grid gap-1 text-xs text-muted-foreground">
                 <span>Считать по дате</span>
-                <select
-                  value={dateField}
-                  onChange={(event) => setDateField(event.target.value as 'changed' | 'created')}
-                  className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
-                >
-                  <option value="changed">изменения</option>
-                  <option value="created">создания</option>
-                </select>
+                <Select value={dateField} onValueChange={(value) => setDateField(value as 'changed' | 'created')}>
+                  <SelectTrigger className="w-32" aria-label="Считать по дате"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="changed">изменения</SelectItem>
+                    <SelectItem value="created">создания</SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
               <label className="grid gap-1 text-xs text-muted-foreground">
                 <span>С</span>

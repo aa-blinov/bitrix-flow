@@ -141,14 +141,16 @@ export default function Sidebar() {
                 })}
                 {archivedProjects.length > 0 && (
                   <div className="mt-2 border-t pt-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => setArchiveOpen((open) => !open)}
-                      className="flex w-full items-center gap-1 px-2.5 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                      className="flex w-full justify-start gap-1 px-2.5 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
                     >
                       <ChevronDown className={`size-3 transition-transform ${archiveOpen || projectQuery ? 'rotate-180' : ''}`} />
                       Архив ({archivedProjects.length})
-                    </button>
+                    </Button>
                     {(archiveOpen || projectQuery) && archivedProjects.map((project) => {
                       const active = pathname === `/projects/${project.id}`;
                       return (

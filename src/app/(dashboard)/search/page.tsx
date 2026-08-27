@@ -81,14 +81,8 @@ export default function SearchPage() {
           <div className="max-w-2xl space-y-3">
             <p className="text-sm text-muted-foreground">Найдено: {searchResults.length}</p>
             {searchResults.map((task) => (
-              <Card
-                key={task.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openTask(task.id)}
-                onKeyDown={(event) => event.key === 'Enter' && openTask(task.id)}
-                className="cursor-pointer gap-0 p-4 transition hover:ring-primary/20 hover:shadow-sm"
-              >
+              <Card key={task.id} asChild className="cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm">
+                <button type="button" onClick={() => openTask(task.id)}>
                 <div className="flex items-start gap-4">
                   <div
                     className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
@@ -132,6 +126,7 @@ export default function SearchPage() {
                     </div>
                   </div>
                 </div>
+                </button>
               </Card>
             ))}
           </div>

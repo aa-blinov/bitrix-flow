@@ -812,30 +812,21 @@ function InlineAddForm({
         disabled={submitting}
       />
       <div className="mt-2 flex items-center gap-1">
-        <select
-          value={assigneeId}
-          onChange={(e) => setAssigneeId(e.target.value)}
-          className="h-7 flex-1 rounded border bg-background px-2 text-xs text-foreground"
-          disabled={submitting}
-          aria-label="Исполнитель"
-        >
-          <option value="">Без исполнителя</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="h-7 w-24 rounded border bg-background px-2 text-xs text-foreground"
-          aria-label="Приоритет"
-        >
-          <option value="low">Низкий</option>
-          <option value="medium">Обычный</option>
-          <option value="high">Высокий</option>
-        </select>
+        <Select value={assigneeId || 'unassigned'} onValueChange={(value) => setAssigneeId(value === 'unassigned' ? '' : value)} disabled={submitting}>
+          <SelectTrigger className="h-7 min-w-0 flex-1 text-xs" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">Без исполнителя</SelectItem>
+            {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={priority} onValueChange={setPriority}>
+          <SelectTrigger className="h-7 w-24 text-xs" aria-label="Приоритет"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Низкий</SelectItem>
+            <SelectItem value="medium">Обычный</SelectItem>
+            <SelectItem value="high">Высокий</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="mt-2 flex items-center justify-end gap-1">
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={submitting}>
