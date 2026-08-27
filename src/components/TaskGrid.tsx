@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
+import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
 import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
@@ -35,15 +36,15 @@ const controlClass =
   'h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-input focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30';
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
-type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated';
+type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated' | 'description' | 'status' | 'created' | 'comments' | 'parent';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
-type ColumnKey = Exclude<SortKey, 'updated'>;
+type ColumnKey = SortKey;
 type SavedView = { id: string; name: string; config: { statusFilter: string; assigneeFilter: string; projectFilter: string; groupBy: 'none' | 'stage' | 'assignee'; sorts: Sort[]; visibleColumns: ColumnKey[] } };
 const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'priority', 'deadline', 'estimate', 'actual'];
-const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт' };
+const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт', description: 'Описание', status: 'Статус', created: 'Создана', updated: 'Обновлена', comments: 'Комментарии', parent: 'Родительская' };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 320, project: 180, stage: 160, assignee: 180, priority: 130,
-  deadline: 150, estimate: 180, actual: 80, updated: 160,
+  deadline: 150, estimate: 180, actual: 80, updated: 160, description: 260, status: 130, created: 160, comments: 110, parent: 130,
 };
 
 function EditableTitle({ task }: { task: BxTask }) {
@@ -272,6 +273,11 @@ export default function TaskGrid({
       if (key === 'estimate') return task.estimate;
       if (key === 'actual') return task.actualTime;
       if (key === 'updated') return task.updatedDate;
+      if (key === 'description') return task.description;
+      if (key === 'status') return task.status;
+      if (key === 'created') return task.createdDate;
+      if (key === 'comments') return task.commentsCount ?? task.comments.length;
+      if (key === 'parent') return task.parentId || '';
       return task.title;
     };
     const needle = query.trim().toLocaleLowerCase('ru');
@@ -448,7 +454,7 @@ export default function TaskGrid({
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Поля</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {DEFAULT_COLUMNS.filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
+                {(Object.keys(COLUMN_LABELS) as ColumnKey[]).filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
               </DropdownMenuContent>
             </DropdownMenu>
             <Input
@@ -578,6 +584,7 @@ export default function TaskGrid({
                 {visibleColumns.includes('deadline') && <col style={{ width: columnWidths.deadline }} />}
                 {visibleColumns.includes('estimate') && <col style={{ width: columnWidths.estimate }} />}
                 {visibleColumns.includes('actual') && <col style={{ width: columnWidths.actual }} />}
+                {(['description', 'status', 'created', 'updated', 'comments', 'parent'] as ColumnKey[]).map((column) => visibleColumns.includes(column) && <col key={column} style={{ width: columnWidths[column] }} />)}
                 <col className="w-20" />
               </colgroup>
               <TableHeader>
@@ -597,6 +604,7 @@ export default function TaskGrid({
                   {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
                   {visibleColumns.includes('estimate') && sortableHead('estimate', 'План')}
                   {visibleColumns.includes('actual') && sortableHead('actual', 'Факт')}
+                  {(['description', 'status', 'created', 'updated', 'comments', 'parent'] as ColumnKey[]).map((column) => visibleColumns.includes(column) && sortableHead(column, COLUMN_LABELS[column]))}
                   <TableHead className="w-20">
                     <span className="sr-only">Действия</span>
                   </TableHead>
@@ -634,6 +642,12 @@ export default function TaskGrid({
                         {showProject && visibleColumns.includes('project') && <TableCell className="max-w-48 truncate text-muted-foreground">{projectById[task.projectId]?.name ?? `—`}</TableCell>}
                         <FieldControls task={task} readOnly={isReadOnly} visibleColumns={visibleColumns} />
                         {visibleColumns.includes('actual') && <TableCell className="text-muted-foreground">{task.actualTime || 0} ч</TableCell>}
+                        {visibleColumns.includes('description') && <TableCell className="max-w-64 truncate text-muted-foreground">{task.description || '—'}</TableCell>}
+                        {visibleColumns.includes('status') && <TableCell>{STATUS_LABELS[task.status] || task.status}</TableCell>}
+                        {visibleColumns.includes('created') && <TableCell className="text-muted-foreground">{formatBitrixDateTime(task.createdDate)}</TableCell>}
+                        {visibleColumns.includes('updated') && <TableCell className="text-muted-foreground">{formatBitrixDateTime(task.updatedDate)}</TableCell>}
+                        {visibleColumns.includes('comments') && <TableCell className="text-muted-foreground">{task.commentsCount ?? task.comments.length}</TableCell>}
+                        {visibleColumns.includes('parent') && <TableCell className="text-muted-foreground">{task.parentId ? `#${task.parentId}` : '—'}</TableCell>}
                         <TableCell>
                           <TaskActions task={task} />
                         </TableCell>

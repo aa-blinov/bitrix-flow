@@ -131,6 +131,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     estimate: secondsToHours(bxTask.timeEstimate),
     actualTime: secondsToHours(bxTask.timeSpentInLogs),
     comments: [],
+    commentsCount: bxTask.commentsCount,
     timeEntries: [],
     // Bitrix represents a root task as the string "0". Keep only a real
     // parent id so root tasks are not visually labelled as subtasks.

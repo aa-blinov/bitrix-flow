@@ -15,6 +15,7 @@ export interface BxTask {
   actualTime: number;
   storyPoints?: number;
   comments: BxComment[];
+  commentsCount?: number;
   timeEntries: TimeEntry[];
   parentId?: string;
   subtasks: BxTask[];
