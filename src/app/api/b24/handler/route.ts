@@ -9,7 +9,22 @@ import { timingSafeEqual } from 'node:crypto';
 // OAuth code is exchanged, expecting a JSON-ish response. Mirror it so the
 // browser doesn't surface a "405 Method Not Allowed" while still treating
 // this URL as the webhook handler for subsequent POSTs.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const code = url.searchParams.get('code');
+  if (code) {
+    // Если Bitrix ошибочно отправил OAuth-callback на webhook-handler (часто
+    // бывает, когда в кабинете приложения перепутан «Путь для первоначальной
+    // установки» и «Путь вашего обработчика»), перенаправляем код на основной
+    // /api/oauth, чтобы обмен токеном прошёл там.
+    const target = new URL('/api/oauth', url);
+    target.searchParams.set('code', code);
+    for (const key of ['state', 'domain', 'member_id', 'scope', 'server_domain']) {
+      const value = url.searchParams.get(key);
+      if (value) target.searchParams.set(key, value);
+    }
+    return NextResponse.redirect(target);
+  }
   return NextResponse.json({ status: 'ok', method: 'GET' });
 }
 
