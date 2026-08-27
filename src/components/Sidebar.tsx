@@ -84,10 +84,7 @@ export default function Sidebar() {
     <div className="flex h-full w-full min-w-0 flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <span className="font-heading text-sm font-bold text-white">B</span>
-        </div>
-        <span className="ml-2.5 font-heading text-lg font-semibold tracking-tight text-foreground">BitrixFlow</span>
+        <span className="font-heading text-lg font-semibold tracking-tight text-foreground">BitrixFlow</span>
       </div>
 
       {/* Navigation */}
@@ -214,9 +211,9 @@ export default function Sidebar() {
         size="icon-lg"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Открыть меню"
-        className="fixed right-4 bottom-4 z-40 rounded-full bg-background shadow-lg md:hidden"
+        className="fixed right-4 bottom-4 z-40 size-14 rounded-full border-border bg-background text-foreground shadow-xl md:hidden dark:bg-popover"
       >
-        <Menu size={20} />
+        <Menu size={26} strokeWidth={2.5} />
       </Button>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
