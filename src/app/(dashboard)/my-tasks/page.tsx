@@ -71,10 +71,12 @@ function MyTasksContent() {
     // Задача ещё не в локальном зеркале: подтянем её одним запросом и
     // покажем в модалке, чтобы уведомление не висело «без ответа».
     void openTransientTask(notificationTaskId);
+    let cancelled = false;
     void (async () => {
       try {
         const response = await fetch('/api/bitrix/tasks.task.get?taskId=' + encodeURIComponent(notificationTaskId), { method: 'POST' });
         const data = await response.json();
+        if (cancelled) return;
         const remote = data?.result?.task || data?.result;
         if (remote) {
           setLocalTask({
@@ -101,12 +103,13 @@ function MyTasksContent() {
           });
         }
       } catch (error) {
-        console.error('Failed to load task for notification', error);
+        if (!cancelled) console.error('Failed to load task for notification', error);
       }
     })();
     const next = new URL(window.location.href);
     next.searchParams.delete('task');
     router.replace(`${next.pathname}${next.search ? `?${next.searchParams.toString()}` : ''}`);
+    return () => { cancelled = true; };
   }, [notificationTaskId, allTasks, setSelectedTask, openTransientTask, router]);
 
   const myTasks = allTasks.filter(
