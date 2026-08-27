@@ -336,6 +336,11 @@ export default function TaskGrid({
   }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, tasks]);
 
   const applyView = (id: string) => {
+    if (id === 'default') {
+      setActiveViewId(''); setStatusFilter(initialStatus); setAssigneeFilter('all'); setProjectFilter('all');
+      setGroupBy('none'); setSorts([{ key: 'updated', direction: 'desc' }]); setVisibleColumns(DEFAULT_COLUMNS);
+      return;
+    }
     setActiveViewId(id);
     const view = views.find((item) => item.id === id);
     if (!view) return;
@@ -429,11 +434,17 @@ export default function TaskGrid({
         <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
-            {viewScope && <Select value={activeViewId} onValueChange={applyView}>
-              <SelectTrigger className="w-40" aria-label="Представление"><SelectValue placeholder="Представление" /></SelectTrigger>
-              <SelectContent>{views.map((view) => <SelectItem key={view.id} value={view.id}>{view.name}</SelectItem>)}</SelectContent>
-            </Select>}
-            {viewScope && <Button variant="outline" size="sm" onClick={() => setSaveViewOpen(true)}>Сохранить вид</Button>}
+            {viewScope && <div className="flex shrink-0 items-center gap-1 rounded-lg border bg-background p-1">
+              <span className="px-1 text-xs font-medium text-muted-foreground">Виды</span>
+              <Select value={activeViewId || 'default'} onValueChange={applyView}>
+                <SelectTrigger className="w-44 border-0 bg-transparent" aria-label="Виды"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">По умолчанию</SelectItem>
+                  {views.map((view) => <SelectItem key={view.id} value={view.id}>{view.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button variant="secondary" size="sm" onClick={() => setSaveViewOpen(true)}>+ Сохранить</Button>
+            </div>}
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Поля</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
