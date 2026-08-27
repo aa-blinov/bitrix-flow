@@ -1,12 +1,20 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { CheckCircle2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoadingState from '@/components/LoadingState';
 import TaskGrid from '@/components/TaskGrid';
 
 export default function MyTasksPage() {
+  return (
+    <Suspense fallback={<LoadingState className="min-h-screen bg-muted/30" />}>
+      <MyTasksContent />
+    </Suspense>
+  );
+}
+
+function MyTasksContent() {
   const {
     allTasks,
     currentUser,
