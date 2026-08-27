@@ -96,6 +96,8 @@ function MyTasksContent() {
             subtasks: [],
             stageId: String(remote.stageId || '0'),
             chatId: remote.chatId || remote.CHAT_ID,
+            estimate: parseInt(remote.timeEstimate) || 0,
+            actualTime: parseInt(remote.timeSpentInLogs) || 0,
           });
         }
       } catch (error) {
