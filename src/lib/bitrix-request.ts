@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns';
 import { request } from 'node:https';
 
-const CONNECT_TIMEOUT_MS = 4_000;
+const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 3;
 let addressCursor = 0;
 

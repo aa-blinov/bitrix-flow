@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
   if (byId.size === 0) {
     const allTasks: any[] = [];
     let start = 0;
-    for (let page = 0; page < 20; page += 1) {
+    const visited = new Set<number>();
+    while (!visited.has(start)) {
+      visited.add(start);
       const response = await postBitrixJson(
         `https://${token.domain}/rest/tasks.task.list?auth=${token.access_token}`,
         { order: { ID: 'DESC' }, start },
