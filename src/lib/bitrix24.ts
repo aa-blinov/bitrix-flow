@@ -110,6 +110,7 @@ export interface Bx24Task {
   creatorId: string;
   creatorName: string;
   commentsCount: number;
+  storyPoints?: number;
   parentId?: string;
   stageId: string;
   stageName: string;
@@ -433,6 +434,7 @@ function mapTask(t: any): Bx24Task {
     creatorId: t.creatorId || t.creator_id || '',
     creatorName: t.creatorName || t.creator_name || '',
     commentsCount: t.commentsCount || t.comments_count || 0,
+    storyPoints: Number(t.storyPoints || t.story_points) || undefined,
     parentId: t.parentId,
     stageId: t.stageId || '0',
     stageName: '',
