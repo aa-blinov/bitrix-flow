@@ -322,50 +322,6 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 </div>
               </Card>
 
-              {/* Comments */}
-              <div>
-                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-3 flex items-center gap-2">
-                  <MessageSquare size={14} />
-                  Комментарии ({task.comments.length})
-                </h3>
-
-                <div ref={commentsRef} className="space-y-3 mb-4 max-h-48 overflow-y-auto">
-                  {isLoadingTask && task.comments.length === 0 ? (
-                    <LoadingState className="min-h-24 bg-transparent" />
-                  ) : (
-                    task.comments.map((c) => (
-                      <div key={c.id} className="bg-muted rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs flex items-center justify-center font-medium">
-                            {c.authorName.charAt(0)}
-                          </div>
-                          <span className="font-medium text-sm text-foreground">{c.authorName}</span>
-                          <span className="text-xs text-muted-foreground">{formatDate(c.createdDate)}</span>
-                        </div>
-                        <p className="text-foreground/80 text-sm pl-8"><BitrixText text={c.text} /></p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <Textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Написать комментарий…"
-                    rows={4}
-                    className="min-h-32 flex-1 resize-y"
-                  />
-                  <Button
-                    onClick={handleAddComment}
-                    disabled={!comment.trim()}
-                    size="icon"
-                    className="h-10 shrink-0"
-                  >
-                    <Send size={16} />
-                  </Button>
-                </div>
-              </div>
             </div>
 
             {/* Sidebar */}
@@ -608,6 +564,28 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   </div>
                 </div>
               </Card>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+              <MessageSquare size={14} /> Комментарии ({task.comments.length})
+            </h3>
+            <div ref={commentsRef} className="mb-4 max-h-60 space-y-3 overflow-y-auto">
+              {isLoadingTask && task.comments.length === 0 ? <LoadingState className="min-h-24 bg-transparent" /> : task.comments.map((commentItem) => (
+                <div key={commentItem.id} className="rounded-lg bg-muted p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex size-6 items-center justify-center rounded-full bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300">{commentItem.authorName.charAt(0)}</div>
+                    <span className="text-sm font-medium">{commentItem.authorName}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(commentItem.createdDate)}</span>
+                  </div>
+                  <p className="pl-8 text-sm text-foreground/80"><BitrixText text={commentItem.text} /></p>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-end gap-2">
+              <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий…" rows={4} className="min-h-32 flex-1 resize-y" />
+              <Button onClick={handleAddComment} disabled={!comment.trim()} size="icon" className="h-10 shrink-0"><Send size={16} /></Button>
             </div>
           </div>
         </div>
