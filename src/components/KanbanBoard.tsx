@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import TaskModal from './TaskModal';
 import {
   Plus,
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import LoadingState from '@/components/LoadingState';
+import { sortKanbanTasks, type KanbanSort } from '@/lib/kanban-sort';
 
 function getStageColor(hex: string): { bg: string; text: string; border: string } {
   // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
@@ -137,7 +138,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     currentUser,
   } = useKanbanStore();
 
-  const filteredTasks = getFilteredTasks();
+  const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
+  const filteredTasks = useMemo(() => sortKanbanTasks(getFilteredTasks(), kanbanSort), [filters, getFilteredTasks, kanbanSort, selectedProjectId, tasks]);
 
   // Добавляем дефолтные системные стадии
   const defaultStages = [
@@ -335,6 +337,15 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
         <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {toolbar}
+          <Select value={kanbanSort} onValueChange={(value) => setKanbanSort(value as KanbanSort)}>
+            <SelectTrigger className="h-8 w-36 shrink-0 bg-background" aria-label="Сортировка задач"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="urgency">По срочности</SelectItem>
+              <SelectItem value="updated">По обновлению</SelectItem>
+              <SelectItem value="deadline">По дедлайну</SelectItem>
+              <SelectItem value="title">По названию</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
             value={filters.search}
             onChange={(event) => setFilters({ search: event.target.value })}
