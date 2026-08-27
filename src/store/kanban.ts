@@ -189,7 +189,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     try {
       const task = await fetchSingleTask(taskId);
       if (!task) return;
-      set({ selectedTransientTask: task, selectedTaskId: taskId });
+      set({ selectedTransientTask: convertBxTask(task), selectedTaskId: taskId });
     } catch (error) {
       console.error('Failed to fetch transient task', error);
     }

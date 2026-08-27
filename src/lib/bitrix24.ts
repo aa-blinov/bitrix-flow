@@ -460,6 +460,7 @@ export async function fetchSingleTask(taskId: string): Promise<Bx24Task | null> 
   }
 }
 
+
 // Поиск задач - кеш 30 секунд
 export async function searchTasks(query: string): Promise<Bx24Task[]> {
   const key = `search:${query}`;
