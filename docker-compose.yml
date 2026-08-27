@@ -8,7 +8,6 @@ services:
     environment:
       MONGO_URL: mongodb://mongodb:27017
       MONGO_DB: bitrix_kanban
-      HOSTNAME: 0.0.0.0
       PORT: 3000
       MOCK_B24: ${MOCK_B24:-0}
     expose:
