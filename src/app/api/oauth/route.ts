@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
-import { getOAuthServer, getOAuthTokenUrl } from '@/lib/bitrix-oauth-server';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
@@ -24,7 +23,7 @@ export async function GET(req: NextRequest) {
     if (expectedState && state !== expectedState) {
       return NextResponse.json({ error: 'OAUTH_STATE_INVALID' }, { status: 400 });
     }
-    return await handleCallback(code, req, url.searchParams.get('server_domain') || undefined);
+    return await handleCallback(code, req, url.searchParams.get('domain') || undefined);
   }
 
   // Если есть member_id и auth - это прямая установка из маркетплейса
@@ -46,13 +45,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.redirect(authUrl);
 }
 
-async function handleCallback(code: string, req: NextRequest, oauthServer?: string) {
+async function handleCallback(code: string, req: NextRequest, portalDomain?: string) {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return NextResponse.json({ error: 'OAuth not configured' }, { status: 500 });
   }
 
   // Обмениваем code на токены
-  const tokenRes = await fetch(getOAuthTokenUrl(oauthServer), {
+  const tokenRes = await fetch('https://oauth.bitrix.info/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -76,6 +75,13 @@ async function handleCallback(code: string, req: NextRequest, oauthServer?: stri
     );
   }
 
+  // OAuth возвращает `domain` авторизационного сервера. Для REST нужен
+  // hostname из client_endpoint, например eora.bitrix24.ru.
+  const restDomain = tokens.client_endpoint
+    ? new URL(tokens.client_endpoint).hostname
+    : portalDomain;
+  if (!restDomain) return NextResponse.json({ error: 'OAUTH_PORTAL_DOMAIN_MISSING' }, { status: 400 });
+
   // Сохраняем токен в MongoDB
   const db = await getDb();
   await db.collection('user_tokens').updateOne(
@@ -87,9 +93,8 @@ async function handleCallback(code: string, req: NextRequest, oauthServer?: stri
         refresh_token: tokens.refresh_token,
         expires_in: tokens.expires_in,
         scope: tokens.scope,
-        domain: tokens.domain,
+        domain: restDomain,
         application_token: tokens.application_token,
-        oauth_server: getOAuthServer(oauthServer),
         updated_at: new Date(),
       },
     },
@@ -103,7 +108,7 @@ async function handleCallback(code: string, req: NextRequest, oauthServer?: stri
     const handlerUrl = `${protocol}://${host}/api/b24/handler`;
 
     for (const event of ['OnTaskAdd', 'OnTaskUpdate', 'OnTaskDelete', 'OnTaskCommentAdd']) {
-      await fetch(`https://${tokens.domain}/rest/event.bind?auth=${tokens.access_token}`, {
+      await fetch(`https://${restDomain}/rest/event.bind?auth=${tokens.access_token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ event, handler: handlerUrl }),

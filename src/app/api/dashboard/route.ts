@@ -5,7 +5,6 @@ import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
-import { getOAuthTokenUrl } from '@/lib/bitrix-oauth-server';
 
 // Batch endpoint - загружает все данные для дашборда одним запросом
 export async function GET(req: NextRequest) {
@@ -182,7 +181,7 @@ async function refreshToken(token: any): Promise<string | null> {
   const clientSecret = process.env.BITRIX24_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
 
-  const response = await fetch(getOAuthTokenUrl(token.oauth_server), {
+  const response = await fetch('https://oauth.bitrix.info/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
