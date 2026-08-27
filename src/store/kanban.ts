@@ -96,7 +96,7 @@ interface KanbanStore {
   moveTaskToStage: (taskId: string, stageId: string) => Promise<void>;
   addComment: (taskId: string, text: string) => void;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
-  addChecklistItem: (taskId: string, title: string) => Promise<void>;
+  addChecklistItem: (taskId: string, title: string, parentId?: string) => Promise<void>;
   updateChecklistItem: (taskId: string, itemId: string, title: string) => Promise<void>;
   setChecklistItemCompleted: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
   deleteChecklistItem: (taskId: string, itemId: string) => Promise<void>;
@@ -457,8 +457,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   toggleSearch: () => set((state) => ({ showSearch: !state.showSearch })),
 
   updateTaskField: async (id, field, value) => {
-    const { tasks, users } = get();
-    const previous = tasks.find((task) => task.id === id);
+    const { tasks, allTasks, users } = get();
+    const previous = tasks.find((task) => task.id === id) || allTasks.find((task) => task.id === id);
     if (!previous) return;
 
     // Optimistic update
@@ -476,9 +476,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'parentId') update.parentId = value;
 
     set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t,
-      ),
+      tasks: state.tasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
+      allTasks: state.allTasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
     }));
 
     // Sync
@@ -511,7 +510,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       }
     } catch (error) {
       console.error('Task field update failed:', error);
-      set((state) => ({ tasks: state.tasks.map((task) => (task.id === id ? previous : task)) }));
+      set((state) => ({
+        tasks: state.tasks.map((task) => task.id === id ? previous : task),
+        allTasks: state.allTasks.map((task) => task.id === id ? previous : task),
+      }));
       throw error;
     }
   },
@@ -577,8 +579,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
   },
 
-  addChecklistItem: async (taskId, title) => {
-    await bxAddChecklistItem(taskId, title);
+  addChecklistItem: async (taskId, title, parentId) => {
+    await bxAddChecklistItem(taskId, title, parentId);
     const checklist = await fetchChecklist(taskId);
     set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task) }));
   },

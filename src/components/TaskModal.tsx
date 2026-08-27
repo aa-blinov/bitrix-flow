@@ -66,6 +66,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [parentQuery, setParentQuery] = useState('');
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -97,9 +98,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     }
   };
 
-  const handleAddChecklistItem = async () => {
+  const handleAddChecklistItem = async (parentId = activeChecklistId) => {
     if (!newChecklistItem.trim()) return;
-    await addChecklistItem(task.id, newChecklistItem.trim());
+    await addChecklistItem(task.id, newChecklistItem.trim(), parentId || undefined);
     setNewChecklistItem('');
   };
 
@@ -305,19 +306,26 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-2 text-sm font-medium"><CheckSquare size={16} /> Чек-лист ({task.checklist?.filter((item) => item.completed).length || 0}/{task.checklist?.length || 0})</div>
                 </div>
-                <div className="space-y-1 px-4 pb-3">
-                  {task.checklist?.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted">
-                      <Button variant="ghost" size="icon-xs" aria-label={item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'} onClick={() => void setChecklistItemCompleted(task.id, item.id, !item.completed)}>
-                        {item.completed ? <CheckSquare className="text-primary" /> : <Square />}
-                      </Button>
-                      <span className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}>{item.title}</span>
-                      <Button variant="ghost" size="icon-xs" aria-label="Удалить пункт" onClick={() => void deleteChecklistItem(task.id, item.id)}><Trash2 /></Button>
+                <div className="space-y-3 px-4 pb-3">
+                  {task.checklist?.filter((item) => item.parentId === '0').map((list) => (
+                    <div key={list.id} className="rounded-lg border bg-muted/30 p-2">
+                      <div className="px-1 text-sm font-medium">{list.title}</div>
+                      {task.checklist?.filter((item) => item.parentId === list.id).map((item) => (
+                        <div key={item.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted">
+                          <Button variant="ghost" size="icon-xs" aria-label={item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'} onClick={() => void setChecklistItemCompleted(task.id, item.id, !item.completed)}>{item.completed ? <CheckSquare className="text-primary" /> : <Square />}</Button>
+                          <span className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}>{item.title}</span>
+                          <Button variant="ghost" size="icon-xs" aria-label="Удалить пункт" onClick={() => void deleteChecklistItem(task.id, item.id)}><Trash2 /></Button>
+                        </div>
+                      ))}
+                      <div className="mt-2 flex gap-2">
+                        <Input value={activeChecklistId === list.id ? newChecklistItem : ''} onFocus={() => setActiveChecklistId(list.id)} onChange={(event) => { setActiveChecklistId(list.id); setNewChecklistItem(event.target.value); }} placeholder="Добавить пункт…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
+                        <Button size="sm" onClick={() => void handleAddChecklistItem(list.id)} disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}>Добавить</Button>
+                      </div>
                     </div>
                   ))}
-                  <div className="flex gap-2 pt-2">
-                    <Input value={newChecklistItem} onChange={(event) => setNewChecklistItem(event.target.value)} placeholder="Добавить пункт…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
-                    <Button size="sm" onClick={() => void handleAddChecklistItem()} disabled={!newChecklistItem.trim()}>Добавить</Button>
+                  <div className="flex gap-2 border-t pt-3">
+                    <Input value={activeChecklistId === null ? newChecklistItem : ''} onFocus={() => setActiveChecklistId(null)} onChange={(event) => { setActiveChecklistId(null); setNewChecklistItem(event.target.value); }} placeholder="Название нового чек-листа…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
+                    <Button size="sm" onClick={() => void handleAddChecklistItem(null)} disabled={activeChecklistId !== null || !newChecklistItem.trim()}>Создать</Button>
                   </div>
                 </div>
               </Card>

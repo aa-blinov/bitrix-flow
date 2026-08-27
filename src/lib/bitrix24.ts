@@ -577,11 +577,11 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
 
 export async function fetchChecklist(taskId: string) {
   const result = await bx24('task.checklistitem.getlist', { TASKID: taskId, ORDER: JSON.stringify({ SORT_INDEX: 'asc' }) });
-  return (Array.isArray(result) ? result : []).map((item: any) => ({ id: String(item.ID), title: item.TITLE || '', completed: item.IS_COMPLETE === 'Y' }));
+  return (Array.isArray(result) ? result : []).map((item: any) => ({ id: String(item.ID), parentId: String(item.PARENT_ID || '0'), title: item.TITLE || '', completed: item.IS_COMPLETE === 'Y' }));
 }
 
-export async function addChecklistItem(taskId: string, title: string) {
-  return bx24('task.checklistitem.add', { TASKID: taskId, FIELDS: JSON.stringify({ TITLE: title }) });
+export async function addChecklistItem(taskId: string, title: string, parentId?: string) {
+  return bx24('task.checklistitem.add', { TASKID: taskId, FIELDS: JSON.stringify({ TITLE: title, PARENT_ID: parentId || 0 }) });
 }
 
 export async function updateChecklistItem(taskId: string, itemId: string, title: string) {

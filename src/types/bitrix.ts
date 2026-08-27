@@ -29,6 +29,7 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export interface BxChecklistItem {
   id: string;
+  parentId: string;
   title: string;
   completed: boolean;
 }
