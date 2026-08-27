@@ -5,6 +5,14 @@ import { bx24OAuth } from '@/lib/oauth-client';
 import { enqueueTaskMirrorSync, processTaskMirrorJobs } from '@/lib/task-mirror';
 import { timingSafeEqual } from 'node:crypto';
 
+// Bitrix may follow the install callback with a browser-side GET after the
+// OAuth code is exchanged, expecting a JSON-ish response. Mirror it so the
+// browser doesn't surface a "405 Method Not Allowed" while still treating
+// this URL as the webhook handler for subsequent POSTs.
+export async function GET() {
+  return NextResponse.json({ status: 'ok', method: 'GET' });
+}
+
 function setNested(target: Record<string, any>, key: string, value: string) {
   const parts = key.match(/[^\[\]]+/g) || [key];
   let cursor = target;
