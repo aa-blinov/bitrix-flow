@@ -8,6 +8,9 @@ describe('Bitrix markup', () => {
       { text: 'https://example.com/a', href: 'https://example.com/a' },
     ]);
     expect(parseBitrixMarkup('[url=javascript:alert(1)]ссылка[/url]')).toEqual([{ text: 'ссылка' }]);
+    expect(parseBitrixMarkup('[USER=1]Сергей Веренцов[/USER]')).toEqual([
+      { text: 'Сергей Веренцов', href: 'https://eora.bitrix24.ru/company/personal/user/1/' },
+    ]);
   });
 
   it('uses HH:MM DD.MM.YYYY dates', () => {

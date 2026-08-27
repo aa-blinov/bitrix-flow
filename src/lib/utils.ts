@@ -38,6 +38,10 @@ export function getBitrixTaskUrl(taskId: string): string {
   return `https://eora.bitrix24.ru/company/personal/user/0/tasks/task/view/${encodeURIComponent(taskId)}/`;
 }
 
+export function getBitrixUserUrl(userId: string): string {
+  return `https://eora.bitrix24.ru/company/personal/user/${encodeURIComponent(userId)}/`;
+}
+
 export function getProjectInitials(name: string): string {
   return (name.match(/\p{L}+/gu) ?? [])
     .map((word) => word[0]!.toUpperCase())

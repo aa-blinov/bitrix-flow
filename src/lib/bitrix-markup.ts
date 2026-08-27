@@ -1,3 +1,5 @@
+import { getBitrixUserUrl } from './utils';
+
 export type BitrixMarkupPart = { text: string; href?: string };
 
 function safeUrl(value: string): string | undefined {
@@ -11,13 +13,15 @@ function safeUrl(value: string): string | undefined {
 
 export function parseBitrixMarkup(text: string): BitrixMarkupPart[] {
   const parts: BitrixMarkupPart[] = [];
-  const pattern = /\[url(?:=([^\]]+))?\]([\s\S]*?)\[\/url\]/gi;
+  const pattern = /\[(url|user)(?:=([^\]]+))?\]([\s\S]*?)\[\/\1\]/gi;
   let position = 0;
 
   for (const match of text.matchAll(pattern)) {
     if (match.index! > position) parts.push({ text: text.slice(position, match.index) });
-    const label = match[2];
-    const href = safeUrl(match[1] || label);
+    const [, tag, value, label] = match;
+    const href = tag.toLowerCase() === 'user' && /^\d+$/.test(value || '')
+      ? getBitrixUserUrl(value)
+      : safeUrl(value || label);
     parts.push(href ? { text: label, href } : { text: label });
     position = match.index! + match[0].length;
   }
