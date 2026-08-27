@@ -106,17 +106,28 @@ export async function POST(req: NextRequest) {
     // Bitrix documents application_token as the way to authenticate event
     // handlers. Do not accept an event solely because it supplies a member id.
     const db = await getDb();
-    const stored = await db
+    const tokens = await db
       .collection('user_tokens')
       .findOne({ member_id: String(memberId) }, { projection: { application_token: 1 } });
     const receivedToken = String(body.auth?.application_token || '');
-    const expectedToken =
-      typeof stored?.application_token === 'string' ? stored.application_token : '';
-    const validToken =
-      receivedToken.length > 0 &&
-      expectedToken.length === receivedToken.length &&
-      timingSafeEqual(Buffer.from(expectedToken), Buffer.from(receivedToken));
-    if (!validToken) return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
+    let expectedToken = typeof tokens?.application_token === 'string' ? tokens.application_token : '';
+    // Old portal installations created before this check may not have stored
+    // the token. Bootstrap it from the first authenticated payload so that
+    // subsequent events can be verified against it.
+    if (expectedToken && receivedToken && expectedToken.length === receivedToken.length) {
+      const validToken = timingSafeEqual(Buffer.from(expectedToken), Buffer.from(receivedToken));
+      if (!validToken) return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
+    } else if (!expectedToken && receivedToken) {
+      await db
+        .collection('user_tokens')
+        .updateOne(
+          { member_id: String(memberId) },
+          { $set: { application_token: receivedToken, updated_at: new Date() } },
+        );
+      expectedToken = receivedToken;
+    } else {
+      return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
+    }
 
     const commentDetails = await enrichComment(memberId, eventDetails(event, body.data));
     const details = await enrichTaskTitle(memberId, commentDetails);
@@ -134,8 +145,12 @@ export async function POST(req: NextRequest) {
     await db
       .collection('project_summary_snapshots')
       .updateOne({ member_id: memberId }, { $set: { stale: true, stale_at: now } });
-    if (details.taskId) await db.collection('tasks').deleteOne({ id: details.taskId });
-    await enqueueTaskMirrorSync(memberId, details.taskId, event);
+    // Без taskId нечего синхронизировать. Заглушка нужна, чтобы пустое событие
+    // не помечалось как «все задачи устарели» в сводке.
+    if (details.taskId) {
+      await db.collection('tasks').deleteOne({ id: details.taskId });
+      await enqueueTaskMirrorSync(memberId, details.taskId, event);
+    }
     // Bitrix receives an acknowledgement immediately. The precise task mirror is
     // updated afterwards, so one event never triggers a portal-wide task scan.
     after(async () => {
