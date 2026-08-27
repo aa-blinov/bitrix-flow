@@ -149,6 +149,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     parentId: bxTask.parentId && bxTask.parentId !== '0' ? bxTask.parentId : undefined,
     subtasks: [],
     stageId: bxTask.stageId || '0',
+    chatId: bxTask.chatId,
   };
 }
 
@@ -381,7 +382,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     // Независимые REST-вызовы запускаем вместе: журнал времени не должен
     // ждать медленную загрузку комментариев из чата Bitrix24.
-    const commentsPromise = fetchTaskComments(taskId);
+    const task = get().tasks.find((item) => item.id === taskId) || get().allTasks.find((item) => item.id === taskId);
+    const commentsPromise = fetchTaskComments(taskId, task?.chatId);
     const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
 
     void detailsPromise

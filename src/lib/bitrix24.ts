@@ -114,6 +114,7 @@ export interface Bx24Task {
   parentId?: string;
   stageId: string;
   stageName: string;
+  chatId?: string;
 }
 
 export interface Bx24Project {
@@ -438,6 +439,7 @@ function mapTask(t: any): Bx24Task {
     parentId: t.parentId,
     stageId: t.stageId || '0',
     stageName: '',
+    chatId: t.chatId || t.CHAT_ID || undefined,
   };
 }
 
@@ -484,16 +486,16 @@ export async function fetchSubtasks(parentId: string): Promise<Bx24Task[]> {
 }
 
 // Комментарии
-export async function fetchTaskComments(taskId: string): Promise<Bx24Comment[]> {
+export async function fetchTaskComments(taskId: string, knownChatId?: string): Promise<Bx24Comment[]> {
   const key = `comments:${taskId}`;
   const cached = await cacheGet<Bx24Comment[]>(key);
   if (cached) return cached;
 
   try {
     // New Bitrix task cards store comments in the linked IM chat.
-    const taskResult = await bx24('tasks.task.get', { taskId });
+    const taskResult = knownChatId ? null : await bx24('tasks.task.get', { taskId });
     const task = taskResult?.task || taskResult;
-    const chatId = task?.chatId || task?.CHAT_ID;
+    const chatId = knownChatId || task?.chatId || task?.CHAT_ID;
     if (!chatId) return [];
     const dialog = await bx24('im.dialog.messages.get', {
       DIALOG_ID: `chat${chatId}`,
