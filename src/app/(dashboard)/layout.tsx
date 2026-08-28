@@ -2,6 +2,7 @@
 import Sidebar from '@/components/Sidebar';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSSE } from '@/hooks/useSSE';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -26,8 +27,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [rehydrate, setMemberId]);
 
+  const pathname = usePathname();
   useSSE(memberId, (event) => {
-    if (event?.type === 'tasks-changed') {
+    if (event?.type === 'tasks-changed' && (pathname === '/all-tasks' || pathname === '/my-tasks')) {
       const state = useKanbanStore.getState();
       if (!state.isLoadingAllTasks) void state.loadAllTasks();
     }
