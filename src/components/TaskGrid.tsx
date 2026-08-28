@@ -191,13 +191,15 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   );
 }
 
-function TaskActions({ task }: { task: BxTask }) {
+function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolean }) {
   const { setSelectedTask, moveTask } = useKanbanStore();
   return (
     <div className="flex items-center">
-      <Button variant="ghost" size="icon" aria-label={`Открыть карточку ${task.title}`} title="Открыть карточку" onClick={() => setSelectedTask(task.id)}>
-        <ExternalLink className="size-4" />
-      </Button>
+      {!compact && (
+        <Button variant="ghost" size="icon" aria-label={`Открыть карточку ${task.title}`} title="Открыть карточку" onClick={() => setSelectedTask(task.id)}>
+          <ExternalLink className="size-4" />
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label={`Действия для ${task.title}`}>
@@ -527,50 +529,52 @@ export default function TaskGrid({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
-            {pageTasks.map((task) => (
-              <article
-                key={task.id}
-                className={`max-w-full min-w-0 space-y-3 overflow-hidden p-4 ${
-                  task.status === 'done'
-                    ? 'bg-muted/60 text-muted-foreground'
-                    : needsDeadlineAttention(task)
-                      ? 'bg-yellow-500/10 hover:bg-yellow-500/15'
-                      : ''
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    checked={selectedIds.has(task.id)}
-                    onCheckedChange={() => toggleSelected(task.id)}
-                    aria-label={`Выбрать задачу ${task.title}`}
-                    className="mt-2"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="mt-0.5 shrink-0"
-                    aria-label="Открыть задачу"
-                    onClick={() => setSelectedTask(task.id)}
-                  >
-                    {task.status === 'done' ? (
-                      <CheckCircle2 className="text-primary" />
-                    ) : (
-                      <Circle />
-                    )}
-                  </Button>
-                  <div className="min-w-0 flex-1">
-                    <EditableTitle task={task} />
-                    {showProject && (
-                      <div className="mt-1 px-1 text-xs text-muted-foreground">
-                        {projectById[task.projectId]?.name ?? '—'}
+            {pageTasks.map((task) => {
+              const assignee = users.find((user) => user.id === task.assigneeId)?.name || 'Не назначен';
+              const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
+              return (
+                <article
+                  key={task.id}
+                  className={`max-w-full min-w-0 overflow-hidden p-4 ${
+                    task.status === 'done'
+                      ? 'bg-muted/60 text-muted-foreground'
+                      : needsDeadlineAttention(task)
+                        ? 'bg-yellow-500/10'
+                        : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={selectedIds.has(task.id)}
+                      onCheckedChange={() => toggleSelected(task.id)}
+                      aria-label={`Выбрать задачу ${task.title}`}
+                      className="mt-1.5"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTask(task.id)}
+                      className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                    >
+                      <div className="flex items-start gap-2">
+                        {task.status === 'done' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> : <Circle className="mt-0.5 size-4 shrink-0" />}
+                        <p className="line-clamp-2 font-medium">{task.title}</p>
                       </div>
-                    )}
+                      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>{STATUS_LABELS[task.status] || task.status}</span>
+                        <span>· {priority}</span>
+                        {showProject && <span>· {projectById[task.projectId]?.name ?? '—'}</span>}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>{assignee}</span>
+                        {task.dueDate && <span className={needsDeadlineAttention(task) ? 'font-medium text-yellow-800 dark:text-yellow-200' : undefined}>· до {formatBitrixDateTime(task.dueDate)}</span>}
+                        {(task.estimate || task.actualTime) ? <span>· {task.actualTime || 0} / {task.estimate || 0} ч</span> : null}
+                      </div>
+                    </button>
+                    <TaskActions task={task} compact />
                   </div>
-                  <TaskActions task={task} />
-                </div>
-                <FieldControls task={task} compact readOnly={isReadOnly} />
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
           <div className="hidden overflow-x-auto md:block">
             <Table className="min-w-max table-fixed">
