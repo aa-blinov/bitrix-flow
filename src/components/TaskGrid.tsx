@@ -463,7 +463,7 @@ export default function TaskGrid({
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             {viewScope && <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
                 {views.map((view) => <DropdownMenuItem key={view.id} className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
@@ -472,7 +472,7 @@ export default function TaskGrid({
               </DropdownMenuContent>
             </DropdownMenu>}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Поля</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8">Поля</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {(Object.keys(COLUMN_LABELS) as ColumnKey[]).filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
               </DropdownMenuContent>
@@ -519,7 +519,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
-              <Button variant="outline" size="sm" className="border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
+              <Button variant="outline" size="sm" className="h-8 border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
                 setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
               }}>
                 Сбросить
