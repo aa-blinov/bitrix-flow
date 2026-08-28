@@ -69,8 +69,22 @@ function eventDetails(event: string, raw: any) {
       message: raw?.POST_MESSAGE || raw?.MESSAGE || `в задаче ${title}`,
       ...base,
     };
-  return { type: 'task_updated', taskId, messageId, title: 'Изменение задачи', message: title, ...base };
-  return { type: 'task_updated', taskId, messageId, title: 'Задача обновлена', message: title, ...base };
+  return {
+    type: 'task_updated',
+    taskId,
+    messageId,
+    title: 'Изменение задачи',
+    message: title,
+    ...base,
+  };
+  return {
+    type: 'task_updated',
+    taskId,
+    messageId,
+    title: 'Задача обновлена',
+    message: title,
+    ...base,
+  };
 }
 
 async function enrichComment(memberId: string, details: ReturnType<typeof eventDetails>) {
@@ -138,7 +152,8 @@ export async function POST(req: NextRequest) {
       .collection('user_tokens')
       .findOne({ member_id: String(memberId) }, { projection: { application_token: 1 } });
     const receivedToken = String(body.auth?.application_token || '');
-    let expectedToken = typeof tokens?.application_token === 'string' ? tokens.application_token : '';
+    let expectedToken =
+      typeof tokens?.application_token === 'string' ? tokens.application_token : '';
     // Old portal installations created before this check may not have stored
     // the token. Bootstrap it from the first authenticated payload so that
     // subsequent events can be verified against it.
@@ -166,10 +181,12 @@ export async function POST(req: NextRequest) {
         .findOne({ member_id: memberId, messageId: (details as any).messageId });
       if (existing) {
         // Дублирующийся комментарий: не плодим карточки, только обновляем детали.
-        await db.collection('notifications').updateOne(
-          { _id: existing._id },
-          { $set: { ...details, created_at: now, raw_event: event } },
-        );
+        await db
+          .collection('notifications')
+          .updateOne(
+            { _id: existing._id },
+            { $set: { ...details, created_at: now, raw_event: event } },
+          );
         invalidateByPrefix(`${memberId}:`);
         return NextResponse.json({ ok: true, merged: true });
       }

@@ -9,8 +9,12 @@ beforeEach(() => {
   globalThis.window = {};
   globalThis.localStorage = {
     getItem: (key: string) => values[key] ?? null,
-    setItem: (key: string, value: string) => { values[key] = value; },
-    removeItem: (key: string) => { delete values[key]; },
+    setItem: (key: string, value: string) => {
+      values[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete values[key];
+    },
   } as Storage;
 });
 

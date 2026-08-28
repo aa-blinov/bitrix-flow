@@ -59,7 +59,9 @@ export async function GET(req: NextRequest) {
   // данных, сбрасываем старые данные этого member_id и заставляем клиента
   // пересинхронизироваться с нуля.
   const db2 = await getDb();
-  const hasMirror = await db2.collection('task_mirror').findOne({ member_id: memberId }, { projection: { _id: 1 } });
+  const hasMirror = await db2
+    .collection('task_mirror')
+    .findOne({ member_id: memberId }, { projection: { _id: 1 } });
   if (!hasMirror) {
     await db2.collection('task_mirror').deleteMany({ member_id: memberId });
     await db2.collection('projects').deleteMany({ member_id: memberId });
@@ -71,11 +73,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [rawProjects, rawUsers, rawCurrentUser] = await Promise.all([
-      serverCache(
-        `${memberId}:projects:all`,
-        () => fetchAllProjects(token),
-        PROJECTS_TTL,
-      ),
+      serverCache(`${memberId}:projects:all`, () => fetchAllProjects(token), PROJECTS_TTL),
       serverCache(
         `${memberId}:users:all`,
         () => callBitrix24(token, 'user.get', { ACTIVE: 'true' }),
@@ -157,7 +155,11 @@ async function callBitrix24Response(token: any, method: string, params: Record<s
   return data;
 }
 
-async function callBitrix24(token: any, method: string, params: Record<string, string>): Promise<any> {
+async function callBitrix24(
+  token: any,
+  method: string,
+  params: Record<string, string>,
+): Promise<any> {
   return (await callBitrix24Response(token, method, params)).result;
 }
 

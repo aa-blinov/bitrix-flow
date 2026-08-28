@@ -6,15 +6,28 @@ import { AlertTriangle, ArrowRight, CalendarDays, CalendarOff, ListChecks } from
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, allTasks, loadProjects, loadAllTasks, isLoading, selectedProjectId, setSelectedProject } =
-    useKanbanStore();
+  const {
+    projects,
+    allTasks,
+    loadProjects,
+    loadAllTasks,
+    isLoading,
+    selectedProjectId,
+    setSelectedProject,
+  } = useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -62,7 +75,7 @@ export default function DashboardPage() {
       .catch(() => router.replace('/login'));
   }, [loadAllTasks, loadProjects, router]);
 
-  if (isLoading || !selectedProjectId && !showInstallBanner) {
+  if (isLoading || (!selectedProjectId && !showInstallBanner)) {
     return <LoadingState className="min-h-screen bg-muted/30" />;
   }
 
@@ -88,9 +101,10 @@ export default function DashboardPage() {
     };
   });
 
-  const filteredProjects = projectsWithStats.filter((project) =>
-    (archiveFilter === 'all' || (archiveFilter === 'archived') === Boolean(project.isArchived)) &&
-    project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
+  const filteredProjects = projectsWithStats.filter(
+    (project) =>
+      (archiveFilter === 'all' || (archiveFilter === 'archived') === Boolean(project.isArchived)) &&
+      project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
   );
 
   const attentionCount = allTasks.filter((task) => needsDeadlineAttention(task)).length;
@@ -103,8 +117,16 @@ export default function DashboardPage() {
       {showInstallBanner && (
         <div className="mx-auto mt-4 max-w-6xl px-4 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <span>Вход выполнен, но подключение к Битрикс24 ещё не настроено. Без него список задач останется пустым.</span>
-            <a href="/api/oauth" className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">Подключить Битрикс24</a>
+            <span>
+              Вход выполнен, но подключение к Битрикс24 ещё не настроено. Без него список задач
+              останется пустым.
+            </span>
+            <a
+              href="/api/oauth"
+              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+            >
+              Подключить Битрикс24
+            </a>
           </div>
         </div>
       )}
@@ -118,10 +140,38 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         {/* Stats */}
         <div className="mb-8 grid auto-rows-fr grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard href="/all-tasks?status=attention" icon={AlertTriangle} label="Требуют внимания" value={attentionCount} color="text-amber-700 dark:text-amber-300" bgColor="bg-amber-500/15" />
-          <StatCard href="/all-tasks?status=in_progress" icon={ListChecks} label="В работе" value={inProgressCount} color="text-blue-700 dark:text-blue-300" bgColor="bg-blue-500/15" />
-          <StatCard href="/all-tasks?status=week" icon={CalendarDays} label="Дедлайн на неделе" value={dueThisWeekCount} color="text-violet-700 dark:text-violet-300" bgColor="bg-violet-500/15" />
-          <StatCard href="/all-tasks?status=no_deadline" icon={CalendarOff} label="Без дедлайна" value={noDeadlineCount} color="text-muted-foreground" bgColor="bg-muted" />
+          <StatCard
+            href="/all-tasks?status=attention"
+            icon={AlertTriangle}
+            label="Требуют внимания"
+            value={attentionCount}
+            color="text-amber-700 dark:text-amber-300"
+            bgColor="bg-amber-500/15"
+          />
+          <StatCard
+            href="/all-tasks?status=in_progress"
+            icon={ListChecks}
+            label="В работе"
+            value={inProgressCount}
+            color="text-blue-700 dark:text-blue-300"
+            bgColor="bg-blue-500/15"
+          />
+          <StatCard
+            href="/all-tasks?status=week"
+            icon={CalendarDays}
+            label="Дедлайн на неделе"
+            value={dueThisWeekCount}
+            color="text-violet-700 dark:text-violet-300"
+            bgColor="bg-violet-500/15"
+          />
+          <StatCard
+            href="/all-tasks?status=no_deadline"
+            icon={CalendarOff}
+            label="Без дедлайна"
+            value={noDeadlineCount}
+            color="text-muted-foreground"
+            bgColor="bg-muted"
+          />
         </div>
 
         {/* Projects list */}
@@ -136,8 +186,13 @@ export default function DashboardPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-40 sm:w-64"
               />
-              <Select value={archiveFilter} onValueChange={(value) => setArchiveFilter(value as typeof archiveFilter)}>
-                <SelectTrigger className="w-28" aria-label="Проекты"><SelectValue /></SelectTrigger>
+              <Select
+                value={archiveFilter}
+                onValueChange={(value) => setArchiveFilter(value as typeof archiveFilter)}
+              >
+                <SelectTrigger className="w-28" aria-label="Проекты">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Активные</SelectItem>
                   <SelectItem value="archived">Архив</SelectItem>
@@ -231,17 +286,17 @@ function StatCard({
   return (
     <Link href={href} className="block h-full">
       <Card className="h-full py-0 transition hover:bg-muted/50" size="sm">
-      <CardContent className="flex h-24 items-center p-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center`}>
-            <Icon size={16} className={color} />
+        <CardContent className="flex h-24 items-center p-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center`}>
+              <Icon size={16} className={color} />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className={`text-xl font-semibold ${color} mt-0.5`}>{value}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`text-xl font-semibold ${color} mt-0.5`}>{value}</p>
-          </div>
-        </div>
-      </CardContent>
+        </CardContent>
       </Card>
     </Link>
   );

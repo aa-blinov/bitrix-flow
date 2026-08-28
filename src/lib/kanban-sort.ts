@@ -9,7 +9,8 @@ const dateValue = (value?: string) => {
 
 export function sortKanbanTasks(tasks: BxTask[], sort: KanbanSort): BxTask[] {
   return [...tasks].sort((left, right) => {
-    if ((left.status === 'done') !== (right.status === 'done')) return left.status === 'done' ? 1 : -1;
+    if ((left.status === 'done') !== (right.status === 'done'))
+      return left.status === 'done' ? 1 : -1;
     if (sort === 'title') return left.title.localeCompare(right.title, 'ru');
     if (sort === 'updated') return dateValue(right.updatedDate) - dateValue(left.updatedDate);
     const byDeadline = dateValue(left.dueDate) - dateValue(right.dueDate);

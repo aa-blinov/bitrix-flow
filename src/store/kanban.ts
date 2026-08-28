@@ -90,7 +90,10 @@ interface KanbanStore {
   createStage: (title: string) => Promise<boolean>;
   renameStage: (stageId: string, title: string) => Promise<void>;
   createProject: (name: string, description?: string) => Promise<string>;
-  updateProject: (id: string, fields: { name?: string; description?: string; archived?: boolean }) => Promise<void>;
+  updateProject: (
+    id: string,
+    fields: { name?: string; description?: string; archived?: boolean },
+  ) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: () => Promise<void>;
   loadMoreTasks: () => Promise<void>;
@@ -298,11 +301,17 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     if (!selectedProjectId || !title.trim()) return;
     const previous = stages.find((stage) => stage.id === stageId);
     if (!previous) return;
-    set((state) => ({ stages: state.stages.map((stage) => stage.id === stageId ? { ...stage, name: title.trim() } : stage) }));
+    set((state) => ({
+      stages: state.stages.map((stage) =>
+        stage.id === stageId ? { ...stage, name: title.trim() } : stage,
+      ),
+    }));
     try {
       await updateProjectStage(selectedProjectId, stageId, title.trim());
     } catch (error) {
-      set((state) => ({ stages: state.stages.map((stage) => stage.id === stageId ? previous : stage) }));
+      set((state) => ({
+        stages: state.stages.map((stage) => (stage.id === stageId ? previous : stage)),
+      }));
       throw error;
     }
   },
@@ -316,12 +325,18 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   updateProject: async (id, fields) => {
     const previous = get().projects.find((project) => project.id === id);
     if (!previous) return;
-    set((state) => ({ projects: state.projects.map((project) => project.id === id ? { ...project, ...fields } : project) }));
+    set((state) => ({
+      projects: state.projects.map((project) =>
+        project.id === id ? { ...project, ...fields } : project,
+      ),
+    }));
     try {
       await bxUpdateProject(id, fields);
       await get().loadProjects(true);
     } catch (error) {
-      set((state) => ({ projects: state.projects.map((project) => project.id === id ? previous : project) }));
+      set((state) => ({
+        projects: state.projects.map((project) => (project.id === id ? previous : project)),
+      }));
       throw error;
     }
   },
@@ -426,8 +441,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     try {
       const task = convertBxTask(await fetchTaskById(taskId));
       set((state) => ({
-        tasks: state.tasks.some((item) => item.id === taskId) ? state.tasks : [...state.tasks, task],
-        allTasks: state.allTasks.some((item) => item.id === taskId) ? state.allTasks : [...state.allTasks, task],
+        tasks: state.tasks.some((item) => item.id === taskId)
+          ? state.tasks
+          : [...state.tasks, task],
+        allTasks: state.allTasks.some((item) => item.id === taskId)
+          ? state.allTasks
+          : [...state.allTasks, task],
       }));
       return task;
     } catch {
@@ -440,7 +459,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     // Независимые REST-вызовы запускаем вместе: журнал времени не должен
     // ждать медленную загрузку комментариев из чата Bitrix24.
-    const task = get().tasks.find((item) => item.id === taskId) || get().allTasks.find((item) => item.id === taskId);
+    const task =
+      get().tasks.find((item) => item.id === taskId) ||
+      get().allTasks.find((item) => item.id === taskId);
     const commentsPromise = fetchTaskComments(taskId, task?.chatId);
     const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
 
@@ -464,7 +485,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
             t.id === taskId
               ? {
                   ...t,
-                  timeEntries: timeLog.map((e) => ({ ...e, taskId, hours: secondsToHours(e.seconds) })),
+                  timeEntries: timeLog.map((e) => ({
+                    ...e,
+                    taskId,
+                    hours: secondsToHours(e.seconds),
+                  })),
                   subtasks: subtaskList.map(convertBxTask),
                 }
               : t,
@@ -485,7 +510,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
                   ...comment,
                   taskId,
                   authorName:
-                    comment.authorName || state.users.find((user) => user.id === comment.authorId)?.name || 'Пользователь',
+                    comment.authorName ||
+                    state.users.find((user) => user.id === comment.authorId)?.name ||
+                    'Пользователь',
                 })),
               }
             : t,
@@ -497,7 +524,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
                 comments: comments.map((comment) => ({
                   ...comment,
                   taskId,
-                  authorName: comment.authorName || state.users.find((user) => user.id === comment.authorId)?.name || 'Пользователь',
+                  authorName:
+                    comment.authorName ||
+                    state.users.find((user) => user.id === comment.authorId)?.name ||
+                    'Пользователь',
                 })),
               }
             : t,
@@ -505,10 +535,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         isLoadingTask: false,
       }));
       void fetchChecklist(taskId)
-        .then((checklist) => set((state) => ({
-          tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task),
-          allTasks: state.allTasks.map((task) => task.id === taskId ? { ...task, checklist } : task),
-        })))
+        .then((checklist) =>
+          set((state) => ({
+            tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, checklist } : task)),
+            allTasks: state.allTasks.map((task) =>
+              task.id === taskId ? { ...task, checklist } : task,
+            ),
+          })),
+        )
         .catch(() => {});
     } catch {
       set({ isLoadingTask: false });
@@ -540,12 +574,15 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
   updateTaskField: async (id, field, value) => {
     const { tasks, allTasks, users } = get();
-    const previous = tasks.find((task) => task.id === id) || allTasks.find((task) => task.id === id);
+    const previous =
+      tasks.find((task) => task.id === id) || allTasks.find((task) => task.id === id);
     if (!previous) return;
 
     if (['assigneeId', 'accompliceIds', 'auditorIds'].includes(field)) {
       const members = await fetchProjectMembers(previous.projectId);
-      const memberIds = new Set((Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)));
+      const memberIds = new Set(
+        (Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)),
+      );
       const requested = field === 'assigneeId' ? (value ? [value] : []) : value;
       if (requested.some((id: string) => !memberIds.has(String(id))))
         throw new Error('Можно назначать только участников проекта');
@@ -571,8 +608,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
 
     set((state) => ({
-      tasks: state.tasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
-      allTasks: state.allTasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
+      tasks: state.tasks.map((t) =>
+        t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t,
+      ),
+      allTasks: state.allTasks.map((t) =>
+        t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t,
+      ),
     }));
 
     // Sync
@@ -609,8 +650,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     } catch (error) {
       console.error('Task field update failed:', error);
       set((state) => ({
-        tasks: state.tasks.map((task) => task.id === id ? previous : task),
-        allTasks: state.allTasks.map((task) => task.id === id ? previous : task),
+        tasks: state.tasks.map((task) => (task.id === id ? previous : task)),
+        allTasks: state.allTasks.map((task) => (task.id === id ? previous : task)),
       }));
       throw error;
     }
@@ -622,24 +663,33 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
   moveTaskToProject: async (taskId, projectId) => {
     const { tasks, allTasks, selectedProjectId } = get();
-    const previous = tasks.find((task) => task.id === taskId) || allTasks.find((task) => task.id === taskId);
+    const previous =
+      tasks.find((task) => task.id === taskId) || allTasks.find((task) => task.id === taskId);
     if (!previous || previous.projectId === projectId) return;
     const stages = await fetchProjectStages(projectId);
     const stageId = stages.find((stage) => stage.systemType === 'NEW')?.id || stages[0]?.id;
     if (!stageId) throw new Error('В проекте нет этапов для переноса задачи');
 
     set((state) => ({
-      tasks: selectedProjectId === previous.projectId
-        ? state.tasks.filter((task) => task.id !== taskId)
-        : state.tasks.map((task) => task.id === taskId ? { ...task, projectId, stageId } : task),
-      allTasks: state.allTasks.map((task) => task.id === taskId ? { ...task, projectId, stageId } : task),
+      tasks:
+        selectedProjectId === previous.projectId
+          ? state.tasks.filter((task) => task.id !== taskId)
+          : state.tasks.map((task) =>
+              task.id === taskId ? { ...task, projectId, stageId } : task,
+            ),
+      allTasks: state.allTasks.map((task) =>
+        task.id === taskId ? { ...task, projectId, stageId } : task,
+      ),
     }));
     try {
       await bxUpdateTaskFull(taskId, { groupId: projectId, stageId });
     } catch (error) {
       set((state) => ({
-        tasks: selectedProjectId === previous.projectId ? [...state.tasks, previous] : state.tasks.map((task) => task.id === taskId ? previous : task),
-        allTasks: state.allTasks.map((task) => task.id === taskId ? previous : task),
+        tasks:
+          selectedProjectId === previous.projectId
+            ? [...state.tasks, previous]
+            : state.tasks.map((task) => (task.id === taskId ? previous : task)),
+        allTasks: state.allTasks.map((task) => (task.id === taskId ? previous : task)),
       }));
       throw error;
     }
@@ -705,22 +755,52 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   addChecklistItem: async (taskId, title, parentId) => {
     await bxAddChecklistItem(taskId, title, parentId);
     const checklist = await fetchChecklist(taskId);
-    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist } : task) }));
+    set((state) => ({
+      tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, checklist } : task)),
+    }));
   },
 
   updateChecklistItem: async (taskId, itemId, title) => {
     await bxUpdateChecklistItem(taskId, itemId, title);
-    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, title } : item) } : task) }));
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              checklist: task.checklist?.map((item) =>
+                item.id === itemId ? { ...item, title } : item,
+              ),
+            }
+          : task,
+      ),
+    }));
   },
 
   setChecklistItemCompleted: async (taskId, itemId, completed) => {
     await bxSetChecklistItemCompleted(taskId, itemId, completed);
-    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.map((item) => item.id === itemId ? { ...item, completed } : item) } : task) }));
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              checklist: task.checklist?.map((item) =>
+                item.id === itemId ? { ...item, completed } : item,
+              ),
+            }
+          : task,
+      ),
+    }));
   },
 
   deleteChecklistItem: async (taskId, itemId) => {
     await bxDeleteChecklistItem(taskId, itemId);
-    set((state) => ({ tasks: state.tasks.map((task) => task.id === taskId ? { ...task, checklist: task.checklist?.filter((item) => item.id !== itemId) } : task) }));
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, checklist: task.checklist?.filter((item) => item.id !== itemId) }
+          : task,
+      ),
+    }));
   },
 
   addTimeEntry: async (taskId, hours, description) => {
@@ -814,7 +894,13 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       if (selectedProjectId && t.projectId !== selectedProjectId) return false;
       if (!filters.showCompleted && t.status === 'done') return false;
       if (filters.assigneeId && t.assigneeId !== filters.assigneeId) return false;
-      if (filters.search && !`${t.title} ${t.description} ${t.id}`.toLocaleLowerCase('ru').includes(filters.search.toLocaleLowerCase('ru'))) return false;
+      if (
+        filters.search &&
+        !`${t.title} ${t.description} ${t.id}`
+          .toLocaleLowerCase('ru')
+          .includes(filters.search.toLocaleLowerCase('ru'))
+      )
+        return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.hasDeadline && !t.dueDate) return false;
       if (filters.overdue && t.dueDate) {
@@ -861,9 +947,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const now = new Date();
     const all = get().allTasks;
     return {
-      overdue: all.filter(
-        (t) => t.dueDate && t.status !== 'done' && new Date(t.dueDate) < now,
-      ).length,
+      overdue: all.filter((t) => t.dueDate && t.status !== 'done' && new Date(t.dueDate) < now)
+        .length,
       in_progress: all.filter((t) => t.status === 'in_progress').length,
       done: all.filter((t) => t.status === 'done').length,
     };

@@ -19,10 +19,9 @@ export async function GET(req: NextRequest) {
   // задач — это инвалидированное состояние. Очищаем его и отдаём пустой список,
   // чтобы клиент не видел залежавшиеся данные из старого token.
   const db0 = await getDb();
-  const token = await db0.collection('user_tokens').findOne(
-    { member_id: memberId },
-    { projection: { _id: 1, domain: 1, access_token: 1 } },
-  );
+  const token = await db0
+    .collection('user_tokens')
+    .findOne({ member_id: memberId }, { projection: { _id: 1, domain: 1, access_token: 1 } });
   if (!token?.access_token || !token.domain) {
     await db0.collection('task_mirror').deleteMany({ member_id: memberId });
     await db0.collection('projects').deleteMany({ member_id: memberId });
@@ -67,7 +66,14 @@ export async function GET(req: NextRequest) {
         allTasks.map((task) => ({
           updateOne: {
             filter: { member_id: memberId, id: String(task.id) },
-            update: { $set: { member_id: memberId, id: String(task.id), data: task, updated_at: new Date() } },
+            update: {
+              $set: {
+                member_id: memberId,
+                id: String(task.id),
+                data: task,
+                updated_at: new Date(),
+              },
+            },
             upsert: true,
           },
         })),

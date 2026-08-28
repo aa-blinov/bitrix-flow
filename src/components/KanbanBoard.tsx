@@ -44,11 +44,31 @@ function getStageColor(hex: string): { bg: string; text: string; border: string 
   // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
   // читаются и в светлой, и в тёмной теме без dark: префикса.
   const colors: Record<string, { bg: string; text: string; border: string }> = {
-    '47d1e2': { bg: 'bg-cyan-500/15', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-500/30' },
-    '75d900': { bg: 'bg-green-500/15', text: 'text-green-700 dark:text-green-300', border: 'border-green-500/30' },
-    ffab00: { bg: 'bg-amber-500/15', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-500/30' },
-    ff5752: { bg: 'bg-red-500/15', text: 'text-red-700 dark:text-red-300', border: 'border-red-500/30' },
-    '1eae43': { bg: 'bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-500/30' },
+    '47d1e2': {
+      bg: 'bg-cyan-500/15',
+      text: 'text-cyan-700 dark:text-cyan-300',
+      border: 'border-cyan-500/30',
+    },
+    '75d900': {
+      bg: 'bg-green-500/15',
+      text: 'text-green-700 dark:text-green-300',
+      border: 'border-green-500/30',
+    },
+    ffab00: {
+      bg: 'bg-amber-500/15',
+      text: 'text-amber-700 dark:text-amber-300',
+      border: 'border-amber-500/30',
+    },
+    ff5752: {
+      bg: 'bg-red-500/15',
+      text: 'text-red-700 dark:text-red-300',
+      border: 'border-red-500/30',
+    },
+    '1eae43': {
+      bg: 'bg-emerald-500/15',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      border: 'border-emerald-500/30',
+    },
   };
   return (
     colors[hex?.toLowerCase()] || {
@@ -140,7 +160,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   } = useKanbanStore();
 
   const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
-  const filteredTasks = useMemo(() => sortKanbanTasks(getFilteredTasks(), kanbanSort), [filters, getFilteredTasks, kanbanSort, selectedProjectId, tasks]);
+  const filteredTasks = useMemo(
+    () => sortKanbanTasks(getFilteredTasks(), kanbanSort),
+    [filters, getFilteredTasks, kanbanSort, selectedProjectId, tasks],
+  );
 
   // Добавляем дефолтные системные стадии
   const defaultStages = [
@@ -171,9 +194,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // permissions error on task.stages.get, project Kanban disabled, …) get
   // rendered in a dedicated fallback column so they are never silently lost.
   const knownStageIds = new Set(allStages.map((stage) => stage.id));
-  const orphanTasks = filteredTasks.filter(
-    (task) => !knownStageIds.has(displayedStageId(task)),
-  );
+  const orphanTasks = filteredTasks.filter((task) => !knownStageIds.has(displayedStageId(task)));
   if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
     // ponytail: dev-only — silent in prod, noisy when something is misconfigured.
     console.warn(
@@ -206,7 +227,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const boardScrollRef = useRef<HTMLDivElement>(null);
 
   const selectedTask = useKanbanStore((s) =>
-    s.selectedTaskId ? s.tasks.find((task) => task.id === s.selectedTaskId) || s.allTasks.find((task) => task.id === s.selectedTaskId) || null : null,
+    s.selectedTaskId
+      ? s.tasks.find((task) => task.id === s.selectedTaskId) ||
+        s.allTasks.find((task) => task.id === s.selectedTaskId) ||
+        null
+      : null,
   );
   const currentProject = projects.find((p) => p.id === selectedProjectId);
   const avatarByUserId = new Map(users.map((user) => [user.id, user.icon]));
@@ -341,7 +366,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {toolbar}
           <Select value={kanbanSort} onValueChange={(value) => setKanbanSort(value as KanbanSort)}>
-            <SelectTrigger className="h-8 w-36 shrink-0 bg-background" aria-label="Сортировка задач"><SelectValue /></SelectTrigger>
+            <SelectTrigger
+              className="h-8 w-36 shrink-0 bg-background"
+              aria-label="Сортировка задач"
+            >
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="urgency">По срочности</SelectItem>
               <SelectItem value="updated">По обновлению</SelectItem>
@@ -359,16 +389,16 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={14} />
-            <span>Фильтр</span>
-            {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="ml-0.5 bg-background/20 text-inherit">
-                {activeFiltersCount}
-              </Badge>
-            )}
-          </Button>
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter size={14} />
+              <span>Фильтр</span>
+              {activeFiltersCount > 0 && (
+                <Badge variant="secondary" className="ml-0.5 bg-background/20 text-inherit">
+                  {activeFiltersCount}
+                </Badge>
+              )}
+            </Button>
 
             <Button variant="outline" onClick={() => setShowStageDialog(true)}>
               <Plus size={14} />
@@ -468,7 +498,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             <Button variant="outline" onClick={() => setShowStageDialog(false)}>
               Отмена
             </Button>
-            <Button onClick={() => void handleCreateStage()} disabled={!stageName.trim() || isCreatingStage}>
+            <Button
+              onClick={() => void handleCreateStage()}
+              disabled={!stageName.trim() || isCreatingStage}
+            >
               {isCreatingStage ? 'Создаём…' : 'Создать'}
             </Button>
           </DialogFooter>
@@ -507,12 +540,15 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <div
         ref={topScrollRef}
         onScroll={(event) => {
-          if (boardScrollRef.current) boardScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+          if (boardScrollRef.current)
+            boardScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
         className="hidden overflow-x-auto border-b bg-background lg:block"
       >
         <div className="flex min-w-max gap-4 px-4 py-2 xl:gap-5">
-          {allStages.map((stage) => <div key={stage.id} className="h-px w-[14rem] xl:w-[15rem]" />)}
+          {allStages.map((stage) => (
+            <div key={stage.id} className="h-px w-[14rem] xl:w-[15rem]" />
+          ))}
           {orphanTasks.length > 0 && <div className="h-px w-[14rem] xl:w-[15rem]" />}
         </div>
       </div>
@@ -521,7 +557,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <div
         ref={boardScrollRef}
         onScroll={(event) => {
-          if (topScrollRef.current) topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+          if (topScrollRef.current)
+            topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
         className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-background scrollbar-hide lg:snap-none"
       >
@@ -549,12 +586,28 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       autoFocus
                       value={editingStageTitle}
                       onChange={(event) => setEditingStageTitle(event.target.value)}
-                      onBlur={() => { if (editingStageTitle.trim()) void renameStage(stage.id, editingStageTitle); setEditingStageId(null); }}
-                      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setEditingStageId(null); }}
+                      onBlur={() => {
+                        if (editingStageTitle.trim()) void renameStage(stage.id, editingStageTitle);
+                        setEditingStageId(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') event.currentTarget.blur();
+                        if (event.key === 'Escape') setEditingStageId(null);
+                      }}
                       className="h-7 flex-1 px-1 text-sm font-semibold"
                       aria-label="Название фазы"
                     />
-                  ) : <h3 className="flex-1 cursor-text text-sm font-semibold text-foreground" onDoubleClick={() => { setEditingStageId(stage.id); setEditingStageTitle(stage.name); }}>{stage.name}</h3>}
+                  ) : (
+                    <h3
+                      className="flex-1 cursor-text text-sm font-semibold text-foreground"
+                      onDoubleClick={() => {
+                        setEditingStageId(stage.id);
+                        setEditingStageTitle(stage.name);
+                      }}
+                    >
+                      {stage.name}
+                    </h3>
+                  )}
                   <span className="text-xs font-medium text-muted-foreground">
                     {colTasks.length}
                   </span>
@@ -592,7 +645,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     />
                   )}
                 </div>
-
               </Card>
             );
           })}
@@ -825,15 +877,27 @@ function InlineAddForm({
         disabled={submitting}
       />
       <div className="mt-2 flex items-center gap-1">
-        <Select value={assigneeId || 'unassigned'} onValueChange={(value) => setAssigneeId(value === 'unassigned' ? '' : value)} disabled={submitting}>
-          <SelectTrigger className="h-7 min-w-0 flex-1 text-xs" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+        <Select
+          value={assigneeId || 'unassigned'}
+          onValueChange={(value) => setAssigneeId(value === 'unassigned' ? '' : value)}
+          disabled={submitting}
+        >
+          <SelectTrigger className="h-7 min-w-0 flex-1 text-xs" aria-label="Исполнитель">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="unassigned">Без исполнителя</SelectItem>
-            {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger className="h-7 w-24 text-xs" aria-label="Приоритет"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-7 w-24 text-xs" aria-label="Приоритет">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="low">Низкий</SelectItem>
             <SelectItem value="medium">Обычный</SelectItem>
@@ -896,7 +960,11 @@ function TaskCard({
             Подзадача
           </span>
         )}
-        {!task.dueDate && !isCompleted && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">Без срока</span>}
+        {!task.dueDate && !isCompleted && (
+          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">
+            Без срока
+          </span>
+        )}
       </div>
 
       {/* Title */}
@@ -940,8 +1008,8 @@ function TaskCard({
           )}
         </div>
 
-        {task.assigneeName && (
-          avatarUrl ? (
+        {task.assigneeName &&
+          (avatarUrl ? (
             <img
               src={avatarUrl}
               alt={task.assigneeName}
@@ -955,8 +1023,7 @@ function TaskCard({
             >
               {getInitials(task.assigneeName)}
             </div>
-          )
-        )}
+          ))}
       </div>
     </Card>
   );

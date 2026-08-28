@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = await getDb();
-    const query = memberId ? { member_id: memberId } : { access_token: { $type: 'string', $ne: '' } };
+    const query = memberId
+      ? { member_id: memberId }
+      : { access_token: { $type: 'string', $ne: '' } };
     const token = await db.collection('user_tokens').findOne(query, {
       sort: { updated_at: -1, installed_at: -1 },
     });

@@ -301,12 +301,20 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
   return projects;
 }
 
-export async function updateProjectStage(entityId: string, stageId: string, title: string): Promise<void> {
+export async function updateProjectStage(
+  entityId: string,
+  stageId: string,
+  title: string,
+): Promise<void> {
   await bx24('task.stages.update', { id: stageId, 'fields[TITLE]': title });
   memoryCache.delete(`stages:${entityId}`);
 }
 
-export async function createProjectStage(entityId: string, title: string, afterId?: string): Promise<void> {
+export async function createProjectStage(
+  entityId: string,
+  title: string,
+  afterId?: string,
+): Promise<void> {
   await bx24('task.stages.add', {
     'fields[TITLE]': title,
     'fields[COLOR]': '47D1E2',
@@ -495,7 +503,10 @@ export async function fetchSubtasks(parentId: string): Promise<Bx24Task[]> {
 }
 
 // Комментарии
-export async function fetchTaskComments(taskId: string, knownChatId?: string): Promise<Bx24Comment[]> {
+export async function fetchTaskComments(
+  taskId: string,
+  knownChatId?: string,
+): Promise<Bx24Comment[]> {
   const key = `comments:${taskId}`;
   const cached = await cacheGet<Bx24Comment[]>(key);
   if (cached) return cached;
@@ -518,7 +529,10 @@ export async function fetchTaskComments(taskId: string, knownChatId?: string): P
         text: message.text || message.TEXT || '',
         createdDate: message.date || message.DATE || '',
       }))
-      .sort((left: Bx24Comment, right: Bx24Comment) => (Date.parse(left.createdDate) || 0) - (Date.parse(right.createdDate) || 0));
+      .sort(
+        (left: Bx24Comment, right: Bx24Comment) =>
+          (Date.parse(left.createdDate) || 0) - (Date.parse(right.createdDate) || 0),
+      );
     await cacheSet(key, comments, 60);
     return comments;
   } catch {
@@ -593,32 +607,72 @@ export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
   const result = await bx24('tasks.task.get', { taskId });
   const task = result?.task || result;
   return {
-    id: String(task.id), title: task.title || '', description: task.description || '', status: task.status || '2', subStatus: task.subStatus || '', priority: task.priority || '1',
-    createdDate: task.createdDate || '', changedDate: task.changedDate || '', deadline: task.deadline || undefined,
-    timeEstimate: Number(task.timeEstimate) || 0, timeSpentInLogs: Number(task.timeSpentInLogs) || 0,
-    groupId: String(task.groupId || task.group?.id || '0'), groupName: task.group?.name || '',
-    responsibleId: String(task.responsibleId || task.responsible?.id || ''), responsibleName: task.responsible?.name || '', responsibleIcon: task.responsible?.icon,
-    creatorId: String(task.createdBy || task.creator?.id || ''), creatorName: task.creator?.name || '', commentsCount: Number(task.commentsCount) || 0,
-    parentId: task.parentId, stageId: task.stageId || '0', stageName: '', chatId: task.chatId ? String(task.chatId) : undefined,
-    accompliceIds: task.accomplices || [], auditorIds: task.auditors || [],
+    id: String(task.id),
+    title: task.title || '',
+    description: task.description || '',
+    status: task.status || '2',
+    subStatus: task.subStatus || '',
+    priority: task.priority || '1',
+    createdDate: task.createdDate || '',
+    changedDate: task.changedDate || '',
+    deadline: task.deadline || undefined,
+    timeEstimate: Number(task.timeEstimate) || 0,
+    timeSpentInLogs: Number(task.timeSpentInLogs) || 0,
+    groupId: String(task.groupId || task.group?.id || '0'),
+    groupName: task.group?.name || '',
+    responsibleId: String(task.responsibleId || task.responsible?.id || ''),
+    responsibleName: task.responsible?.name || '',
+    responsibleIcon: task.responsible?.icon,
+    creatorId: String(task.createdBy || task.creator?.id || ''),
+    creatorName: task.creator?.name || '',
+    commentsCount: Number(task.commentsCount) || 0,
+    parentId: task.parentId,
+    stageId: task.stageId || '0',
+    stageName: '',
+    chatId: task.chatId ? String(task.chatId) : undefined,
+    accompliceIds: task.accomplices || [],
+    auditorIds: task.auditors || [],
   };
 }
 
 export async function fetchChecklist(taskId: string) {
-  const result = await bx24('task.checklistitem.getlist', { TASKID: taskId, 'ORDER[SORT_INDEX]': 'asc' });
-  return (Array.isArray(result) ? result : []).map((item: any) => ({ id: String(item.ID), parentId: String(item.PARENT_ID || '0'), title: item.TITLE || '', completed: item.IS_COMPLETE === 'Y' }));
+  const result = await bx24('task.checklistitem.getlist', {
+    TASKID: taskId,
+    'ORDER[SORT_INDEX]': 'asc',
+  });
+  return (Array.isArray(result) ? result : []).map((item: any) => ({
+    id: String(item.ID),
+    parentId: String(item.PARENT_ID || '0'),
+    title: item.TITLE || '',
+    completed: item.IS_COMPLETE === 'Y',
+  }));
 }
 
 export async function addChecklistItem(taskId: string, title: string, parentId?: string) {
-  return bx24('task.checklistitem.add', { TASKID: taskId, 'FIELDS[TITLE]': title, 'FIELDS[PARENT_ID]': parentId || '0' });
+  return bx24('task.checklistitem.add', {
+    TASKID: taskId,
+    'FIELDS[TITLE]': title,
+    'FIELDS[PARENT_ID]': parentId || '0',
+  });
 }
 
 export async function updateChecklistItem(taskId: string, itemId: string, title: string) {
-  return bx24('task.checklistitem.update', { TASKID: taskId, ITEMID: itemId, 'FIELDS[TITLE]': title });
+  return bx24('task.checklistitem.update', {
+    TASKID: taskId,
+    ITEMID: itemId,
+    'FIELDS[TITLE]': title,
+  });
 }
 
-export async function setChecklistItemCompleted(taskId: string, itemId: string, completed: boolean) {
-  return bx24(completed ? 'task.checklistitem.complete' : 'task.checklistitem.renew', { TASKID: taskId, ITEMID: itemId });
+export async function setChecklistItemCompleted(
+  taskId: string,
+  itemId: string,
+  completed: boolean,
+) {
+  return bx24(completed ? 'task.checklistitem.complete' : 'task.checklistitem.renew', {
+    TASKID: taskId,
+    ITEMID: itemId,
+  });
 }
 
 export async function deleteChecklistItem(taskId: string, itemId: string) {
@@ -659,7 +713,10 @@ export async function removeProjectMember(projectId: string, userId: string) {
   await bx24('sonet_group.user.delete', { GROUP_ID: projectId, USER_ID: userId });
 }
 
-export async function updateProject(id: string, fields: { name?: string; description?: string; archived?: boolean }): Promise<void> {
+export async function updateProject(
+  id: string,
+  fields: { name?: string; description?: string; archived?: boolean },
+): Promise<void> {
   const params: Record<string, string> = { GROUP_ID: id };
   if (fields.name !== undefined) params.NAME = fields.name;
   if (fields.description !== undefined) params.DESCRIPTION = fields.description;

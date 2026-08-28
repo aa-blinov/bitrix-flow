@@ -7,26 +7,38 @@ describe('Bitrix markup', () => {
       { text: 'Открыть ' },
       { text: 'https://example.com/a', href: 'https://example.com/a' },
     ]);
-    expect(parseBitrixMarkup('[url=javascript:alert(1)]ссылка[/url]')).toEqual([{ text: 'ссылка' }]);
+    expect(parseBitrixMarkup('[url=javascript:alert(1)]ссылка[/url]')).toEqual([
+      { text: 'ссылка' },
+    ]);
     expect(parseBitrixMarkup('[USER=1]Сергей Веренцов[/USER]')).toEqual([
       { text: 'Сергей Веренцов', href: 'https://eora.bitrix24.ru/company/personal/user/1/' },
     ]);
   });
 
   it('renders Bitrix timestamp BBCode', () => {
-    const text = parseBitrixMarkup('[TIMESTAMP=1784725200 FORMAT=LONG_DATE_FORMAT], [TIMESTAMP=1784725200 FORMAT=SHORT_TIME_FORMAT]').map((part) => part.text).join('');
+    const text = parseBitrixMarkup(
+      '[TIMESTAMP=1784725200 FORMAT=LONG_DATE_FORMAT], [TIMESTAMP=1784725200 FORMAT=SHORT_TIME_FORMAT]',
+    )
+      .map((part) => part.text)
+      .join('');
     expect(text).not.toContain('TIMESTAMP');
     expect(text).toContain('2026');
     expect(text).toMatch(/\d{2}:\d{2}/);
   });
 
   it('parses safe text formatting tags', () => {
-    expect(parseBitrixNodes('[B]жирный[/B] [QUOTE]цитата[/QUOTE] [LIST][*]один[*]два[/LIST]')).toMatchObject([
+    expect(
+      parseBitrixNodes('[B]жирный[/B] [QUOTE]цитата[/QUOTE] [LIST][*]один[*]два[/LIST]'),
+    ).toMatchObject([
       { type: 'format', format: 'b' },
       { type: 'text', text: ' ' },
       { type: 'quote' },
       { type: 'text', text: ' ' },
-      { type: 'list', ordered: false, items: [[{ type: 'text', text: 'один' }], [{ type: 'text', text: 'два' }]] },
+      {
+        type: 'list',
+        ordered: false,
+        items: [[{ type: 'text', text: 'один' }], [{ type: 'text', text: 'два' }]],
+      },
     ]);
   });
 

@@ -100,15 +100,18 @@ export default function Notifications() {
         <div className="max-h-96 overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => {
-              const href = item.projectId && item.taskId
-                ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
-                : null;
+              const href =
+                item.projectId && item.taskId
+                  ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
+                  : null;
               const row = (
                 <>
                   <span className="mt-0.5">{icon(item.type)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{item.title}</p>
-                    <p className="line-clamp-2 text-xs text-muted-foreground"><BitrixText text={item.message} /></p>
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                      <BitrixText text={item.message} />
+                    </p>
                   </div>
                 </>
               );

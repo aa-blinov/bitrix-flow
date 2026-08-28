@@ -12,7 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +28,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -36,15 +48,75 @@ const controlClass =
   'h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-input focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30';
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
-type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadline' | 'estimate' | 'actual' | 'updated' | 'description' | 'created' | 'comments' | 'parent' | 'storyPoints';
+type SortKey =
+  | 'title'
+  | 'project'
+  | 'stage'
+  | 'assignee'
+  | 'priority'
+  | 'deadline'
+  | 'estimate'
+  | 'actual'
+  | 'updated'
+  | 'description'
+  | 'created'
+  | 'comments'
+  | 'parent'
+  | 'storyPoints';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
-type SavedView = { id: string; name: string; config: { statusFilter: string; assigneeFilter: string; projectFilter: string; groupBy: 'none' | 'stage' | 'assignee'; sorts: Sort[]; visibleColumns: ColumnKey[] } };
-const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'estimate', 'actual', 'deadline'];
-const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт', description: 'Описание', created: 'Создана', updated: 'Обновлена', comments: 'Комментарии', parent: 'Родительская', storyPoints: 'Story points' };
+type SavedView = {
+  id: string;
+  name: string;
+  config: {
+    statusFilter: string;
+    assigneeFilter: string;
+    projectFilter: string;
+    groupBy: 'none' | 'stage' | 'assignee';
+    sorts: Sort[];
+    visibleColumns: ColumnKey[];
+  };
+};
+const DEFAULT_COLUMNS: ColumnKey[] = [
+  'title',
+  'project',
+  'stage',
+  'assignee',
+  'estimate',
+  'actual',
+  'deadline',
+];
+const COLUMN_LABELS: Record<ColumnKey, string> = {
+  title: 'Задача',
+  project: 'Проект',
+  stage: 'Фаза',
+  assignee: 'Исполнитель',
+  priority: 'Приоритет',
+  deadline: 'Дедлайн',
+  estimate: 'План',
+  actual: 'Факт',
+  description: 'Описание',
+  created: 'Создана',
+  updated: 'Обновлена',
+  comments: 'Комментарии',
+  parent: 'Родительская',
+  storyPoints: 'Story points',
+};
 const COLUMN_WIDTHS: Record<SortKey, number> = {
-  title: 320, project: 180, stage: 160, assignee: 180, priority: 130,
-  deadline: 150, estimate: 180, actual: 80, updated: 160, description: 260, created: 160, comments: 110, parent: 130, storyPoints: 120,
+  title: 320,
+  project: 180,
+  stage: 160,
+  assignee: 180,
+  priority: 130,
+  deadline: 150,
+  estimate: 180,
+  actual: 80,
+  updated: 160,
+  description: 260,
+  created: 160,
+  comments: 110,
+  parent: 130,
+  storyPoints: 120,
 };
 
 function EditableTitle({ task }: { task: BxTask }) {
@@ -107,17 +179,51 @@ function InlineSelect({
 }) {
   const [open, setOpen] = useState(false);
   if (!open) {
-    return <button type="button" onClick={() => setOpen(true)} className="max-w-full truncate rounded px-1 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">{label}</button>;
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="max-w-full truncate rounded px-1 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+      >
+        {label}
+      </button>
+    );
   }
   return (
-    <Select value={value} open onOpenChange={setOpen} onValueChange={(next) => { onChange(next); setOpen(false); }}>
-      <SelectTrigger className="h-8 w-full min-w-0" aria-label={ariaLabel}><SelectValue /></SelectTrigger>
-      <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+    <Select
+      value={value}
+      open
+      onOpenChange={setOpen}
+      onValueChange={(next) => {
+        onChange(next);
+        setOpen(false);
+      }}
+    >
+      <SelectTrigger className="h-8 w-full min-w-0" aria-label={ariaLabel}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
     </Select>
   );
 }
 
-function FieldControls({ task, compact = false, readOnly = false, visibleColumns = DEFAULT_COLUMNS }: { task: BxTask; compact?: boolean; readOnly?: boolean; visibleColumns?: ColumnKey[] }) {
+function FieldControls({
+  task,
+  compact = false,
+  readOnly = false,
+  visibleColumns = DEFAULT_COLUMNS,
+}: {
+  task: BxTask;
+  compact?: boolean;
+  readOnly?: boolean;
+  visibleColumns?: ColumnKey[];
+}) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
   const label = (name: string, child: React.ReactNode) => (
     <label className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-xs text-muted-foreground">
@@ -128,11 +234,42 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   const stageOptions = stages.length
     ? stages
     : [{ id: task.stageId, name: task.status === 'done' ? 'Завершена' : 'Без фазы' }];
-  const phase = <InlineSelect label={stageOptions.find((stage) => stage.id === task.stageId)?.name || 'Без фазы'} value={task.stageId} options={stageOptions.map((stage) => ({ value: stage.id, label: stage.name }))} onChange={(value) => void moveTaskToStage(task.id, value)} ariaLabel="Фаза" />;
-  const assigneeOptions = [{ value: 'unassigned', label: 'Не назначен' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
-  const assignee = <InlineSelect label={task.assigneeName || 'Не назначен'} value={task.assigneeId || 'unassigned'} options={assigneeOptions} onChange={(value) => void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)} ariaLabel="Исполнитель" />;
-  const priorityOptions = Object.entries(PRIORITY_LABELS).filter(([key]) => key !== 'critical').map(([value, item]) => ({ value, label: item.label }));
-  const priority = <InlineSelect label={PRIORITY_LABELS[task.priority]?.label || task.priority} value={task.priority} options={priorityOptions} onChange={(value) => void updateTaskField(task.id, 'priority', value)} ariaLabel="Приоритет" />;
+  const phase = (
+    <InlineSelect
+      label={stageOptions.find((stage) => stage.id === task.stageId)?.name || 'Без фазы'}
+      value={task.stageId}
+      options={stageOptions.map((stage) => ({ value: stage.id, label: stage.name }))}
+      onChange={(value) => void moveTaskToStage(task.id, value)}
+      ariaLabel="Фаза"
+    />
+  );
+  const assigneeOptions = [
+    { value: 'unassigned', label: 'Не назначен' },
+    ...users.map((user) => ({ value: user.id, label: user.name })),
+  ];
+  const assignee = (
+    <InlineSelect
+      label={task.assigneeName || 'Не назначен'}
+      value={task.assigneeId || 'unassigned'}
+      options={assigneeOptions}
+      onChange={(value) =>
+        void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)
+      }
+      ariaLabel="Исполнитель"
+    />
+  );
+  const priorityOptions = Object.entries(PRIORITY_LABELS)
+    .filter(([key]) => key !== 'critical')
+    .map(([value, item]) => ({ value, label: item.label }));
+  const priority = (
+    <InlineSelect
+      label={PRIORITY_LABELS[task.priority]?.label || task.priority}
+      value={task.priority}
+      options={priorityOptions}
+      onChange={(value) => void updateTaskField(task.id, 'priority', value)}
+      ariaLabel="Приоритет"
+    />
+  );
   const deadline = (
     <Input
       aria-label="Дедлайн"
@@ -141,7 +278,9 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
       onChange={(event) => void updateTaskField(task.id, 'deadline', event.target.value || null)}
       className={
         controlClass +
-        (needsDeadlineAttention(task) ? ' bg-yellow-500/15 text-yellow-800 dark:text-yellow-200' : '')
+        (needsDeadlineAttention(task)
+          ? ' bg-yellow-500/15 text-yellow-800 dark:text-yellow-200'
+          : '')
       }
     />
   );
@@ -162,7 +301,11 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   if (readOnly) {
     return (
       <>
-        {visibleColumns.includes('stage') && <TableCell className="text-muted-foreground">{STATUS_LABELS[task.status] || '—'}</TableCell>}
+        {visibleColumns.includes('stage') && (
+          <TableCell className="text-muted-foreground">
+            {STATUS_LABELS[task.status] || '—'}
+          </TableCell>
+        )}
         {visibleColumns.includes('assignee') && <TableCell>{assignee}</TableCell>}
         {visibleColumns.includes('priority') && <TableCell>{priority}</TableCell>}
         {visibleColumns.includes('deadline') && <TableCell>{deadline}</TableCell>}
@@ -198,9 +341,23 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
 
 function ProjectField({ task, readOnly }: { task: BxTask; readOnly: boolean }) {
   const { projects, moveTaskToProject } = useKanbanStore();
-  const options = [{ value: 'none', label: 'Без проекта' }, ...projects.filter((project) => !project.isArchived).map((project) => ({ value: project.id, label: project.name }))];
-  if (readOnly) return <>{projects.find((project) => project.id === task.projectId)?.name ?? '—'}</>;
-  return <InlineSelect label={projects.find((project) => project.id === task.projectId)?.name ?? '—'} value={task.projectId || 'none'} options={options} onChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)} ariaLabel="Проект" />;
+  const options = [
+    { value: 'none', label: 'Без проекта' },
+    ...projects
+      .filter((project) => !project.isArchived)
+      .map((project) => ({ value: project.id, label: project.name })),
+  ];
+  if (readOnly)
+    return <>{projects.find((project) => project.id === task.projectId)?.name ?? '—'}</>;
+  return (
+    <InlineSelect
+      label={projects.find((project) => project.id === task.projectId)?.name ?? '—'}
+      value={task.projectId || 'none'}
+      options={options}
+      onChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)}
+      ariaLabel="Проект"
+    />
+  );
 }
 
 function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolean }) {
@@ -208,7 +365,13 @@ function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolea
   return (
     <div className="flex items-center">
       {!compact && (
-        <Button variant="ghost" size="icon" aria-label={`Открыть карточку ${task.title}`} title="Открыть карточку" onClick={() => setSelectedTask(task.id)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Открыть карточку ${task.title}`}
+          title="Открыть карточку"
+          onClick={() => setSelectedTask(task.id)}
+        >
           <ExternalLink className="size-4" />
         </Button>
       )}
@@ -218,18 +381,18 @@ function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolea
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Быстрые действия</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => setSelectedTask(task.id)}>
-          <ExternalLink />
-          Открыть карточку
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => void moveTask(task.id, task.status === 'done' ? 'new' : 'done')}
-        >
-          {task.status === 'done' ? <Circle /> : <CheckCircle2 />}
-          {task.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной'}
-        </DropdownMenuItem>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Быстрые действия</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => setSelectedTask(task.id)}>
+            <ExternalLink />
+            Открыть карточку
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => void moveTask(task.id, task.status === 'done' ? 'new' : 'done')}
+          >
+            {task.status === 'done' ? <Circle /> : <CheckCircle2 />}
+            {task.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной'}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -260,10 +423,7 @@ export default function TaskGrid({
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
   const stages = useKanbanStore((state) => state.stages);
-  const projectById = useMemo(
-    () => Object.fromEntries(projects.map((p) => [p.id, p])),
-    [projects],
-  );
+  const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const selectedTask = useMemo(
     () => tasks.find((task) => task.id === selectedTaskId),
     [tasks, selectedTaskId],
@@ -305,7 +465,8 @@ export default function TaskGrid({
     return tasks
       .filter((task) => {
         if (statusFilter === 'overdue') {
-          if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date()) return false;
+          if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date())
+            return false;
         } else if (statusFilter === 'attention') {
           if (!needsDeadlineAttention(task)) return false;
         } else if (statusFilter === 'week') {
@@ -314,7 +475,8 @@ export default function TaskGrid({
           if (task.dueDate || task.status === 'done') return false;
         } else if (statusFilter !== 'all' && task.status !== statusFilter) return false;
         if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) return false;
-        if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter) return false;
+        if (showProject && projectFilter !== 'all' && task.projectId !== projectFilter)
+          return false;
         const searchText = `${task.title} ${task.id} ${task.description} ${projectById[task.projectId]?.name || ''} ${task.assigneeName || ''} ${stages.find((stage) => stage.id === task.stageId)?.name || ''}`;
         return !needle || searchText.toLocaleLowerCase('ru').includes(needle);
       })
@@ -322,32 +484,50 @@ export default function TaskGrid({
         for (const sort of sorts) {
           const leftValue = value(left, sort.key);
           const rightValue = value(right, sort.key);
-          const result = typeof leftValue === 'number' && typeof rightValue === 'number'
-            ? leftValue - rightValue
-            : String(leftValue).localeCompare(String(rightValue), 'ru');
+          const result =
+            typeof leftValue === 'number' && typeof rightValue === 'number'
+              ? leftValue - rightValue
+              : String(leftValue).localeCompare(String(rightValue), 'ru');
           if (result) return sort.direction === 'asc' ? result : -result;
         }
         return 0;
       });
-  }, [assigneeFilter, projectById, projectFilter, query, showProject, sorts, stages, statusFilter, tasks]);
+  }, [
+    assigneeFilter,
+    projectById,
+    projectFilter,
+    query,
+    showProject,
+    sorts,
+    stages,
+    statusFilter,
+    tasks,
+  ]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
   const groupedPageTasks = useMemo(() => {
     if (groupBy === 'none') return [{ key: '', label: '', tasks: pageTasks }];
-    const labels = groupBy === 'stage'
-      ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
-      : Object.fromEntries(users.map((user) => [user.id, user.name]));
+    const labels =
+      groupBy === 'stage'
+        ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
+        : Object.fromEntries(users.map((user) => [user.id, user.name]));
     return Object.entries(
       pageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
         const key = groupBy === 'stage' ? task.stageId : task.assigneeId || '';
         (groups[key] ||= []).push(task);
         return groups;
       }, {}),
-    ).map(([key, groupedTasks]) => ({ key, label: labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен'), tasks: groupedTasks }));
+    ).map(([key, groupedTasks]) => ({
+      key,
+      label: labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен'),
+      tasks: groupedTasks,
+    }));
   }, [groupBy, pageTasks, stages, users]);
   const pageNumbers = Array.from(
-    new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
+    new Set(
+      [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
+    ),
   ).sort((left, right) => left - right);
 
   useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
@@ -355,7 +535,9 @@ export default function TaskGrid({
 
   useEffect(() => {
     if (!viewScope) return;
-    void fetch(`/api/task-views?scope=${viewScope}`).then((response) => response.json()).then((data) => setViews(data.views || []));
+    void fetch(`/api/task-views?scope=${viewScope}`)
+      .then((response) => response.json())
+      .then((data) => setViews(data.views || []));
   }, [viewScope]);
 
   useEffect(() => {
@@ -365,24 +547,42 @@ export default function TaskGrid({
 
   const applyView = (id: string) => {
     if (id === 'default') {
-      setActiveViewId(''); setStatusFilter(initialStatus); setAssigneeFilter('all'); setProjectFilter('all');
-      setGroupBy('none'); setSorts([{ key: 'updated', direction: 'desc' }]); setVisibleColumns(DEFAULT_COLUMNS);
+      setActiveViewId('');
+      setStatusFilter(initialStatus);
+      setAssigneeFilter('all');
+      setProjectFilter('all');
+      setGroupBy('none');
+      setSorts([{ key: 'updated', direction: 'desc' }]);
+      setVisibleColumns(DEFAULT_COLUMNS);
       return;
     }
     setActiveViewId(id);
     const view = views.find((item) => item.id === id);
     if (!view) return;
     const config = view.config;
-    setStatusFilter(config.statusFilter); setAssigneeFilter(config.assigneeFilter); setProjectFilter(config.projectFilter);
-    setGroupBy(config.groupBy); setSorts(config.sorts); setVisibleColumns(config.visibleColumns);
+    setStatusFilter(config.statusFilter);
+    setAssigneeFilter(config.assigneeFilter);
+    setProjectFilter(config.projectFilter);
+    setGroupBy(config.groupBy);
+    setSorts(config.sorts);
+    setVisibleColumns(config.visibleColumns);
   };
   const saveView = async () => {
     const name = viewName.trim();
     if (!name || !viewScope) return;
     const config = { statusFilter, assigneeFilter, projectFilter, groupBy, sorts, visibleColumns };
-    const response = await fetch('/api/task-views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, scope: viewScope, config }) });
+    const response = await fetch('/api/task-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, scope: viewScope, config }),
+    });
     const { view } = await response.json();
-    if (view) { setViews((items) => [...items, view]); setActiveViewId(view.id); setSaveViewOpen(false); setViewName(''); }
+    if (view) {
+      setViews((items) => [...items, view]);
+      setActiveViewId(view.id);
+      setSaveViewOpen(false);
+      setViewName('');
+    }
   };
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
@@ -412,10 +612,16 @@ export default function TaskGrid({
   };
   const sortLabel = (key: SortKey) => {
     const index = sorts.findIndex((sort) => sort.key === key);
-    return index < 0 ? '' : `${sorts[index].direction === 'asc' ? '↑' : '↓'}${sorts.length > 1 ? index + 1 : ''}`;
+    return index < 0
+      ? ''
+      : `${sorts[index].direction === 'asc' ? '↑' : '↓'}${sorts.length > 1 ? index + 1 : ''}`;
   };
   const resizeColumn = (key: SortKey, startX: number, startWidth: number) => {
-    const move = (event: PointerEvent) => setColumnWidths((widths) => ({ ...widths, [key]: Math.max(80, startWidth + event.clientX - startX) }));
+    const move = (event: PointerEvent) =>
+      setColumnWidths((widths) => ({
+        ...widths,
+        [key]: Math.max(80, startWidth + event.clientX - startX),
+      }));
     const end = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
@@ -425,13 +631,22 @@ export default function TaskGrid({
   };
   const sortableHead = (key: SortKey, label: string) => (
     <TableHead className="relative p-0" style={{ width: columnWidths[key] }}>
-      <button type="button" onClick={() => toggleSort(key)} className="flex h-10 w-full items-center gap-1 px-4 text-left hover:text-foreground">
-        {label}<span className="min-w-3 text-xs">{sortLabel(key)}</span>
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className="flex h-10 w-full items-center gap-1 px-4 text-left hover:text-foreground"
+      >
+        {label}
+        <span className="min-w-3 text-xs">{sortLabel(key)}</span>
       </button>
       <span
         role="separator"
         aria-label={`Изменить ширину столбца ${label}`}
-        onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); resizeColumn(key, event.clientX, columnWidths[key]); }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          resizeColumn(key, event.clientX, columnWidths[key]);
+        }}
         className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-primary"
       />
     </TableHead>
@@ -461,20 +676,71 @@ export default function TaskGrid({
       <Card className="mx-4 mt-5 overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
         <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
-            {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
-            {viewScope && <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 rounded-md focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">{views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
-                {views.map((view) => <DropdownMenuItem key={view.id} className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => setSaveViewOpen(true)}>Сохранить текущий вид</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>}
+            {title !== null && (
+              <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
+            )}
+            {viewScope && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-md focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground"
+                  >
+                    {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent"
+                    onClick={() => applyView('default')}
+                  >
+                    По умолчанию
+                  </DropdownMenuItem>
+                  {views.map((view) => (
+                    <DropdownMenuItem
+                      key={view.id}
+                      className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent"
+                      onClick={() => applyView(view.id)}
+                    >
+                      {view.name}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent"
+                    onClick={() => setSaveViewOpen(true)}
+                  >
+                    Сохранить текущий вид
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 rounded-md">Поля</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 rounded-md">
+                  Поля
+                </Button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {(Object.keys(COLUMN_LABELS) as ColumnKey[]).filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
+                {(Object.keys(COLUMN_LABELS) as ColumnKey[])
+                  .filter((column) => showProject || column !== 'project')
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column}
+                      checked={visibleColumns.includes(column)}
+                      disabled={column === 'title'}
+                      onCheckedChange={(checked) =>
+                        setVisibleColumns((columns) =>
+                          checked
+                            ? [...columns, column]
+                            : columns.filter((item) => item !== column),
+                        )
+                      }
+                    >
+                      {COLUMN_LABELS[column]}
+                    </DropdownMenuCheckboxItem>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenu>
             <Input
@@ -484,34 +750,54 @@ export default function TaskGrid({
               className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32 rounded-md" aria-label="Статус"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все задачи</SelectItem>
                 <SelectItem value="attention">Требуют внимания</SelectItem>
                 <SelectItem value="week">Дедлайн на неделе</SelectItem>
                 <SelectItem value="no_deadline">Без дедлайна</SelectItem>
                 <SelectItem value="overdue">Просрочено</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-              <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все исполнители</SelectItem>
-                {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {showProject && (
               <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="w-40 rounded-md" aria-label="Проект"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все проекты</SelectItem>
-                  {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
             <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
-              <SelectTrigger className="w-40 rounded-md" aria-label="Группировка"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40 rounded-md" aria-label="Группировка">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без группировки</SelectItem>
                 <SelectItem value="stage">По фазе</SelectItem>
@@ -522,8 +808,20 @@ export default function TaskGrid({
               variant="outline"
               size="sm"
               className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
-              disabled={!query && statusFilter === 'all' && assigneeFilter === 'all' && projectFilter === 'all' && groupBy === 'none'}
-              onClick={() => { setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none'); }}
+              disabled={
+                !query &&
+                statusFilter === 'all' &&
+                assigneeFilter === 'all' &&
+                projectFilter === 'all' &&
+                groupBy === 'none'
+              }
+              onClick={() => {
+                setQuery('');
+                setStatusFilter('all');
+                setAssigneeFilter('all');
+                setProjectFilter('all');
+                setGroupBy('none');
+              }}
             >
               Сбросить
             </Button>
@@ -532,25 +830,38 @@ export default function TaskGrid({
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
               <span className="font-medium">Выбрано: {selectedIds.size}</span>
               <Select onValueChange={(value) => applyBulk('assigneeId', value)}>
-                <SelectTrigger className="w-44" aria-label="Назначить исполнителя"><SelectValue placeholder="Назначить…" /></SelectTrigger>
-                <SelectContent>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-44" aria-label="Назначить исполнителя">
+                  <SelectValue placeholder="Назначить…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
               <Select onValueChange={(value) => applyBulk('status', value)}>
-                <SelectTrigger className="w-40" aria-label="Сменить статус"><SelectValue placeholder="Сменить статус…" /></SelectTrigger>
+                <SelectTrigger className="w-40" aria-label="Сменить статус">
+                  <SelectValue placeholder="Сменить статус…" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new">Новая</SelectItem>
                   <SelectItem value="in_progress">В работе</SelectItem>
                   <SelectItem value="done">Готово</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Снять выбор</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Снять выбор
+              </Button>
             </div>
           )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
             {pageTasks.map((task) => {
-              const assignee = users.find((user) => user.id === task.assigneeId)?.name || 'Не назначен';
+              const assignee =
+                users.find((user) => user.id === task.assigneeId)?.name || 'Не назначен';
               const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
               return (
                 <article
@@ -576,7 +887,11 @@ export default function TaskGrid({
                       className="min-w-0 flex-1 text-left focus-visible:outline-none"
                     >
                       <div className="flex items-start gap-2">
-                        {task.status === 'done' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" /> : <Circle className="mt-0.5 size-4 shrink-0" />}
+                        {task.status === 'done' ? (
+                          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                        ) : (
+                          <Circle className="mt-0.5 size-4 shrink-0" />
+                        )}
                         <p className="line-clamp-2 font-medium">{task.title}</p>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -586,9 +901,27 @@ export default function TaskGrid({
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{assignee}</span>
-                        {!task.dueDate && task.status !== 'done' && <span className="font-medium text-violet-700 dark:text-violet-300">· без срока</span>}
-                        {task.dueDate && <span className={needsDeadlineAttention(task) ? 'font-medium text-yellow-800 dark:text-yellow-200' : undefined}>· до {formatBitrixDateTime(task.dueDate)}</span>}
-                        {(task.estimate || task.actualTime) ? <span>· {task.actualTime || 0} / {task.estimate || 0} ч</span> : null}
+                        {!task.dueDate && task.status !== 'done' && (
+                          <span className="font-medium text-violet-700 dark:text-violet-300">
+                            · без срока
+                          </span>
+                        )}
+                        {task.dueDate && (
+                          <span
+                            className={
+                              needsDeadlineAttention(task)
+                                ? 'font-medium text-yellow-800 dark:text-yellow-200'
+                                : undefined
+                            }
+                          >
+                            · до {formatBitrixDateTime(task.dueDate)}
+                          </span>
+                        )}
+                        {task.estimate || task.actualTime ? (
+                          <span>
+                            · {task.actualTime || 0} / {task.estimate || 0} ч
+                          </span>
+                        ) : null}
                       </div>
                     </button>
                     <TaskActions task={task} compact />
@@ -602,34 +935,78 @@ export default function TaskGrid({
               <colgroup>
                 <col className="w-10" />
                 {visibleColumns.includes('title') && <col style={{ width: columnWidths.title }} />}
-                {showProject && visibleColumns.includes('project') && <col style={{ width: columnWidths.project }} />}
+                {showProject && visibleColumns.includes('project') && (
+                  <col style={{ width: columnWidths.project }} />
+                )}
                 {visibleColumns.includes('stage') && <col style={{ width: columnWidths.stage }} />}
-                {visibleColumns.includes('assignee') && <col style={{ width: columnWidths.assignee }} />}
-                {visibleColumns.includes('priority') && <col style={{ width: columnWidths.priority }} />}
-                {visibleColumns.includes('deadline') && <col style={{ width: columnWidths.deadline }} />}
-                {visibleColumns.includes('estimate') && <col style={{ width: columnWidths.estimate }} />}
-                {visibleColumns.includes('actual') && <col style={{ width: columnWidths.actual }} />}
-                {(['description', 'created', 'updated', 'comments', 'parent', 'storyPoints'] as ColumnKey[]).map((column) => visibleColumns.includes(column) && <col key={column} style={{ width: columnWidths[column] }} />)}
+                {visibleColumns.includes('assignee') && (
+                  <col style={{ width: columnWidths.assignee }} />
+                )}
+                {visibleColumns.includes('priority') && (
+                  <col style={{ width: columnWidths.priority }} />
+                )}
+                {visibleColumns.includes('deadline') && (
+                  <col style={{ width: columnWidths.deadline }} />
+                )}
+                {visibleColumns.includes('estimate') && (
+                  <col style={{ width: columnWidths.estimate }} />
+                )}
+                {visibleColumns.includes('actual') && (
+                  <col style={{ width: columnWidths.actual }} />
+                )}
+                {(
+                  [
+                    'description',
+                    'created',
+                    'updated',
+                    'comments',
+                    'parent',
+                    'storyPoints',
+                  ] as ColumnKey[]
+                ).map(
+                  (column) =>
+                    visibleColumns.includes(column) && (
+                      <col key={column} style={{ width: columnWidths[column] }} />
+                    ),
+                )}
                 <col className="w-20" />
               </colgroup>
               <TableHeader className="bg-muted/20">
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
-                      checked={pageTasks.length > 0 && pageTasks.every((task) => selectedIds.has(task.id))}
+                      checked={
+                        pageTasks.length > 0 && pageTasks.every((task) => selectedIds.has(task.id))
+                      }
                       onCheckedChange={togglePage}
                       aria-label="Выбрать задачи на странице"
                     />
                   </TableHead>
                   {visibleColumns.includes('title') && sortableHead('title', 'Задача')}
-                  {showProject && visibleColumns.includes('project') && sortableHead('project', 'Проект')}
-                  {visibleColumns.includes('stage') && sortableHead('stage', showProject ? 'Статус' : 'Фаза')}
+                  {showProject &&
+                    visibleColumns.includes('project') &&
+                    sortableHead('project', 'Проект')}
+                  {visibleColumns.includes('stage') &&
+                    sortableHead('stage', showProject ? 'Статус' : 'Фаза')}
                   {visibleColumns.includes('assignee') && sortableHead('assignee', 'Исполнитель')}
                   {visibleColumns.includes('priority') && sortableHead('priority', 'Приоритет')}
                   {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
                   {visibleColumns.includes('estimate') && sortableHead('estimate', 'План')}
                   {visibleColumns.includes('actual') && sortableHead('actual', 'Факт')}
-                  {(['description', 'created', 'updated', 'comments', 'parent', 'storyPoints'] as ColumnKey[]).map((column) => visibleColumns.includes(column) && sortableHead(column, COLUMN_LABELS[column]))}
+                  {(
+                    [
+                      'description',
+                      'created',
+                      'updated',
+                      'comments',
+                      'parent',
+                      'storyPoints',
+                    ] as ColumnKey[]
+                  ).map(
+                    (column) =>
+                      visibleColumns.includes(column) &&
+                      sortableHead(column, COLUMN_LABELS[column]),
+                  )}
                   <TableHead className="w-20">
                     <span className="sr-only">Действия</span>
                   </TableHead>
@@ -640,7 +1017,10 @@ export default function TaskGrid({
                   <Fragment key={group.label || 'all'}>
                     {groupBy !== 'none' && (
                       <TableRow className="bg-muted/60 hover:bg-muted/60">
-                        <TableCell colSpan={showProject ? 10 : 9} className="font-medium text-foreground">
+                        <TableCell
+                          colSpan={showProject ? 10 : 9}
+                          className="font-medium text-foreground"
+                        >
                           {group.label} ({group.tasks.length})
                         </TableCell>
                       </TableRow>
@@ -663,16 +1043,56 @@ export default function TaskGrid({
                             aria-label={`Выбрать задачу ${task.title}`}
                           />
                         </TableCell>
-                        {visibleColumns.includes('title') && <TableCell><EditableTitle task={task} /></TableCell>}
-                        {showProject && visibleColumns.includes('project') && <TableCell><ProjectField task={task} readOnly={false} /></TableCell>}
-                        <FieldControls task={task} readOnly={isReadOnly} visibleColumns={visibleColumns} />
-                        {visibleColumns.includes('actual') && <TableCell className="text-muted-foreground">{task.actualTime || 0} ч</TableCell>}
-                        {visibleColumns.includes('description') && <TableCell className="max-w-64 truncate text-muted-foreground">{task.description || '—'}</TableCell>}
-                        {visibleColumns.includes('created') && <TableCell className="text-muted-foreground">{formatBitrixDateTime(task.createdDate)}</TableCell>}
-                        {visibleColumns.includes('updated') && <TableCell className="text-muted-foreground">{formatBitrixDateTime(task.updatedDate)}</TableCell>}
-                        {visibleColumns.includes('comments') && <TableCell className="text-muted-foreground">{task.commentsCount ?? task.comments.length}</TableCell>}
-                        {visibleColumns.includes('parent') && <TableCell className="text-muted-foreground">{task.parentId ? `#${task.parentId}` : '—'}</TableCell>}
-                        {visibleColumns.includes('storyPoints') && <TableCell className="text-muted-foreground">{task.storyPoints ?? '—'}</TableCell>}
+                        {visibleColumns.includes('title') && (
+                          <TableCell>
+                            <EditableTitle task={task} />
+                          </TableCell>
+                        )}
+                        {showProject && visibleColumns.includes('project') && (
+                          <TableCell>
+                            <ProjectField task={task} readOnly={false} />
+                          </TableCell>
+                        )}
+                        <FieldControls
+                          task={task}
+                          readOnly={isReadOnly}
+                          visibleColumns={visibleColumns}
+                        />
+                        {visibleColumns.includes('actual') && (
+                          <TableCell className="text-muted-foreground">
+                            {task.actualTime || 0} ч
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('description') && (
+                          <TableCell className="max-w-64 truncate text-muted-foreground">
+                            {task.description || '—'}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('created') && (
+                          <TableCell className="text-muted-foreground">
+                            {formatBitrixDateTime(task.createdDate)}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('updated') && (
+                          <TableCell className="text-muted-foreground">
+                            {formatBitrixDateTime(task.updatedDate)}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('comments') && (
+                          <TableCell className="text-muted-foreground">
+                            {task.commentsCount ?? task.comments.length}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('parent') && (
+                          <TableCell className="text-muted-foreground">
+                            {task.parentId ? `#${task.parentId}` : '—'}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('storyPoints') && (
+                          <TableCell className="text-muted-foreground">
+                            {task.storyPoints ?? '—'}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <TaskActions task={task} />
                         </TableCell>
@@ -686,12 +1106,37 @@ export default function TaskGrid({
                               autoFocus
                               value={newTaskTitle}
                               onChange={(event) => setNewTaskTitle(event.target.value)}
-                              onBlur={() => { setAddingStageId(null); setNewTaskTitle(''); }}
-                              onKeyDown={(event) => { if (event.key === 'Enter' && newTaskTitle.trim()) { void createTask({ title: newTaskTitle.trim(), stageId: group.key }); setNewTaskTitle(''); setAddingStageId(null); } if (event.key === 'Escape') { setAddingStageId(null); setNewTaskTitle(''); } }}
+                              onBlur={() => {
+                                setAddingStageId(null);
+                                setNewTaskTitle('');
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && newTaskTitle.trim()) {
+                                  void createTask({
+                                    title: newTaskTitle.trim(),
+                                    stageId: group.key,
+                                  });
+                                  setNewTaskTitle('');
+                                  setAddingStageId(null);
+                                }
+                                if (event.key === 'Escape') {
+                                  setAddingStageId(null);
+                                  setNewTaskTitle('');
+                                }
+                              }}
                               placeholder="Название новой задачи"
                               className="h-8"
                             />
-                          ) : <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setAddingStageId(group.key)}>+ Добавить задачу</Button>}
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground"
+                              onClick={() => setAddingStageId(group.key)}
+                            >
+                              + Добавить задачу
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     )}
@@ -710,7 +1155,12 @@ export default function TaskGrid({
               <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}>
                 Первая
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((value) => value - 1)} disabled={page === 1}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((value) => value - 1)}
+                disabled={page === 1}
+              >
                 Назад
               </Button>
               {pageNumbers.map((number) => (
@@ -724,10 +1174,20 @@ export default function TaskGrid({
                   {number}
                 </Button>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setPage((value) => value + 1)} disabled={page === pageCount}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((value) => value + 1)}
+                disabled={page === pageCount}
+              >
                 Вперёд
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setPage(pageCount)} disabled={page === pageCount}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(pageCount)}
+                disabled={page === pageCount}
+              >
                 Последняя
               </Button>
             </div>
@@ -736,9 +1196,21 @@ export default function TaskGrid({
       </Card>
       <Dialog open={saveViewOpen} onOpenChange={setSaveViewOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Сохранить представление</DialogTitle></DialogHeader>
-          <Input value={viewName} onChange={(event) => setViewName(event.target.value)} placeholder="Название вида" autoFocus onKeyDown={(event) => event.key === 'Enter' && void saveView()} />
-          <DialogFooter><Button onClick={() => void saveView()} disabled={!viewName.trim()}>Сохранить</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Сохранить представление</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={viewName}
+            onChange={(event) => setViewName(event.target.value)}
+            placeholder="Название вида"
+            autoFocus
+            onKeyDown={(event) => event.key === 'Enter' && void saveView()}
+          />
+          <DialogFooter>
+            <Button onClick={() => void saveView()} disabled={!viewName.trim()}>
+              Сохранить
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}

@@ -37,7 +37,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
@@ -80,7 +85,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const commentsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void fetchProjectMembers(task.projectId).then((members) => setProjectMemberIds((Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)))).catch(() => setProjectMemberIds([]));
+    void fetchProjectMembers(task.projectId)
+      .then((members) =>
+        setProjectMemberIds(
+          (Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)),
+        ),
+      )
+      .catch(() => setProjectMemberIds([]));
   }, [task.projectId]);
 
   useEffect(() => {
@@ -90,7 +101,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
   const taskSubtasks = subtasks[task.id] || [];
   const mentionQuery = comment.match(/(?:^|\s)@([^\s]*)$/)?.[1];
-  const mentionUsers = mentionQuery === undefined ? [] : users.filter((user) => user.name.toLocaleLowerCase('ru').includes(mentionQuery.toLocaleLowerCase('ru'))).slice(0, 5);
+  const mentionUsers =
+    mentionQuery === undefined
+      ? []
+      : users
+          .filter((user) =>
+            user.name.toLocaleLowerCase('ru').includes(mentionQuery.toLocaleLowerCase('ru')),
+          )
+          .slice(0, 5);
 
   const handleUpdateField = async (field: string, value: any) => {
     await updateTaskField(task.id, field, value);
@@ -217,7 +235,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
               {/* Description */}
               <div>
-                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-2">Описание</h3>
+                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-2">
+                  Описание
+                </h3>
                 {editingField === 'description' ? (
                   <Textarea
                     className="min-h-24 resize-none"
@@ -263,10 +283,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 {showSubtasks && (
                   <div className="p-3 space-y-2">
                     {taskSubtasks.map((sub) => (
-                      <div
-                        key={sub.id}
-                        className="flex items-center gap-3 p-2 bg-muted rounded-lg"
-                      >
+                      <div key={sub.id} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
                         <GripVertical size={14} className="text-muted-foreground/70" />
                         <Button
                           onClick={() => moveTask(sub.id, sub.status === 'done' ? 'new' : 'done')}
@@ -328,32 +345,100 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
               <Card className="gap-0 py-0">
                 <div className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm font-medium"><CheckSquare size={16} /> Чек-лист ({task.checklist?.filter((item) => item.completed).length || 0}/{task.checklist?.length || 0})</div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <CheckSquare size={16} /> Чек-лист (
+                    {task.checklist?.filter((item) => item.completed).length || 0}/
+                    {task.checklist?.length || 0})
+                  </div>
                 </div>
                 <div className="space-y-3 px-4 pb-3">
-                  {task.checklist?.filter((item) => item.parentId === '0').map((list) => (
-                    <div key={list.id} className="rounded-lg border bg-muted/30 p-2">
-                      <div className="px-1 text-sm font-medium">{list.title}</div>
-                      {task.checklist?.filter((item) => item.parentId === list.id).map((item) => (
-                        <div key={item.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted">
-                          <Button variant="ghost" size="icon-xs" aria-label={item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'} onClick={() => void setChecklistItemCompleted(task.id, item.id, !item.completed)}>{item.completed ? <CheckSquare className="text-primary" /> : <Square />}</Button>
-                          <span className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}>{item.title}</span>
-                          <Button variant="ghost" size="icon-xs" aria-label="Удалить пункт" onClick={() => void deleteChecklistItem(task.id, item.id)}><Trash2 /></Button>
+                  {task.checklist
+                    ?.filter((item) => item.parentId === '0')
+                    .map((list) => (
+                      <div key={list.id} className="rounded-lg border bg-muted/30 p-2">
+                        <div className="px-1 text-sm font-medium">{list.title}</div>
+                        {task.checklist
+                          ?.filter((item) => item.parentId === list.id)
+                          .map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={
+                                  item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'
+                                }
+                                onClick={() =>
+                                  void setChecklistItemCompleted(task.id, item.id, !item.completed)
+                                }
+                              >
+                                {item.completed ? (
+                                  <CheckSquare className="text-primary" />
+                                ) : (
+                                  <Square />
+                                )}
+                              </Button>
+                              <span
+                                className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}
+                              >
+                                {item.title}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label="Удалить пункт"
+                                onClick={() => void deleteChecklistItem(task.id, item.id)}
+                              >
+                                <Trash2 />
+                              </Button>
+                            </div>
+                          ))}
+                        <div className="mt-2 flex gap-2">
+                          <Input
+                            value={activeChecklistId === list.id ? newChecklistItem : ''}
+                            onFocus={() => setActiveChecklistId(list.id)}
+                            onChange={(event) => {
+                              setActiveChecklistId(list.id);
+                              setNewChecklistItem(event.target.value);
+                            }}
+                            placeholder="Добавить пункт…"
+                            onKeyDown={(event) =>
+                              event.key === 'Enter' && void handleAddChecklistItem()
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => void handleAddChecklistItem(list.id)}
+                            disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}
+                          >
+                            Добавить
+                          </Button>
                         </div>
-                      ))}
-                      <div className="mt-2 flex gap-2">
-                        <Input value={activeChecklistId === list.id ? newChecklistItem : ''} onFocus={() => setActiveChecklistId(list.id)} onChange={(event) => { setActiveChecklistId(list.id); setNewChecklistItem(event.target.value); }} placeholder="Добавить пункт…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
-                        <Button size="sm" onClick={() => void handleAddChecklistItem(list.id)} disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}>Добавить</Button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                   <div className="flex gap-2 border-t pt-3">
-                    <Input value={activeChecklistId === null ? newChecklistItem : ''} onFocus={() => setActiveChecklistId(null)} onChange={(event) => { setActiveChecklistId(null); setNewChecklistItem(event.target.value); }} placeholder="Название нового чек-листа…" onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()} />
-                    <Button size="sm" onClick={() => void handleAddChecklistItem(null)} disabled={activeChecklistId !== null || !newChecklistItem.trim()}>Создать</Button>
+                    <Input
+                      value={activeChecklistId === null ? newChecklistItem : ''}
+                      onFocus={() => setActiveChecklistId(null)}
+                      onChange={(event) => {
+                        setActiveChecklistId(null);
+                        setNewChecklistItem(event.target.value);
+                      }}
+                      placeholder="Название нового чек-листа…"
+                      onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => void handleAddChecklistItem(null)}
+                      disabled={activeChecklistId !== null || !newChecklistItem.trim()}
+                    >
+                      Создать
+                    </Button>
                   </div>
                 </div>
               </Card>
-
             </div>
 
             {/* Sidebar */}
@@ -375,12 +460,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 {showDetails && (
                   <div className="p-4 space-y-4">
                     <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Layers size={12} /> Проект</label>
-                      <Select value={task.projectId || 'none'} onValueChange={(value) => value !== 'none' && void handleMoveProject(value)}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Без проекта" /></SelectTrigger>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Layers size={12} /> Проект
+                      </label>
+                      <Select
+                        value={task.projectId || 'none'}
+                        onValueChange={(value) => value !== 'none' && void handleMoveProject(value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Без проекта" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Без проекта</SelectItem>
-                          {projects.filter((project) => !project.isArchived).map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
+                          {projects
+                            .filter((project) => !project.isArchived)
+                            .map((project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -420,27 +518,123 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     </div>
 
                     <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Users size={12} /> Соисполнители</label>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users size={12} /> Соисполнители
+                      </label>
                       <div className="mb-1 flex flex-wrap gap-1">
-                        {(task.accompliceIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить соисполнителя" onClick={() => void handleUpdateField('accompliceIds', (task.accompliceIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
+                        {(task.accompliceIds || []).map((id) => (
+                          <Badge key={id} variant="secondary" className="gap-1 pr-1">
+                            {users.find((user) => user.id === id)?.name || `#${id}`}
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="size-4"
+                              aria-label="Удалить соисполнителя"
+                              onClick={() =>
+                                void handleUpdateField(
+                                  'accompliceIds',
+                                  (task.accompliceIds || []).filter((item) => item !== id),
+                                )
+                              }
+                            >
+                              <X size={11} />
+                            </Button>
+                          </Badge>
+                        ))}
                       </div>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать соисполнителей…</Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
-                          {users.filter((user) => projectMemberIds.includes(user.id)).map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.accompliceIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('accompliceIds', checked ? [...new Set([...(task.accompliceIds || []), user.id])] : (task.accompliceIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="h-8 w-full justify-start font-normal"
+                          >
+                            Выбрать соисполнителей…
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          className="max-h-64 w-64 overflow-y-auto"
+                        >
+                          {users
+                            .filter((user) => projectMemberIds.includes(user.id))
+                            .map((user) => (
+                              <DropdownMenuCheckboxItem
+                                key={user.id}
+                                checked={(task.accompliceIds || []).includes(user.id)}
+                                onSelect={(event) => event.preventDefault()}
+                                onCheckedChange={(checked) =>
+                                  void handleUpdateField(
+                                    'accompliceIds',
+                                    checked
+                                      ? [...new Set([...(task.accompliceIds || []), user.id])]
+                                      : (task.accompliceIds || []).filter((id) => id !== user.id),
+                                  )
+                                }
+                              >
+                                {user.name}
+                              </DropdownMenuCheckboxItem>
+                            ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
 
                     <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Eye size={12} /> Наблюдатели</label>
+                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Eye size={12} /> Наблюдатели
+                      </label>
                       <div className="mb-1 flex flex-wrap gap-1">
-                        {(task.auditorIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить наблюдателя" onClick={() => void handleUpdateField('auditorIds', (task.auditorIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
+                        {(task.auditorIds || []).map((id) => (
+                          <Badge key={id} variant="secondary" className="gap-1 pr-1">
+                            {users.find((user) => user.id === id)?.name || `#${id}`}
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="size-4"
+                              aria-label="Удалить наблюдателя"
+                              onClick={() =>
+                                void handleUpdateField(
+                                  'auditorIds',
+                                  (task.auditorIds || []).filter((item) => item !== id),
+                                )
+                              }
+                            >
+                              <X size={11} />
+                            </Button>
+                          </Badge>
+                        ))}
                       </div>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать наблюдателей…</Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
-                          {users.filter((user) => projectMemberIds.includes(user.id)).map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.auditorIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('auditorIds', checked ? [...new Set([...(task.auditorIds || []), user.id])] : (task.auditorIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="h-8 w-full justify-start font-normal"
+                          >
+                            Выбрать наблюдателей…
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          className="max-h-64 w-64 overflow-y-auto"
+                        >
+                          {users
+                            .filter((user) => projectMemberIds.includes(user.id))
+                            .map((user) => (
+                              <DropdownMenuCheckboxItem
+                                key={user.id}
+                                checked={(task.auditorIds || []).includes(user.id)}
+                                onSelect={(event) => event.preventDefault()}
+                                onCheckedChange={(checked) =>
+                                  void handleUpdateField(
+                                    'auditorIds',
+                                    checked
+                                      ? [...new Set([...(task.auditorIds || []), user.id])]
+                                      : (task.auditorIds || []).filter((id) => id !== user.id),
+                                  )
+                                }
+                              >
+                                {user.name}
+                              </DropdownMenuCheckboxItem>
+                            ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -513,19 +707,52 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       </label>
                       {task.parentId && (
                         <div className="mb-1 flex items-center justify-between rounded border bg-muted px-2 py-1 text-sm">
-                          <span className="truncate">{tasks.find((candidate) => candidate.id === task.parentId)?.title || `#${task.parentId}`}</span>
-                          <Button variant="ghost" size="icon-xs" aria-label="Убрать родительскую задачу" onClick={() => void handleUpdateField('parentId', '')}><X /></Button>
+                          <span className="truncate">
+                            {tasks.find((candidate) => candidate.id === task.parentId)?.title ||
+                              `#${task.parentId}`}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="Убрать родительскую задачу"
+                            onClick={() => void handleUpdateField('parentId', '')}
+                          >
+                            <X />
+                          </Button>
                         </div>
                       )}
                       <div className="relative">
-                        <Input value={parentQuery} onChange={(event) => setParentQuery(event.target.value)} placeholder="Найти задачу по названию или ID…" />
+                        <Input
+                          value={parentQuery}
+                          onChange={(event) => setParentQuery(event.target.value)}
+                          placeholder="Найти задачу по названию или ID…"
+                        />
                         {parentQuery && (
                           <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
-                            {tasks.filter((candidate) => candidate.id !== task.id && `${candidate.id} ${candidate.title}`.toLocaleLowerCase('ru').includes(parentQuery.toLocaleLowerCase('ru'))).slice(0, 10).map((candidate) => (
-                              <Button key={candidate.id} variant="ghost" className="h-auto w-full justify-start px-2 py-1.5 text-left" onClick={() => { void handleUpdateField('parentId', candidate.id); setParentQuery(''); }}>
-                                <span className="truncate">#{candidate.id} · {candidate.title}</span>
-                              </Button>
-                            ))}
+                            {tasks
+                              .filter(
+                                (candidate) =>
+                                  candidate.id !== task.id &&
+                                  `${candidate.id} ${candidate.title}`
+                                    .toLocaleLowerCase('ru')
+                                    .includes(parentQuery.toLocaleLowerCase('ru')),
+                              )
+                              .slice(0, 10)
+                              .map((candidate) => (
+                                <Button
+                                  key={candidate.id}
+                                  variant="ghost"
+                                  className="h-auto w-full justify-start px-2 py-1.5 text-left"
+                                  onClick={() => {
+                                    void handleUpdateField('parentId', candidate.id);
+                                    setParentQuery('');
+                                  }}
+                                >
+                                  <span className="truncate">
+                                    #{candidate.id} · {candidate.title}
+                                  </span>
+                                </Button>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -546,7 +773,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           onChange={(e) => setEditValue(e.target.value)}
                           onBlur={() => handleUpdateField('estimate', parseFloat(editValue) || 0)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') void handleUpdateField('estimate', parseFloat(editValue) || 0);
+                            if (e.key === 'Enter')
+                              void handleUpdateField('estimate', parseFloat(editValue) || 0);
                           }}
                           autoFocus
                         />
@@ -608,7 +836,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {task.timeEntries.slice(0, 3).map((entry) => (
                     <div key={entry.id} className="text-sm bg-muted rounded-lg p-2">
                       <div className="flex justify-between">
-                        <span className="font-medium text-blue-600 dark:text-blue-400">{entry.hours} ч</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">
+                          {entry.hours} ч
+                        </span>
                         <span className="text-muted-foreground text-xs">{entry.date}</span>
                       </div>
                       {entry.description && (
@@ -643,23 +873,63 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               </h3>
             </div>
             <div ref={commentsRef} className="m-4 max-h-60 space-y-3 overflow-y-auto">
-              {isLoadingTask && task.comments.length === 0 ? <LoadingState className="min-h-24 bg-transparent" /> : task.comments.map((commentItem) => (
-                <div key={commentItem.id} className="rounded-lg bg-muted p-3">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="flex size-6 items-center justify-center rounded-full bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300">{commentItem.authorName.charAt(0)}</div>
-                    <span className="text-sm font-medium">{commentItem.authorName}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(commentItem.createdDate)}</span>
+              {isLoadingTask && task.comments.length === 0 ? (
+                <LoadingState className="min-h-24 bg-transparent" />
+              ) : (
+                task.comments.map((commentItem) => (
+                  <div key={commentItem.id} className="rounded-lg bg-muted p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-full bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300">
+                        {commentItem.authorName.charAt(0)}
+                      </div>
+                      <span className="text-sm font-medium">{commentItem.authorName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(commentItem.createdDate)}
+                      </span>
+                    </div>
+                    <p className="pl-8 text-sm text-foreground/80">
+                      <BitrixText text={commentItem.text} />
+                    </p>
                   </div>
-                  <p className="pl-8 text-sm text-foreground/80"><BitrixText text={commentItem.text} /></p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="flex items-end gap-2 border-t p-4">
               <div className="relative flex-1">
-                <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий… Используйте @ для упоминания" rows={4} className="min-h-32 resize-y" />
-                {mentionUsers.length > 0 && <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">{mentionUsers.map((user) => <Button key={user.id} variant="ghost" className="h-auto w-full justify-start px-2 py-1.5" onClick={() => setComment((text) => text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `))}>{user.name}</Button>)}</div>}
+                <Textarea
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Написать комментарий… Используйте @ для упоминания"
+                  rows={4}
+                  className="min-h-32 resize-y"
+                />
+                {mentionUsers.length > 0 && (
+                  <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">
+                    {mentionUsers.map((user) => (
+                      <Button
+                        key={user.id}
+                        variant="ghost"
+                        className="h-auto w-full justify-start px-2 py-1.5"
+                        onClick={() =>
+                          setComment((text) =>
+                            text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `),
+                          )
+                        }
+                      >
+                        {user.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <Button onClick={handleAddComment} disabled={!comment.trim()} size="icon" className="h-10 shrink-0"><Send size={16} /></Button>
+              <Button
+                onClick={handleAddComment}
+                disabled={!comment.trim()}
+                size="icon"
+                className="h-10 shrink-0"
+              >
+                <Send size={16} />
+              </Button>
             </div>
           </Card>
         </div>

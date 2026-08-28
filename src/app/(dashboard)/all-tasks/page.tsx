@@ -8,14 +8,8 @@ import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 
 function AllTasksInner() {
-  const {
-    projects,
-    allTasks,
-    isLoadingAllTasks,
-    loadAllTasks,
-    loadProjects,
-    currentUser,
-  } = useKanbanStore();
+  const { projects, allTasks, isLoadingAllTasks, loadAllTasks, loadProjects, currentUser } =
+    useKanbanStore();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') || 'all';
   const initialAssigneeId = searchParams.get('assignee') === 'me' ? currentUser.id : 'all';
@@ -23,7 +17,7 @@ function AllTasksInner() {
   useEffect(() => {
     if (projects.length === 0) void loadProjects();
     if (allTasks.length === 0) void loadAllTasks();
-    }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
+  }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
@@ -38,7 +32,6 @@ function AllTasksInner() {
           </div>
         </div>
       </header>
-
 
       <div className="mt-4">
         {isLoadingAllTasks ? (

@@ -81,57 +81,63 @@ export default function SearchPage() {
           <div className="max-w-2xl space-y-3">
             <p className="text-sm text-muted-foreground">Найдено: {searchResults.length}</p>
             {searchResults.map((task) => (
-              <Card key={task.id} asChild className="cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm">
+              <Card
+                key={task.id}
+                asChild
+                className="cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm"
+              >
                 <button type="button" onClick={() => openTask(task.id)}>
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
-                      task.status === 'done'
-                        ? 'bg-green-500'
-                        : task.status === 'in_progress'
-                          ? 'bg-blue-500'
-                          : task.status === 'testing'
-                            ? 'bg-yellow-500'
-                            : 'bg-gray-400'
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900">{task.title}</h3>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span className="font-mono">#{task.id}</span>
-                      <Badge
-                        variant="secondary"
-                        className={`${PRIORITY_LABELS[task.priority]?.bgColor} ${PRIORITY_LABELS[task.priority]?.color}`}
-                      >
-                        {PRIORITY_LABELS[task.priority]?.label}
-                      </Badge>
-                      {task.assigneeName && (
-                        <span className="flex items-center gap-1">
-                          <User size={12} />
-                          {task.assigneeName}
-                        </span>
-                      )}
-                      {task.dueDate && (
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} />
-                          {new Date(task.dueDate).toLocaleDateString('ru-RU')}
-                        </span>
-                      )}
-                      {task.comments.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <MessageSquare size={12} />
-                          {task.comments.length}
-                        </span>
-                      )}
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
+                        task.status === 'done'
+                          ? 'bg-green-500'
+                          : task.status === 'in_progress'
+                            ? 'bg-blue-500'
+                            : task.status === 'testing'
+                              ? 'bg-yellow-500'
+                              : 'bg-gray-400'
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900">{task.title}</h3>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                        <span className="font-mono">#{task.id}</span>
+                        <Badge
+                          variant="secondary"
+                          className={`${PRIORITY_LABELS[task.priority]?.bgColor} ${PRIORITY_LABELS[task.priority]?.color}`}
+                        >
+                          {PRIORITY_LABELS[task.priority]?.label}
+                        </Badge>
+                        {task.assigneeName && (
+                          <span className="flex items-center gap-1">
+                            <User size={12} />
+                            {task.assigneeName}
+                          </span>
+                        )}
+                        {task.dueDate && (
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            {new Date(task.dueDate).toLocaleDateString('ru-RU')}
+                          </span>
+                        )}
+                        {task.comments.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <MessageSquare size={12} />
+                            {task.comments.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
                 </button>
               </Card>
             ))}
           </div>
         ) : query ? (
-          <div className="text-center py-8 text-gray-400">Задачи по запросу «{query}» не найдены</div>
+          <div className="text-center py-8 text-gray-400">
+            Задачи по запросу «{query}» не найдены
+          </div>
         ) : (
           <div className="text-center py-8 text-gray-400">Начните вводить текст для поиска</div>
         )}

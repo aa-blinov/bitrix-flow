@@ -7,8 +7,7 @@ const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
 // Bitrix24 в маркетплейс-flow редиректит сюда же, на /api/oauth. Это рабочий
 // и одобренный redirect_uri для нашего приложения.
 const APP_URL = process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org';
-const REDIRECT_URI =
-  process.env.BITRIX24_REDIRECT_URI || `${APP_URL}/api/oauth`;
+const REDIRECT_URI = process.env.BITRIX24_REDIRECT_URI || `${APP_URL}/api/oauth`;
 
 // Стартовая точка OAuth flow
 export async function GET(req: NextRequest) {
@@ -81,7 +80,8 @@ async function handleCallback(code: string, req: NextRequest, portalDomain?: str
   const restDomain = tokens.client_endpoint
     ? new URL(tokens.client_endpoint).hostname
     : portalDomain;
-  if (!restDomain) return NextResponse.json({ error: 'OAUTH_PORTAL_DOMAIN_MISSING' }, { status: 400 });
+  if (!restDomain)
+    return NextResponse.json({ error: 'OAUTH_PORTAL_DOMAIN_MISSING' }, { status: 400 });
 
   // Сохраняем токен в MongoDB
   const db = await getDb();

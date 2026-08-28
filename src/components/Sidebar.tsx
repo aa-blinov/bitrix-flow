@@ -1,6 +1,15 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, ListChecks, Menu, LogOut, TableProperties, ChevronDown, Bell, Plus } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ListChecks,
+  Menu,
+  LogOut,
+  TableProperties,
+  ChevronDown,
+  Bell,
+  Plus,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,21 +18,21 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Notifications from '@/components/Notifications';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 
 export default function Sidebar() {
-  const {
-    projects,
-    setSelectedProject,
-    currentUser,
-    isLoading,
-    loadProjects,
-    createProject,
-  } = useKanbanStore();
+  const { projects, setSelectedProject, currentUser, isLoading, loadProjects, createProject } =
+    useKanbanStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
@@ -112,7 +121,9 @@ export default function Sidebar() {
     <div className="flex h-full w-full min-w-0 flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-4">
-        <span className="font-heading text-lg font-semibold tracking-tight text-foreground">BitrixFlow</span>
+        <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
+          BitrixFlow
+        </span>
       </div>
 
       {/* Navigation */}
@@ -124,14 +135,21 @@ export default function Sidebar() {
           <NavItem href="/notifications" icon={Bell} label="Уведомления" />
         </div>
 
-
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Проекты ({isLoading && !projects.length ? '…' : projects.length})
             </h3>
-            <Button variant="ghost" size="icon-xs" onClick={() => setCreateOpen(true)} aria-label="Создать проект" title="Создать проект"><Plus /></Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setCreateOpen(true)}
+              aria-label="Создать проект"
+              title="Создать проект"
+            >
+              <Plus />
+            </Button>
           </div>
           <Input
             value={projectQuery}
@@ -177,28 +195,35 @@ export default function Sidebar() {
                       onClick={() => setArchiveOpen((open) => !open)}
                       className="flex w-full justify-start gap-1 px-2.5 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
                     >
-                      <ChevronDown className={`size-3 transition-transform ${archiveOpen || projectQuery ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        className={`size-3 transition-transform ${archiveOpen || projectQuery ? 'rotate-180' : ''}`}
+                      />
                       Архив ({archivedProjects.length})
                     </Button>
-                    {(archiveOpen || projectQuery) && archivedProjects.map((project) => {
-                      const active = pathname === `/projects/${project.id}`;
-                      return (
-                        <Link
-                          key={project.id}
-                          href={`/projects/${project.id}`}
-                          prefetch={false}
-                          onClick={() => setMobileOpen(false)}
-                          className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
-                            active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
-                          }`}
-                        >
-                          <span className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}>
-                            {getProjectInitials(project.name)}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                        </Link>
-                      );
-                    })}
+                    {(archiveOpen || projectQuery) &&
+                      archivedProjects.map((project) => {
+                        const active = pathname === `/projects/${project.id}`;
+                        return (
+                          <Link
+                            key={project.id}
+                            href={`/projects/${project.id}`}
+                            prefetch={false}
+                            onClick={() => setMobileOpen(false)}
+                            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
+                              active
+                                ? 'bg-muted text-foreground font-medium'
+                                : 'text-muted-foreground hover:bg-muted'
+                            }`}
+                          >
+                            <span
+                              className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                            >
+                              {getProjectInitials(project.name)}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                          </Link>
+                        );
+                      })}
                   </div>
                 )}
               </>
@@ -267,9 +292,24 @@ export default function Sidebar() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Новый проект</DialogTitle></DialogHeader>
-          <Input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Название проекта" autoFocus onKeyDown={(event) => event.key === 'Enter' && void createNewProject()} />
-          <DialogFooter><Button onClick={() => void createNewProject()} disabled={!projectName.trim() || creating}>Создать</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Новый проект</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Название проекта"
+            autoFocus
+            onKeyDown={(event) => event.key === 'Enter' && void createNewProject()}
+          />
+          <DialogFooter>
+            <Button
+              onClick={() => void createNewProject()}
+              disabled={!projectName.trim() || creating}
+            >
+              Создать
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

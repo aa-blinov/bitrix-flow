@@ -17,10 +17,22 @@ import TaskGrid from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
 
 export default function ProjectPage() {
@@ -71,7 +83,9 @@ export default function ProjectPage() {
   useEffect(() => {
     if (!notificationTaskId) return;
     const openTask = async () => {
-      const task = projectTasks.find((item) => item.id === notificationTaskId) || await loadTaskById(notificationTaskId);
+      const task =
+        projectTasks.find((item) => item.id === notificationTaskId) ||
+        (await loadTaskById(notificationTaskId));
       if (!task || task.projectId !== projectId) return;
       if (useKanbanStore.getState().selectedTaskId === notificationTaskId) return;
       setSelectedTask(notificationTaskId);
@@ -85,20 +99,31 @@ export default function ProjectPage() {
   // Clear any stale modal state when the user leaves this project page so the
   // back button restores the project view without a stuck modal.
   useEffect(() => {
-    return () => { setSelectedTask(null); };
+    return () => {
+      setSelectedTask(null);
+    };
   }, [projectId, setSelectedTask]);
   const visibleTasks = getFilteredTasks();
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
   const activeTasks = projectTasks.filter((task) => task.status !== 'done');
-  const overdueTasks = activeTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date()).length;
+  const overdueTasks = activeTasks.filter(
+    (task) => task.dueDate && new Date(task.dueDate) < new Date(),
+  ).length;
   const unassignedTasks = activeTasks.filter((task) => !task.assigneeId).length;
-
 
   useEffect(() => {
     if (!membersOpen || !currentProject) return;
-    void fetchProjectMembers(currentProject.id).then((result) => setMemberIds((Array.isArray(result) ? result : []).map((item: any) => String(item.USER_ID || item.userId || item)))).catch(() => setMemberIds([]));
+    void fetchProjectMembers(currentProject.id)
+      .then((result) =>
+        setMemberIds(
+          (Array.isArray(result) ? result : []).map((item: any) =>
+            String(item.USER_ID || item.userId || item),
+          ),
+        ),
+      )
+      .catch(() => setMemberIds([]));
   }, [currentProject, membersOpen]);
 
   async function addMember(userId: string) {
@@ -122,7 +147,13 @@ export default function ProjectPage() {
   }
 
   async function toggleArchive() {
-    if (!currentProject || !window.confirm(currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?')) return;
+    if (
+      !currentProject ||
+      !window.confirm(
+        currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?',
+      )
+    )
+      return;
     await updateProject(currentProject.id, { archived: !currentProject.isArchived });
     setSettingsOpen(false);
   }
@@ -172,27 +203,65 @@ export default function ProjectPage() {
                 </span>
                 {currentProject.name}
                 {currentProject.isArchived && (
-                  <span className="rounded border px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Архив</span>
+                  <span className="rounded border px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    Архив
+                  </span>
                 )}
               </h1>
               <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
-                <Button variant="link" size="xs" onClick={() => setMembersOpen(true)} className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"><Users size={14} />{currentProject.membersCount || 0} участников</Button>
-                <span>•</span><span>{projectTasks.length} задач</span><span>•</span><span className="text-emerald-600">{completedTasks} завершено</span>
+                <Button
+                  variant="link"
+                  size="xs"
+                  onClick={() => setMembersOpen(true)}
+                  className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"
+                >
+                  <Users size={14} />
+                  {currentProject.membersCount || 0} участников
+                </Button>
+                <span>•</span>
+                <span>{projectTasks.length} задач</span>
+                <span>•</span>
+                <span className="text-emerald-600">{completedTasks} завершено</span>
               </div>
               {(overdueTasks || unassignedTasks) && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {overdueTasks > 0 && <span className="font-medium text-destructive">{overdueTasks} просрочено</span>}
-                  {unassignedTasks > 0 && <span>{overdueTasks ? ' · ' : ''}{unassignedTasks} без исполнителя</span>}
+                  {overdueTasks > 0 && (
+                    <span className="font-medium text-destructive">{overdueTasks} просрочено</span>
+                  )}
+                  {unassignedTasks > 0 && (
+                    <span>
+                      {overdueTasks ? ' · ' : ''}
+                      {unassignedTasks} без исполнителя
+                    </span>
+                  )}
                 </p>
               )}
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-4">
               <div className="hidden gap-4 text-sm md:flex">
-                <div className="text-center"><p className="text-xs text-muted-foreground">План</p><p className="font-semibold">{totalEstimate.toFixed(1)} ч</p></div>
-                <div className="text-center"><p className="text-xs text-muted-foreground">Факт</p><p className="font-semibold">{totalActual.toFixed(1)} ч</p></div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">План</p>
+                  <p className="font-semibold">{totalEstimate.toFixed(1)} ч</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Факт</p>
+                  <p className="font-semibold">{totalActual.toFixed(1)} ч</p>
+                </div>
               </div>
-              <Button variant="ghost" size="icon-sm" title="Настройки проекта" aria-label="Настройки проекта" onClick={() => { setName(currentProject.name); setDescription(currentProject.description); setSettingsOpen(true); }}><Settings className="size-4" /></Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Настройки проекта"
+                aria-label="Настройки проекта"
+                onClick={() => {
+                  setName(currentProject.name);
+                  setDescription(currentProject.description);
+                  setSettingsOpen(true);
+                }}
+              >
+                <Settings className="size-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -200,21 +269,71 @@ export default function ProjectPage() {
 
       <Dialog open={membersOpen} onOpenChange={setMembersOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Участники проекта</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Участники проекта</DialogTitle>
+          </DialogHeader>
           <Select onValueChange={(value) => void addMember(value)}>
-            <SelectTrigger><UserPlus className="size-4" /><SelectValue placeholder="Добавить участника" /></SelectTrigger>
-            <SelectContent>{users.filter((user) => !memberIds.includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+            <SelectTrigger>
+              <UserPlus className="size-4" />
+              <SelectValue placeholder="Добавить участника" />
+            </SelectTrigger>
+            <SelectContent>
+              {users
+                .filter((user) => !memberIds.includes(user.id))
+                .map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
           </Select>
-          <div className="max-h-64 space-y-1 overflow-y-auto">{memberIds.map((id) => { const user = users.find((item) => item.id === id); return <div key={id} className="flex items-center justify-between rounded-md px-2 py-2 text-sm"><span>{user?.name || `Пользователь #${id}`}</span><Button variant="ghost" size="icon-xs" aria-label="Удалить участника" onClick={() => void removeMember(id)}><X /></Button></div>; })}</div>
+          <div className="max-h-64 space-y-1 overflow-y-auto">
+            {memberIds.map((id) => {
+              const user = users.find((item) => item.id === id);
+              return (
+                <div
+                  key={id}
+                  className="flex items-center justify-between rounded-md px-2 py-2 text-sm"
+                >
+                  <span>{user?.name || `Пользователь #${id}`}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Удалить участника"
+                    onClick={() => void removeMember(id)}
+                  >
+                    <X />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Настройки проекта</DialogTitle></DialogHeader>
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Название" />
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Описание" />
-          <DialogFooter className="gap-2 sm:justify-between"><Button variant="outline" onClick={() => void toggleArchive()}>{currentProject.isArchived ? 'Разархивировать' : 'Архивировать'}</Button><Button onClick={() => void saveProject()} disabled={!name.trim()}>Сохранить</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Настройки проекта</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Название"
+          />
+          <Textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Описание"
+          />
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="outline" onClick={() => void toggleArchive()}>
+              {currentProject.isArchived ? 'Разархивировать' : 'Архивировать'}
+            </Button>
+            <Button onClick={() => void saveProject()} disabled={!name.trim()}>
+              Сохранить
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

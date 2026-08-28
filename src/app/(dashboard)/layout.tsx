@@ -29,7 +29,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const pathname = usePathname();
   useSSE(memberId, (event) => {
-    if (event?.type === 'tasks-changed' && (pathname === '/all-tasks' || pathname === '/my-tasks')) {
+    if (
+      event?.type === 'tasks-changed' &&
+      (pathname === '/all-tasks' || pathname === '/my-tasks')
+    ) {
       const state = useKanbanStore.getState();
       if (!state.isLoadingAllTasks) void state.loadAllTasks();
     }

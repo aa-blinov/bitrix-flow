@@ -67,10 +67,17 @@ export default function NotificationsPage() {
             <Bell className="size-5" />
             <div>
               <h1 className="text-xl font-semibold">Уведомления</h1>
-              <p className="text-sm text-muted-foreground">Последние изменения в задачах Битрикс24</p>
+              <p className="text-sm text-muted-foreground">
+                Последние изменения в задачах Битрикс24
+              </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void clearHistory()} disabled={!items.length || clearing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void clearHistory()}
+            disabled={!items.length || clearing}
+          >
             Очистить
           </Button>
         </div>
@@ -81,9 +88,10 @@ export default function NotificationsPage() {
         ) : items.length ? (
           <div className="space-y-2">
             {items.map((item) => {
-              const href = item.projectId && item.taskId
-                ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
-                : null;
+              const href =
+                item.projectId && item.taskId
+                  ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
+                  : null;
               const createdAt = item.created_at || item.createdAt;
               const content = (
                 <Card className={href ? 'transition-colors hover:bg-muted/50' : undefined}>
@@ -92,15 +100,22 @@ export default function NotificationsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="font-medium">{item.title}</p>
-                        <span className="text-xs text-muted-foreground">{noticeLabel(item.type)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {noticeLabel(item.type)}
+                        </span>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground"><BitrixText text={item.message} /></p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        <BitrixText text={item.message} />
+                      </p>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         {item.taskId && <span>Задача #{item.taskId}</span>}
                         {item.projectId && <span>Проект #{item.projectId}</span>}
                         {createdAt && (
                           <time dateTime={createdAt}>
-                            {new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(createdAt))}
+                            {new Intl.DateTimeFormat('ru-RU', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }).format(new Date(createdAt))}
                           </time>
                         )}
                       </div>
@@ -108,13 +123,23 @@ export default function NotificationsPage() {
                   </CardContent>
                 </Card>
               );
-              return href ? <Link key={item.id} href={href} className="block">{content}</Link> : <div key={item.id}>{content}</div>;
+              return href ? (
+                <Link key={item.id} href={href} className="block">
+                  {content}
+                </Link>
+              ) : (
+                <div key={item.id}>{content}</div>
+              );
             })}
           </div>
         ) : (
           <Card>
-            <CardHeader><CardTitle>Пока нет уведомлений</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground">Изменения задач и комментарии из Битрикс24 появятся здесь.</CardContent>
+            <CardHeader>
+              <CardTitle>Пока нет уведомлений</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Изменения задач и комментарии из Битрикс24 появятся здесь.
+            </CardContent>
           </Card>
         )}
       </main>

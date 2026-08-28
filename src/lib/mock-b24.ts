@@ -13,36 +13,153 @@ const USERS = [
 ];
 
 const PROJECTS = [
-  { ID: '10', NAME: 'Разработка API v2', DESCRIPTION: 'Перевод публичного API на GraphQL', NUMBER_OF_MEMBERS: '5' },
-  { ID: '11', NAME: 'Маркетинг Q4', DESCRIPTION: 'Запуск осенней кампании', NUMBER_OF_MEMBERS: '4' },
-  { ID: '12', NAME: 'Внутренний бэклог', DESCRIPTION: 'Технический долг и улучшения', NUMBER_OF_MEMBERS: '3' },
-  { ID: '13', NAME: 'Инфраструктура', DESCRIPTION: 'CI/CD и observability', NUMBER_OF_MEMBERS: '8' },
-  { ID: '14', NAME: 'Мобильное приложение', DESCRIPTION: 'iOS и Android клиенты', NUMBER_OF_MEMBERS: '6' },
-  { ID: '15', NAME: 'Аналитика', DESCRIPTION: 'Продуктовая аналитика и отчёты', NUMBER_OF_MEMBERS: '3' },
-  { ID: '16', NAME: 'Документация', DESCRIPTION: 'Портал для разработчиков', NUMBER_OF_MEMBERS: '2' },
+  {
+    ID: '10',
+    NAME: 'Разработка API v2',
+    DESCRIPTION: 'Перевод публичного API на GraphQL',
+    NUMBER_OF_MEMBERS: '5',
+  },
+  {
+    ID: '11',
+    NAME: 'Маркетинг Q4',
+    DESCRIPTION: 'Запуск осенней кампании',
+    NUMBER_OF_MEMBERS: '4',
+  },
+  {
+    ID: '12',
+    NAME: 'Внутренний бэклог',
+    DESCRIPTION: 'Технический долг и улучшения',
+    NUMBER_OF_MEMBERS: '3',
+  },
+  {
+    ID: '13',
+    NAME: 'Инфраструктура',
+    DESCRIPTION: 'CI/CD и observability',
+    NUMBER_OF_MEMBERS: '8',
+  },
+  {
+    ID: '14',
+    NAME: 'Мобильное приложение',
+    DESCRIPTION: 'iOS и Android клиенты',
+    NUMBER_OF_MEMBERS: '6',
+  },
+  {
+    ID: '15',
+    NAME: 'Аналитика',
+    DESCRIPTION: 'Продуктовая аналитика и отчёты',
+    NUMBER_OF_MEMBERS: '3',
+  },
+  {
+    ID: '16',
+    NAME: 'Документация',
+    DESCRIPTION: 'Портал для разработчиков',
+    NUMBER_OF_MEMBERS: '2',
+  },
   { ID: '17', NAME: 'Дизайн-система', DESCRIPTION: 'UI-kit и компоненты', NUMBER_OF_MEMBERS: '4' },
   { ID: '18', NAME: 'Безопасность', DESCRIPTION: 'Аудит и pentest', NUMBER_OF_MEMBERS: '2' },
-  { ID: '19', NAME: 'Поддержка', DESCRIPTION: 'Текущие тикеты и инциденты', NUMBER_OF_MEMBERS: '5' },
+  {
+    ID: '19',
+    NAME: 'Поддержка',
+    DESCRIPTION: 'Текущие тикеты и инциденты',
+    NUMBER_OF_MEMBERS: '5',
+  },
 ];
 
 const STAGES_10: Record<string, any> = {
-  '100': { ID: '100', TITLE: 'Бэклог', SORT: '100', COLOR: '47D1E2', SYSTEM_TYPE: 'NEW', ENTITY_ID: '10' },
-  '101': { ID: '101', TITLE: 'В работе', SORT: '200', COLOR: '75D900', SYSTEM_TYPE: 'PROCESS', ENTITY_ID: '10' },
-  '102': { ID: '102', TITLE: 'На ревью', SORT: '300', COLOR: 'FFAB00', SYSTEM_TYPE: 'WORK', ENTITY_ID: '10' },
-  '103': { ID: '103', TITLE: 'Готово', SORT: '400', COLOR: 'D0D0D0', SYSTEM_TYPE: 'FINISH', ENTITY_ID: '10' },
+  '100': {
+    ID: '100',
+    TITLE: 'Бэклог',
+    SORT: '100',
+    COLOR: '47D1E2',
+    SYSTEM_TYPE: 'NEW',
+    ENTITY_ID: '10',
+  },
+  '101': {
+    ID: '101',
+    TITLE: 'В работе',
+    SORT: '200',
+    COLOR: '75D900',
+    SYSTEM_TYPE: 'PROCESS',
+    ENTITY_ID: '10',
+  },
+  '102': {
+    ID: '102',
+    TITLE: 'На ревью',
+    SORT: '300',
+    COLOR: 'FFAB00',
+    SYSTEM_TYPE: 'WORK',
+    ENTITY_ID: '10',
+  },
+  '103': {
+    ID: '103',
+    TITLE: 'Готово',
+    SORT: '400',
+    COLOR: 'D0D0D0',
+    SYSTEM_TYPE: 'FINISH',
+    ENTITY_ID: '10',
+  },
 };
 
 const STAGES_11: Record<string, any> = {
-  '110': { ID: '110', TITLE: 'Идеи', SORT: '100', COLOR: '47D1E2', SYSTEM_TYPE: 'NEW', ENTITY_ID: '11' },
-  '111': { ID: '111', TITLE: 'В работе', SORT: '200', COLOR: '75D900', SYSTEM_TYPE: 'PROCESS', ENTITY_ID: '11' },
-  '112': { ID: '112', TITLE: 'Согласование', SORT: '300', COLOR: 'FFAB00', SYSTEM_TYPE: 'WORK', ENTITY_ID: '11' },
-  '113': { ID: '113', TITLE: 'Запущено', SORT: '400', COLOR: '1EAE43', SYSTEM_TYPE: 'FINISH', ENTITY_ID: '11' },
+  '110': {
+    ID: '110',
+    TITLE: 'Идеи',
+    SORT: '100',
+    COLOR: '47D1E2',
+    SYSTEM_TYPE: 'NEW',
+    ENTITY_ID: '11',
+  },
+  '111': {
+    ID: '111',
+    TITLE: 'В работе',
+    SORT: '200',
+    COLOR: '75D900',
+    SYSTEM_TYPE: 'PROCESS',
+    ENTITY_ID: '11',
+  },
+  '112': {
+    ID: '112',
+    TITLE: 'Согласование',
+    SORT: '300',
+    COLOR: 'FFAB00',
+    SYSTEM_TYPE: 'WORK',
+    ENTITY_ID: '11',
+  },
+  '113': {
+    ID: '113',
+    TITLE: 'Запущено',
+    SORT: '400',
+    COLOR: '1EAE43',
+    SYSTEM_TYPE: 'FINISH',
+    ENTITY_ID: '11',
+  },
 };
 
 const STAGES_12: Record<string, any> = {
-  '120': { ID: '120', TITLE: 'Новые', SORT: '100', COLOR: '47D1E2', SYSTEM_TYPE: 'NEW', ENTITY_ID: '12' },
-  '121': { ID: '121', TITLE: 'В работе', SORT: '200', COLOR: '75D900', SYSTEM_TYPE: 'PROCESS', ENTITY_ID: '12' },
-  '122': { ID: '122', TITLE: 'Готово', SORT: '300', COLOR: '1EAE43', SYSTEM_TYPE: 'FINISH', ENTITY_ID: '12' },
+  '120': {
+    ID: '120',
+    TITLE: 'Новые',
+    SORT: '100',
+    COLOR: '47D1E2',
+    SYSTEM_TYPE: 'NEW',
+    ENTITY_ID: '12',
+  },
+  '121': {
+    ID: '121',
+    TITLE: 'В работе',
+    SORT: '200',
+    COLOR: '75D900',
+    SYSTEM_TYPE: 'PROCESS',
+    ENTITY_ID: '12',
+  },
+  '122': {
+    ID: '122',
+    TITLE: 'Готово',
+    SORT: '300',
+    COLOR: '1EAE43',
+    SYSTEM_TYPE: 'FINISH',
+    ENTITY_ID: '12',
+  },
 };
 
 const TASKS_10 = [
@@ -431,10 +548,24 @@ const COMMENTS: Record<string, any[]> = {
 
 const TIME_LOG: Record<string, any[]> = {
   '1001': [
-    { ID: '1', USER_ID: '2', USER_NAME: 'Дмитрий Соколов', DATE_PLAN: '2025-08-20', SECONDS: '7200', COMMENT_TEXT: 'Драфт схемы' },
+    {
+      ID: '1',
+      USER_ID: '2',
+      USER_NAME: 'Дмитрий Соколов',
+      DATE_PLAN: '2025-08-20',
+      SECONDS: '7200',
+      COMMENT_TEXT: 'Драфт схемы',
+    },
   ],
   '1002': [
-    { ID: '2', USER_ID: '4', USER_NAME: 'Илья Беляев', DATE_PLAN: '2025-08-22', SECONDS: '10800', COMMENT_TEXT: 'Поднял dev-стенд' },
+    {
+      ID: '2',
+      USER_ID: '4',
+      USER_NAME: 'Илья Беляев',
+      DATE_PLAN: '2025-08-22',
+      SECONDS: '10800',
+      COMMENT_TEXT: 'Поднял dev-стенд',
+    },
   ],
 };
 
@@ -501,9 +632,7 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       const id = params.taskId || params['filter[ID]'];
       const all = Object.values(ALL_TASKS).flat();
       const task = all.find((t) => String(t.id) === String(id));
-      return task
-        ? { ...task, chatId: '1' }
-        : null;
+      return task ? { ...task, chatId: '1' } : null;
     }
 
     case 'im.dialog.messages.get': {

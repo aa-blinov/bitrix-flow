@@ -90,9 +90,7 @@ describe('setSelectedProject: stages load before tasks', () => {
           ok: true,
           json: async () => ({
             result: {
-              tasks: [
-                { id: '1', title: 'T1', stageId: 'NEW', status: '2', priority: '1' },
-              ],
+              tasks: [{ id: '1', title: 'T1', stageId: 'NEW', status: '2', priority: '1' }],
               total: 1,
               next: null,
             },

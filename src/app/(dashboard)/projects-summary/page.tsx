@@ -7,7 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -131,15 +137,32 @@ export default function ProjectsSummaryPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-              <Select value={dateField} onValueChange={(value) => setDateField(value as 'changed' | 'created')}>
-                <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате"><SelectValue /></SelectTrigger>
+              <Select
+                value={dateField}
+                onValueChange={(value) => setDateField(value as 'changed' | 'created')}
+              >
+                <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="changed">изменения</SelectItem>
                   <SelectItem value="created">создания</SelectItem>
                 </SelectContent>
               </Select>
-              <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="h-8 rounded-md sm:w-32" aria-label="С" />
-              <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="h-8 rounded-md sm:w-32" aria-label="По" />
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+                className="h-8 rounded-md sm:w-32"
+                aria-label="С"
+              />
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+                className="h-8 rounded-md sm:w-32"
+                aria-label="По"
+              />
               <Button
                 variant="secondary"
                 size="sm"
@@ -154,7 +177,11 @@ export default function ProjectsSummaryPage() {
                 size="sm"
                 className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
                 disabled={!fromDate && !toDate}
-                onClick={() => { setFromDate(''); setToDate(''); setTimeout(() => void load(false), 0); }}
+                onClick={() => {
+                  setFromDate('');
+                  setToDate('');
+                  setTimeout(() => void load(false), 0);
+                }}
               >
                 Сбросить
               </Button>
@@ -228,9 +255,13 @@ export default function ProjectsSummaryPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {project.overdue > 0 && <Badge variant="destructive">{project.overdue} просроч.</Badge>}
+                          {project.overdue > 0 && (
+                            <Badge variant="destructive">{project.overdue} просроч.</Badge>
+                          )}
                           <Badge variant="secondary">{project.inProgress} в работе</Badge>
-                          {project.noDeadline > 0 && <Badge variant="outline">{project.noDeadline} без срока</Badge>}
+                          {project.noDeadline > 0 && (
+                            <Badge variant="outline">{project.noDeadline} без срока</Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
