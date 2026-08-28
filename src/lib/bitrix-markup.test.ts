@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBitrixDateTime, parseBitrixMarkup } from './bitrix-markup';
+import { formatBitrixDateTime, parseBitrixMarkup, parseBitrixNodes } from './bitrix-markup';
 
 describe('Bitrix markup', () => {
   it('turns URL BBCode into a safe link', () => {
@@ -18,6 +18,16 @@ describe('Bitrix markup', () => {
     expect(text).not.toContain('TIMESTAMP');
     expect(text).toContain('2026');
     expect(text).toMatch(/\d{2}:\d{2}/);
+  });
+
+  it('parses safe text formatting tags', () => {
+    expect(parseBitrixNodes('[B]жирный[/B] [QUOTE]цитата[/QUOTE] [LIST][*]один[*]два[/LIST]')).toMatchObject([
+      { type: 'format', format: 'b' },
+      { type: 'text', text: ' ' },
+      { type: 'quote' },
+      { type: 'text', text: ' ' },
+      { type: 'list', ordered: false, items: [[{ type: 'text', text: 'один' }], [{ type: 'text', text: 'два' }]] },
+    ]);
   });
 
   it('uses HH:MM DD.MM.YYYY dates', () => {
