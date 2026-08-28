@@ -520,9 +520,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         onScroll={(event) => {
           if (topScrollRef.current) topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-muted/30 scrollbar-hide lg:snap-none"
+        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-background scrollbar-hide lg:snap-none"
       >
-        <div className="flex h-full min-w-max gap-4 px-4 py-6 xl:gap-5">
+        <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
           {allStages.map((stage: any) => {
             const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
             const colors = getStageColor(stage.color);
@@ -531,8 +531,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             return (
               <Card
                 key={stage.id}
-                className={`w-[20rem] shrink-0 snap-start gap-0 py-0 transition-colors lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
-                  isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
+                className={`w-[20rem] shrink-0 snap-start gap-0 rounded-lg bg-muted/30 py-0 shadow-none ring-0 transition-colors lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
+                  isDragOver ? 'ring-2 ring-blue-400 bg-blue-500/10' : ''
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
@@ -865,7 +865,7 @@ function TaskCard({
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
-      className={`cursor-pointer gap-0 p-3 lg:p-4 transition-all hover:ring-primary/20 hover:shadow-sm ${
+      className={`cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors hover:border-border hover:shadow-sm ${
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
@@ -887,7 +887,7 @@ function TaskCard({
 
       {/* Title */}
       <h4
-        className={`mb-2 text-sm leading-snug line-clamp-2 lg:text-base xl:line-clamp-3 ${
+        className={`mb-2 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
           isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
         }`}
       >
@@ -902,7 +902,7 @@ function TaskCard({
       )}
 
       {/* Meta footer */}
-      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-border">
+      <div className="mt-2 flex items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0 flex-1">
           {dueDate && (
             <span
