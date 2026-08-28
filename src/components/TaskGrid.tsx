@@ -40,7 +40,7 @@ type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadli
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
 type SavedView = { id: string; name: string; config: { statusFilter: string; assigneeFilter: string; projectFilter: string; groupBy: 'none' | 'stage' | 'assignee'; sorts: Sort[]; visibleColumns: ColumnKey[] } };
-const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'priority', 'deadline', 'estimate', 'actual'];
+const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'deadline'];
 const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт', description: 'Описание', created: 'Создана', updated: 'Обновлена', comments: 'Комментарии', parent: 'Родительская', storyPoints: 'Story points' };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 320, project: 180, stage: 160, assignee: 180, priority: 130,

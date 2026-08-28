@@ -50,7 +50,7 @@ function AllTasksInner() {
             initialStatus={initialStatus}
             initialAssigneeId={initialAssigneeId}
             viewScope="all"
-            title="Задачи"
+            title={null}
           />
         )}
       </div>
