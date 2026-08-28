@@ -133,7 +133,7 @@ export default function Notifications() {
           onClick={() => setOpen(false)}
           className="block px-3 py-2.5 text-center text-xs font-medium text-primary hover:bg-muted"
         >
-          Все уведомления
+          Открыть все уведомления
         </Link>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Bell, CheckCircle2, MessageSquareText, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
 
 type Notice = {
@@ -34,6 +35,7 @@ function noticeLabel(type: string) {
 export default function NotificationsPage() {
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     void fetch('/api/notifications?limit=200')
@@ -42,15 +44,31 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  async function clearHistory() {
+    if (!items.length || !window.confirm('Очистить всю историю уведомлений?')) return;
+    setClearing(true);
+    try {
+      const response = await fetch('/api/notifications', { method: 'DELETE' });
+      if (response.ok) setItems([]);
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
-        <div className="flex items-center gap-3">
-          <Bell className="size-5" />
-          <div>
-            <h1 className="text-xl font-semibold">Уведомления</h1>
-            <p className="text-sm text-muted-foreground">Последние изменения в задачах Битрикс24</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Bell className="size-5" />
+            <div>
+              <h1 className="text-xl font-semibold">Уведомления</h1>
+              <p className="text-sm text-muted-foreground">Последние изменения в задачах Битрикс24</p>
+            </div>
           </div>
+          <Button variant="outline" size="sm" onClick={() => void clearHistory()} disabled={!items.length || clearing}>
+            Очистить
+          </Button>
         </div>
       </header>
       <main className="mx-auto max-w-4xl p-4 lg:p-6">
