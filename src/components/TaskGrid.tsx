@@ -634,7 +634,7 @@ export default function TaskGrid({
                     {groupBy !== 'none' && (
                       <TableRow className="bg-muted/60 hover:bg-muted/60">
                         <TableCell colSpan={showProject ? 10 : 9} className="font-medium text-foreground">
-                          {group.label} · {group.tasks.length}
+                          {group.label} ({group.tasks.length})
                         </TableCell>
                       </TableRow>
                     )}
