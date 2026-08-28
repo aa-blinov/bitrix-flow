@@ -72,7 +72,8 @@ export default function ProjectPage() {
     if (!notificationTaskId) return;
     const openTask = async () => {
       const task = projectTasks.find((item) => item.id === notificationTaskId) || await loadTaskById(notificationTaskId);
-      if (task?.projectId !== projectId) return;
+      if (!task || task.projectId !== projectId) return;
+      if (useKanbanStore.getState().selectedTaskId === notificationTaskId) return;
       setSelectedTask(notificationTaskId);
       // The query starts the modal once; remove it so closing the modal returns
       // to this project instead of immediately opening the same task again.
