@@ -106,20 +106,25 @@ describe('setSelectedProject: stages load before tasks', () => {
     global.fetch = originalFetch;
   });
 
-  it('stages fetch завершается до того, как tasks fetch начинается', async () => {
+  it('stages и tasks запускаются параллельно — tasks не ждут stages', async () => {
     await useKanbanStore.getState().setSelectedProject('group-1');
     // Ждём пока оба промиса из цепочки отработают.
     await new Promise((r) => setTimeout(r, 200));
 
+    const stagesStart = events.indexOf('stages:start');
     const stagesEnd = events.indexOf('stages:end');
     const tasksStart = events.indexOf('tasks:start');
+    const tasksEnd = events.indexOf('tasks:end');
 
-    expect(stagesEnd).toBeGreaterThanOrEqual(0);
-    expect(tasksStart).toBeGreaterThan(stagesEnd);
+    // Оба запроса стартовали и завершились.
+    expect(stagesStart).toBeGreaterThanOrEqual(0);
+    expect(stagesEnd).toBeGreaterThan(stagesStart);
+    expect(tasksStart).toBeGreaterThanOrEqual(0);
+    expect(tasksEnd).toBeGreaterThan(tasksStart);
 
-    // Контрольная проверка: на СТАРОМ (параллельном) коде events были бы
-    // ['tasks:start', 'tasks:end', 'stages:start', 'stages:end'] — tasks
-    // приходит первым из-за меньшей задержки. Этот ассерт ловит регрессию.
-    expect(events).toEqual(['stages:start', 'stages:end', 'tasks:start', 'tasks:end']);
+    // Параллельный запуск: tasks начинается до завершения stages. Иначе
+    // медленный Bitrix24 на /task.stages.get будет блокировать отрисовку
+    // списка задач.
+    expect(tasksStart).toBeLessThan(stagesEnd);
   });
 });
