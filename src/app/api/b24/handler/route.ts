@@ -109,7 +109,8 @@ async function enrichComment(memberId: string, details: ReturnType<typeof eventD
 async function enrichTaskTitle(memberId: string, details: ReturnType<typeof eventDetails>) {
   if (!details.taskId || details.type === 'task_deleted') return details;
   try {
-    const task = await bx24OAuth(memberId, 'tasks.task.get', { taskId: details.taskId });
+    const taskResult = await bx24OAuth(memberId, 'tasks.task.get', { taskId: details.taskId });
+    const task = taskResult?.task || taskResult;
     const taskTitle = task?.title || task?.TITLE;
     if (!taskTitle) return details;
     const projectId = String(task?.group?.id || task?.groupId || task?.group_id || '');

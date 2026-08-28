@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
+import { postBitrixJson } from '@/lib/bitrix-request';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
@@ -108,10 +109,9 @@ async function handleCallback(code: string, req: NextRequest, portalDomain?: str
     const handlerUrl = `${protocol}://${host}/api/b24/handler`;
 
     for (const event of ['OnTaskAdd', 'OnTaskUpdate', 'OnTaskDelete', 'OnTaskCommentAdd']) {
-      await fetch(`https://${restDomain}/rest/event.bind?auth=${tokens.access_token}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ event, handler: handlerUrl }),
+      await postBitrixJson(`https://${restDomain}/rest/event.bind?auth=${tokens.access_token}`, {
+        event,
+        handler: handlerUrl,
       });
     }
   } catch (e) {

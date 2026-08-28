@@ -1,4 +1,5 @@
 import { getDb } from './mongo';
+import { postBitrixJson } from './bitrix-request';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID!;
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET!;
@@ -58,28 +59,16 @@ export async function bx24OAuth(
 
   if (!token) throw new Error('No token for user');
 
-  const webhookUrl = `https://${token.domain}/rest/${method}?auth=${token.access_token}`;
+  const call = (accessToken: string) =>
+    postBitrixJson(
+      `https://${token.domain}/rest/${method}?auth=${accessToken}`,
+      params as Record<string, string>,
+    );
 
-  let res = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params as any).toString(),
-  });
-
-  // Если 401 или token expired - refresh и retry
-  if (res.status === 401) {
-    await refreshToken(member_id);
-    const newToken = await db.collection('user_tokens').findOne({ member_id });
-
-    const retryUrl = `https://${newToken!.domain}/rest/${method}?auth=${newToken!.access_token}`;
-    res = await fetch(retryUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(params as any).toString(),
-    });
+  let data = await call(token.access_token);
+  if (data.error === 'expired_token' || data.error === 'invalid_token') {
+    data = await call(await refreshToken(member_id));
   }
-
-  const data = await res.json();
-  if (data.error) throw new Error(data.error_description);
+  if (data.error) throw new Error(data.error_description || data.error);
   return data.result;
 }
