@@ -465,10 +465,10 @@ export default function TaskGrid({
             {viewScope && <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
-                {views.map((view) => <DropdownMenuItem key={view.id} onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
+                <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
+                {views.map((view) => <DropdownMenuItem key={view.id} className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setSaveViewOpen(true)}>Сохранить текущий вид</DropdownMenuItem>
+                <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => setSaveViewOpen(true)}>Сохранить текущий вид</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>}
             <DropdownMenu>
