@@ -518,13 +518,15 @@ export default function TaskGrid({
                 <SelectItem value="assignee">По исполнителю</SelectItem>
               </SelectContent>
             </Select>
-            {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
-              <Button variant="outline" size="sm" className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
-                setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
-              }}>
-                Сбросить
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+              disabled={!query && statusFilter === 'all' && assigneeFilter === 'all' && projectFilter === 'all' && groupBy === 'none'}
+              onClick={() => { setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none'); }}
+            >
+              Сбросить
+            </Button>
           </div>
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
