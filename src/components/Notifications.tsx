@@ -2,6 +2,7 @@
 
 import { Bell, CheckCircle2, MessageSquareText, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import BitrixText from '@/components/BitrixText';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -102,7 +103,7 @@ export default function Notifications() {
                   <span className="mt-0.5">{icon(item.type)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{item.title}</p>
-                    <p className="line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
+                    <p className="line-clamp-2 text-xs text-muted-foreground"><BitrixText text={item.message} /></p>
                   </div>
                 </>
               );

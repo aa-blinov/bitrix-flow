@@ -69,7 +69,7 @@ function eventDetails(event: string, raw: any) {
       message: raw?.POST_MESSAGE || raw?.MESSAGE || `в задаче ${title}`,
       ...base,
     };
-  return { type: 'task_updated', taskId, title: 'Задача обновлена', message: title, ...base };
+  return { type: 'task_updated', taskId, messageId, title: 'Задача обновлена', message: title, ...base };
 }
 
 async function enrichComment(memberId: string, details: ReturnType<typeof eventDetails>) {
@@ -159,6 +159,20 @@ export async function POST(req: NextRequest) {
     const commentDetails = await enrichComment(memberId, eventDetails(event, body.data));
     const details = await enrichTaskTitle(memberId, commentDetails);
     const now = new Date();
+    if ((details as any).messageId) {
+      const existing = await db
+        .collection('notifications')
+        .findOne({ member_id: memberId, messageId: (details as any).messageId });
+      if (existing) {
+        // Дублирующийся комментарий: не плодим карточки, только обновляем детали.
+        await db.collection('notifications').updateOne(
+          { _id: existing._id },
+          { $set: { ...details, created_at: now, raw_event: event } },
+        );
+        invalidateByPrefix(`${memberId}:`);
+        return NextResponse.json({ ok: true, merged: true });
+      }
+    }
     await db
       .collection('notifications')
       .insertOne({ member_id: memberId, ...details, created_at: now, raw_event: event });

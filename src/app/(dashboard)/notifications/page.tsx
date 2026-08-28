@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
+import BitrixText from '@/components/BitrixText';
 
 type Notice = {
   id: string;
@@ -90,7 +91,7 @@ export default function NotificationsPage() {
                         <p className="font-medium">{item.title}</p>
                         <span className="text-xs text-muted-foreground">{noticeLabel(item.type)}</span>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{item.message}</p>
+                      <p className="mt-1 text-sm text-muted-foreground"><BitrixText text={item.message} /></p>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         {item.taskId && <span>Задача #{item.taskId}</span>}
                         {item.projectId && <span>Проект #{item.projectId}</span>}
