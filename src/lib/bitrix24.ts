@@ -447,20 +447,6 @@ function mapTask(t: any): Bx24Task {
   };
 }
 
-// Одиночный запрос задачи по id. Нужен уведомлениям: если задачи ещё нет
-// в локальном зеркале (тестовая задача 4242, новая задача, событие пришло
-// раньше hydrate), модалка всё равно должна открыться.
-export async function fetchSingleTask(taskId: string): Promise<Bx24Task | null> {
-  try {
-    const result = await bx24('tasks.task.get', { taskId });
-    const task = result?.task || result;
-    return task ? mapTask(task) : null;
-  } catch {
-    return null;
-  }
-}
-
-
 // Поиск задач - кеш 30 секунд
 export async function searchTasks(query: string): Promise<Bx24Task[]> {
   const key = `search:${query}`;

@@ -54,10 +54,12 @@ function eventDetails(event: string, raw: any) {
     data.MESSAGE_ID || data.messageId || raw?.MESSAGE_ID || raw?.messageId || '',
   );
   const title = data.TITLE || data.title || `#${taskId}`;
+  const projectId = String(data.GROUP_ID || data.groupId || raw?.GROUP_ID || raw?.groupId || '');
+  const base = projectId ? { projectId } : {};
   if (event === 'ONTASKADD')
-    return { type: 'task_added', taskId, title: 'Новая задача', message: title };
+    return { type: 'task_added', taskId, title: 'Новая задача', message: title, ...base };
   if (event === 'ONTASKDELETE')
-    return { type: 'task_deleted', taskId, title: 'Задача удалена', message: title };
+    return { type: 'task_deleted', taskId, title: 'Задача удалена', message: title, ...base };
   if (event === 'ONTASKCOMMENTADD')
     return {
       type: 'comment_added',
@@ -65,8 +67,9 @@ function eventDetails(event: string, raw: any) {
       messageId,
       title: 'Новый комментарий',
       message: raw?.POST_MESSAGE || raw?.MESSAGE || `в задаче ${title}`,
+      ...base,
     };
-  return { type: 'task_updated', taskId, title: 'Задача обновлена', message: title };
+  return { type: 'task_updated', taskId, title: 'Задача обновлена', message: title, ...base };
 }
 
 async function enrichComment(memberId: string, details: ReturnType<typeof eventDetails>) {
@@ -86,7 +89,7 @@ async function enrichComment(memberId: string, details: ReturnType<typeof eventD
       });
       const messages = dialog?.messages || [];
       const message =
-        messages.find((item: any) => String(item.id || item.ID) === details.messageId) ||
+        messages.find((item: any) => String(item.id || item.ID) === (details as any).messageId) ||
         messages[0];
       if (message?.text) {
         return {

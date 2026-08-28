@@ -228,18 +228,15 @@ export default function TaskGrid({
   title,
   initialStatus = 'all',
   viewScope,
-  transientTask = null,
 }: {
   tasks: BxTask[];
   showProject?: boolean;
   title?: string | null;
   initialStatus?: string;
   viewScope?: 'all' | 'my';
-  transientTask?: BxTask | null;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
-  const clearTransientTask = useKanbanStore((state) => state.clearTransientTask);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -248,13 +245,10 @@ export default function TaskGrid({
     () => Object.fromEntries(projects.map((p) => [p.id, p])),
     [projects],
   );
-  const selectedTask = useMemo(() => {
-    if (!selectedTaskId) return null;
-    const local = tasks.find((task) => task.id === selectedTaskId);
-    if (local) return local;
-    if (transientTask && transientTask.id === selectedTaskId) return transientTask;
-    return null;
-  }, [tasks, selectedTaskId, transientTask]);
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId),
+    [tasks, selectedTaskId],
+  );
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
@@ -705,15 +699,7 @@ export default function TaskGrid({
           <DialogFooter><Button onClick={() => void saveView()} disabled={!viewName.trim()}>Сохранить</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      {selectedTask && (
-        <TaskModal
-          task={selectedTask}
-          onClose={() => {
-            setSelectedTask(null);
-            clearTransientTask();
-          }}
-        />
-      )}
+      {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
     </>
   );
 }

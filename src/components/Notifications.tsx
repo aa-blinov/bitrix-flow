@@ -94,10 +94,8 @@ export default function Notifications() {
         <div className="max-h-96 overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => {
-              const href = item.taskId
-                ? item.projectId
-                  ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
-                  : `/my-tasks?task=${encodeURIComponent(item.taskId)}`
+              const href = item.projectId && item.taskId
+                ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
                 : null;
               return (
                 <div
