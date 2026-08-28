@@ -92,6 +92,31 @@ function EditableTitle({ task }: { task: BxTask }) {
   );
 }
 
+function InlineSelect({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)} className="max-w-full truncate rounded px-1 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">{label}</button>;
+  }
+  return (
+    <Select value={value} open onOpenChange={setOpen} onValueChange={(next) => { onChange(next); setOpen(false); }}>
+      <SelectTrigger className="h-8 w-full min-w-0" aria-label={ariaLabel}><SelectValue /></SelectTrigger>
+      <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+}
+
 function FieldControls({ task, compact = false, readOnly = false, visibleColumns = DEFAULT_COLUMNS }: { task: BxTask; compact?: boolean; readOnly?: boolean; visibleColumns?: ColumnKey[] }) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
   const label = (name: string, child: React.ReactNode) => (
@@ -103,31 +128,11 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   const stageOptions = stages.length
     ? stages
     : [{ id: task.stageId, name: task.status === 'done' ? 'Завершена' : 'Без фазы' }];
-  const phase = (
-    <Select value={task.stageId} onValueChange={(value) => void moveTaskToStage(task.id, value)}>
-      <SelectTrigger className="w-full min-w-0" aria-label="Фаза"><SelectValue /></SelectTrigger>
-      <SelectContent>{stageOptions.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}</SelectContent>
-    </Select>
-  );
-  const assignee = (
-    <Select value={task.assigneeId || 'unassigned'} onValueChange={(value) => void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)}>
-      <SelectTrigger className="w-full min-w-0" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="unassigned">Не назначен</SelectItem>
-        {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
-  const priority = (
-    <Select value={task.priority} onValueChange={(value) => void updateTaskField(task.id, 'priority', value)}>
-      <SelectTrigger className="w-full min-w-0" aria-label="Приоритет"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {Object.entries(PRIORITY_LABELS).filter(([key]) => key !== 'critical').map(([key, item]) => (
-          <SelectItem key={key} value={key}>{item.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
+  const phase = <InlineSelect label={stageOptions.find((stage) => stage.id === task.stageId)?.name || 'Без фазы'} value={task.stageId} options={stageOptions.map((stage) => ({ value: stage.id, label: stage.name }))} onChange={(value) => void moveTaskToStage(task.id, value)} ariaLabel="Фаза" />;
+  const assigneeOptions = [{ value: 'unassigned', label: 'Не назначен' }, ...users.map((user) => ({ value: user.id, label: user.name }))];
+  const assignee = <InlineSelect label={task.assigneeName || 'Не назначен'} value={task.assigneeId || 'unassigned'} options={assigneeOptions} onChange={(value) => void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)} ariaLabel="Исполнитель" />;
+  const priorityOptions = Object.entries(PRIORITY_LABELS).filter(([key]) => key !== 'critical').map(([value, item]) => ({ value, label: item.label }));
+  const priority = <InlineSelect label={PRIORITY_LABELS[task.priority]?.label || task.priority} value={task.priority} options={priorityOptions} onChange={(value) => void updateTaskField(task.id, 'priority', value)} ariaLabel="Приоритет" />;
   const deadline = (
     <Input
       aria-label="Дедлайн"
@@ -193,16 +198,9 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
 
 function ProjectField({ task, readOnly }: { task: BxTask; readOnly: boolean }) {
   const { projects, updateTaskField } = useKanbanStore();
+  const options = [{ value: 'none', label: 'Без проекта' }, ...projects.filter((project) => !project.isArchived).map((project) => ({ value: project.id, label: project.name }))];
   if (readOnly) return <>{projects.find((project) => project.id === task.projectId)?.name ?? '—'}</>;
-  return (
-    <Select value={task.projectId || 'none'} onValueChange={(value) => void updateTaskField(task.id, 'projectId', value === 'none' ? '' : value)}>
-      <SelectTrigger className="h-8 min-w-36" aria-label="Проект"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="none">Без проекта</SelectItem>
-        {projects.filter((project) => !project.isArchived).map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
+  return <InlineSelect label={projects.find((project) => project.id === task.projectId)?.name ?? '—'} value={task.projectId || 'none'} options={options} onChange={(value) => void updateTaskField(task.id, 'projectId', value === 'none' ? '' : value)} ariaLabel="Проект" />;
 }
 
 function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolean }) {
