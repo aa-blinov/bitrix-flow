@@ -20,12 +20,15 @@ export async function GET(req: NextRequest) {
     .sort({ created_at: -1 })
     .limit(Math.min(Math.max(requestedLimit, 1), 200))
     .toArray();
-  return NextResponse.json({
-    notifications: notifications.map(({ _id, member_id, ...item }) => ({
-      id: _id.toString(),
-      ...item,
-    })),
-  });
+  return NextResponse.json(
+    {
+      notifications: notifications.map(({ _id, member_id, ...item }) => ({
+        id: _id.toString(),
+        ...item,
+      })),
+    },
+    { headers: { 'Cache-Control': 'private, max-age=10' } },
+  );
 }
 
 export async function DELETE(req: NextRequest) {
