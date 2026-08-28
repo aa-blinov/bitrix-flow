@@ -211,9 +211,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       isLoading: Boolean(id),
     });
     if (id) {
-      // При F5 этапы уже есть в localStorage: не ждём повторный запрос к Bitrix24.
-      if (cachedStages.length > 0) void get().loadTasks(id, true);
-      else void get().loadStages(id).then(() => get().loadTasks(id, true));
+      // Этапы не должны задерживать задачи: Bitrix может отвечать на них медленнее.
+      void get().loadStages(id);
+      void get().loadTasks(id, true);
     }
   },
 

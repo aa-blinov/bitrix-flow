@@ -896,7 +896,7 @@ function TaskCard({
             Подзадача
           </span>
         )}
-        {!task.dueDate && !isCompleted && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">Без срока</span>}
+        {!task.dueDate && !isCompleted && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">Без срока</span>}
       </div>
 
       {/* Title */}
