@@ -16,6 +16,7 @@ import {
   fetchTaskComments,
   fetchTaskById,
   fetchTaskTimeLog,
+  fetchProjectMembers,
   fetchChecklist,
   addChecklistItem as bxAddChecklistItem,
   updateChecklistItem as bxUpdateChecklistItem,
@@ -541,6 +542,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const { tasks, allTasks, users } = get();
     const previous = tasks.find((task) => task.id === id) || allTasks.find((task) => task.id === id);
     if (!previous) return;
+
+    if (['assigneeId', 'accompliceIds', 'auditorIds'].includes(field)) {
+      const members = await fetchProjectMembers(previous.projectId);
+      const memberIds = new Set((Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)));
+      const requested = field === 'assigneeId' ? (value ? [value] : []) : value;
+      if (requested.some((id: string) => !memberIds.has(String(id))))
+        throw new Error('Можно назначать только участников проекта');
+    }
 
     // Optimistic update
     const update: Partial<BxTask> = {};
