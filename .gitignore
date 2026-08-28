@@ -45,3 +45,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local MCP / IDE scratch files
+.mcp.json
+
+# stray screenshots dropped in the repo root
+Снимок экрана*.png
+Screenshot*.png
