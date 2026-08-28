@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     const [rawProjects, rawUsers, rawCurrentUser] = await Promise.all([
       serverCache(
         `${memberId}:projects:all`,
-        () => callBitrix24(token, 'sonet_group.get', {}),
+        () => fetchAllProjects(token),
         PROJECTS_TTL,
       ),
       serverCache(
@@ -146,26 +146,35 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function callBitrix24(
-  token: any,
-  method: string,
-  params: Record<string, string>,
-): Promise<any> {
-  const data = await callBitrix24WithToken(token, method, params);
+async function callBitrix24Response(token: any, method: string, params: Record<string, string>) {
+  let data = await callBitrix24WithToken(token, method, params);
   if (data.error === 'expired_token' || data.error === 'invalid_token') {
     const refreshedToken = await refreshToken(token);
     if (!refreshedToken) throw new Error('TOKEN_REFRESH_FAILED');
-    const refreshedData = await callBitrix24WithToken(
-      { ...token, access_token: refreshedToken },
-      method,
-      params,
-    );
-    if (refreshedData.error)
-      throw new Error(`${refreshedData.error}: ${refreshedData.error_description}`);
-    return refreshedData.result;
+    data = await callBitrix24WithToken({ ...token, access_token: refreshedToken }, method, params);
   }
   if (data.error) throw new Error(`${data.error}: ${data.error_description}`);
-  return data.result;
+  return data;
+}
+
+async function callBitrix24(token: any, method: string, params: Record<string, string>): Promise<any> {
+  return (await callBitrix24Response(token, method, params)).result;
+}
+
+async function fetchAllProjects(token: any) {
+  const projects: any[] = [];
+  const visited = new Set<number>();
+  let start = 0;
+
+  while (!visited.has(start)) {
+    visited.add(start);
+    const data = await callBitrix24Response(token, 'sonet_group.get', { start: String(start) });
+    projects.push(...(data.result || []));
+    if (data.next === undefined || data.next === null) break;
+    start = Number(data.next);
+  }
+
+  return projects;
 }
 
 async function callBitrix24WithToken(token: any, method: string, params: Record<string, string>) {
