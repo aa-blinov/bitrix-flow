@@ -627,6 +627,14 @@ export async function addTimeEntry(
   await cacheInvalidate(`time:${taskId}`);
 }
 
+export async function updateProject(id: string, fields: { name?: string; description?: string; archived?: boolean }): Promise<void> {
+  const params: Record<string, string> = { GROUP_ID: id };
+  if (fields.name !== undefined) params.NAME = fields.name;
+  if (fields.description !== undefined) params.DESCRIPTION = fields.description;
+  if (fields.archived !== undefined) params.CLOSED = fields.archived ? 'Y' : 'N';
+  await bx24('sonet_group.update', params);
+}
+
 export async function createProject(name: string, description = ''): Promise<string> {
   const result = await bx24('sonet_group.create', {
     NAME: name,

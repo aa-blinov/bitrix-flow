@@ -9,11 +9,15 @@ import {
   ChevronRight,
   Columns3,
   TableProperties,
+  Settings,
 } from 'lucide-react';
 import TaskGrid from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -22,6 +26,9 @@ export default function ProjectPage() {
   const projectId = (params?.id as string) || '0';
   const notificationTaskId = searchParams.get('task');
   const [view, setView] = useState('kanban');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
 
   const {
     projects,
@@ -30,6 +37,7 @@ export default function ProjectPage() {
     setSelectedTask,
     tasks,
     isRehydrated,
+    updateProject,
   } = useKanbanStore();
 
   useEffect(() => {
@@ -64,6 +72,18 @@ export default function ProjectPage() {
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
+
+  async function saveProject() {
+    if (!currentProject || !name.trim()) return;
+    await updateProject(currentProject.id, { name: name.trim(), description });
+    setSettingsOpen(false);
+  }
+
+  async function toggleArchive() {
+    if (!currentProject || !window.confirm(currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?')) return;
+    await updateProject(currentProject.id, { archived: !currentProject.isArchived });
+    setSettingsOpen(false);
+  }
 
   if (projects.length === 0) {
     return <LoadingState className="min-h-screen" />;
@@ -125,6 +145,7 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            <Button variant="outline" size="sm" onClick={() => { setName(currentProject.name); setDescription(currentProject.description); setSettingsOpen(true); }}><Settings className="size-4" /> Настройки</Button>
             <div className="hidden md:flex gap-4 text-sm">
               <div className="text-center">
                 <p className="text-muted-foreground text-xs">План</p>
@@ -138,6 +159,15 @@ export default function ProjectPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Настройки проекта</DialogTitle></DialogHeader>
+          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Название" />
+          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Описание" />
+          <DialogFooter className="gap-2 sm:justify-between"><Button variant="outline" onClick={() => void toggleArchive()}>{currentProject.isArchived ? 'Разархивировать' : 'Архивировать'}</Button><Button onClick={() => void saveProject()} disabled={!name.trim()}>Сохранить</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={view} onValueChange={setView} className="pb-6">
         {view === 'grid' && (

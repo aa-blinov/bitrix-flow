@@ -25,6 +25,7 @@ import {
   fetchProjectStages,
   createProjectStage,
   createProject as bxCreateProject,
+  updateProject as bxUpdateProject,
   updateTaskStatus as bxUpdateStatus,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
@@ -85,6 +86,7 @@ interface KanbanStore {
   loadStages: (entityId: string) => Promise<void>;
   createStage: (title: string) => Promise<boolean>;
   createProject: (name: string, description?: string) => Promise<string>;
+  updateProject: (id: string, fields: { name?: string; description?: string; archived?: boolean }) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: () => Promise<void>;
   loadMoreTasks: () => Promise<void>;
@@ -290,6 +292,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const id = await bxCreateProject(name, description);
     await get().loadProjects(true);
     return id;
+  },
+
+  updateProject: async (id, fields) => {
+    const previous = get().projects.find((project) => project.id === id);
+    if (!previous) return;
+    set((state) => ({ projects: state.projects.map((project) => project.id === id ? { ...project, ...fields } : project) }));
+    try {
+      await bxUpdateProject(id, fields);
+      await get().loadProjects(true);
+    } catch (error) {
+      set((state) => ({ projects: state.projects.map((project) => project.id === id ? previous : project) }));
+      throw error;
+    }
   },
 
   loadTasks: async (groupId?: string | boolean, reset: boolean = true) => {
