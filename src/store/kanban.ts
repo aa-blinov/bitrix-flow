@@ -14,6 +14,7 @@ import {
   fetchProjectList,
   fetchSubtasks,
   fetchTaskComments,
+  fetchTaskById,
   fetchTaskTimeLog,
   fetchChecklist,
   addChecklistItem as bxAddChecklistItem,
@@ -92,6 +93,7 @@ interface KanbanStore {
   loadMoreTasks: () => Promise<void>;
   loadSubtasks: (parentId: string) => Promise<void>;
   loadTaskDetails: (taskId: string) => Promise<void>;
+  loadTaskById: (taskId: string) => Promise<BxTask | null>;
   setFilters: (filters: Partial<TaskFilters>) => void;
   search: (query: string) => Promise<void>;
   toggleSearch: () => void;
@@ -400,6 +402,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       }));
     } catch (err) {
       console.error('Failed to load subtasks:', err);
+    }
+  },
+
+  loadTaskById: async (taskId) => {
+    try {
+      const task = convertBxTask(await fetchTaskById(taskId));
+      set((state) => ({
+        tasks: state.tasks.some((item) => item.id === taskId) ? state.tasks : [...state.tasks, task],
+        allTasks: state.allTasks.some((item) => item.id === taskId) ? state.allTasks : [...state.allTasks, task],
+      }));
+      return task;
+    } catch {
+      return null;
     }
   },
 

@@ -584,6 +584,21 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   await taskInvalidate(taskId);
 }
 
+export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
+  const result = await bx24('tasks.task.get', { taskId });
+  const task = result?.task || result;
+  return {
+    id: String(task.id), title: task.title || '', description: task.description || '', status: task.status || '2', subStatus: task.subStatus || '', priority: task.priority || '1',
+    createdDate: task.createdDate || '', changedDate: task.changedDate || '', deadline: task.deadline || undefined,
+    timeEstimate: Number(task.timeEstimate) || 0, timeSpentInLogs: Number(task.timeSpentInLogs) || 0,
+    groupId: String(task.groupId || task.group?.id || '0'), groupName: task.group?.name || '',
+    responsibleId: String(task.responsibleId || task.responsible?.id || ''), responsibleName: task.responsible?.name || '', responsibleIcon: task.responsible?.icon,
+    creatorId: String(task.createdBy || task.creator?.id || ''), creatorName: task.creator?.name || '', commentsCount: Number(task.commentsCount) || 0,
+    parentId: task.parentId, stageId: task.stageId || '0', stageName: '', chatId: task.chatId ? String(task.chatId) : undefined,
+    accompliceIds: task.accomplices || [], auditorIds: task.auditors || [],
+  };
+}
+
 export async function fetchChecklist(taskId: string) {
   const result = await bx24('task.checklistitem.getlist', { TASKID: taskId, 'ORDER[SORT_INDEX]': 'asc' });
   return (Array.isArray(result) ? result : []).map((item: any) => ({ id: String(item.ID), parentId: String(item.PARENT_ID || '0'), title: item.TITLE || '', completed: item.IS_COMPLETE === 'Y' }));
