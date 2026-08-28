@@ -39,10 +39,13 @@ export default function NotificationsPage() {
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
-    void fetch('/api/notifications?limit=200')
+    const controller = new AbortController();
+    void fetch('/api/notifications?limit=200', { signal: controller.signal })
       .then((response) => response.json())
       .then((data) => setItems(data.notifications || []))
+      .catch(() => {})
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   async function clearHistory() {

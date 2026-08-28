@@ -53,17 +53,22 @@ export default function Notifications() {
   }, [memberId]);
 
   useEffect(() => {
+    if (!open || !memberId) return;
     void loadHistory();
-  }, [loadHistory]);
+  }, [loadHistory, memberId, open]);
 
   const onEvent = useCallback(
     (event: Notice) => {
-      setItems((current) =>
-        [{ ...event, id: `${event.createdAt || Date.now()}-${event.type}` }, ...current].slice(
-          0,
-          50,
-        ),
-      );
+      setItems((current) => {
+        if (event.id) {
+          const incomingId = String(event.id);
+          if (current.some((item) => String(item.id) === incomingId)) return current;
+        }
+        return [
+          { ...event, id: event.id || `${event.createdAt || Date.now()}-${event.type}` },
+          ...current,
+        ].slice(0, 50);
+      });
       if (selectedProjectId) void loadTasks(selectedProjectId, true);
     },
     [loadTasks, selectedProjectId],
