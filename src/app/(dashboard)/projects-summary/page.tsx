@@ -107,11 +107,11 @@ export default function ProjectsSummaryPage() {
   );
 
   return (
-    <div className="min-h-full bg-muted/20">
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-5 backdrop-blur sm:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+    <div className="min-h-screen bg-muted/30 pb-12">
+      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Сводка по проектам</h1>
+            <h1 className="text-xl font-semibold text-foreground">Сводка по проектам</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               План, факт и операционный статус по задачам проектов
             </p>
@@ -121,16 +121,11 @@ export default function ProjectsSummaryPage() {
           </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-8">
-        <Card>
-          <CardHeader className="gap-3 border-b">
+      <main className="space-y-3 px-4 py-4 lg:px-6">
+        <Card className="overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0">
+          <CardHeader className="gap-3 border-y bg-transparent px-0 py-3">
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-              <div>
-                <CardTitle>Проекты</CardTitle>
-                <CardDescription>
-                  Полная история задач. План учитывает оценку задачи или её оценённых подзадач.
-                </CardDescription>
-              </div>
+              <p className="text-sm text-muted-foreground">План, факт и операционный статус</p>
               <Input
                 className="w-full lg:w-64"
                 placeholder="Найти проект…"
