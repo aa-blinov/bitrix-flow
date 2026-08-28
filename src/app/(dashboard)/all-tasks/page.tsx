@@ -20,9 +20,8 @@ function AllTasksInner() {
 
   useEffect(() => {
     if (projects.length === 0) void loadProjects();
-    void loadAllTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (allTasks.length === 0) void loadAllTasks();
+    }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">

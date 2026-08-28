@@ -125,6 +125,7 @@ export default function Sidebar() {
                     <Link
                       key={project.id}
                       href={`/projects/${project.id}`}
+                      prefetch={false}
                       onClick={() => setMobileOpen(false)}
                       className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
                         active
@@ -160,6 +161,7 @@ export default function Sidebar() {
                         <Link
                           key={project.id}
                           href={`/projects/${project.id}`}
+                          prefetch={false}
                           onClick={() => setMobileOpen(false)}
                           className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
                             active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
