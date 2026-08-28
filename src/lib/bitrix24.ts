@@ -572,6 +572,7 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.estimate !== undefined) updateFields.TIME_ESTIMATE = fields.estimate * 3600;
   if (fields.parentId !== undefined) updateFields.PARENT_ID = fields.parentId || 0;
   if (fields.stageId !== undefined) updateFields.STAGE_ID = fields.stageId;
+  if (fields.groupId !== undefined) updateFields.GROUP_ID = fields.groupId || 0;
   if (fields.accompliceIds !== undefined) updateFields.ACCOMPLICES = fields.accompliceIds;
   if (fields.auditorIds !== undefined) updateFields.AUDITORS = fields.auditorIds;
 
@@ -624,6 +625,15 @@ export async function addTimeEntry(
     'fields[COMMENT_TEXT]': description,
   });
   await cacheInvalidate(`time:${taskId}`);
+}
+
+export async function createProject(name: string, description = ''): Promise<string> {
+  const result = await bx24('sonet_group.create', {
+    'fields[NAME]': name,
+    'fields[DESCRIPTION]': description,
+  });
+  await cacheInvalidateByPrefix('projects:');
+  return String(result.ID || result.id || result);
 }
 
 export async function createTask(fields: any): Promise<string> {

@@ -24,6 +24,7 @@ import {
   fetchUsers,
   fetchProjectStages,
   createProjectStage,
+  createProject as bxCreateProject,
   updateTaskStatus as bxUpdateStatus,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
@@ -83,6 +84,7 @@ interface KanbanStore {
   loadProjects: (force?: boolean) => Promise<void>;
   loadStages: (entityId: string) => Promise<void>;
   createStage: (title: string) => Promise<boolean>;
+  createProject: (name: string, description?: string) => Promise<string>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: () => Promise<void>;
   loadMoreTasks: () => Promise<void>;
@@ -281,6 +283,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       console.error('Create stage failed:', error);
       return false;
     }
+  },
+
+  createProject: async (name, description) => {
+    const id = await bxCreateProject(name, description);
+    await get().loadProjects(true);
+    return id;
   },
 
   loadTasks: async (groupId?: string | boolean, reset: boolean = true) => {
@@ -502,6 +510,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'parentId') update.parentId = value;
     else if (field === 'accompliceIds') update.accompliceIds = value;
     else if (field === 'auditorIds') update.auditorIds = value;
+    else if (field === 'projectId') {
+      update.projectId = value;
+    }
 
     set((state) => ({
       tasks: state.tasks.map((t) => t.id === id ? { ...t, ...update, updatedDate: new Date().toISOString() } : t),
@@ -519,6 +530,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'parentId') bxFields.parentId = value || 0;
     else if (field === 'accompliceIds') bxFields.accompliceIds = value;
     else if (field === 'auditorIds') bxFields.auditorIds = value;
+    else if (field === 'projectId') bxFields.groupId = value;
 
     try {
       if (Object.keys(bxFields).length > 0) await bxUpdateTaskFull(id, bxFields);

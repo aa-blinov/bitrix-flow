@@ -1,14 +1,15 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, ListChecks, Menu, Inbox, LogOut, TableProperties, ChevronDown, Bell } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Menu, Inbox, LogOut, TableProperties, ChevronDown, Bell, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Notifications from '@/components/Notifications';
 import ThemeToggle from '@/components/ThemeToggle';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
@@ -21,17 +22,22 @@ export default function Sidebar() {
     currentUser,
     isLoading,
     loadProjects,
+    createProject,
     getMyTasks,
   } = useKanbanStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!projects.length && !isLoading) void loadProjects();
   }, [isLoading, loadProjects, projects.length]);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   const myTasks = getMyTasks();
   const sortedProjects = [...projects]
@@ -49,6 +55,20 @@ export default function Sidebar() {
       .slice(0, 2)
       .join('')
       .toUpperCase();
+  }
+
+  async function createNewProject() {
+    if (!projectName.trim()) return;
+    setCreating(true);
+    try {
+      const id = await createProject(projectName.trim());
+      setProjectName('');
+      setCreateOpen(false);
+      setMobileOpen(false);
+      router.push(`/projects/${id}`);
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function logout() {
@@ -110,9 +130,12 @@ export default function Sidebar() {
 
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">
-          <h3 className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Проекты ({isLoading && !projects.length ? '…' : projects.length})
-          </h3>
+          <div className="mb-2 flex items-center justify-between px-2.5">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Проекты ({isLoading && !projects.length ? '…' : projects.length})
+            </h3>
+            <Button variant="ghost" size="icon-xs" onClick={() => setCreateOpen(true)} aria-label="Создать проект" title="Создать проект"><Plus /></Button>
+          </div>
           <Input
             value={projectQuery}
             onChange={(event) => setProjectQuery(event.target.value)}
@@ -244,6 +267,14 @@ export default function Sidebar() {
       <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r bg-background md:flex">
         <SidebarContent />
       </aside>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Новый проект</DialogTitle></DialogHeader>
+          <Input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Название проекта" autoFocus onKeyDown={(event) => event.key === 'Enter' && void createNewProject()} />
+          <DialogFooter><Button onClick={() => void createNewProject()} disabled={!projectName.trim() || creating}>Создать</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
