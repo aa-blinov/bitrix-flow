@@ -191,7 +191,6 @@ async function handleRequest(req: NextRequest, method: string) {
         commentsCount: parseInt(t.commentsCount) || 0,
         parentId: t.parentId || undefined,
         stageId: t.stageId || '0',
-        tags: Array.isArray(t.tags) ? t.tags : [],
       }));
       return NextResponse.json({
         result: {
@@ -342,7 +341,6 @@ async function handleRequest(req: NextRequest, method: string) {
       commentsCount: parseInt(t.commentsCount) || 0,
       parentId: t.parentId || undefined,
       stageId: t.stageId || '0',
-      tags: Array.isArray(t.tags) ? t.tags : [],
     }));
     return NextResponse.json({
       result: {

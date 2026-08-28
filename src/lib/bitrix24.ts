@@ -117,7 +117,6 @@ export interface Bx24Task {
   chatId?: string;
   accompliceIds?: string[];
   auditorIds?: string[];
-  tags?: string[];
 }
 
 export interface Bx24Project {
@@ -181,7 +180,6 @@ const TASK_LIST_FIELDS = [
   'CREATED_BY',
   'PARENT_ID',
   'STAGE_ID',
-  'TAGS',
 ];
 
 function addTaskListFields(params: Record<string, string>) {
@@ -575,7 +573,6 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.parentId !== undefined) updateFields.PARENT_ID = fields.parentId || 0;
   if (fields.stageId !== undefined) updateFields.STAGE_ID = fields.stageId;
   if (fields.groupId !== undefined) updateFields.GROUP_ID = fields.groupId || 0;
-  if (fields.tags !== undefined) updateFields.TAGS = fields.tags;
   if (fields.accompliceIds !== undefined) updateFields.ACCOMPLICES = fields.accompliceIds;
   if (fields.auditorIds !== undefined) updateFields.AUDITORS = fields.auditorIds;
 
