@@ -41,6 +41,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
+import { fetchProjectMembers } from '@/lib/bitrix24';
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
@@ -75,7 +76,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [parentQuery, setParentQuery] = useState('');
+  const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const commentsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void fetchProjectMembers(task.projectId).then((members) => setProjectMemberIds((Array.isArray(members) ? members : []).map((member: any) => String(member.USER_ID)))).catch(() => setProjectMemberIds([]));
+  }, [task.projectId]);
 
   useEffect(() => {
     const element = commentsRef.current;
@@ -151,6 +157,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       <DialogContent
         showCloseButton={false}
         onInteractOutside={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onFocusOutside={(event) => event.preventDefault()}
         className="top-0 left-0 h-dvh w-dvw max-h-none max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none p-0 lg:left-auto lg:right-0 lg:flex lg:w-[60rem] lg:max-w-[calc(100vw-4rem)] lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-l-xl"
       >
         {/* Header */}
@@ -419,7 +427,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать соисполнителей…</Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
-                          {users.map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.accompliceIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('accompliceIds', checked ? [...new Set([...(task.accompliceIds || []), user.id])] : (task.accompliceIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                          {users.filter((user) => projectMemberIds.includes(user.id)).map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.accompliceIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('accompliceIds', checked ? [...new Set([...(task.accompliceIds || []), user.id])] : (task.accompliceIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -432,7 +440,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать наблюдателей…</Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
-                          {users.map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.auditorIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('auditorIds', checked ? [...new Set([...(task.auditorIds || []), user.id])] : (task.auditorIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                          {users.filter((user) => projectMemberIds.includes(user.id)).map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.auditorIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('auditorIds', checked ? [...new Set([...(task.auditorIds || []), user.id])] : (task.auditorIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
