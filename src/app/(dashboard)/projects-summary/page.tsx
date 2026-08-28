@@ -124,64 +124,40 @@ export default function ProjectsSummaryPage() {
       <main className="space-y-3 px-4 py-4 lg:px-6">
         <Card className="overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0">
           <CardHeader className="gap-3 rounded-none border-0 bg-transparent px-0 py-3">
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center gap-2">
               <Input
-                className="w-full rounded-md lg:w-64"
+                className="h-8 w-full rounded-md sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1"
                 placeholder="Найти проект…"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="grid gap-1 text-xs text-muted-foreground">
-                <span>Считать по дате</span>
-                <Select value={dateField} onValueChange={(value) => setDateField(value as 'changed' | 'created')}>
-                  <SelectTrigger className="w-32" aria-label="Считать по дате"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="changed">изменения</SelectItem>
-                    <SelectItem value="created">создания</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="grid gap-1 text-xs text-muted-foreground">
-                <span>С</span>
-                <Input
-                  type="date"
-                  value={fromDate}
-                  onChange={(event) => setFromDate(event.target.value)}
-                  className="h-9"
-                />
-              </label>
-              <label className="grid gap-1 text-xs text-muted-foreground">
-                <span>По</span>
-                <Input
-                  type="date"
-                  value={toDate}
-                  onChange={(event) => setToDate(event.target.value)}
-                  className="h-9"
-                />
-              </label>
+              <Select value={dateField} onValueChange={(value) => setDateField(value as 'changed' | 'created')}>
+                <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="changed">изменения</SelectItem>
+                  <SelectItem value="created">создания</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="h-8 rounded-md sm:w-32" aria-label="С" />
+              <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="h-8 rounded-md sm:w-32" aria-label="По" />
               <Button
                 variant="secondary"
                 size="sm"
+                className="h-8 rounded-md"
                 onClick={() => void load(false)}
                 disabled={isLoading}
               >
                 Применить
               </Button>
-              {(fromDate || toDate) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setFromDate('');
-                    setToDate('');
-                    setTimeout(() => void load(false), 0);
-                  }}
-                >
-                  За всё время
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                disabled={!fromDate && !toDate}
+                onClick={() => { setFromDate(''); setToDate(''); setTimeout(() => void load(false), 0); }}
+              >
+                Сбросить
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
