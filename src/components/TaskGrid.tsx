@@ -463,7 +463,7 @@ export default function TaskGrid({
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             {viewScope && <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="focus:ring-0 focus-visible:ring-2">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
                 {views.map((view) => <DropdownMenuItem key={view.id} className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
