@@ -96,6 +96,7 @@ interface KanbanStore {
   updateTaskField: (id: string, field: string, value: any) => Promise<void>;
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
   moveTaskToStage: (taskId: string, stageId: string) => Promise<void>;
+  moveTaskToProject: (taskId: string, projectId: string) => Promise<void>;
   addComment: (taskId: string, text: string) => void;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
   addChecklistItem: (taskId: string, title: string, parentId?: string) => Promise<void>;
@@ -562,6 +563,31 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
   moveTask: (taskId, newStatus) => {
     get().updateTaskField(taskId, 'status', newStatus);
+  },
+
+  moveTaskToProject: async (taskId, projectId) => {
+    const { tasks, allTasks, selectedProjectId } = get();
+    const previous = tasks.find((task) => task.id === taskId) || allTasks.find((task) => task.id === taskId);
+    if (!previous || previous.projectId === projectId) return;
+    const stages = await fetchProjectStages(projectId);
+    const stageId = stages.find((stage) => stage.systemType === 'NEW')?.id || stages[0]?.id;
+    if (!stageId) throw new Error('В проекте нет этапов для переноса задачи');
+
+    set((state) => ({
+      tasks: selectedProjectId === previous.projectId
+        ? state.tasks.filter((task) => task.id !== taskId)
+        : state.tasks.map((task) => task.id === taskId ? { ...task, projectId, stageId } : task),
+      allTasks: state.allTasks.map((task) => task.id === taskId ? { ...task, projectId, stageId } : task),
+    }));
+    try {
+      await bxUpdateTaskFull(taskId, { groupId: projectId, stageId });
+    } catch (error) {
+      set((state) => ({
+        tasks: selectedProjectId === previous.projectId ? [...state.tasks, previous] : state.tasks.map((task) => task.id === taskId ? previous : task),
+        allTasks: state.allTasks.map((task) => task.id === taskId ? previous : task),
+      }));
+      throw error;
+    }
   },
 
   moveTaskToStage: async (taskId, stageId) => {

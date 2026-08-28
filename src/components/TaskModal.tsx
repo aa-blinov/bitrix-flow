@@ -43,6 +43,7 @@ import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
     updateTaskField,
+    moveTaskToProject,
     addComment,
     addTimeEntry,
     users,
@@ -357,7 +358,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   <div className="p-4 space-y-4">
                     <div>
                       <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Layers size={12} /> Проект</label>
-                      <Select value={task.projectId || 'none'} onValueChange={(value) => void handleUpdateField('projectId', value === 'none' ? '' : value)}>
+                      <Select value={task.projectId || 'none'} onValueChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)}>
                         <SelectTrigger className="w-full"><SelectValue placeholder="Без проекта" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Без проекта</SelectItem>

@@ -197,10 +197,10 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
 }
 
 function ProjectField({ task, readOnly }: { task: BxTask; readOnly: boolean }) {
-  const { projects, updateTaskField } = useKanbanStore();
+  const { projects, moveTaskToProject } = useKanbanStore();
   const options = [{ value: 'none', label: 'Без проекта' }, ...projects.filter((project) => !project.isArchived).map((project) => ({ value: project.id, label: project.name }))];
   if (readOnly) return <>{projects.find((project) => project.id === task.projectId)?.name ?? '—'}</>;
-  return <InlineSelect label={projects.find((project) => project.id === task.projectId)?.name ?? '—'} value={task.projectId || 'none'} options={options} onChange={(value) => void updateTaskField(task.id, 'projectId', value === 'none' ? '' : value)} ariaLabel="Проект" />;
+  return <InlineSelect label={projects.find((project) => project.id === task.projectId)?.name ?? '—'} value={task.projectId || 'none'} options={options} onChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)} ariaLabel="Проект" />;
 }
 
 function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolean }) {
