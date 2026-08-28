@@ -72,6 +72,11 @@ export default function ProjectPage() {
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
+  const activeTasks = projectTasks.filter((task) => task.status !== 'done');
+  const overdueTasks = activeTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date()).length;
+  const unassignedTasks = activeTasks.filter((task) => !task.assigneeId).length;
+  const noDeadlineTasks = activeTasks.filter((task) => !task.dueDate).length;
+  const nextDeadline = activeTasks.filter((task) => task.dueDate).map((task) => task.dueDate!).sort()[0];
 
   async function saveProject() {
     if (!currentProject || !name.trim()) return;
@@ -133,16 +138,18 @@ export default function ProjectPage() {
                   <span className="rounded border px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Архив</span>
                 )}
               </h1>
-              <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Users size={14} />
-                  {currentProject.membersCount || 0} участников
-                </span>
-                <span>•</span>
-                <span>{projectTasks.length} задач</span>
-                <span>•</span>
-                <span className="text-emerald-600">{completedTasks} завершено</span>
+              <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1"><Users size={14} />{currentProject.membersCount || 0} участников</span>
+                <span>•</span><span>{projectTasks.length} задач</span><span>•</span><span className="text-emerald-600">{completedTasks} завершено</span>
               </div>
+              {(overdueTasks || unassignedTasks || noDeadlineTasks || nextDeadline) && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {overdueTasks > 0 && <span className="font-medium text-destructive">{overdueTasks} просрочено</span>}
+                  {unassignedTasks > 0 && <span>{overdueTasks ? ' · ' : ''}{unassignedTasks} без исполнителя</span>}
+                  {noDeadlineTasks > 0 && <span>{overdueTasks || unassignedTasks ? ' · ' : ''}{noDeadlineTasks} без срока</span>}
+                  {nextDeadline && <span>{overdueTasks || unassignedTasks || noDeadlineTasks ? ' · ' : ''}Ближайший срок: {new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(nextDeadline))}</span>}
+                </p>
+              )}
             </div>
 
             <Button variant="outline" size="sm" onClick={() => { setName(currentProject.name); setDescription(currentProject.description); setSettingsOpen(true); }}><Settings className="size-4" /> Настройки</Button>
