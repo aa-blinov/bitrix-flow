@@ -655,7 +655,7 @@ export default function TaskGrid({
                           />
                         </TableCell>
                         {visibleColumns.includes('title') && <TableCell><EditableTitle task={task} /></TableCell>}
-                        {showProject && visibleColumns.includes('project') && <TableCell><ProjectField task={task} readOnly={isReadOnly} /></TableCell>}
+                        {showProject && visibleColumns.includes('project') && <TableCell><ProjectField task={task} readOnly={false} /></TableCell>}
                         <FieldControls task={task} readOnly={isReadOnly} visibleColumns={visibleColumns} />
                         {visibleColumns.includes('actual') && <TableCell className="text-muted-foreground">{task.actualTime || 0} ч</TableCell>}
                         {visibleColumns.includes('description') && <TableCell className="max-w-64 truncate text-muted-foreground">{task.description || '—'}</TableCell>}
