@@ -124,10 +124,9 @@ export default function ProjectsSummaryPage() {
       <main className="space-y-3 px-4 py-4 lg:px-6">
         <Card className="overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0">
           <CardHeader className="gap-3 rounded-none border-0 bg-transparent px-0 py-3">
-            <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-              <p className="text-sm text-muted-foreground">План, факт и операционный статус</p>
+            <div className="flex justify-end">
               <Input
-                className="w-full lg:w-64"
+                className="w-full rounded-md lg:w-64"
                 placeholder="Найти проект…"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
