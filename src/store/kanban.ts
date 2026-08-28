@@ -215,10 +215,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   setCurrentUser: (currentUser) => set({ currentUser }),
 
   loadProjects: async (force = false) => {
-    const { projects } = get();
+    const { projects, isLoading } = get();
 
     // Защита от дублирующих вызовов
-    if (!force && projects.length > 0) return;
+    if (isLoading || (!force && projects.length > 0)) return;
 
     set({ isLoading: true, error: null });
     try {

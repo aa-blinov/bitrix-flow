@@ -7,10 +7,23 @@ bitrix-flow.duckdns.org {
     tls {
         dns duckdns {env.DUCKDNS_TOKEN}
     }
-    reverse_proxy app:3000 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+
+    @events path /api/events
+    handle @events {
+        reverse_proxy app:3000 {
+            flush_interval -1
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
-    encode gzip zstd
+
+    handle {
+        reverse_proxy app:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+        encode gzip zstd
+    }
 }
