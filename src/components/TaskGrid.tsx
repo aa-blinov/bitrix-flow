@@ -580,6 +580,7 @@ export default function TaskGrid({
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{assignee}</span>
+                        {!task.dueDate && task.status !== 'done' && <span className="font-medium text-amber-700 dark:text-amber-300">· без срока</span>}
                         {task.dueDate && <span className={needsDeadlineAttention(task) ? 'font-medium text-yellow-800 dark:text-yellow-200' : undefined}>· до {formatBitrixDateTime(task.dueDate)}</span>}
                         {(task.estimate || task.actualTime) ? <span>· {task.actualTime || 0} / {task.estimate || 0} ч</span> : null}
                       </div>

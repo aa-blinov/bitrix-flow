@@ -87,8 +87,7 @@ export default function ProjectPage() {
   const activeTasks = projectTasks.filter((task) => task.status !== 'done');
   const overdueTasks = activeTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date()).length;
   const unassignedTasks = activeTasks.filter((task) => !task.assigneeId).length;
-  const noDeadlineTasks = activeTasks.filter((task) => !task.dueDate).length;
-  const nextDeadline = activeTasks.filter((task) => task.dueDate).map((task) => task.dueDate!).sort()[0];
+
 
   useEffect(() => {
     if (!membersOpen || !currentProject) return;
@@ -173,12 +172,10 @@ export default function ProjectPage() {
                 <Button variant="link" size="xs" onClick={() => setMembersOpen(true)} className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"><Users size={14} />{currentProject.membersCount || 0} участников</Button>
                 <span>•</span><span>{projectTasks.length} задач</span><span>•</span><span className="text-emerald-600">{completedTasks} завершено</span>
               </div>
-              {(overdueTasks || unassignedTasks || noDeadlineTasks || nextDeadline) && (
+              {(overdueTasks || unassignedTasks) && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   {overdueTasks > 0 && <span className="font-medium text-destructive">{overdueTasks} просрочено</span>}
                   {unassignedTasks > 0 && <span>{overdueTasks ? ' · ' : ''}{unassignedTasks} без исполнителя</span>}
-                  {noDeadlineTasks > 0 && <span>{overdueTasks || unassignedTasks ? ' · ' : ''}{noDeadlineTasks} без срока</span>}
-                  {nextDeadline && <span>{overdueTasks || unassignedTasks || noDeadlineTasks ? ' · ' : ''}Ближайший срок: {new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(nextDeadline))}</span>}
                 </p>
               )}
             </div>
