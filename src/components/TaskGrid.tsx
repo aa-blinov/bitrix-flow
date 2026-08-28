@@ -40,7 +40,7 @@ type SortKey = 'title' | 'project' | 'stage' | 'assignee' | 'priority' | 'deadli
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
 type SavedView = { id: string; name: string; config: { statusFilter: string; assigneeFilter: string; projectFilter: string; groupBy: 'none' | 'stage' | 'assignee'; sorts: Sort[]; visibleColumns: ColumnKey[] } };
-const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'deadline'];
+const DEFAULT_COLUMNS: ColumnKey[] = ['title', 'project', 'stage', 'assignee', 'estimate', 'actual', 'deadline'];
 const COLUMN_LABELS: Record<ColumnKey, string> = { title: 'Задача', project: 'Проект', stage: 'Фаза', assignee: 'Исполнитель', priority: 'Приоритет', deadline: 'Дедлайн', estimate: 'План', actual: 'Факт', description: 'Описание', created: 'Создана', updated: 'Обновлена', comments: 'Комментарии', parent: 'Родительская', storyPoints: 'Story points' };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 320, project: 180, stage: 160, assignee: 180, priority: 130,
@@ -462,17 +462,15 @@ export default function TaskGrid({
         <CardHeader className="gap-2 border-y bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
-            {viewScope && <div className="flex shrink-0 items-center gap-1 rounded-lg border bg-background p-1">
-              <span className="px-1 text-xs font-medium text-muted-foreground">Виды</span>
-              <Select value={activeViewId || 'default'} onValueChange={applyView}>
-                <SelectTrigger className="w-44 border-0 bg-transparent" aria-label="Виды"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">По умолчанию</SelectItem>
-                  {views.map((view) => <SelectItem key={view.id} value={view.id}>{view.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button variant="secondary" size="sm" onClick={() => setSaveViewOpen(true)}>+ Сохранить</Button>
-            </div>}
+            {viewScope && <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
+                {views.map((view) => <DropdownMenuItem key={view.id} onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSaveViewOpen(true)}>Сохранить текущий вид</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>}
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Поля</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
