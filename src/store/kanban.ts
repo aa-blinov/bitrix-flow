@@ -25,6 +25,7 @@ import {
   fetchUsers,
   fetchProjectStages,
   createProjectStage,
+  updateProjectStage,
   createProject as bxCreateProject,
   updateProject as bxUpdateProject,
   updateTaskStatus as bxUpdateStatus,
@@ -86,6 +87,7 @@ interface KanbanStore {
   loadProjects: (force?: boolean) => Promise<void>;
   loadStages: (entityId: string) => Promise<void>;
   createStage: (title: string) => Promise<boolean>;
+  renameStage: (stageId: string, title: string) => Promise<void>;
   createProject: (name: string, description?: string) => Promise<string>;
   updateProject: (id: string, fields: { name?: string; description?: string; archived?: boolean }) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
@@ -287,6 +289,20 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     } catch (error) {
       console.error('Create stage failed:', error);
       return false;
+    }
+  },
+
+  renameStage: async (stageId, title) => {
+    const { selectedProjectId, stages } = get();
+    if (!selectedProjectId || !title.trim()) return;
+    const previous = stages.find((stage) => stage.id === stageId);
+    if (!previous) return;
+    set((state) => ({ stages: state.stages.map((stage) => stage.id === stageId ? { ...stage, name: title.trim() } : stage) }));
+    try {
+      await updateProjectStage(selectedProjectId, stageId, title.trim());
+    } catch (error) {
+      set((state) => ({ stages: state.stages.map((stage) => stage.id === stageId ? previous : stage) }));
+      throw error;
     }
   },
 

@@ -129,6 +129,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     setSelectedTask,
     createTask,
     createStage,
+    renameStage,
     isLoading,
     filters,
     setFilters,
@@ -198,6 +199,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const [inlineAddStage, setInlineAddStage] = useState<string | null>(null);
   const [showStageDialog, setShowStageDialog] = useState(false);
   const [stageName, setStageName] = useState('');
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editingStageTitle, setEditingStageTitle] = useState('');
   const [isCreatingStage, setIsCreatingStage] = useState(false);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
@@ -541,7 +544,17 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 {/* Column header */}
                 <div className="flex items-center gap-2 border-b px-3 py-2.5">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
-                  <h3 className="flex-1 text-sm font-semibold text-foreground">{stage.name}</h3>
+                  {editingStageId === stage.id ? (
+                    <Input
+                      autoFocus
+                      value={editingStageTitle}
+                      onChange={(event) => setEditingStageTitle(event.target.value)}
+                      onBlur={() => { if (editingStageTitle.trim()) void renameStage(stage.id, editingStageTitle); setEditingStageId(null); }}
+                      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setEditingStageId(null); }}
+                      className="h-7 flex-1 px-1 text-sm font-semibold"
+                      aria-label="Название фазы"
+                    />
+                  ) : <h3 className="flex-1 cursor-text text-sm font-semibold text-foreground" onDoubleClick={() => { setEditingStageId(stage.id); setEditingStageTitle(stage.name); }}>{stage.name}</h3>}
                   <span className="text-xs font-medium text-muted-foreground">
                     {colTasks.length}
                   </span>

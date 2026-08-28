@@ -157,16 +157,12 @@ export default function ProjectPage() {
               )}
             </div>
 
-            <Button variant="outline" size="sm" onClick={() => { setName(currentProject.name); setDescription(currentProject.description); setSettingsOpen(true); }}><Settings className="size-4" /> Настройки</Button>
-            <div className="hidden md:flex gap-4 text-sm">
-              <div className="text-center">
-                <p className="text-muted-foreground text-xs">План</p>
-                <p className="font-semibold">{totalEstimate.toFixed(1)} ч</p>
+            <div className="ml-auto flex shrink-0 items-center gap-4">
+              <div className="hidden gap-4 text-sm md:flex">
+                <div className="text-center"><p className="text-xs text-muted-foreground">План</p><p className="font-semibold">{totalEstimate.toFixed(1)} ч</p></div>
+                <div className="text-center"><p className="text-xs text-muted-foreground">Факт</p><p className="font-semibold">{totalActual.toFixed(1)} ч</p></div>
               </div>
-              <div className="text-center">
-                <p className="text-muted-foreground text-xs">Факт</p>
-                <p className="font-semibold">{totalActual.toFixed(1)} ч</p>
-              </div>
+              <Button variant="ghost" size="icon-sm" title="Настройки проекта" aria-label="Настройки проекта" onClick={() => { setName(currentProject.name); setDescription(currentProject.description); setSettingsOpen(true); }}><Settings className="size-4" /></Button>
             </div>
           </div>
         </div>

@@ -106,6 +106,7 @@ const MUTATION_METHODS = new Set([
   'task.elapseditem.delete',
   'task.stages.add',
   'task.stages.delete',
+  'task.stages.update',
   'task.checklistitem.add',
   'task.checklistitem.update',
   'task.checklistitem.delete',

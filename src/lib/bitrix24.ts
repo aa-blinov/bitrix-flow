@@ -301,6 +301,11 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
   return projects;
 }
 
+export async function updateProjectStage(entityId: string, stageId: string, title: string): Promise<void> {
+  await bx24('task.stages.update', { id: stageId, 'fields[TITLE]': title });
+  memoryCache.delete(`stages:${entityId}`);
+}
+
 export async function createProjectStage(entityId: string, title: string, afterId?: string): Promise<void> {
   await bx24('task.stages.add', {
     'fields[TITLE]': title,
