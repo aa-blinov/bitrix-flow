@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { LayoutDashboard, ListChecks, Menu, Inbox, LogOut, TableProperties, ChevronDown, Bell } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -20,11 +20,16 @@ export default function Sidebar() {
     setSelectedProject,
     currentUser,
     isLoading,
+    loadProjects,
     getMyTasks,
   } = useKanbanStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
+
+  useEffect(() => {
+    if (!projects.length && !isLoading) void loadProjects();
+  }, [isLoading, loadProjects, projects.length]);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const pathname = usePathname();
 
