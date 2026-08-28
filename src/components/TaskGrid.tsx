@@ -241,12 +241,14 @@ export default function TaskGrid({
   showProject = false,
   title,
   initialStatus = 'all',
+  initialGroupBy = 'none',
   viewScope,
 }: {
   tasks: BxTask[];
   showProject?: boolean;
   title?: string | null;
   initialStatus?: string;
+  initialGroupBy?: 'none' | 'stage' | 'assignee';
   viewScope?: 'all' | 'my';
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
@@ -269,7 +271,7 @@ export default function TaskGrid({
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
-  const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>('none');
+  const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>(initialGroupBy);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);

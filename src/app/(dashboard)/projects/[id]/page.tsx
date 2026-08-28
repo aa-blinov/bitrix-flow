@@ -187,7 +187,7 @@ export default function ProjectPage() {
               </TabsTrigger>
               <TabsTrigger value="grid">
                 <TableProperties className="size-4" />
-                Таблица
+                Список
               </TabsTrigger>
             </TabsList>
           </div>
@@ -202,14 +202,14 @@ export default function ProjectPage() {
                 </TabsTrigger>
                 <TabsTrigger value="grid">
                   <TableProperties className="size-4" />
-                  Таблица
+                  Список
                 </TabsTrigger>
               </TabsList>
             }
           />
         </TabsContent>
         <TabsContent value="grid" className="mt-0">
-          <TaskGrid tasks={visibleTasks} />
+          <TaskGrid tasks={visibleTasks} initialGroupBy="stage" />
         </TabsContent>
       </Tabs>
     </div>
