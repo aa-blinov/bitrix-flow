@@ -459,7 +459,7 @@ export default function TaskGrid({
   return (
     <>
       <Card className="mx-4 mt-5 overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
-        <CardHeader className="gap-2 border-y bg-transparent px-0 py-3">
+        <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             {viewScope && <DropdownMenu>
