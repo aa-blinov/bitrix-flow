@@ -111,7 +111,7 @@ export default function Sidebar() {
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">
           <h3 className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Проекты ({projects.length})
+            Проекты ({isLoading && !projects.length ? '…' : projects.length})
           </h3>
           <Input
             value={projectQuery}
