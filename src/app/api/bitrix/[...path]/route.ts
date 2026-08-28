@@ -98,6 +98,8 @@ const MUTATION_METHODS = new Set([
   'tasks.task.delete',
   'sonet_group.create',
   'sonet_group.update',
+  'sonet_group.user.add',
+  'sonet_group.user.delete',
   'task.commentitem.add',
   'task.commentitem.update',
   'task.commentitem.delete',

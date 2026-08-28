@@ -647,6 +647,18 @@ export async function addTimeEntry(
   await cacheInvalidate(`time:${taskId}`);
 }
 
+export async function fetchProjectMembers(projectId: string) {
+  return bx24('sonet_group.user.get', { GROUP_ID: projectId });
+}
+
+export async function addProjectMember(projectId: string, userId: string) {
+  await bx24('sonet_group.user.add', { GROUP_ID: projectId, USER_ID: userId, ROLE: 'USER' });
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  await bx24('sonet_group.user.delete', { GROUP_ID: projectId, USER_ID: userId });
+}
+
 export async function updateProject(id: string, fields: { name?: string; description?: string; archived?: boolean }): Promise<void> {
   const params: Record<string, string> = { GROUP_ID: id };
   if (fields.name !== undefined) params.NAME = fields.name;

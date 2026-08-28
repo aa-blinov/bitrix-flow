@@ -10,6 +10,8 @@ import {
   Columns3,
   TableProperties,
   Settings,
+  UserPlus,
+  X,
 } from 'lucide-react';
 import TaskGrid from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,6 +20,8 @@ import LoadingState from '@/components/LoadingState';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -29,6 +33,8 @@ export default function ProjectPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
 
   const {
     projects,
@@ -39,6 +45,7 @@ export default function ProjectPage() {
     tasks,
     isRehydrated,
     updateProject,
+    users,
   } = useKanbanStore();
 
   useEffect(() => {
@@ -82,6 +89,25 @@ export default function ProjectPage() {
   const unassignedTasks = activeTasks.filter((task) => !task.assigneeId).length;
   const noDeadlineTasks = activeTasks.filter((task) => !task.dueDate).length;
   const nextDeadline = activeTasks.filter((task) => task.dueDate).map((task) => task.dueDate!).sort()[0];
+
+  useEffect(() => {
+    if (!membersOpen || !currentProject) return;
+    void fetchProjectMembers(currentProject.id).then((result) => setMemberIds((Array.isArray(result) ? result : []).map((item: any) => String(item.USER_ID || item.userId || item)))).catch(() => setMemberIds([]));
+  }, [currentProject, membersOpen]);
+
+  async function addMember(userId: string) {
+    if (!currentProject) return;
+    await addProjectMember(currentProject.id, userId);
+    setMemberIds((ids) => [...ids, userId]);
+    await useKanbanStore.getState().loadProjects(true);
+  }
+
+  async function removeMember(userId: string) {
+    if (!currentProject || !window.confirm('Удалить участника из проекта?')) return;
+    await removeProjectMember(currentProject.id, userId);
+    setMemberIds((ids) => ids.filter((id) => id !== userId));
+    await useKanbanStore.getState().loadProjects(true);
+  }
 
   async function saveProject() {
     if (!currentProject || !name.trim()) return;
@@ -144,7 +170,7 @@ export default function ProjectPage() {
                 )}
               </h1>
               <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><Users size={14} />{currentProject.membersCount || 0} участников</span>
+                <Button variant="link" size="xs" onClick={() => setMembersOpen(true)} className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"><Users size={14} />{currentProject.membersCount || 0} участников</Button>
                 <span>•</span><span>{projectTasks.length} задач</span><span>•</span><span className="text-emerald-600">{completedTasks} завершено</span>
               </div>
               {(overdueTasks || unassignedTasks || noDeadlineTasks || nextDeadline) && (
@@ -167,6 +193,17 @@ export default function ProjectPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={membersOpen} onOpenChange={setMembersOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Участники проекта</DialogTitle></DialogHeader>
+          <Select onValueChange={(value) => void addMember(value)}>
+            <SelectTrigger><UserPlus className="size-4" /><SelectValue placeholder="Добавить участника" /></SelectTrigger>
+            <SelectContent>{users.filter((user) => !memberIds.includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
+          </Select>
+          <div className="max-h-64 space-y-1 overflow-y-auto">{memberIds.map((id) => { const user = users.find((item) => item.id === id); return <div key={id} className="flex items-center justify-between rounded-md px-2 py-2 text-sm"><span>{user?.name || `Пользователь #${id}`}</span><Button variant="ghost" size="icon-xs" aria-label="Удалить участника" onClick={() => void removeMember(id)}><X /></Button></div>; })}</div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="sm:max-w-md">
