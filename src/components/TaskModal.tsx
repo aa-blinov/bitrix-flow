@@ -149,6 +149,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     >
       <DialogContent
         showCloseButton={false}
+        onInteractOutside={(event) => event.preventDefault()}
         className="top-0 left-0 h-dvh w-dvw max-h-none max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none p-0 lg:left-auto lg:right-0 lg:flex lg:w-[60rem] lg:max-w-[calc(100vw-4rem)] lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-l-xl"
       >
         {/* Header */}
