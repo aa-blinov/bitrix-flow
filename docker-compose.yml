@@ -26,7 +26,7 @@ services:
       - '80:80'
       - '443:443'
     environment:
-      DUCKDNS_TOKEN: DUCKDNS_TOKEN_REDACTED
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in .env.local}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
