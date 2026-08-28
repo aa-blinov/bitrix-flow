@@ -648,7 +648,7 @@ export async function addTimeEntry(
 }
 
 export async function fetchProjectMembers(projectId: string) {
-  return bx24('sonet_group.user.get', { GROUP_ID: projectId });
+  return bx24('sonet_group.user.get', { ID: projectId });
 }
 
 export async function addProjectMember(projectId: string, userId: string) {
