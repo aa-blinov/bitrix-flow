@@ -519,7 +519,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
-              <Button variant="ghost" size="sm" onClick={() => {
+              <Button variant="outline" size="sm" className="border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
                 setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
               }}>
                 Сбросить
