@@ -81,9 +81,11 @@ export default function ProjectPage() {
     void openTask();
   }, [loadTaskById, notificationTaskId, projectId, projectTasks, router, setSelectedTask]);
 
-  // Clear any stale modal state on route changes so closing from a deeper
-  // page (or the system back button) restores the project view cleanly.
-  useEffect(() => () => { setSelectedTask(null); }, [projectId, setSelectedTask]);
+  // Clear any stale modal state when the user leaves this project page so the
+  // back button restores the project view without a stuck modal.
+  useEffect(() => {
+    return () => { setSelectedTask(null); };
+  }, [projectId, setSelectedTask]);
   const visibleTasks = getFilteredTasks();
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
