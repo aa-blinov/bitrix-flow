@@ -162,7 +162,7 @@ function FieldControls({ task, compact = false, readOnly = false, visibleColumns
   if (readOnly) {
     return (
       <>
-        {visibleColumns.includes('stage') && <TableCell className="text-muted-foreground">{task.stageId === '0' ? '—' : `#${task.stageId}`}</TableCell>}
+        {visibleColumns.includes('stage') && <TableCell className="text-muted-foreground">{STATUS_LABELS[task.status] || '—'}</TableCell>}
         {visibleColumns.includes('assignee') && <TableCell>{assignee}</TableCell>}
         {visibleColumns.includes('priority') && <TableCell>{priority}</TableCell>}
         {visibleColumns.includes('deadline') && <TableCell>{deadline}</TableCell>}
@@ -614,7 +614,7 @@ export default function TaskGrid({
                   </TableHead>
                   {visibleColumns.includes('title') && sortableHead('title', 'Задача')}
                   {showProject && visibleColumns.includes('project') && sortableHead('project', 'Проект')}
-                  {visibleColumns.includes('stage') && sortableHead('stage', 'Фаза')}
+                  {visibleColumns.includes('stage') && sortableHead('stage', showProject ? 'Статус' : 'Фаза')}
                   {visibleColumns.includes('assignee') && sortableHead('assignee', 'Исполнитель')}
                   {visibleColumns.includes('priority') && sortableHead('priority', 'Приоритет')}
                   {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
