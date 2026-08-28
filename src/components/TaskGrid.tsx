@@ -254,6 +254,7 @@ export default function TaskGrid({
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
+  const createTask = useKanbanStore((state) => state.createTask);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
   const stages = useKanbanStore((state) => state.stages);
@@ -279,6 +280,8 @@ export default function TaskGrid({
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewOpen, setSaveViewOpen] = useState(false);
   const [viewName, setViewName] = useState('');
+  const [addingStageId, setAddingStageId] = useState<string | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
   const orderedTasks = useMemo(() => {
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
@@ -329,17 +332,17 @@ export default function TaskGrid({
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
   const groupedPageTasks = useMemo(() => {
-    if (groupBy === 'none') return [{ label: '', tasks: pageTasks }];
+    if (groupBy === 'none') return [{ key: '', label: '', tasks: pageTasks }];
     const labels = groupBy === 'stage'
       ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
       : Object.fromEntries(users.map((user) => [user.id, user.name]));
     return Object.entries(
       pageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
         const key = groupBy === 'stage' ? task.stageId : task.assigneeId || '';
-        (groups[labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен')] ||= []).push(task);
+        (groups[key] ||= []).push(task);
         return groups;
       }, {}),
-    ).map(([label, groupedTasks]) => ({ label, tasks: groupedTasks }));
+    ).map(([key, groupedTasks]) => ({ key, label: labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен'), tasks: groupedTasks }));
   }, [groupBy, pageTasks, stages, users]);
   const pageNumbers = Array.from(
     new Set([1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount)),
@@ -672,6 +675,23 @@ export default function TaskGrid({
                         </TableCell>
                       </TableRow>
                     ))}
+                    {groupBy === 'stage' && !showProject && group.key !== '0' && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="py-2">
+                          {addingStageId === group.key ? (
+                            <Input
+                              autoFocus
+                              value={newTaskTitle}
+                              onChange={(event) => setNewTaskTitle(event.target.value)}
+                              onBlur={() => { setAddingStageId(null); setNewTaskTitle(''); }}
+                              onKeyDown={(event) => { if (event.key === 'Enter' && newTaskTitle.trim()) { void createTask({ title: newTaskTitle.trim(), stageId: group.key }); setNewTaskTitle(''); setAddingStageId(null); } if (event.key === 'Escape') { setAddingStageId(null); setNewTaskTitle(''); } }}
+                              placeholder="Название новой задачи"
+                              className="h-8"
+                            />
+                          ) : <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setAddingStageId(group.key)}>+ Добавить задачу</Button>}
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </Fragment>
                 ))}
               </TableBody>
