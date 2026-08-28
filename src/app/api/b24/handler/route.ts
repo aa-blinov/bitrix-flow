@@ -69,6 +69,7 @@ function eventDetails(event: string, raw: any) {
       message: raw?.POST_MESSAGE || raw?.MESSAGE || `в задаче ${title}`,
       ...base,
     };
+  return { type: 'task_updated', taskId, messageId, title: 'Изменение задачи', message: title, ...base };
   return { type: 'task_updated', taskId, messageId, title: 'Задача обновлена', message: title, ...base };
 }
 
