@@ -2,6 +2,7 @@
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X,
   User,
@@ -59,6 +60,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     isLoadingTask,
   } = useKanbanStore();
 
+  const router = useRouter();
   const [comment, setComment] = useState('');
   const [showTimeEntry, setShowTimeEntry] = useState(false);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
@@ -86,6 +88,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const handleUpdateField = async (field: string, value: any) => {
     await updateTaskField(task.id, field, value);
     setEditingField(null);
+  };
+
+  const handleMoveProject = async (projectId: string) => {
+    await moveTaskToProject(task.id, projectId);
+    onClose();
+    router.push(`/projects/${projectId}`);
   };
 
   const handleAddComment = () => {
@@ -358,7 +366,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   <div className="p-4 space-y-4">
                     <div>
                       <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground"><Layers size={12} /> Проект</label>
-                      <Select value={task.projectId || 'none'} onValueChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)}>
+                      <Select value={task.projectId || 'none'} onValueChange={(value) => value !== 'none' && void handleMoveProject(value)}>
                         <SelectTrigger className="w-full"><SelectValue placeholder="Без проекта" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Без проекта</SelectItem>
