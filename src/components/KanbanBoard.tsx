@@ -203,7 +203,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const boardScrollRef = useRef<HTMLDivElement>(null);
 
   const selectedTask = useKanbanStore((s) =>
-    s.selectedTaskId ? tasks.find((t) => t.id === s.selectedTaskId) : null,
+    s.selectedTaskId ? s.tasks.find((task) => task.id === s.selectedTaskId) || s.allTasks.find((task) => task.id === s.selectedTaskId) || null : null,
   );
   const currentProject = projects.find((p) => p.id === selectedProjectId);
   const avatarByUserId = new Map(users.map((user) => [user.id, user.icon]));
