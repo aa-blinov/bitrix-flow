@@ -450,8 +450,8 @@ export default function TaskGrid({
   const isReadOnly = showProject;
   return (
     <>
-      <Card className="mx-4 mt-5 overflow-hidden shadow-sm sm:mx-6">
-        <CardHeader className="gap-2 border-b bg-muted/30 px-4 py-3 sm:px-6">
+      <Card className="mx-4 mt-5 overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
+        <CardHeader className="gap-2 border-y bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             {viewScope && <div className="flex shrink-0 items-center gap-1 rounded-lg border bg-background p-1">
@@ -603,7 +603,7 @@ export default function TaskGrid({
                 {(['description', 'created', 'updated', 'comments', 'parent', 'storyPoints'] as ColumnKey[]).map((column) => visibleColumns.includes(column) && <col key={column} style={{ width: columnWidths[column] }} />)}
                 <col className="w-20" />
               </colgroup>
-              <TableHeader>
+              <TableHeader className="bg-muted/20">
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
