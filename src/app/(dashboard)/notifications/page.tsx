@@ -63,8 +63,8 @@ export default function NotificationsPage() {
                 ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
                 : null;
               const createdAt = item.created_at || item.createdAt;
-              return (
-                <Card key={item.id}>
+              const content = (
+                <Card className={href ? 'transition-colors hover:bg-muted/50' : undefined}>
                   <CardContent className="flex gap-3 p-4">
                     <span className="mt-0.5">{noticeIcon(item.type)}</span>
                     <div className="min-w-0 flex-1">
@@ -81,12 +81,12 @@ export default function NotificationsPage() {
                             {new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(createdAt))}
                           </time>
                         )}
-                        {href && <Link href={href} className="font-medium text-primary hover:underline">Открыть задачу</Link>}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               );
+              return href ? <Link key={item.id} href={href} className="block">{content}</Link> : <div key={item.id}>{content}</div>;
             })}
           </div>
         ) : (

@@ -97,25 +97,27 @@ export default function Notifications() {
               const href = item.projectId && item.taskId
                 ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
                 : null;
-              return (
-                <div
-                  key={item.id}
-                  className="flex gap-2 rounded-md px-2 py-2.5 text-sm"
-                >
+              const row = (
+                <>
                   <span className="mt-0.5">{icon(item.type)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{item.title}</p>
                     <p className="line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
-                    {href && (
-                      <Link
-                        href={href}
-                        onClick={() => setOpen(false)}
-                        className="mt-1 inline-block text-xs font-medium text-primary hover:underline focus-visible:outline-none"
-                      >
-                        Открыть задачу
-                      </Link>
-                    )}
                   </div>
+                </>
+              );
+              return href ? (
+                <Link
+                  key={item.id}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className="flex gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                >
+                  {row}
+                </Link>
+              ) : (
+                <div key={item.id} className="flex gap-2 rounded-md px-2 py-2.5 text-sm">
+                  {row}
                 </div>
               );
             })

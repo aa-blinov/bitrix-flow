@@ -55,8 +55,11 @@ export default function ProjectPage() {
   useEffect(() => {
     if (notificationTaskId && projectTasks.some((task) => task.id === notificationTaskId)) {
       setSelectedTask(notificationTaskId);
+      // The query starts the modal once; remove it so closing the modal returns
+      // to this project instead of immediately opening the same task again.
+      router.replace(`/projects/${projectId}`);
     }
-  }, [notificationTaskId, projectTasks, setSelectedTask]);
+  }, [notificationTaskId, projectId, projectTasks, router, setSelectedTask]);
   const visibleTasks = getFilteredTasks();
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
