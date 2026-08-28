@@ -520,7 +520,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         onScroll={(event) => {
           if (topScrollRef.current) topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="flex-1 overflow-x-auto overscroll-x-contain bg-muted/30 scrollbar-hide"
+        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-muted/30 scrollbar-hide lg:snap-none"
       >
         <div className="flex h-full min-w-max gap-4 px-4 py-6 xl:gap-5">
           {allStages.map((stage: any) => {
@@ -531,7 +531,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             return (
               <Card
                 key={stage.id}
-                className={`w-[20rem] flex-shrink-0 gap-0 py-0 transition-colors lg:w-[14rem] xl:w-[15rem] ${
+                className={`w-[20rem] shrink-0 snap-start gap-0 py-0 transition-colors lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
                   isDragOver ? 'border-blue-400 bg-blue-500/10' : 'border-border'
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
