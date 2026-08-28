@@ -170,11 +170,11 @@ export default function ProjectsSummaryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Проект</TableHead>
-                    <TableHead>План / факт</TableHead>
+                    <TableHead>Часы</TableHead>
                     <TableHead>Прогресс</TableHead>
                     <TableHead>Задачи</TableHead>
-                    <TableHead>Операционный статус</TableHead>
-                    <TableHead>Активность</TableHead>
+                    <TableHead>Статус</TableHead>
+                    <TableHead>Изменения</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -196,46 +196,41 @@ export default function ProjectsSummaryPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="grid gap-0.5 text-sm">
-                          <span>
-                            <span className="text-muted-foreground">План: </span>
-                            <span className="font-medium">{hours(project.plannedHours)}</span>
-                          </span>
-                          <span>
-                            <span className="text-muted-foreground">Факт: </span>
-                            <span className="font-medium">{hours(project.actualHours)}</span>
-                          </span>
+                        <div className="text-sm">
+                          <span className="font-medium">{hours(project.plannedHours)}</span>
+                          <span className="mx-1 text-muted-foreground">/</span>
+                          <span className="font-medium">{hours(project.actualHours)}</span>
                         </div>
+                        <div className="text-xs text-muted-foreground">план / факт</div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex min-w-28 items-center gap-2">
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                             <div
                               className="h-full bg-primary"
                               style={{ width: `${project.progress}%` }}
                             />
                           </div>
-                          <span className="text-xs">{project.progress}%</span>
+                          <span className="text-xs font-medium">{project.progress}%</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {project.completed} из {project.leafTaskCount}
-                        </span>
+                        <div className="text-xs text-muted-foreground">
+                          {project.completed} из {project.leafTaskCount} выполнено
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div>{project.taskCount} всего</div>
+                        <div className="text-sm">
+                          <span className="font-medium">{project.taskCount}</span>
+                          <span className="ml-1 text-muted-foreground">всего</span>
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          {project.leafTaskCount} исп. · {project.parentTaskCount} родит.
+                          {project.leafTaskCount} исполнителей
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {project.overdue > 0 && (
-                            <Badge variant="destructive">{project.overdue} просроч.</Badge>
-                          )}
+                          {project.overdue > 0 && <Badge variant="destructive">{project.overdue} просроч.</Badge>}
                           <Badge variant="secondary">{project.inProgress} в работе</Badge>
-                          {project.noDeadline > 0 && (
-                            <Badge variant="outline">без срока: {project.noDeadline}</Badge>
-                          )}
+                          {project.noDeadline > 0 && <Badge variant="outline">{project.noDeadline} без срока</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
