@@ -125,6 +125,14 @@ export default function Notifications() {
             </p>
           )}
         </div>
+        <DropdownMenuSeparator />
+        <Link
+          href="/notifications"
+          onClick={() => setOpen(false)}
+          className="block px-3 py-2.5 text-center text-xs font-medium text-primary hover:bg-muted"
+        >
+          Все уведомления
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );

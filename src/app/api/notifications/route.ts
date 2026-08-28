@@ -9,11 +9,12 @@ export async function GET(req: NextRequest) {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
   if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 400 });
   const db = await getDb();
+  const requestedLimit = Number(req.nextUrl.searchParams.get('limit')) || 50;
   const notifications = await db
     .collection('notifications')
     .find({ member_id: memberId })
     .sort({ created_at: -1 })
-    .limit(50)
+    .limit(Math.min(Math.max(requestedLimit, 1), 200))
     .toArray();
   return NextResponse.json({
     notifications: notifications.map(({ _id, member_id, ...item }) => ({
