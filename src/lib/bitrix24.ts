@@ -629,8 +629,12 @@ export async function addTimeEntry(
 
 export async function createProject(name: string, description = ''): Promise<string> {
   const result = await bx24('sonet_group.create', {
-    'fields[NAME]': name,
-    'fields[DESCRIPTION]': description,
+    NAME: name,
+    DESCRIPTION: description,
+    PROJECT: 'Y',
+    VISIBLE: 'Y',
+    OPENED: 'N',
+    INITIATE_PERMS: 'K',
   });
   await cacheInvalidateByPrefix('projects:');
   return String(result.ID || result.id || result);
