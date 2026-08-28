@@ -463,7 +463,7 @@ export default function TaskGrid({
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
             {title !== null && <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>}
             {viewScope && <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 rounded-md focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground">Вид: {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView('default')}>По умолчанию</DropdownMenuItem>
                 {views.map((view) => <DropdownMenuItem key={view.id} className="focus:bg-transparent focus:text-foreground focus-visible:bg-accent" onClick={() => applyView(view.id)}>{view.name}</DropdownMenuItem>)}
@@ -472,7 +472,7 @@ export default function TaskGrid({
               </DropdownMenuContent>
             </DropdownMenu>}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8">Поля</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 rounded-md">Поля</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {(Object.keys(COLUMN_LABELS) as ColumnKey[]).filter((column) => showProject || column !== 'project').map((column) => <DropdownMenuCheckboxItem key={column} checked={visibleColumns.includes(column)} disabled={column === 'title'} onCheckedChange={(checked) => setVisibleColumns((columns) => checked ? [...columns, column] : columns.filter((item) => item !== column))}>{COLUMN_LABELS[column]}</DropdownMenuCheckboxItem>)}
               </DropdownMenuContent>
@@ -481,10 +481,10 @@ export default function TaskGrid({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Поиск задач…"
-              className="h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
+              className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32" aria-label="Статус"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32 rounded-md" aria-label="Статус"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все задачи</SelectItem>
                 <SelectItem value="attention">Требуют внимания</SelectItem>
@@ -495,7 +495,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-              <SelectTrigger className="w-40" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все исполнители</SelectItem>
                 {users.map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}
@@ -503,7 +503,7 @@ export default function TaskGrid({
             </Select>
             {showProject && (
               <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="w-40" aria-label="Проект"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-40 rounded-md" aria-label="Проект"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все проекты</SelectItem>
                   {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
@@ -511,7 +511,7 @@ export default function TaskGrid({
               </Select>
             )}
             <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
-              <SelectTrigger className="w-40" aria-label="Группировка"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40 rounded-md" aria-label="Группировка"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Без группировки</SelectItem>
                 <SelectItem value="stage">По фазе</SelectItem>
@@ -519,7 +519,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             {(query || statusFilter !== 'all' || assigneeFilter !== 'all' || projectFilter !== 'all' || groupBy !== 'none') && (
-              <Button variant="outline" size="sm" className="h-8 border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
+              <Button variant="outline" size="sm" className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive" onClick={() => {
                 setQuery(''); setStatusFilter('all'); setAssigneeFilter('all'); setProjectFilter('all'); setGroupBy('none');
               }}>
                 Сбросить
