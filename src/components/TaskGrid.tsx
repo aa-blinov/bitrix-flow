@@ -242,6 +242,7 @@ export default function TaskGrid({
   title,
   initialStatus = 'all',
   initialGroupBy = 'none',
+  initialAssigneeId = 'all',
   viewScope,
 }: {
   tasks: BxTask[];
@@ -249,6 +250,7 @@ export default function TaskGrid({
   title?: string | null;
   initialStatus?: string;
   initialGroupBy?: 'none' | 'stage' | 'assignee';
+  initialAssigneeId?: string;
   viewScope?: 'all' | 'my';
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
@@ -269,7 +271,7 @@ export default function TaskGrid({
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>(initialGroupBy);
@@ -349,6 +351,7 @@ export default function TaskGrid({
   ).sort((left, right) => left - right);
 
   useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
+  useEffect(() => setAssigneeFilter(initialAssigneeId), [initialAssigneeId]);
 
   useEffect(() => {
     if (!viewScope) return;

@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { LayoutDashboard, ListChecks, Menu, Inbox, LogOut, TableProperties, ChevronDown, Bell, Plus } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Menu, LogOut, TableProperties, ChevronDown, Bell, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -23,7 +23,6 @@ export default function Sidebar() {
     isLoading,
     loadProjects,
     createProject,
-    getMyTasks,
   } = useKanbanStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,7 +38,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const myTasks = getMyTasks();
   const sortedProjects = [...projects]
     .sort((left, right) => left.name.localeCompare(right.name, 'ru', { sensitivity: 'base' }))
     .filter((project) =>
@@ -122,7 +120,6 @@ export default function Sidebar() {
         <div className="space-y-0.5">
           <NavItem href="/" icon={LayoutDashboard} label="Главная" />
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
-          <NavItem href="/my-tasks" icon={Inbox} label="Мои задачи" badge={myTasks.length} />
           <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
           <NavItem href="/notifications" icon={Bell} label="Уведомления" />
         </div>

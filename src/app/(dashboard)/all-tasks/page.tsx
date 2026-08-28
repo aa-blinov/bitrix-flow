@@ -14,9 +14,11 @@ function AllTasksInner() {
     isLoadingAllTasks,
     loadAllTasks,
     loadProjects,
+    currentUser,
   } = useKanbanStore();
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') || 'all';
+  const initialAssigneeId = searchParams.get('assignee') === 'me' ? currentUser.id : 'all';
 
   useEffect(() => {
     if (projects.length === 0) void loadProjects();
@@ -46,6 +48,7 @@ function AllTasksInner() {
             tasks={allTasks}
             showProject
             initialStatus={initialStatus}
+            initialAssigneeId={initialAssigneeId}
             viewScope="all"
             title="Задачи"
           />
