@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
@@ -415,10 +416,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <div className="mb-1 flex flex-wrap gap-1">
                         {(task.accompliceIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить соисполнителя" onClick={() => void handleUpdateField('accompliceIds', (task.accompliceIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
                       </div>
-                      <Select onValueChange={(id) => void handleUpdateField('accompliceIds', [...new Set([...(task.accompliceIds || []), id])])}>
-                        <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Добавить соисполнителя…" /></SelectTrigger>
-                        <SelectContent>{users.filter((user) => !(task.accompliceIds || []).includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать соисполнителей…</Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
+                          {users.map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.accompliceIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('accompliceIds', checked ? [...new Set([...(task.accompliceIds || []), user.id])] : (task.accompliceIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     <div>
@@ -426,10 +429,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <div className="mb-1 flex flex-wrap gap-1">
                         {(task.auditorIds || []).map((id) => <Badge key={id} variant="secondary" className="gap-1 pr-1">{users.find((user) => user.id === id)?.name || `#${id}`}<Button variant="ghost" size="icon-xs" className="size-4" aria-label="Удалить наблюдателя" onClick={() => void handleUpdateField('auditorIds', (task.auditorIds || []).filter((item) => item !== id))}><X size={11} /></Button></Badge>)}
                       </div>
-                      <Select onValueChange={(id) => void handleUpdateField('auditorIds', [...new Set([...(task.auditorIds || []), id])])}>
-                        <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Добавить наблюдателя…" /></SelectTrigger>
-                        <SelectContent>{users.filter((user) => !(task.auditorIds || []).includes(user.id)).map((user) => <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="outline" className="h-8 w-full justify-start font-normal">Выбрать наблюдателей…</Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
+                          {users.map((user) => <DropdownMenuCheckboxItem key={user.id} checked={(task.auditorIds || []).includes(user.id)} onSelect={(event) => event.preventDefault()} onCheckedChange={(checked) => void handleUpdateField('auditorIds', checked ? [...new Set([...(task.auditorIds || []), user.id])] : (task.auditorIds || []).filter((id) => id !== user.id))}>{user.name}</DropdownMenuCheckboxItem>)}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     {/* Priority */}
