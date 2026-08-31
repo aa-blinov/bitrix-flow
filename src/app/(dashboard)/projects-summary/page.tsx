@@ -274,7 +274,7 @@ export default function ProjectsSummaryPage() {
                             </Badge>
                           )}
                           <Badge asChild variant="secondary">
-                            <Link href={`/projects/${project.id}?view=grid&status=in_progress`}>
+                            <Link href={`/projects/${project.id}?view=grid&status=active`}>
                               {project.inProgress} в работе
                             </Link>
                           </Badge>

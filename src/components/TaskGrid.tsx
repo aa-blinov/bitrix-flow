@@ -509,7 +509,9 @@ export default function TaskGrid({
     return tasks
       .filter((task) => {
         if (hideDone && task.status === 'done') return false;
-        if (statusFilter === 'overdue') {
+        if (statusFilter === 'active') {
+          if (task.status === 'done') return false;
+        } else if (statusFilter === 'overdue') {
           if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date())
             return false;
         } else if (statusFilter === 'attention') {
@@ -869,6 +871,7 @@ export default function TaskGrid({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Все задачи</SelectItem>
+                <SelectItem value="active">Активные задачи</SelectItem>
                 <SelectItem value="attention">Требуют внимания</SelectItem>
                 <SelectItem value="week">Дедлайн на неделе</SelectItem>
                 <SelectItem value="no_deadline">Без дедлайна</SelectItem>
