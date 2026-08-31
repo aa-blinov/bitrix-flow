@@ -574,12 +574,15 @@ export default function TaskGrid({
   }, [groupBy, pageTasks, stages, users]);
   const tableColumnCount =
     visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
+  // Tasks are loaded in PAGE_SIZE-sized chunks, so pageCount alone cannot tell
+  // whether the view needs a compact scrollport. Only a shorter result set is
+  // guaranteed to fit on one loaded page and can safely grow with its content.
   const tableHeightClass =
-    pageCount > 1
-      ? showProject
+    orderedTasks.length < PAGE_SIZE
+      ? 'max-h-none'
+      : showProject
         ? 'max-h-[calc(100dvh-17rem)]'
-        : 'max-h-[calc(100dvh-28rem)]'
-      : 'max-h-none';
+        : 'max-h-[calc(100dvh-28rem)]';
   const pageNumbers = Array.from(
     new Set(
       [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
