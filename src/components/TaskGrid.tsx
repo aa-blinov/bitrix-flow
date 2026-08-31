@@ -99,6 +99,7 @@ type SavedView = {
     assigneeFilter: string;
     projectFilter: string;
     groupBy: 'none' | 'stage' | 'assignee';
+    hideDone: boolean;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
   };
@@ -459,6 +460,7 @@ export default function TaskGrid({
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [hideDone, setHideDone] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
@@ -529,6 +531,7 @@ export default function TaskGrid({
     sorts,
     stages,
     statusFilter,
+    hideDone,
     tasks,
   ]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
@@ -571,7 +574,7 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, tasks]);
+  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tasks]);
 
   const applyView = (id: string) => {
     if (id === 'default') {
@@ -589,6 +592,7 @@ export default function TaskGrid({
     if (!view) return;
     const config = view.config;
     setStatusFilter(config.statusFilter);
+    setHideDone(config.hideDone);
     setAssigneeFilter(config.assigneeFilter);
     setProjectFilter(config.projectFilter);
     setGroupBy(config.groupBy);
@@ -598,7 +602,15 @@ export default function TaskGrid({
   const saveView = async () => {
     const name = viewName.trim();
     if (!name || !viewScope) return;
-    const config = { statusFilter, assigneeFilter, projectFilter, groupBy, sorts, visibleColumns };
+    const config = {
+      statusFilter,
+      assigneeFilter,
+      projectFilter,
+      groupBy,
+      hideDone,
+      sorts,
+      visibleColumns,
+    };
     const response = await fetch('/api/task-views', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -777,6 +789,14 @@ export default function TaskGrid({
               placeholder="Поиск задач…"
               className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
+            <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+              <Checkbox
+                checked={hideDone}
+                onCheckedChange={(value) => setHideDone(value === true)}
+                aria-label="Скрыть закрытые задачи"
+              />
+              <span>Скрыть закрытые</span>
+            </label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
                 <SelectValue />
@@ -999,7 +1019,7 @@ export default function TaskGrid({
                 )}
                 <col className="w-20" />
               </colgroup>
-              <TableHeader className="bg-muted/20">
+              <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border)]">
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
