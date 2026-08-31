@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -91,6 +91,14 @@ type SortKey =
   | 'storyPoints';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
+type GroupBy = 'none' | 'stage' | 'assignee';
+const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
+  { value: 'none', label: 'Без группировки' },
+  { value: 'stage', label: 'По фазе' },
+  { value: 'assignee', label: 'По исполнителю' },
+];
+const isGroupBy = (value: string): value is GroupBy =>
+  GROUP_BY_OPTIONS.some((option) => option.value === value);
 type SavedView = {
   id: string;
   name: string;
@@ -98,7 +106,7 @@ type SavedView = {
     statusFilter: string;
     assigneeFilter: string;
     projectFilter: string;
-    groupBy: 'none' | 'stage' | 'assignee';
+    groupBy: GroupBy;
     hideDone: boolean;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
@@ -440,7 +448,7 @@ export default function TaskGrid({
   showProject?: boolean;
   title?: string | null;
   initialStatus?: string;
-  initialGroupBy?: 'none' | 'stage' | 'assignee';
+  initialGroupBy?: GroupBy;
   initialAssigneeId?: string;
   viewScope?: 'all' | 'my';
 }) {
@@ -448,17 +456,6 @@ export default function TaskGrid({
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
   const { openTask, closeTask } = useTaskUrl();
-  const filterBarRef = useRef<HTMLDivElement | null>(null);
-  const [filterBarHeight, setFilterBarHeight] = useState(0);
-  useEffect(() => {
-    const node = filterBarRef.current;
-    if (!node) return;
-    const update = () => setFilterBarHeight(node.offsetHeight);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
   const createTask = useKanbanStore((state) => state.createTask);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -475,7 +472,7 @@ export default function TaskGrid({
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState('all');
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
-  const [groupBy, setGroupBy] = useState<'none' | 'stage' | 'assignee'>(initialGroupBy);
+  const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
@@ -567,6 +564,8 @@ export default function TaskGrid({
       tasks: groupedTasks,
     }));
   }, [groupBy, pageTasks, stages, users]);
+  const tableColumnCount =
+    visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
   const pageNumbers = Array.from(
     new Set(
       [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
@@ -726,8 +725,8 @@ export default function TaskGrid({
   return (
     <>
       <Card className="mx-4 mt-5 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
-        <CardHeader className="sticky top-0 z-30 gap-2 rounded-none border-b border-border bg-background px-0 py-3 shadow-[0_1px_0_0_var(--border)]">
-          <div ref={filterBarRef} className="flex flex-wrap items-center gap-2">
+        <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             {title !== null && (
               <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
             )}
@@ -854,16 +853,21 @@ export default function TaskGrid({
                 </SelectContent>
               </Select>
             )}
-            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as typeof groupBy)}>
-              <SelectTrigger className="w-40 rounded-md" aria-label="Группировка">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Без группировки</SelectItem>
-                <SelectItem value="stage">По фазе</SelectItem>
-                <SelectItem value="assignee">По исполнителю</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              aria-label="Группировка"
+              value={groupBy}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (isGroupBy(value)) setGroupBy(value);
+              }}
+              className="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            >
+              {GROUP_BY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <Button
               variant="outline"
               size="sm"
@@ -1031,10 +1035,7 @@ export default function TaskGrid({
                 )}
                 <col className="w-20" />
               </colgroup>
-              <TableHeader
-                className="sticky z-20 bg-background shadow-[0_1px_0_0_var(--border)]"
-                style={{ top: filterBarHeight }}
-              >
+              <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border)]">
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
@@ -1081,7 +1082,7 @@ export default function TaskGrid({
                     {groupBy !== 'none' && (
                       <TableRow className="bg-muted/60 hover:bg-muted/60">
                         <TableCell
-                          colSpan={showProject ? 10 : 9}
+                          colSpan={tableColumnCount}
                           className="font-medium text-foreground"
                         >
                           {group.label} ({group.tasks.length})
@@ -1163,7 +1164,7 @@ export default function TaskGrid({
                     ))}
                     {groupBy === 'stage' && !showProject && group.key !== '0' && (
                       <TableRow>
-                        <TableCell colSpan={9} className="py-2">
+                        <TableCell colSpan={tableColumnCount} className="py-2">
                           {addingStageId === group.key ? (
                             <Input
                               autoFocus
