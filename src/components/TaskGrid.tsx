@@ -471,8 +471,14 @@ export default function TaskGrid({
   const [hideDone, setHideDone] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState('all');
-  const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
+  const [draftQuery, setDraftQuery] = useState('');
+  const [draftStatusFilter, setDraftStatusFilter] = useState(initialStatus);
+  const [draftHideDone, setDraftHideDone] = useState(false);
+  const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(initialAssigneeId);
+  const [draftProjectFilter, setDraftProjectFilter] = useState('all');
+  const [draftGroupBy, setDraftGroupBy] = useState<GroupBy>(initialGroupBy);
+  const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
@@ -572,8 +578,14 @@ export default function TaskGrid({
     ),
   ).sort((left, right) => left - right);
 
-  useEffect(() => setStatusFilter(initialStatus), [initialStatus]);
-  useEffect(() => setAssigneeFilter(initialAssigneeId), [initialAssigneeId]);
+  useEffect(() => {
+    setStatusFilter(initialStatus);
+    setDraftStatusFilter(initialStatus);
+  }, [initialStatus]);
+  useEffect(() => {
+    setAssigneeFilter(initialAssigneeId);
+    setDraftAssigneeFilter(initialAssigneeId);
+  }, [initialAssigneeId]);
 
   useEffect(() => {
     if (!viewScope) return;
@@ -587,10 +599,45 @@ export default function TaskGrid({
     setSelectedIds(new Set());
   }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tasks]);
 
+  const applyFilters = () => {
+    setQuery(draftQuery);
+    setStatusFilter(draftStatusFilter);
+    setHideDone(draftHideDone);
+    setAssigneeFilter(draftAssigneeFilter);
+    setProjectFilter(draftProjectFilter);
+    setGroupBy(draftGroupBy);
+  };
+  const resetFilters = () => {
+    setDraftQuery('');
+    setDraftStatusFilter('all');
+    setDraftHideDone(false);
+    setDraftAssigneeFilter('all');
+    setDraftProjectFilter('all');
+    setDraftGroupBy('none');
+    setQuery('');
+    setStatusFilter('all');
+    setHideDone(false);
+    setAssigneeFilter('all');
+    setProjectFilter('all');
+    setGroupBy('none');
+  };
+  const filtersDirty =
+    draftQuery !== query ||
+    draftStatusFilter !== statusFilter ||
+    draftHideDone !== hideDone ||
+    draftAssigneeFilter !== assigneeFilter ||
+    draftProjectFilter !== projectFilter ||
+    draftGroupBy !== groupBy;
   const applyView = (id: string) => {
     if (id === 'default') {
       setActiveViewId('');
+      setDraftStatusFilter(initialStatus);
+      setDraftHideDone(false);
+      setDraftAssigneeFilter('all');
+      setDraftProjectFilter('all');
+      setDraftGroupBy('none');
       setStatusFilter(initialStatus);
+      setHideDone(false);
       setAssigneeFilter('all');
       setProjectFilter('all');
       setGroupBy('none');
@@ -602,6 +649,11 @@ export default function TaskGrid({
     const view = views.find((item) => item.id === id);
     if (!view) return;
     const config = view.config;
+    setDraftStatusFilter(config.statusFilter);
+    setDraftHideDone(config.hideDone);
+    setDraftAssigneeFilter(config.assigneeFilter);
+    setDraftProjectFilter(config.projectFilter);
+    setDraftGroupBy(config.groupBy);
     setStatusFilter(config.statusFilter);
     setHideDone(config.hideDone);
     setAssigneeFilter(config.assigneeFilter);
@@ -614,11 +666,11 @@ export default function TaskGrid({
     const name = viewName.trim();
     if (!name || !viewScope) return;
     const config = {
-      statusFilter,
-      assigneeFilter,
-      projectFilter,
-      groupBy,
-      hideDone,
+      statusFilter: draftStatusFilter,
+      assigneeFilter: draftAssigneeFilter,
+      projectFilter: draftProjectFilter,
+      groupBy: draftGroupBy,
+      hideDone: draftHideDone,
       sorts,
       visibleColumns,
     };
@@ -768,8 +820,11 @@ export default function TaskGrid({
               </DropdownMenu>
             )}
             <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={draftQuery}
+              onChange={(event) => setDraftQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') applyFilters();
+              }}
               placeholder="Поиск задач…"
               className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
@@ -802,13 +857,13 @@ export default function TaskGrid({
             </DropdownMenu>
             <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
               <Checkbox
-                checked={hideDone}
-                onCheckedChange={(value) => setHideDone(value === true)}
+                checked={draftHideDone}
+                onCheckedChange={(value) => setDraftHideDone(value === true)}
                 aria-label="Скрыть закрытые задачи"
               />
               <span>Скрыть закрытые</span>
             </label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
               <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
                 <SelectValue />
               </SelectTrigger>
@@ -825,7 +880,7 @@ export default function TaskGrid({
                 ))}
               </SelectContent>
             </Select>
-            <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+            <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
               <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
                 <SelectValue />
               </SelectTrigger>
@@ -839,7 +894,7 @@ export default function TaskGrid({
               </SelectContent>
             </Select>
             {showProject && (
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
                 <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
                   <SelectValue />
                 </SelectTrigger>
@@ -855,10 +910,10 @@ export default function TaskGrid({
             )}
             <select
               aria-label="Группировка"
-              value={groupBy}
+              value={draftGroupBy}
               onChange={(event) => {
                 const value = event.target.value;
-                if (isGroupBy(value)) setGroupBy(value);
+                if (isGroupBy(value)) setDraftGroupBy(value);
               }}
               className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
             >
@@ -869,23 +924,27 @@ export default function TaskGrid({
               ))}
             </select>
             <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 rounded-md"
+              disabled={!filtersDirty}
+              onClick={applyFilters}
+            >
+              Применить
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
               disabled={
-                !query &&
-                statusFilter === 'all' &&
-                assigneeFilter === 'all' &&
-                projectFilter === 'all' &&
-                groupBy === 'none'
+                !draftQuery &&
+                draftStatusFilter === 'all' &&
+                !draftHideDone &&
+                draftAssigneeFilter === 'all' &&
+                draftProjectFilter === 'all' &&
+                draftGroupBy === 'none'
               }
-              onClick={() => {
-                setQuery('');
-                setStatusFilter('all');
-                setAssigneeFilter('all');
-                setProjectFilter('all');
-                setGroupBy('none');
-              }}
+              onClick={resetFilters}
             >
               Сбросить
             </Button>
