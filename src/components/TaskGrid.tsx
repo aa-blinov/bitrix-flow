@@ -860,7 +860,7 @@ export default function TaskGrid({
                 const value = event.target.value;
                 if (isGroupBy(value)) setGroupBy(value);
               }}
-              className="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
             >
               {GROUP_BY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
