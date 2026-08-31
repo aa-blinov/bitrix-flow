@@ -574,11 +574,17 @@ export default function TaskGrid({
   }, [groupBy, pageTasks, stages, users]);
   const tableColumnCount =
     visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
-  // Tasks are loaded in PAGE_SIZE-sized chunks, so pageCount alone cannot tell
-  // whether the view needs a compact scrollport. Only a shorter result set is
-  // guaranteed to fit on one loaded page and can safely grow with its content.
+  // Data arrives in PAGE_SIZE-sized chunks, so a short unfiltered list may
+  // still be incomplete. Let only a deliberately narrowed, partial result
+  // grow with its content; otherwise preserve the compact scrollport.
+  const hasNarrowingFilter =
+    Boolean(query.trim()) ||
+    statusFilter !== 'all' ||
+    hideDone ||
+    assigneeFilter !== 'all' ||
+    (showProject && projectFilter !== 'all');
   const tableHeightClass =
-    orderedTasks.length < PAGE_SIZE
+    hasNarrowingFilter && orderedTasks.length < PAGE_SIZE
       ? 'max-h-none'
       : showProject
         ? 'max-h-[calc(100dvh-17rem)]'
