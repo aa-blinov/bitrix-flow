@@ -800,7 +800,7 @@ export default function TaskGrid({
               placeholder="Поиск задач…"
               className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
-            <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+            <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
               <Checkbox
                 checked={hideDone}
                 onCheckedChange={(value) => setHideDone(value === true)}
