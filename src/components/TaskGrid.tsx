@@ -138,13 +138,13 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   storyPoints: 'Story points',
 };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
-  title: 320,
+  title: 280,
   project: 180,
-  stage: 160,
-  assignee: 180,
+  stage: 140,
+  assignee: 160,
   priority: 130,
-  deadline: 150,
-  estimate: 180,
+  deadline: 140,
+  estimate: 150,
   actual: 80,
   updated: 160,
   description: 260,
