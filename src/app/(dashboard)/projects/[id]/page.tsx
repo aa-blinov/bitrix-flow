@@ -41,7 +41,8 @@ export default function ProjectPage() {
   const searchParams = useSearchParams();
   const projectId = (params?.id as string) || '0';
   const notificationTaskId = searchParams.get('task');
-  const [view, setView] = useState('kanban');
+  const initialStatus = searchParams.get('status') || 'all';
+  const [view, setView] = useState(() => (searchParams.get('view') === 'grid' ? 'grid' : 'kanban'));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -369,7 +370,12 @@ export default function ProjectPage() {
           />
         </TabsContent>
         <TabsContent value="grid" className="mt-0">
-          <TaskGrid tasks={visibleTasks} initialGroupBy="stage" title={null} />
+          <TaskGrid
+            tasks={visibleTasks}
+            initialGroupBy="stage"
+            initialStatus={initialStatus}
+            title={null}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -267,11 +267,23 @@ export default function ProjectsSummaryPage() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {project.overdue > 0 && (
-                            <Badge variant="destructive">{project.overdue} просроч.</Badge>
+                            <Badge asChild variant="destructive">
+                              <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
+                                {project.overdue} просроч.
+                              </Link>
+                            </Badge>
                           )}
-                          <Badge variant="secondary">{project.inProgress} в работе</Badge>
+                          <Badge asChild variant="secondary">
+                            <Link href={`/projects/${project.id}?view=grid&status=in_progress`}>
+                              {project.inProgress} в работе
+                            </Link>
+                          </Badge>
                           {project.noDeadline > 0 && (
-                            <Badge variant="outline">{project.noDeadline} без срока</Badge>
+                            <Badge asChild variant="outline">
+                              <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
+                                {project.noDeadline} без срока
+                              </Link>
+                            </Badge>
                           )}
                         </div>
                       </TableCell>
