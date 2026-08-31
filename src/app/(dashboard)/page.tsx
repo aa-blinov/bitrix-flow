@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, CalendarDays, CalendarOff, ListChecks } from
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import PageHeader from '@/components/PageHeader';
 import {
   Select,
   SelectContent,
@@ -130,12 +131,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-5 backdrop-blur sm:px-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-semibold tracking-tight">Главная</h1>
-        </div>
-      </header>
+      <PageHeader title="Главная" description="Обзор проектов, задач и сроков" />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         {/* Stats */}

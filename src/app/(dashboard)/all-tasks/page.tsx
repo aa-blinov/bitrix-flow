@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 
 import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
+import PageHeader from '@/components/PageHeader';
 
 function AllTasksInner() {
   const {
@@ -38,14 +39,7 @@ function AllTasksInner() {
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="pt-2 md:pt-0">
-            <h1 className="text-xl font-semibold text-foreground">Все задачи</h1>
-            <p className="text-sm text-muted-foreground">Задачи по всем доступным проектам</p>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Все задачи" description="Задачи по всем доступным проектам" />
 
       <div className="mt-4">
         {isLoadingAllTasks ? (

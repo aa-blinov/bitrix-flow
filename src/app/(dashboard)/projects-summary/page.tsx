@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { useSSE } from '@/hooks/useSSE';
 import LoadingState from '@/components/LoadingState';
+import PageHeader from '@/components/PageHeader';
 
 type ProjectSummary = {
   id: string;
@@ -114,19 +115,15 @@ export default function ProjectsSummaryPage() {
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Сводка по проектам</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              План, факт и операционный статус по задачам проектов
-            </p>
-          </div>
+      <PageHeader
+        title="Сводка по проектам"
+        description="План, факт и операционный статус по задачам проектов"
+        actions={
           <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={isLoading}>
             <RefreshCw className={isLoading ? 'animate-spin' : ''} /> Обновить
           </Button>
-        </div>
-      </header>
+        }
+      />
       <main className="space-y-3 px-4 py-4 lg:px-6">
         <Card className="overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0">
           <CardHeader className="gap-3 rounded-none border-0 bg-transparent px-0 py-3">
