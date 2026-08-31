@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -448,6 +448,17 @@ export default function TaskGrid({
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
   const { openTask, closeTask } = useTaskUrl();
+  const filterBarRef = useRef<HTMLDivElement | null>(null);
+  const [filterBarHeight, setFilterBarHeight] = useState(0);
+  useEffect(() => {
+    const node = filterBarRef.current;
+    if (!node) return;
+    const update = () => setFilterBarHeight(node.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const createTask = useKanbanStore((state) => state.createTask);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -715,8 +726,11 @@ export default function TaskGrid({
   return (
     <>
       <Card className="mx-4 mt-5 overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
-        <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
-          <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
+        <CardHeader className="sticky top-0 z-30 gap-2 rounded-none border-b border-border bg-background px-0 py-3 shadow-[0_1px_0_0_var(--border)]">
+          <div
+            ref={filterBarRef}
+            className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto"
+          >
             {title !== null && (
               <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
             )}
@@ -1020,7 +1034,10 @@ export default function TaskGrid({
                 )}
                 <col className="w-20" />
               </colgroup>
-              <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border)]">
+              <TableHeader
+                className="sticky z-20 bg-background shadow-[0_1px_0_0_var(--border)]"
+                style={{ top: filterBarHeight }}
+              >
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
