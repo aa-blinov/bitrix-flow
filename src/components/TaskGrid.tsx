@@ -776,7 +776,7 @@ export default function TaskGrid({
   const isReadOnly = showProject;
   return (
     <>
-      <Card className="mx-4 mt-5 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
+      <Card className="mx-4 mt-5 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
         <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2">
             {title !== null && (
@@ -1053,7 +1053,7 @@ export default function TaskGrid({
               );
             })}
           </div>
-          <div className="hidden max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain pt-2 md:block">
+          <div className="hidden max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain md:block">
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
