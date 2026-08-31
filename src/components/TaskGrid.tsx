@@ -1035,7 +1035,7 @@ export default function TaskGrid({
                 )}
                 <col className="w-20" />
               </colgroup>
-              <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border)]">
+              <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-background [&_th]:shadow-[0_1px_0_0_var(--border)]">
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
