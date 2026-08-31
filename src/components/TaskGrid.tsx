@@ -994,7 +994,7 @@ export default function TaskGrid({
               );
             })}
           </div>
-          <div className="hidden max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain md:block">
+          <div className="hidden max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain pt-2 md:block">
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
