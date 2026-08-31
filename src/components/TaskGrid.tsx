@@ -73,7 +73,7 @@ function useTaskUrl() {
   return { openTask, closeTask };
 }
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 50;
 type SortKey =
   | 'title'
   | 'project'
