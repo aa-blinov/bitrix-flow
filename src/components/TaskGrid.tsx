@@ -1,12 +1,13 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +47,31 @@ import {
 
 const controlClass =
   'h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm hover:border-input focus:border-input focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30';
+
+// Хук навигации по задаче через URL: каждая открытая задача — это
+// /<path>?task=<id>, и back/forward браузера честно меняют состояние. Store
+// держит selectedTaskId, и страница /all-tasks зеркалит searchParam в него
+// через useEffect — этот хук просто пишет в URL, остальное делает она.
+function useTaskUrl() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const openTask = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('task', id);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+  const closeTask = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('task');
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+  return { openTask, closeTask };
+}
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
 type SortKey =
@@ -361,7 +387,8 @@ function ProjectField({ task, readOnly }: { task: BxTask; readOnly: boolean }) {
 }
 
 function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolean }) {
-  const { setSelectedTask, moveTask } = useKanbanStore();
+  const { moveTask } = useKanbanStore();
+  const { openTask } = useTaskUrl();
   return (
     <div className="flex items-center">
       {!compact && (
@@ -370,7 +397,7 @@ function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolea
           size="icon"
           aria-label={`Открыть карточку ${task.title}`}
           title="Открыть карточку"
-          onClick={() => setSelectedTask(task.id)}
+          onClick={() => openTask(task.id)}
         >
           <ExternalLink className="size-4" />
         </Button>
@@ -383,7 +410,7 @@ function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolea
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Быстрые действия</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => setSelectedTask(task.id)}>
+          <DropdownMenuItem onClick={() => openTask(task.id)}>
             <ExternalLink />
             Открыть карточку
           </DropdownMenuItem>
@@ -419,6 +446,7 @@ export default function TaskGrid({
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
+  const { openTask, closeTask } = useTaskUrl();
   const createTask = useKanbanStore((state) => state.createTask);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -883,7 +911,7 @@ export default function TaskGrid({
                     />
                     <button
                       type="button"
-                      onClick={() => setSelectedTask(task.id)}
+                      onClick={() => openTask(task.id)}
                       className="min-w-0 flex-1 text-left focus-visible:outline-none"
                     >
                       <div className="flex items-start gap-2">
@@ -1213,7 +1241,7 @@ export default function TaskGrid({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+      {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
     </>
   );
 }
