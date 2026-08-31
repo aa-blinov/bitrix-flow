@@ -42,10 +42,7 @@ function AllTasksInner() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="pt-2 md:pt-0">
             <h1 className="text-xl font-semibold text-foreground">Все задачи</h1>
-            <p className="text-sm text-muted-foreground">
-              Задачи по всем доступным проектам
-              {isLoadingAllTasks && ' · загружаю…'}
-            </p>
+            <p className="text-sm text-muted-foreground">Задачи по всем доступным проектам</p>
           </div>
         </div>
       </header>
