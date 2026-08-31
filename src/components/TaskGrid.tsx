@@ -995,7 +995,7 @@ export default function TaskGrid({
             })}
           </div>
           <div className="hidden max-h-[calc(100dvh-12rem)] overflow-auto overscroll-contain md:block">
-            <Table className="min-w-max table-fixed">
+            <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
                 {visibleColumns.includes('title') && <col style={{ width: columnWidths.title }} />}
