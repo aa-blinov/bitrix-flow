@@ -725,12 +725,9 @@ export default function TaskGrid({
   const isReadOnly = showProject;
   return (
     <>
-      <Card className="mx-4 mt-5 overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
+      <Card className="mx-4 mt-5 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
         <CardHeader className="sticky top-0 z-30 gap-2 rounded-none border-b border-border bg-background px-0 py-3 shadow-[0_1px_0_0_var(--border)]">
-          <div
-            ref={filterBarRef}
-            className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto"
-          >
+          <div ref={filterBarRef} className="flex flex-wrap items-center gap-2">
             {title !== null && (
               <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
             )}
@@ -987,7 +984,7 @@ export default function TaskGrid({
                         ) : null}
                       </div>
                     </button>
-                    <TaskActions task={task} compact />
+                    <TaskActions task={task} />
                   </div>
                 </article>
               );
