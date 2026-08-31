@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Bell,
   Plus,
+  UserCheck,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -132,6 +133,7 @@ export default function Sidebar() {
           <NavItem href="/" icon={LayoutDashboard} label="Главная" />
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
           <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
+          <NavItem href="/my-tasks" icon={UserCheck} label="Мои задачи" />
           <NavItem href="/notifications" icon={Bell} label="Уведомления" />
         </div>
 
