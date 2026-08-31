@@ -37,6 +37,7 @@ import {
   Bx24Task,
   Bx24Project,
   Bx24Stage,
+  CreateProjectInput,
   mapBxPriority,
   secondsToHours,
   hoursToSeconds,
@@ -89,7 +90,7 @@ interface KanbanStore {
   loadStages: (entityId: string) => Promise<void>;
   createStage: (title: string) => Promise<boolean>;
   renameStage: (stageId: string, title: string) => Promise<void>;
-  createProject: (name: string, description?: string) => Promise<string>;
+  createProject: (input: CreateProjectInput) => Promise<string>;
   updateProject: (
     id: string,
     fields: { name?: string; description?: string; archived?: boolean },
@@ -316,8 +317,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
   },
 
-  createProject: async (name, description) => {
-    const id = await bxCreateProject(name, description);
+  createProject: async (input) => {
+    const id = await bxCreateProject(input);
     await get().loadProjects(true);
     return id;
   },

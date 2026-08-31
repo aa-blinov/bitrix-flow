@@ -19,6 +19,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +47,14 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectKeywords, setProjectKeywords] = useState('');
+  const [projectStartDate, setProjectStartDate] = useState('');
+  const [projectFinishDate, setProjectFinishDate] = useState('');
+  const [projectVisible, setProjectVisible] = useState(true);
+  const [projectOpened, setProjectOpened] = useState(false);
+  const [invitePermissions, setInvitePermissions] = useState<'A' | 'E' | 'K'>('K');
+  const [createError, setCreateError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -67,13 +84,36 @@ export default function Sidebar() {
 
   async function createNewProject() {
     if (!projectName.trim()) return;
+    if (projectStartDate && projectFinishDate && projectStartDate > projectFinishDate) {
+      setCreateError('Дата окончания не может быть раньше даты начала.');
+      return;
+    }
     setCreating(true);
+    setCreateError('');
     try {
-      const id = await createProject(projectName.trim());
+      const id = await createProject({
+        name: projectName.trim(),
+        description: projectDescription.trim(),
+        keywords: projectKeywords.trim(),
+        startDate: projectStartDate || undefined,
+        finishDate: projectFinishDate || undefined,
+        visible: projectVisible,
+        opened: projectOpened,
+        initiatePerms: invitePermissions,
+      });
       setProjectName('');
+      setProjectDescription('');
+      setProjectKeywords('');
+      setProjectStartDate('');
+      setProjectFinishDate('');
+      setProjectVisible(true);
+      setProjectOpened(false);
+      setInvitePermissions('K');
       setCreateOpen(false);
       setMobileOpen(false);
       router.push(`/projects/${id}`);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Не удалось создать проект.');
     } finally {
       setCreating(false);
     }
@@ -292,24 +332,113 @@ export default function Sidebar() {
         <SidebarContent />
       </aside>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-sm">
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (open) setCreateError('');
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Новый проект</DialogTitle>
           </DialogHeader>
-          <Input
-            value={projectName}
-            onChange={(event) => setProjectName(event.target.value)}
-            placeholder="Название проекта"
-            autoFocus
-            onKeyDown={(event) => event.key === 'Enter' && void createNewProject()}
-          />
+          <div className="space-y-4">
+            <label className="block text-sm font-medium">
+              Название проекта
+              <Input
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+                placeholder="Например, Запуск нового продукта"
+                className="mt-1.5"
+                autoFocus
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Описание
+              <Textarea
+                value={projectDescription}
+                onChange={(event) => setProjectDescription(event.target.value)}
+                placeholder="Цель, контекст и ожидаемый результат"
+                className="mt-1.5 min-h-20 resize-y"
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Ключевые слова
+              <Input
+                value={projectKeywords}
+                onChange={(event) => setProjectKeywords(event.target.value)}
+                placeholder="Например, запуск, mobile, клиент"
+                className="mt-1.5"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                Разделяйте слова запятыми.
+              </span>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-medium">
+                Дата начала
+                <Input
+                  type="date"
+                  value={projectStartDate}
+                  onChange={(event) => setProjectStartDate(event.target.value)}
+                  className="mt-1.5"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                Дата окончания
+                <Input
+                  type="date"
+                  value={projectFinishDate}
+                  min={projectStartDate || undefined}
+                  onChange={(event) => setProjectFinishDate(event.target.value)}
+                  className="mt-1.5"
+                />
+              </label>
+            </div>
+            <div className="space-y-3 rounded-lg border p-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={projectVisible}
+                  onCheckedChange={(checked) => setProjectVisible(checked === true)}
+                />
+                Показывать проект в общем списке
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox
+                  checked={projectOpened}
+                  onCheckedChange={(checked) => setProjectOpened(checked === true)}
+                />
+                Разрешить свободное вступление
+              </label>
+              <label className="block text-sm font-medium">
+                Кто может приглашать участников
+                <Select
+                  value={invitePermissions}
+                  onValueChange={(value) => setInvitePermissions(value as 'A' | 'E' | 'K')}
+                >
+                  <SelectTrigger className="mt-1.5 w-full" aria-label="Права приглашения">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Только владелец</SelectItem>
+                    <SelectItem value="E">Владелец и модераторы</SelectItem>
+                    <SelectItem value="K">Все участники</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+            </div>
+            {createError && <p className="text-sm text-destructive">{createError}</p>}
+          </div>
           <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Отмена
+            </Button>
             <Button
               onClick={() => void createNewProject()}
               disabled={!projectName.trim() || creating}
             >
-              Создать
+              Создать проект
             </Button>
           </DialogFooter>
         </DialogContent>

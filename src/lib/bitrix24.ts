@@ -728,15 +728,39 @@ export async function updateProject(
   await bx24('sonet_group.update', params);
 }
 
-export async function createProject(name: string, description = ''): Promise<string> {
-  const result = await bx24('sonet_group.create', {
+export type CreateProjectInput = {
+  name: string;
+  description?: string;
+  keywords?: string;
+  visible?: boolean;
+  opened?: boolean;
+  initiatePerms?: 'A' | 'E' | 'K';
+  startDate?: string;
+  finishDate?: string;
+};
+
+export async function createProject({
+  name,
+  description = '',
+  keywords = '',
+  visible = true,
+  opened = false,
+  initiatePerms = 'K',
+  startDate,
+  finishDate,
+}: CreateProjectInput): Promise<string> {
+  const params: Record<string, string> = {
     NAME: name,
     DESCRIPTION: description,
+    KEYWORDS: keywords,
     PROJECT: 'Y',
-    VISIBLE: 'Y',
-    OPENED: 'N',
-    INITIATE_PERMS: 'K',
-  });
+    VISIBLE: visible ? 'Y' : 'N',
+    OPENED: opened ? 'Y' : 'N',
+    INITIATE_PERMS: initiatePerms,
+  };
+  if (startDate) params.PROJECT_DATE_START = `${startDate}T00:00:00`;
+  if (finishDate) params.PROJECT_DATE_FINISH = `${finishDate}T23:59:59`;
+  const result = await bx24('sonet_group.create', params);
   await cacheInvalidateByPrefix('projects:');
   return String(result.ID || result.id || result);
 }
