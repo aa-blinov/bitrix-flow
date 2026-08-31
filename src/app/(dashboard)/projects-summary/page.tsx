@@ -137,32 +137,46 @@ export default function ProjectsSummaryPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-              <Select
-                value={dateField}
-                onValueChange={(value) => setDateField(value as 'changed' | 'created')}
-              >
-                <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="changed">изменения</SelectItem>
-                  <SelectItem value="created">создания</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="date"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-                className="h-8 rounded-md sm:w-32"
-                aria-label="С"
-              />
-              <Input
-                type="date"
-                value={toDate}
-                onChange={(event) => setToDate(event.target.value)}
-                className="h-8 rounded-md sm:w-32"
-                aria-label="По"
-              />
+              <div className="flex h-8 items-center gap-1.5 text-sm">
+                <span className="shrink-0 text-muted-foreground">По дате:</span>
+                <Select
+                  value={dateField}
+                  onValueChange={(value) => setDateField(value as 'changed' | 'created')}
+                >
+                  <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="changed">изменения</SelectItem>
+                    <SelectItem value="created">создания</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex h-8 items-center gap-1.5 text-sm">
+                <span className="shrink-0 text-muted-foreground">Период:</span>
+                <label htmlFor="summary-date-from" className="text-muted-foreground">
+                  с
+                </label>
+                <Input
+                  id="summary-date-from"
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  className="h-8 w-36 rounded-md"
+                  aria-label="Начальная дата периода"
+                />
+                <label htmlFor="summary-date-to" className="text-muted-foreground">
+                  по
+                </label>
+                <Input
+                  id="summary-date-to"
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  className="h-8 w-36 rounded-md"
+                  aria-label="Конечная дата периода"
+                />
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
