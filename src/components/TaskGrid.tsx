@@ -1078,7 +1078,7 @@ export default function TaskGrid({
               </TableHeader>
               <TableBody>
                 {groupedPageTasks.map((group) => (
-                  <Fragment key={group.label || 'all'}>
+                  <Fragment key={`${groupBy}:${group.key || 'all'}`}>
                     {groupBy !== 'none' && (
                       <TableRow className="bg-muted/60 hover:bg-muted/60">
                         <TableCell
