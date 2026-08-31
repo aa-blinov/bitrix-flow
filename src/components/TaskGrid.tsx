@@ -574,6 +574,12 @@ export default function TaskGrid({
   }, [groupBy, pageTasks, stages, users]);
   const tableColumnCount =
     visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
+  const tableHeightClass =
+    pageCount > 1
+      ? showProject
+        ? 'max-h-[calc(100dvh-17rem)]'
+        : 'max-h-[calc(100dvh-28rem)]'
+      : 'max-h-none';
   const pageNumbers = Array.from(
     new Set(
       [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
@@ -1056,11 +1062,7 @@ export default function TaskGrid({
               );
             })}
           </div>
-          <div
-            className={`hidden overflow-auto overscroll-contain md:block ${
-              showProject ? 'max-h-[calc(100dvh-17rem)]' : 'max-h-[calc(100dvh-28rem)]'
-            }`}
-          >
+          <div className={`hidden overflow-auto overscroll-contain md:block ${tableHeightClass}`}>
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
