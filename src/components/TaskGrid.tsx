@@ -494,6 +494,7 @@ export default function TaskGrid({
     const needle = query.trim().toLocaleLowerCase('ru');
     return tasks
       .filter((task) => {
+        if (hideDone && task.status === 'done') return false;
         if (statusFilter === 'overdue') {
           if (!task.dueDate || task.status === 'done' || new Date(task.dueDate) >= new Date())
             return false;
