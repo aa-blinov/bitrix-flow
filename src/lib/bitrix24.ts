@@ -107,6 +107,10 @@ export interface Bx24Task {
   responsibleId: string;
   responsibleName: string;
   responsibleIcon?: string;
+  // Bitrix24 REST nests the assignee under `responsible` for some endpoints;
+  // flat fields are not always populated. Keep the object around as a source
+  // of truth so the UI can fall back when the flat fields are empty.
+  responsible?: { id: string; name: string; icon?: string; link?: string; workPosition?: string };
   creatorId: string;
   creatorName: string;
   commentsCount: number;
