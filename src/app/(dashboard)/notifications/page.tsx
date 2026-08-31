@@ -93,6 +93,10 @@ export default function NotificationsPage() {
                   ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
                   : null;
               const createdAt = item.created_at || item.createdAt;
+              const typeLabel = noticeLabel(item.type);
+              const titleIncludesType = item.title
+                .toLocaleLowerCase('ru')
+                .startsWith(typeLabel.toLocaleLowerCase('ru'));
               const content = (
                 <Card className={href ? 'transition-colors hover:bg-muted/50' : undefined}>
                   <CardContent className="flex gap-3 p-4">
@@ -100,9 +104,9 @@ export default function NotificationsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="font-medium">{item.title}</p>
-                        <span className="text-xs text-muted-foreground">
-                          {noticeLabel(item.type)}
-                        </span>
+                        {!titleIncludesType && (
+                          <span className="text-xs text-muted-foreground">{typeLabel}</span>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         <BitrixText text={item.message} />
