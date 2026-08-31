@@ -176,7 +176,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background" suppressHydrationWarning>
+    <div className="min-h-screen overflow-x-clip bg-background" suppressHydrationWarning>
       {/* Project Header */}
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
         <div className="px-4 lg:px-6 pt-3 pb-2">
@@ -369,7 +369,7 @@ export default function ProjectPage() {
           />
         </TabsContent>
         <TabsContent value="grid" className="mt-0">
-          <TaskGrid tasks={visibleTasks} initialGroupBy="stage" />
+          <TaskGrid tasks={visibleTasks} initialGroupBy="stage" title={null} />
         </TabsContent>
       </Tabs>
     </div>
