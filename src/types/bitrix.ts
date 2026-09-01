@@ -43,6 +43,7 @@ export interface BxComment {
   taskId: string;
   authorId: string;
   authorName: string;
+  isSystem?: boolean;
   text: string;
   createdDate: string;
 }

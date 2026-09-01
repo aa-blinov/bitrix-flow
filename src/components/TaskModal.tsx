@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   GripVertical,
   Trash2,
+  Settings2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1022,78 +1023,114 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             </div>
           </div>
 
-          <Card className="mt-6 gap-0 py-0">
-            <div className="border-b px-4 py-3">
-              <h3 className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
-                <MessageSquare size={14} /> Комментарии ({task.comments.length})
+          <Card className="mt-6 gap-0 overflow-hidden py-0">
+            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <MessageSquare size={16} className="text-primary" /> Комментарии
               </h3>
+              <Badge variant="secondary" className="font-normal tabular-nums">
+                {task.comments.length}
+              </Badge>
             </div>
-            <div ref={commentsRef} className="m-4 max-h-60 space-y-3 overflow-y-auto">
+            <div
+              ref={commentsRef}
+              className="max-h-80 space-y-3 overflow-y-auto bg-muted/20 p-3 sm:p-4"
+            >
               {isLoadingTask && task.comments.length === 0 ? (
                 <LoadingState className="min-h-24 bg-transparent" />
+              ) : task.comments.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Комментариев пока нет
+                </p>
               ) : (
-                task.comments.map((commentItem) => (
-                  <div key={commentItem.id} className="rounded-lg bg-muted p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                      <div className="flex size-6 items-center justify-center rounded-full bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300">
-                        {commentItem.authorName.charAt(0)}
+                task.comments.map((commentItem) =>
+                  commentItem.isSystem ? (
+                    <div
+                      key={commentItem.id}
+                      className="rounded-lg border border-dashed bg-background/70 px-3 py-2 text-sm text-muted-foreground"
+                    >
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium">
+                        <Settings2 size={13} /> Система
+                        <span className="font-normal">· {formatDate(commentItem.createdDate)}</span>
                       </div>
-                      <span className="text-sm font-medium">{commentItem.authorName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(commentItem.createdDate)}
-                      </span>
+                      <div className="leading-relaxed text-foreground/75">
+                        <BitrixText text={commentItem.text} />
+                      </div>
                     </div>
-                    <p className="pl-8 text-sm text-foreground/80">
-                      <BitrixText text={commentItem.text} />
-                    </p>
-                  </div>
-                ))
+                  ) : (
+                    <article
+                      key={commentItem.id}
+                      className="flex gap-3 rounded-xl border bg-background p-3 shadow-sm"
+                    >
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                        {commentItem.authorName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-sm font-semibold">{commentItem.authorName}</span>
+                          <time className="text-xs text-muted-foreground">
+                            {formatDate(commentItem.createdDate)}
+                          </time>
+                        </div>
+                        <div className="break-words text-sm leading-relaxed text-foreground/85">
+                          <BitrixText text={commentItem.text} />
+                        </div>
+                      </div>
+                    </article>
+                  ),
+                )
               )}
             </div>
-            <div className="flex items-end gap-2 border-t p-4">
-              <div className="relative flex-1">
-                <Textarea
-                  value={comment}
-                  onChange={(event) => setComment(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
-                      event.preventDefault();
-                      void handleAddComment();
-                    }
-                  }}
-                  placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
-                  rows={4}
-                  className="min-h-32 resize-y"
-                />
-                {mentionUsers.length > 0 && (
-                  <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">
-                    {mentionUsers.map((user) => (
-                      <Button
-                        key={user.id}
-                        variant="ghost"
-                        className="h-auto w-full justify-start px-2 py-1.5"
-                        onClick={() =>
-                          setComment((text) =>
-                            text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `),
-                          )
-                        }
-                      >
-                        {user.name}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+            <div className="border-t bg-background p-3 sm:p-4">
+              <div className="flex items-end gap-2">
+                <div className="relative flex-1">
+                  <Textarea
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === 'Enter' &&
+                        event.shiftKey &&
+                        !event.nativeEvent.isComposing
+                      ) {
+                        event.preventDefault();
+                        void handleAddComment();
+                      }
+                    }}
+                    placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
+                    rows={3}
+                    className="min-h-24 resize-y bg-muted/30"
+                  />
+                  {mentionUsers.length > 0 && (
+                    <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">
+                      {mentionUsers.map((user) => (
+                        <Button
+                          key={user.id}
+                          variant="ghost"
+                          className="h-auto w-full justify-start px-2 py-1.5"
+                          onClick={() =>
+                            setComment((text) =>
+                              text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `),
+                            )
+                          }
+                        >
+                          {user.name}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={() => void handleAddComment()}
+                  disabled={!comment.trim() || isSendingComment}
+                  className="h-10 shrink-0 gap-2"
+                >
+                  <Send size={16} />
+                  <span className="hidden sm:inline">Отправить</span>
+                </Button>
               </div>
-              <Button
-                onClick={() => void handleAddComment()}
-                disabled={!comment.trim() || isSendingComment}
-                size="icon"
-                className="h-10 shrink-0"
-              >
-                <Send size={16} />
-              </Button>
+              {commentError && <p className="mt-2 text-sm text-destructive">{commentError}</p>}
             </div>
-            {commentError && <p className="px-4 pb-4 text-sm text-destructive">{commentError}</p>}
           </Card>
         </div>
       </DialogContent>

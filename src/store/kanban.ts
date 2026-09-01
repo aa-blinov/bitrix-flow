@@ -50,6 +50,26 @@ function getMemberIdHeader(): Record<string, string> {
   return id ? { 'X-Member-Id': id } : {};
 }
 
+function normalizeComments(
+  comments: Array<Omit<BxComment, 'taskId' | 'isSystem'>>,
+  taskId: string,
+  users: Bx24User[],
+): BxComment[] {
+  return comments.map((comment) => {
+    const isSystem = !comment.authorId || comment.authorId === '0';
+    return {
+      ...comment,
+      taskId,
+      isSystem,
+      authorName: isSystem
+        ? 'Система'
+        : comment.authorName ||
+          users.find((user) => user.id === comment.authorId)?.name ||
+          'Пользователь',
+    };
+  });
+}
+
 interface KanbanStore {
   // Данные
   projects: Bx24Project[];
@@ -506,32 +526,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map((t) =>
           t.id === taskId
-            ? {
-                ...t,
-                comments: comments.map((comment) => ({
-                  ...comment,
-                  taskId,
-                  authorName:
-                    comment.authorName ||
-                    state.users.find((user) => user.id === comment.authorId)?.name ||
-                    'Пользователь',
-                })),
-              }
+            ? { ...t, comments: normalizeComments(comments, taskId, state.users) }
             : t,
         ),
         allTasks: state.allTasks.map((t) =>
           t.id === taskId
-            ? {
-                ...t,
-                comments: comments.map((comment) => ({
-                  ...comment,
-                  taskId,
-                  authorName:
-                    comment.authorName ||
-                    state.users.find((user) => user.id === comment.authorId)?.name ||
-                    'Пользователь',
-                })),
-              }
+            ? { ...t, comments: normalizeComments(comments, taskId, state.users) }
             : t,
         ),
         isLoadingTask: false,
@@ -741,14 +741,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       const comments = await fetchTaskComments(taskId);
       if (comments.some((comment) => comment.text === text)) {
         set((state) => {
-          const normalized = comments.map((comment) => ({
-            ...comment,
-            taskId,
-            authorName:
-              comment.authorName ||
-              state.users.find((user) => user.id === comment.authorId)?.name ||
-              'Пользователь',
-          }));
+          const normalized = normalizeComments(comments, taskId, state.users);
           const replaceComments = (task: BxTask) =>
             task.id === taskId ? { ...task, comments: normalized } : task;
           return {
