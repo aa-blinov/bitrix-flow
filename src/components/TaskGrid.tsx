@@ -706,6 +706,8 @@ export default function TaskGrid({
       : showProject
         ? 'max-h-[calc(100dvh-17rem)]'
         : 'max-h-[calc(100dvh-28rem)]';
+  const tableScrollClass =
+    tableHeightClass === 'max-h-none' ? 'overflow-x-auto' : 'overflow-auto overscroll-contain';
   const pageNumbers = Array.from(
     new Set(
       [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
@@ -1228,7 +1230,7 @@ export default function TaskGrid({
               );
             })}
           </div>
-          <div className={`hidden overflow-auto overscroll-contain md:block ${tableHeightClass}`}>
+          <div className={`hidden md:block ${tableScrollClass} ${tableHeightClass}`}>
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
