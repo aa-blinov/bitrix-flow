@@ -124,18 +124,20 @@ function getAvatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-function formatDate(dateStr: string | undefined): string {
+function formatDeadline(dateStr: string | undefined): string {
   if (!dateStr) return '';
   try {
-    const d = new Date(dateStr);
+    const date = new Date(dateStr);
     const now = new Date();
-    const diff = Math.floor((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff === 0) return 'Сегодня';
-    if (diff === 1) return 'Завтра';
-    if (diff === -1) return 'Вчера';
-    if (diff > 1 && diff < 7) return d.toLocaleDateString('ru-RU', { weekday: 'short' });
-    if (diff < 0 && diff > -7) return d.toLocaleDateString('ru-RU', { weekday: 'short' });
-    return d.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
+    const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    let day = date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
+    if (diff === 0) day = 'Сегодня';
+    else if (diff === 1) day = 'Завтра';
+    else if (diff === -1) day = 'Вчера';
+    else if (diff > 1 && diff < 7) day = date.toLocaleDateString('ru-RU', { weekday: 'short' });
+    else if (diff < 0 && diff > -7) day = date.toLocaleDateString('ru-RU', { weekday: 'short' });
+
+    return `${day}, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
   } catch {
     return '';
   }
@@ -954,7 +956,7 @@ function TaskCard({
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
   const isCompleted = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
-  const dueDate = formatDate(task.dueDate);
+  const dueDate = formatDeadline(task.dueDate);
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
 
@@ -979,11 +981,6 @@ function TaskCard({
             Подзадача
           </span>
         )}
-        {!task.dueDate && !isCompleted && (
-          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">
-            Без срока
-          </span>
-        )}
       </div>
 
       {/* Title and description indicator share one row so the icon never changes card height. */}
@@ -1003,14 +1000,12 @@ function TaskCard({
       {/* Meta footer */}
       <div className="mt-2 flex items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0 flex-1">
-          {dueDate && (
-            <span
-              className={`flex items-center gap-1 shrink-0 ${isOverdue ? 'text-destructive font-medium' : ''}`}
-            >
-              <Calendar size={12} />
-              {dueDate}
-            </span>
-          )}
+          <span
+            className={`flex items-center gap-1 shrink-0 ${isOverdue ? 'text-destructive font-medium' : ''}`}
+          >
+            <Calendar size={12} />
+            {dueDate || 'Без срока'}
+          </span>
           {task.actualTime > 0 && (
             <span className="flex items-center gap-1 shrink-0">
               <Timer size={12} />
