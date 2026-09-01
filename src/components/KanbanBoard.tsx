@@ -1020,23 +1020,37 @@ function TaskCard({
           )}
         </div>
 
-        {task.assigneeName &&
-          (avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={task.assigneeName}
-              title={task.assigneeName}
-              className="size-6 shrink-0 rounded-full object-cover ring-2 ring-card"
-            />
-          ) : (
-            <div
-              className={`w-6 h-6 rounded-full ${getAvatarColor(task.assigneeName)} text-white text-[10px] font-semibold flex items-center justify-center ring-2 ring-card shrink-0`}
-              title={task.assigneeName}
-            >
-              {getInitials(task.assigneeName)}
-            </div>
-          ))}
+        {task.assigneeName && <AssigneeAvatar name={task.assigneeName} avatarUrl={avatarUrl} />}
       </div>
     </Card>
+  );
+}
+
+function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
+  const [imageFailed, setImageFailed] = useState(!avatarUrl);
+
+  useEffect(() => {
+    setImageFailed(!avatarUrl);
+  }, [avatarUrl]);
+
+  if (!avatarUrl || imageFailed) {
+    return (
+      <div
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${getAvatarColor(name)} text-[10px] font-semibold text-white`}
+        title={name}
+      >
+        {getInitials(name)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={name}
+      title={name}
+      onError={() => setImageFailed(true)}
+      className="size-6 shrink-0 rounded-full object-cover ring-2 ring-card"
+    />
   );
 }
