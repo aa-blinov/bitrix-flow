@@ -47,6 +47,7 @@ function MyTasksInner() {
             initialAssigneeId={currentUser.id}
             title={null}
             viewScope="my"
+            layoutScope="my"
           />
         )}
       </div>

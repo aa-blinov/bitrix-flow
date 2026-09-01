@@ -51,6 +51,7 @@ function AllTasksInner() {
             initialStatus={initialStatus}
             initialAssigneeId={initialAssigneeId}
             viewScope="all"
+            layoutScope="all"
             title={null}
           />
         )}

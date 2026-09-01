@@ -577,6 +577,7 @@ export default function TaskGrid({
   initialGroupBy = 'none',
   initialAssigneeId = 'all',
   viewScope,
+  layoutScope = 'all',
 }: {
   tasks: BxTask[];
   showProject?: boolean;
@@ -585,6 +586,7 @@ export default function TaskGrid({
   initialGroupBy?: GroupBy;
   initialAssigneeId?: string;
   viewScope?: 'all' | 'my';
+  layoutScope?: string;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
@@ -853,7 +855,10 @@ export default function TaskGrid({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/task-grid-preferences')
+    setLayoutLoaded(false);
+    setVisibleColumns(DEFAULT_COLUMNS);
+    setColumnWidths(COLUMN_WIDTHS);
+    void fetch(`/api/task-grid-preferences?scope=${encodeURIComponent(layoutScope)}`)
       .then((response) => response.json())
       .then((data) => {
         if (cancelled || !data.preference) return;
@@ -869,7 +874,7 @@ export default function TaskGrid({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [layoutScope]);
 
   useEffect(() => {
     if (!layoutLoaded) return;
@@ -877,11 +882,11 @@ export default function TaskGrid({
       void fetch('/api/task-grid-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { visibleColumns, columnWidths } }),
+        body: JSON.stringify({ scope: layoutScope, config: { visibleColumns, columnWidths } }),
       });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [columnWidths, layoutLoaded, visibleColumns]);
+  }, [columnWidths, layoutLoaded, layoutScope, visibleColumns]);
 
   useEffect(() => {
     setPage(1);

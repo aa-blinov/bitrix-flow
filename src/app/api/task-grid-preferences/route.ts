@@ -25,15 +25,23 @@ async function memberId(request: NextRequest) {
   return getAuthorizedMemberId(request.cookies.get(sessionCookie.name)?.value);
 }
 
+function normalizeScope(value: unknown): string {
+  if (value === 'all' || value === 'my') return value;
+  return typeof value === 'string' && /^project:\d+$/.test(value) ? value : 'all';
+}
+
 export async function GET(request: NextRequest) {
   const member = await memberId(request);
   if (!member) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
 
-  const preference = await (
-    await getDb()
-  )
-    .collection('task_grid_preferences')
-    .findOne({ memberId: member });
+  const scope = normalizeScope(request.nextUrl.searchParams.get('scope'));
+  const preferences = (await getDb()).collection('task_grid_preferences');
+  let preference = await preferences.findOne({ memberId: member, scope });
+  // Migrate the single global layout created before layouts gained scopes.
+  if (!preference && scope === 'all') {
+    preference = await preferences.findOne({ memberId: member, scope: { $exists: false } });
+    if (preference) await preferences.updateOne({ _id: preference._id }, { $set: { scope } });
+  }
   return NextResponse.json({ preference: preference?.config || null });
 }
 
@@ -42,6 +50,7 @@ export async function PUT(request: NextRequest) {
   if (!member) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
+  const scope = normalizeScope(body?.scope);
   const config = body?.config;
   const visibleColumns = Array.isArray(config?.visibleColumns)
     ? [
@@ -66,14 +75,13 @@ export async function PUT(request: NextRequest) {
   }
 
   const savedConfig = { visibleColumns, columnWidths };
-  await (
-    await getDb()
-  )
-    .collection('task_grid_preferences')
-    .updateOne(
-      { memberId: member },
-      { $set: { config: savedConfig, updatedAt: new Date() }, $setOnInsert: { memberId: member } },
-      { upsert: true },
-    );
+  await (await getDb()).collection('task_grid_preferences').updateOne(
+    { memberId: member, scope },
+    {
+      $set: { config: savedConfig, updatedAt: new Date() },
+      $setOnInsert: { memberId: member, scope },
+    },
+    { upsert: true },
+  );
   return NextResponse.json({ preference: savedConfig });
 }
