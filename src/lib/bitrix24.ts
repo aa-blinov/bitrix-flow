@@ -1,4 +1,6 @@
 // Используем in-memory fallback для клиента, MongoDB для сервера
+import { extractTaskTags } from './task-tags';
+
 const isClient = typeof window !== 'undefined';
 
 // In-memory кеш для клиента
@@ -121,6 +123,7 @@ export interface Bx24Task {
   chatId?: string;
   accompliceIds?: string[];
   auditorIds?: string[];
+  tags: string[];
 }
 
 export interface Bx24Project {
@@ -461,6 +464,7 @@ function mapTask(t: any): Bx24Task {
     chatId: t.chatId || t.CHAT_ID || undefined,
     accompliceIds: (t.accomplices || t.ACCOMPLICES || []).map(String),
     auditorIds: (t.auditors || t.AUDITORS || []).map(String),
+    tags: extractTaskTags(t.title || t.TITLE, t.description || t.DESCRIPTION),
   };
 }
 
@@ -664,6 +668,7 @@ export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
     chatId: task.chatId ? String(task.chatId) : undefined,
     accompliceIds: task.accomplices || [],
     auditorIds: task.auditors || [],
+    tags: extractTaskTags(task.title, task.description),
   };
 }
 

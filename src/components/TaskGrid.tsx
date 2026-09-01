@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
+import { extractTaskTags } from '@/lib/task-tags';
 import { getBitrixTaskUrl } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
@@ -298,23 +299,16 @@ function InlineSelect({
 }
 
 function TaskTags({ task }: { task: BxTask }) {
-  const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
+  const tags = task.tags || extractTaskTags(task.title, task.description);
+  if (tags.length === 0) return <span className="text-muted-foreground">—</span>;
 
   return (
     <div className="flex flex-wrap gap-1">
-      <Badge className={`border-0 text-[10px] ${priority.bgColor} ${priority.color}`}>
-        {priority.label}
-      </Badge>
-      {task.parentId && (
-        <Badge variant="secondary" className="text-[10px]">
-          Подзадача
+      {tags.map((tag) => (
+        <Badge key={tag} variant="secondary" className="text-[10px]">
+          {tag}
         </Badge>
-      )}
-      {!task.dueDate && task.status !== 'done' && (
-        <Badge variant="secondary" className="text-[10px]">
-          Без срока
-        </Badge>
-      )}
+      ))}
     </div>
   );
 }
@@ -576,7 +570,7 @@ export default function TaskGrid({
       if (key === 'parent') return task.parentId || '';
       if (key === 'storyPoints') return task.storyPoints || 0;
       if (key === 'tags')
-        return `${task.priority} ${task.parentId ? 'subtask' : ''} ${task.dueDate ? '' : 'no-deadline'}`;
+        return (task.tags || extractTaskTags(task.title, task.description)).join(' ');
       return task.title;
     };
     const needle = query.trim().toLocaleLowerCase('ru');

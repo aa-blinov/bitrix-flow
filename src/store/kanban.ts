@@ -166,6 +166,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     chatId: bxTask.chatId,
     accompliceIds: bxTask.accompliceIds,
     auditorIds: bxTask.auditorIds,
+    tags: bxTask.tags,
   };
 }
 
