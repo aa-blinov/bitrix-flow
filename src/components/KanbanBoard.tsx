@@ -986,21 +986,19 @@ function TaskCard({
         )}
       </div>
 
-      {/* Title */}
-      <h4
-        className={`mb-2 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
-          isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
-        }`}
-      >
-        {task.title}
-      </h4>
-
-      {/* Description indicator */}
-      {task.description && (
-        <div className="text-muted-foreground mb-2">
-          <AlignLeft size={14} />
-        </div>
-      )}
+      {/* Title and description indicator share one row so the icon never changes card height. */}
+      <div className="mb-2 flex items-start gap-1">
+        <h4
+          className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
+            isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
+          }`}
+        >
+          {task.title}
+        </h4>
+        {task.description && (
+          <AlignLeft className="mt-0.5 shrink-0 text-muted-foreground" size={14} />
+        )}
+      </div>
 
       {/* Meta footer */}
       <div className="mt-2 flex items-center justify-between gap-2 pt-1">
