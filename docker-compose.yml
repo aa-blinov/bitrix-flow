@@ -6,7 +6,7 @@ services:
     env_file:
       - .env.local
     environment:
-      MONGO_URL: mongodb://mongodb:27017
+      MONGO_URL: mongodb://${MONGO_USERNAME:?set MONGO_USERNAME in .env.local}:${MONGO_PASSWORD:?set MONGO_PASSWORD in .env.local}@mongodb:27017/?authSource=admin
       MONGO_DB: bitrix_kanban
       HOSTNAME: 0.0.0.0
       PORT: 3000
@@ -44,10 +44,18 @@ services:
     image: mongo:7
     container_name: bitrix-mongodb
     restart: unless-stopped
+    command: ['mongod', '--auth', '--bind_ip_all']
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME in .env.local}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD in .env.local}
     volumes:
       - mongodb_data:/data/db
     healthcheck:
-      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      test:
+        [
+          'CMD-SHELL',
+          'mongosh --quiet "mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/admin?authSource=admin" --eval "db.adminCommand({ping:1})"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
