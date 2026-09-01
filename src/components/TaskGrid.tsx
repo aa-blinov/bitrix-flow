@@ -1,7 +1,14 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, ExternalLink, MoreHorizontal } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  ExternalLink,
+  MoreHorizontal,
+} from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { getBitrixTaskUrl } from '@/lib/utils';
@@ -91,11 +98,12 @@ type SortKey =
   | 'storyPoints';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
-type GroupBy = 'none' | 'stage' | 'assignee';
+type GroupBy = 'none' | 'stage' | 'assignee' | 'hierarchy';
 const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
   { value: 'none', label: 'Без группировки' },
   { value: 'stage', label: 'По фазе' },
   { value: 'assignee', label: 'По исполнителю' },
+  { value: 'hierarchy', label: 'Иерархия задач' },
 ];
 const isGroupBy = (value: string): value is GroupBy =>
   GROUP_BY_OPTIONS.some((option) => option.value === value);
@@ -154,8 +162,15 @@ const COLUMN_WIDTHS: Record<SortKey, number> = {
   storyPoints: 120,
 };
 
-function EditableTitle({ task }: { task: BxTask }) {
+function EditableTitle({
+  task,
+  tree,
+}: {
+  task: BxTask;
+  tree?: { depth: number; hasChildren: boolean; expanded: boolean; onToggle: () => void };
+}) {
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
+  const { openTask } = useTaskUrl();
   const [title, setTitle] = useState(task.title);
   useEffect(() => setTitle(task.title), [task.title]);
   const commit = () => {
@@ -168,32 +183,62 @@ function EditableTitle({ task }: { task: BxTask }) {
       void updateTaskField(task.id, 'title', next).catch(() => setTitle(task.title));
   };
   return (
-    <div className="min-w-0">
-      <Input
-        aria-label={`Название задачи ${task.id}`}
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-          if (event.key === 'Escape') {
-            setTitle(task.title);
-            event.currentTarget.blur();
+    <div
+      className="flex min-w-0"
+      style={{ paddingLeft: tree ? `${tree.depth * 20}px` : undefined }}
+    >
+      {tree?.hasChildren ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="mt-1 size-6 shrink-0"
+          aria-label={
+            tree.expanded
+              ? `Свернуть подзадачи ${task.title}`
+              : `Развернуть подзадачи ${task.title}`
           }
-        }}
-        className="h-8 max-w-full border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
-      />
-      <div className="mt-1 flex gap-2 px-1 text-xs text-muted-foreground">
-        <a
-          href={getBitrixTaskUrl(task.id)}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-primary hover:underline"
-          onClick={(event) => event.stopPropagation()}
+          onClick={tree.onToggle}
         >
-          #{task.id}
-        </a>
-        {task.parentId && <span>↳ подзадача</span>}
+          {tree.expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </Button>
+      ) : tree?.depth ? (
+        <span className="mt-1 block size-6 shrink-0 border-l border-b border-muted-foreground/30" />
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <Input
+          aria-label={`Название задачи ${task.id}`}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+            if (event.key === 'Escape') {
+              setTitle(task.title);
+              event.currentTarget.blur();
+            }
+          }}
+          className="h-8 max-w-full border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
+        />
+        <div className="mt-1 flex gap-2 px-1 text-xs text-muted-foreground">
+          <a
+            href={getBitrixTaskUrl(task.id)}
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-primary hover:underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            #{task.id}
+          </a>
+          {task.parentId && (
+            <button
+              type="button"
+              className="hover:text-foreground hover:underline"
+              onClick={() => openTask(task.parentId!)}
+            >
+              ↳ Подзадача #{task.parentId}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -488,6 +533,7 @@ export default function TaskGrid({
   const [viewName, setViewName] = useState('');
   const [addingStageId, setAddingStageId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<string>>(new Set());
   const orderedTasks = useMemo(() => {
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
@@ -506,7 +552,7 @@ export default function TaskGrid({
       return task.title;
     };
     const needle = query.trim().toLocaleLowerCase('ru');
-    return tasks
+    const matchingTasks = tasks
       .filter((task) => {
         if (hideDone && task.status === 'done') return false;
         if (statusFilter === 'active') {
@@ -539,6 +585,46 @@ export default function TaskGrid({
         }
         return 0;
       });
+    if (groupBy !== 'hierarchy') return matchingTasks;
+
+    const taskById = new Map(tasks.map((task) => [task.id, task]));
+    const visibleIds = new Set(matchingTasks.map((task) => task.id));
+    const ranks = new Map(matchingTasks.map((task, index) => [task.id, index]));
+    for (const task of matchingTasks) {
+      let parentId = task.parentId;
+      while (parentId && !visibleIds.has(parentId)) {
+        const parent = taskById.get(parentId);
+        if (!parent) break;
+        visibleIds.add(parent.id);
+        ranks.set(parent.id, Math.min(ranks.get(parent.id) ?? Infinity, ranks.get(task.id) ?? 0));
+        parentId = parent.parentId;
+      }
+    }
+    const children = new Map<string, BxTask[]>();
+    const roots: BxTask[] = [];
+    for (const task of tasks) {
+      if (!visibleIds.has(task.id)) continue;
+      if (task.parentId && visibleIds.has(task.parentId)) {
+        const siblings = children.get(task.parentId) || [];
+        siblings.push(task);
+        children.set(task.parentId, siblings);
+      } else {
+        roots.push(task);
+      }
+    }
+    const sortTree = (items: BxTask[]) =>
+      items.sort(
+        (left, right) => (ranks.get(left.id) ?? Infinity) - (ranks.get(right.id) ?? Infinity),
+      );
+    const result: BxTask[] = [];
+    const walk = (task: BxTask, seen = new Set<string>()) => {
+      if (seen.has(task.id)) return;
+      seen.add(task.id);
+      result.push(task);
+      sortTree(children.get(task.id) || []).forEach((child) => walk(child, seen));
+    };
+    sortTree(roots).forEach((task) => walk(task));
+    return result;
   }, [
     assigneeFilter,
     projectById,
@@ -550,18 +636,49 @@ export default function TaskGrid({
     statusFilter,
     hideDone,
     tasks,
+    groupBy,
   ]);
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const hierarchy = useMemo(() => {
+    const pageTaskIds = new Set(pageTasks.map((task) => task.id));
+    const pageTaskById = new Map(pageTasks.map((task) => [task.id, task]));
+    const childCount = new Map<string, number>();
+    const depthById = new Map<string, number>();
+    const isVisible = new Map<string, boolean>();
+    for (const task of pageTasks) {
+      if (task.parentId && pageTaskIds.has(task.parentId)) {
+        childCount.set(task.parentId, (childCount.get(task.parentId) || 0) + 1);
+      }
+      let depth = 0;
+      let parentId = task.parentId;
+      let visible = true;
+      const seen = new Set<string>();
+      while (parentId && pageTaskById.has(parentId) && !seen.has(parentId)) {
+        seen.add(parentId);
+        depth += 1;
+        if (collapsedTaskIds.has(parentId)) visible = false;
+        parentId = pageTaskById.get(parentId)?.parentId;
+      }
+      depthById.set(task.id, depth);
+      isVisible.set(task.id, visible);
+    }
+    return { childCount, depthById, isVisible };
+  }, [collapsedTaskIds, pageTasks]);
+  const displayPageTasks =
+    groupBy === 'hierarchy'
+      ? pageTasks.filter((task) => hierarchy.isVisible.get(task.id))
+      : pageTasks;
   const groupedPageTasks = useMemo(() => {
-    if (groupBy === 'none') return [{ key: '', label: '', tasks: pageTasks }];
+    if (groupBy === 'none' || groupBy === 'hierarchy')
+      return [{ key: '', label: '', tasks: displayPageTasks }];
     const labels =
       groupBy === 'stage'
         ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
         : Object.fromEntries(users.map((user) => [user.id, user.name]));
     return Object.entries(
-      pageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
+      displayPageTasks.reduce<Record<string, BxTask[]>>((groups, task) => {
         const key = groupBy === 'stage' ? task.stageId : task.assigneeId || '';
         (groups[key] ||= []).push(task);
         return groups;
@@ -571,7 +688,7 @@ export default function TaskGrid({
       label: labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен'),
       tasks: groupedTasks,
     }));
-  }, [groupBy, pageTasks, stages, users]);
+  }, [displayPageTasks, groupBy, stages, users]);
   const tableColumnCount =
     visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
   // Data arrives in PAGE_SIZE-sized chunks, so a short unfiltered list may
@@ -615,6 +732,9 @@ export default function TaskGrid({
     setPage(1);
     setSelectedIds(new Set());
   }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tasks]);
+  useEffect(() => {
+    setCollapsedTaskIds(new Set());
+  }, [groupBy]);
 
   const applyFilters = () => {
     setQuery(draftQuery);
@@ -1000,7 +1120,7 @@ export default function TaskGrid({
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y md:hidden">
-            {pageTasks.map((task) => {
+            {displayPageTasks.map((task) => {
               const assignee =
                 users.find((user) => user.id === task.assigneeId)?.name || 'Не назначен';
               const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
@@ -1026,6 +1146,12 @@ export default function TaskGrid({
                       type="button"
                       onClick={() => openTask(task.id)}
                       className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                      style={{
+                        paddingLeft:
+                          groupBy === 'hierarchy'
+                            ? `${(hierarchy.depthById.get(task.id) || 0) * 16}px`
+                            : undefined,
+                      }}
                     >
                       <div className="flex items-start gap-2">
                         {task.status === 'done' ? (
@@ -1033,7 +1159,12 @@ export default function TaskGrid({
                         ) : (
                           <Circle className="mt-0.5 size-4 shrink-0" />
                         )}
-                        <p className="line-clamp-2 font-medium">{task.title}</p>
+                        <p className="line-clamp-2 font-medium">
+                          {groupBy === 'hierarchy' &&
+                            (hierarchy.depthById.get(task.id) || 0) > 0 &&
+                            '↳ '}
+                          {task.title}
+                        </p>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{STATUS_LABELS[task.status] || task.status}</span>
@@ -1156,7 +1287,7 @@ export default function TaskGrid({
               <TableBody>
                 {groupedPageTasks.map((group) => (
                   <Fragment key={`${groupBy}:${group.key || 'all'}`}>
-                    {groupBy !== 'none' && (
+                    {groupBy !== 'none' && groupBy !== 'hierarchy' && (
                       <TableRow className="bg-muted/60 hover:bg-muted/60">
                         <TableCell
                           colSpan={tableColumnCount}
@@ -1186,7 +1317,25 @@ export default function TaskGrid({
                         </TableCell>
                         {visibleColumns.includes('title') && (
                           <TableCell>
-                            <EditableTitle task={task} />
+                            <EditableTitle
+                              task={task}
+                              tree={
+                                groupBy === 'hierarchy'
+                                  ? {
+                                      depth: hierarchy.depthById.get(task.id) || 0,
+                                      hasChildren: (hierarchy.childCount.get(task.id) || 0) > 0,
+                                      expanded: !collapsedTaskIds.has(task.id),
+                                      onToggle: () =>
+                                        setCollapsedTaskIds((ids) => {
+                                          const next = new Set(ids);
+                                          if (next.has(task.id)) next.delete(task.id);
+                                          else next.add(task.id);
+                                          return next;
+                                        }),
+                                    }
+                                  : undefined
+                              }
+                            />
                           </TableCell>
                         )}
                         {showProject && visibleColumns.includes('project') && (
