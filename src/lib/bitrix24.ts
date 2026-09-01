@@ -683,13 +683,13 @@ export async function deleteChecklistItem(taskId: string, itemId: string) {
   return bx24('task.checklistitem.delete', { TASKID: taskId, ITEMID: itemId });
 }
 
-export async function addTaskComment(taskId: string, text: string): Promise<string> {
-  const result = await bx24('task.commentitem.add', {
-    TASKID: taskId,
-    'fields[POST_MESSAGE]': text,
+export async function addTaskComment(taskId: string, text: string): Promise<void> {
+  const result = await bx24('tasks.task.chat.message.send', {
+    taskId,
+    text,
   });
+  if (!result?.result) throw new Error('Bitrix24 did not confirm comment delivery');
   await cacheInvalidate(`comments:${taskId}`);
-  return result;
 }
 
 export async function addTimeEntry(

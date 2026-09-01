@@ -108,7 +108,7 @@ interface KanbanStore {
   moveTask: (taskId: string, newStatus: TaskStatus) => void;
   moveTaskToStage: (taskId: string, stageId: string) => Promise<void>;
   moveTaskToProject: (taskId: string, projectId: string) => Promise<void>;
-  addComment: (taskId: string, text: string) => void;
+  addComment: (taskId: string, text: string) => Promise<void>;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
   addChecklistItem: (taskId: string, title: string, parentId?: string) => Promise<void>;
   updateChecklistItem: (taskId: string, itemId: string, title: string) => Promise<void>;
@@ -697,59 +697,75 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   moveTaskToStage: async (taskId, stageId) => {
+    const previous =
+      get().tasks.find((task) => task.id === taskId) ||
+      get().allTasks.find((task) => task.id === taskId);
+    if (!previous || previous.stageId === stageId) return;
+
+    const updateStage = (task: BxTask) => (task.id === taskId ? { ...task, stageId } : task);
     set((state) => ({
-      tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, stageId } : t)),
+      tasks: state.tasks.map(updateStage),
+      allTasks: state.allTasks.map(updateStage),
     }));
     try {
       await bxUpdateTaskFull(taskId, { stageId });
-    } catch (err) {
-      console.error('Move task failed:', err);
+    } catch (error) {
+      const restore = (task: BxTask) => (task.id === taskId ? previous : task);
+      set((state) => ({ tasks: state.tasks.map(restore), allTasks: state.allTasks.map(restore) }));
+      throw error;
     }
   },
 
   addComment: async (taskId, text) => {
     const { currentUser } = get();
     const tempId = `temp-${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      taskId,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      text,
+      createdDate: new Date().toISOString(),
+    };
+    const appendComment = (task: BxTask) =>
+      task.id === taskId ? { ...task, comments: [...task.comments, optimisticComment] } : task;
 
     set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              comments: [
-                ...t.comments,
-                {
-                  id: tempId,
-                  taskId,
-                  authorId: currentUser.id,
-                  authorName: currentUser.name,
-                  text,
-                  createdDate: new Date().toISOString(),
-                },
-              ],
-            }
-          : t,
-      ),
+      tasks: state.tasks.map(appendComment),
+      allTasks: state.allTasks.map(appendComment),
     }));
 
     try {
-      const result = await bxAddComment(taskId, text);
+      await bxAddComment(taskId, text);
+      const comments = await fetchTaskComments(taskId);
+      if (comments.some((comment) => comment.text === text)) {
+        set((state) => {
+          const normalized = comments.map((comment) => ({
+            ...comment,
+            taskId,
+            authorName:
+              comment.authorName ||
+              state.users.find((user) => user.id === comment.authorId)?.name ||
+              'Пользователь',
+          }));
+          const replaceComments = (task: BxTask) =>
+            task.id === taskId ? { ...task, comments: normalized } : task;
+          return {
+            tasks: state.tasks.map(replaceComments),
+            allTasks: state.allTasks.map(replaceComments),
+          };
+        });
+      }
+    } catch (error) {
+      const removeComment = (task: BxTask) =>
+        task.id === taskId
+          ? { ...task, comments: task.comments.filter((comment) => comment.id !== tempId) }
+          : task;
       set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                comments: t.comments.map((c) => (c.id === tempId ? { ...c, id: result } : c)),
-              }
-            : t,
-        ),
+        tasks: state.tasks.map(removeComment),
+        allTasks: state.allTasks.map(removeComment),
       }));
-    } catch {
-      set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId ? { ...t, comments: t.comments.filter((c) => c.id !== tempId) } : t,
-        ),
-      }));
+      throw error;
     }
   },
 

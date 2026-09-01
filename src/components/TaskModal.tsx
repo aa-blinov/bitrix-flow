@@ -61,6 +61,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     loadSubtasks,
     createTask,
     moveTask,
+    moveTaskToStage,
+    stages,
     addChecklistItem,
     setChecklistItemCompleted,
     deleteChecklistItem,
@@ -69,6 +71,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
   const router = useRouter();
   const [comment, setComment] = useState('');
+  const [isSendingComment, setIsSendingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [showTimeEntry, setShowTimeEntry] = useState(false);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -100,6 +104,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [task.id, task.comments.length]);
 
   const taskSubtasks = subtasks[task.id] || [];
+  const projectStages = stages.filter(
+    (stage) => !stage.entityId || String(stage.entityId) === String(task.projectId),
+  );
+  const selectedStageId =
+    projectStages.find((stage) => stage.id === task.stageId)?.id ||
+    (task.stageId === '0'
+      ? projectStages.find((stage) => stage.systemType === 'NEW')?.id || projectStages[0]?.id
+      : task.stageId);
   const mentionQuery = comment.match(/(?:^|\s)@([^\s]*)$/)?.[1];
   const mentionUsers =
     mentionQuery === undefined
@@ -121,10 +133,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     router.push(`/projects/${projectId}`);
   };
 
-  const handleAddComment = () => {
-    if (comment.trim()) {
-      addComment(task.id, comment);
-      setComment('');
+  const handleAddComment = async () => {
+    const text = comment.trim();
+    if (!text || isSendingComment) return;
+
+    setComment('');
+    setCommentError(null);
+    setIsSendingComment(true);
+    try {
+      await addComment(task.id, text);
+    } catch {
+      setComment((current) => current || text);
+      setCommentError('Не удалось отправить комментарий. Попробуйте ещё раз.');
+    } finally {
+      setIsSendingComment(false);
     }
   };
 
@@ -198,6 +220,24 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 ))}
               </SelectContent>
             </Select>
+            {projectStages.length > 0 && (
+              <Select
+                value={selectedStageId}
+                onValueChange={(stageId) => void moveTaskToStage(task.id, stageId)}
+              >
+                <SelectTrigger className="w-40">
+                  <Layers size={14} className="mr-1 shrink-0" />
+                  <SelectValue placeholder="Фаза" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectStages.map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {stage.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X size={20} />
@@ -899,7 +939,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 <Textarea
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
-                  placeholder="Написать комментарий… Используйте @ для упоминания"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      void handleAddComment();
+                    }
+                  }}
+                  placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
                   rows={4}
                   className="min-h-32 resize-y"
                 />
@@ -923,14 +969,15 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 )}
               </div>
               <Button
-                onClick={handleAddComment}
-                disabled={!comment.trim()}
+                onClick={() => void handleAddComment()}
+                disabled={!comment.trim() || isSendingComment}
                 size="icon"
                 className="h-10 shrink-0"
               >
                 <Send size={16} />
               </Button>
             </div>
+            {commentError && <p className="px-4 pb-4 text-sm text-destructive">{commentError}</p>}
           </Card>
         </div>
       </DialogContent>

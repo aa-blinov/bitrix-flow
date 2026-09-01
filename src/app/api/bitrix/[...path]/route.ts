@@ -103,6 +103,7 @@ const MUTATION_METHODS = new Set([
   'task.commentitem.add',
   'task.commentitem.update',
   'task.commentitem.delete',
+  'tasks.task.chat.message.send',
   'task.elapseditem.add',
   'task.elapseditem.update',
   'task.elapseditem.delete',
@@ -115,7 +116,13 @@ const MUTATION_METHODS = new Set([
   'task.checklistitem.complete',
   'task.checklistitem.renew',
 ]);
-const JSON_PAYLOAD_METHODS = new Set(['tasks.task.list', 'tasks.task.add', 'tasks.task.update']);
+const JSON_PAYLOAD_METHODS = new Set([
+  'tasks.task.list',
+  'tasks.task.add',
+  'tasks.task.update',
+  'tasks.task.chat.message.send',
+]);
+const REST_V3_METHODS = new Set(['tasks.task.chat.message.send']);
 
 function getCacheTtl(method: string): number {
   if (method === 'task.stages.get') return PROJECTS_TTL;
@@ -364,9 +371,12 @@ async function callBitrix24(
   method: string,
   params: Record<string, string>,
 ): Promise<any> {
-  const url = token.domain
-    ? `https://${token.domain}/rest/${method}?auth=${token.access_token}`
-    : `https://eora.bitrix24.ru/rest/${method}?auth=${token.access_token}`;
+  const getUrl = (accessToken: string) => {
+    const domain = token.domain || 'eora.bitrix24.ru';
+    const apiPath = REST_V3_METHODS.has(method) ? 'rest/api' : 'rest';
+    return `https://${domain}/${apiPath}/${method}?auth=${accessToken}`;
+  };
+  const url = getUrl(token.access_token);
 
   let lastError: any;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -380,9 +390,7 @@ async function callBitrix24(
       if (data.error === 'expired_token' || data.error === 'invalid_token') {
         const refreshed = await refreshToken(token);
         if (refreshed) {
-          const retryUrl = token.domain
-            ? `https://${token.domain}/rest/${method}?auth=${refreshed}`
-            : `https://eora.bitrix24.ru/rest/${method}?auth=${refreshed}`;
+          const retryUrl = getUrl(refreshed);
           const retryData = await postBitrixJson(
             retryUrl,
             getPayload(method, params),
@@ -413,6 +421,10 @@ async function callBitrix24(
 }
 
 function getPayload(method: string, params: Record<string, string>): Record<string, unknown> {
+  if (method === 'tasks.task.chat.message.send') {
+    return { fields: { taskId: Number(params.taskId), text: params.text } };
+  }
+
   if (method === 'tasks.task.add' || method === 'tasks.task.update') {
     const payload: Record<string, unknown> = { ...params };
     if (typeof params.fields === 'string') {
