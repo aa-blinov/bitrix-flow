@@ -179,7 +179,7 @@ export default function ProjectPage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-background" suppressHydrationWarning>
       {/* Project Header */}
-      <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+      <div className="border-b bg-background">
         <div className="px-4 lg:px-6 pt-3 pb-2">
           <div className="flex items-center gap-1 text-xs text-gray-500 overflow-x-auto scrollbar-hide">
             <Button
