@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
-const REDIRECT_URI = process.env.BITRIX24_REDIRECT_URI || 'http://57.131.129.41:3000/api/oauth';
+const REDIRECT_URI =
+  process.env.BITRIX24_REDIRECT_URI || 'https://bitrix-flow.duckdns.org/api/oauth';
 
 // Запуск OAuth flow - редирект на Bitrix24
 export async function GET(req: NextRequest) {

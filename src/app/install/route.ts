@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 
-const APP_URL = process.env.BITRIX24_APP_URL || 'http://57.131.129.41:3000';
+const APP_URL = process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org';
 
 // Путь первоначальной установки - Битрикс24 перенаправляет сюда когда
 // пользователь устанавливает приложение. Содержит auth токен в URL.
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       console.error('Save install error:', err);
     }
 
-    const APP_URL = process.env.BITRIX24_APP_URL || 'http://57.131.129.41:3000';
+    const APP_URL = process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org';
     return NextResponse.redirect(`${APP_URL}/?install=success&member_id=${member_id}`);
   }
 
