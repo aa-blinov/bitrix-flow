@@ -969,13 +969,11 @@ function TaskCard({
     >
       {/* Tags row */}
       <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-        {task.priority !== 'medium' && task.priority !== 'low' && (
-          <span
-            className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
-          >
-            {priority.label}
-          </span>
-        )}
+        <span
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
+        >
+          {priority.label}
+        </span>
         {task.parentId && (
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
             Подзадача
