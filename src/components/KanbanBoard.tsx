@@ -40,6 +40,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import LoadingState from '@/components/LoadingState';
 import { sortKanbanTasks, type KanbanSort } from '@/lib/kanban-sort';
+import { extractTaskTags } from '@/lib/task-tags';
 
 function getStageColor(hex: string): { bg: string; text: string; border: string } {
   // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
@@ -954,6 +955,7 @@ function TaskCard({
   isDragging: boolean;
 }) {
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
+  const taskTags = task.tags || extractTaskTags(task.title, task.description);
   const isCompleted = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
   const dueDate = formatDeadline(task.dueDate);
@@ -976,6 +978,20 @@ function TaskCard({
         >
           {priority.label}
         </span>
+        {taskTags.slice(0, 3).map((tag) => (
+          <span
+            key={tag}
+            title={tag}
+            className="max-w-28 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+          >
+            {tag}
+          </span>
+        ))}
+        {taskTags.length > 3 && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            +{taskTags.length - 3}
+          </span>
+        )}
         {task.parentId && (
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
             Подзадача

@@ -46,6 +46,7 @@ import {
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
+import { extractTaskTags } from '@/lib/task-tags';
 import { fetchProjectMembers, searchProjectTasks } from '@/lib/bitrix24';
 import type { Bx24Task } from '@/lib/bitrix24';
 
@@ -147,6 +148,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [existingSubtaskQuery, task.projectId]);
 
   const taskSubtasks = subtasks[task.id] || [];
+  const taskTags = task.tags || extractTaskTags(task.title, task.description);
   const projectStages = stages.filter(
     (stage) => !stage.entityId || String(stage.entityId) === String(task.projectId),
   );
@@ -353,6 +355,19 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   </div>
                 )}
               </div>
+
+              {taskTags.length > 0 && (
+                <div>
+                  <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Теги</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {taskTags.map((tag) => (
+                      <Badge key={tag} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Subtasks - Collapsible */}
               <Card className="gap-0 py-0">
