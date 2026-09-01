@@ -139,6 +139,7 @@ type SavedView = {
     hideDone: boolean;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
+    columnWidths?: Record<SortKey, number>;
   };
 };
 const DEFAULT_COLUMNS: ColumnKey[] = [
@@ -151,6 +152,15 @@ const DEFAULT_COLUMNS: ColumnKey[] = [
   'actual',
   'deadline',
 ];
+function normalizeVisibleColumns(columns: unknown): ColumnKey[] {
+  if (!Array.isArray(columns)) return DEFAULT_COLUMNS;
+  const valid = columns.filter(
+    (column): column is ColumnKey => typeof column === 'string' && column in COLUMN_LABELS,
+  );
+  const unique = [...new Set(valid)];
+  return unique.includes('title') ? unique : ['title', ...unique];
+}
+
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   title: 'Задача',
   project: 'Проект',
@@ -607,6 +617,7 @@ export default function TaskGrid({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
+  const [layoutLoaded, setLayoutLoaded] = useState(false);
   const [views, setViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewOpen, setSaveViewOpen] = useState(false);
@@ -841,6 +852,38 @@ export default function TaskGrid({
   }, [viewScope]);
 
   useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/task-grid-preferences')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !data.preference) return;
+        setVisibleColumns(normalizeVisibleColumns(data.preference.visibleColumns));
+        if (data.preference.columnWidths && typeof data.preference.columnWidths === 'object') {
+          setColumnWidths((current) => ({ ...current, ...data.preference.columnWidths }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLayoutLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!layoutLoaded) return;
+    const timer = window.setTimeout(() => {
+      void fetch('/api/task-grid-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: { visibleColumns, columnWidths } }),
+      });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [columnWidths, layoutLoaded, visibleColumns]);
+
+  useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
   }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tasks]);
@@ -889,6 +932,7 @@ export default function TaskGrid({
       setGroupBy('none');
       setSorts([{ key: 'updated', direction: 'desc' }]);
       setVisibleColumns(DEFAULT_COLUMNS);
+      setColumnWidths(COLUMN_WIDTHS);
       return;
     }
     setActiveViewId(id);
@@ -906,7 +950,8 @@ export default function TaskGrid({
     setProjectFilter(config.projectFilter);
     setGroupBy(config.groupBy);
     setSorts(config.sorts);
-    setVisibleColumns(config.visibleColumns);
+    setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
+    if (config.columnWidths) setColumnWidths((current) => ({ ...current, ...config.columnWidths }));
   };
   const saveView = async () => {
     const name = viewName.trim();
@@ -919,6 +964,7 @@ export default function TaskGrid({
       hideDone: draftHideDone,
       sorts,
       visibleColumns,
+      columnWidths,
     };
     const response = await fetch('/api/task-views', {
       method: 'POST',
