@@ -51,6 +51,15 @@ function formatHours(hours: number) {
     : `${hours.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ч`;
 }
 
+function taskLabel(count: number) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  if (lastTwo >= 11 && lastTwo <= 14) return 'задач';
+  if (last === 1) return 'задача';
+  if (last >= 2 && last <= 4) return 'задачи';
+  return 'задач';
+}
+
 function loadTone(count: number, hours: number) {
   if (count >= 5 || hours >= 8)
     return 'border-red-300 bg-red-500/10 text-red-800 dark:border-red-900 dark:text-red-200';
@@ -59,13 +68,40 @@ function loadTone(count: number, hours: number) {
   return 'border-emerald-300 bg-emerald-500/10 text-emerald-800 dark:border-emerald-900 dark:text-emerald-200';
 }
 
+function UserAvatar({ user }: { user: Bx24User }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const initials = user.name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  if (user.icon && !imageFailed) {
+    return (
+      <img
+        src={user.icon}
+        alt=""
+        className="size-7 shrink-0 rounded-full object-cover"
+        onError={() => setImageFailed(true)}
+      />
+    );
+  }
+  return (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+      {initials || '—'}
+    </span>
+  );
+}
+
 function WorkloadValue({ tasks }: { tasks: BxTask[] }) {
   const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
   if (tasks.length === 0) return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex flex-col items-center gap-0.5 leading-tight">
       <strong className="font-semibold">
-        {tasks.length} {tasks.length === 1 ? 'задача' : 'задач'}
+        {tasks.length} {taskLabel(tasks.length)}
       </strong>
       <span className="text-xs opacity-80">{formatHours(hours)}</span>
     </span>
@@ -94,18 +130,28 @@ export default function TeamWorkload() {
   );
 
   const openTasks = useMemo(() => allTasks.filter((task) => task.status !== 'done'), [allTasks]);
+  // Bitrix user.get identifies company staff as USER_TYPE=employee. Extranet
+  // users must not influence an internal workload plan.
+  const employees = useMemo(
+    () => users.filter((user) => user.userType !== 'extranet' && user.userType !== 'email'),
+    [users],
+  );
+  const workloadTasks = useMemo(() => {
+    const employeeIds = new Set(employees.map((user) => user.id));
+    return openTasks.filter((task) => !task.assigneeId || employeeIds.has(task.assigneeId));
+  }, [employees, openTasks]);
   const assignees = useMemo(() => {
-    const ids = new Set(openTasks.map((task) => task.assigneeId || 'unassigned'));
-    const known = users
+    const ids = new Set(workloadTasks.map((task) => task.assigneeId || 'unassigned'));
+    const known = employees
       .filter((user) => ids.has(user.id))
       .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
     return ids.has('unassigned')
       ? [...known, { id: 'unassigned', name: 'Без исполнителя' } as Bx24User]
       : known;
-  }, [openTasks, users]);
+  }, [employees, workloadTasks]);
 
   const tasksFor = (assigneeId: string, key: string | null) =>
-    openTasks.filter(
+    workloadTasks.filter(
       (task) =>
         (task.assigneeId || 'unassigned') === assigneeId &&
         (key ? dayKey(task.dueDate) === key : !task.dueDate),
@@ -113,13 +159,18 @@ export default function TeamWorkload() {
 
   const weekTasks = useMemo(
     () =>
-      openTasks.filter((task) => {
+      workloadTasks.filter((task) => {
         const dueKey = dayKey(task.dueDate);
         return dueKey !== null && weekKeys.has(dueKey);
       }),
-    [openTasks, weekKeys],
+    [weekKeys, workloadTasks],
   );
-  const noDeadlineCount = openTasks.filter((task) => !task.dueDate).length;
+  const noDeadlineCount = workloadTasks.filter((task) => !task.dueDate).length;
+  const todayKey = calendarDayKey(new Date());
+  const overdueTasks = workloadTasks.filter((task) => {
+    const dueKey = dayKey(task.dueDate);
+    return dueKey !== null && dueKey < todayKey;
+  });
   const weekHours = weekTasks.reduce((sum, task) => sum + task.estimate, 0);
 
   return (
@@ -130,7 +181,7 @@ export default function TeamWorkload() {
       />
 
       <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
               <ClipboardList className="size-5 text-primary" />
@@ -155,6 +206,15 @@ export default function TeamWorkload() {
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{noDeadlineCount}</p>
                 <p className="text-sm text-muted-foreground">задач без срока</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <ClipboardList className="size-5 text-red-600" />
+              <div>
+                <p className="text-2xl font-semibold tabular-nums">{overdueTasks.length}</p>
+                <p className="text-sm text-muted-foreground">просроченных задач</p>
               </div>
             </CardContent>
           </Card>
@@ -199,8 +259,8 @@ export default function TeamWorkload() {
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[1000px]">
-                <div className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)] border-b bg-muted/40 text-sm">
+              <div className="min-w-[1130px]">
+                <div className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)_minmax(130px,1fr)] border-b bg-muted/40 text-sm">
                   <div className="px-4 py-3 font-medium">Исполнитель</div>
                   {days.map((day, index) => (
                     <div key={calendarDayKey(day)} className="border-l px-2 py-3 text-center">
@@ -209,16 +269,17 @@ export default function TeamWorkload() {
                     </div>
                   ))}
                   <div className="border-l px-2 py-3 text-center font-medium">Без срока</div>
+                  <div className="border-l px-2 py-3 text-center font-medium text-red-700 dark:text-red-300">
+                    Просрочено
+                  </div>
                 </div>
                 {assignees.map((assignee) => (
                   <div
                     key={assignee.id}
-                    className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)] border-b last:border-b-0"
+                    className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)_minmax(130px,1fr)] border-b last:border-b-0"
                   >
                     <div className="flex min-w-0 items-center gap-2 px-4 py-3">
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {assignee.name.charAt(0)}
-                      </span>
+                      <UserAvatar user={assignee} />
                       <span className="truncate text-sm font-medium">{assignee.name}</span>
                     </div>
                     {days.map((day) => {
@@ -258,6 +319,28 @@ export default function TeamWorkload() {
                             })
                           }
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
+                        >
+                          <WorkloadValue tasks={tasks} />
+                        </button>
+                      );
+                    })()}
+                    {(() => {
+                      const tasks = overdueTasks.filter(
+                        (task) => (task.assigneeId || 'unassigned') === assignee.id,
+                      );
+                      const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            tasks.length &&
+                            setSelectedCell({
+                              assigneeName: assignee.name,
+                              dateLabel: 'Просрочено',
+                              tasks,
+                            })
+                          }
+                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-red-300 bg-red-500/10 text-red-800 hover:ring-2 hover:ring-red-500/30 dark:border-red-900 dark:text-red-200' : 'border-transparent hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
                         </button>

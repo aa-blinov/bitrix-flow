@@ -166,6 +166,7 @@ export interface Bx24User {
   name: string;
   email?: string;
   icon?: string;
+  userType?: 'employee' | 'extranet' | 'email' | string;
 }
 
 const TASK_LIST_FIELDS = [
@@ -272,6 +273,7 @@ export async function fetchUsers(): Promise<Bx24User[]> {
       name: `${u.NAME} ${u.LAST_NAME || ''}`.trim(),
       email: u.EMAIL,
       icon: u.PERSONAL_PHOTO,
+      userType: u.USER_TYPE,
     }));
     await cacheSet('users:all', users, 5 * 60);
     return users;

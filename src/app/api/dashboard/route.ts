@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
         name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
         email: u.EMAIL,
         icon: u.PERSONAL_PHOTO,
+        userType: u.USER_TYPE,
       })),
       currentUser: rawCurrentUser
         ? {
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
       name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
       email: u.EMAIL,
       icon: u.PERSONAL_PHOTO,
+      userType: u.USER_TYPE,
     }));
 
     const currentUser = rawCurrentUser

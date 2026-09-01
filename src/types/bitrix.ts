@@ -121,6 +121,7 @@ export interface Bx24User {
   name: string;
   email?: string;
   icon?: string;
+  userType?: 'employee' | 'extranet' | 'email' | string;
 }
 
 export interface TaskFilters {
