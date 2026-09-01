@@ -918,39 +918,6 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         )}
                       </div>
                     </div>
-
-                    {/* Estimate */}
-                    <div>
-                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                        <Timer size={12} /> Оценка
-                      </label>
-                      {editingField === 'estimate' ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          className="w-full"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={() => handleUpdateField('estimate', parseFloat(editValue) || 0)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter')
-                              void handleUpdateField('estimate', parseFloat(editValue) || 0);
-                          }}
-                          autoFocus
-                        />
-                      ) : (
-                        <p
-                          className="font-medium text-foreground cursor-pointer hover:bg-muted rounded px-1 -mx-1"
-                          onClick={() => {
-                            setEditValue(String(task.estimate));
-                            setEditingField('estimate');
-                          }}
-                        >
-                          {task.estimate > 0 ? `${task.estimate} ч` : 'Без оценки'}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 )}
               </Card>
@@ -1009,9 +976,37 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   ))}
 
                   <div className="pt-2 border-t space-y-1">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-muted-foreground">План:</span>
-                      <span className="font-medium">{task.estimate} ч</span>
+                      {editingField === 'estimate' ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          className="h-7 w-24 text-right"
+                          value={editValue}
+                          onChange={(event) => setEditValue(event.target.value)}
+                          onBlur={() =>
+                            void handleUpdateField('estimate', parseFloat(editValue) || 0)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter')
+                              void handleUpdateField('estimate', parseFloat(editValue) || 0);
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="font-medium hover:underline"
+                          onClick={() => {
+                            setEditValue(String(task.estimate));
+                            setEditingField('estimate');
+                          }}
+                        >
+                          {task.estimate} ч
+                        </button>
+                      )}
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Затрачено:</span>
