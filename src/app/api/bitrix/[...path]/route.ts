@@ -9,13 +9,27 @@ import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 // ponytail: чтение/запись MongoDB-кэша задач прямо из прокси-роута.
 // Клиентский fetchTasksByProject (в src/lib/bitrix24.ts) тоже ходит в tasksCacheGet,
 // но в браузере это пустая трата — пусть proxy отдаёт кэш из MongoDB напрямую.
+// Кэш содержит полный список проекта; запросы с любым дополнительным filter нельзя
+// обслуживать из него, иначе поиск и фильтры получают лишние задачи.
+function hasTaskListFiltersBeyondGroup(params: Record<string, string>): boolean {
+  const allowed = new Set([
+    'filter[GROUP_ID]',
+    'filter%5BGROUP_ID%5D',
+    'filter[>=CHANGED_DATE]',
+    'filter%5B%3E%3DCHANGED_DATE%5D',
+  ]);
+  return Object.keys(params).some(
+    (key) => (key.startsWith('filter[') || key.startsWith('filter%5B')) && !allowed.has(key),
+  );
+}
+
 async function mongoTasksCacheRead(
   method: string,
   params: Record<string, string>,
 ): Promise<any | null> {
   if (method !== 'tasks.task.list') return null;
-  // "Активные задачи" или любые другие фильтры — скип, кэш только полный список.
-  if (params['filter[!STATUS]']) return null;
+  // Только полный список проекта: любые дополнительные фильтры должны уйти в Bitrix.
+  if (hasTaskListFiltersBeyondGroup(params)) return null;
 
   const groupId = params['filter[GROUP_ID]'] || params['filter%5BGROUP_ID%5D'];
   if (!groupId) return null;
@@ -54,9 +68,8 @@ async function mongoTasksCacheWrite(
   data: any,
 ): Promise<void> {
   if (method !== 'tasks.task.list') return;
-  // Если стоит filter[!STATUS]=5 — это запрос "только активные", его
-  // кэшировать нельзя (любая мутация может перевести задачу в done).
-  if (params['filter[!STATUS]']) return;
+  // Кэшируем только полный список проекта, не результаты поиска или фильтров.
+  if (hasTaskListFiltersBeyondGroup(params)) return;
 
   const groupId = params['filter[GROUP_ID]'] || params['filter%5BGROUP_ID%5D'];
   if (!groupId) return; // без проекта — неклассифицированные задачи, скип
