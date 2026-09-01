@@ -488,6 +488,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     setFilters({
                       search: '',
                       assigneeId: '',
+                      priority: '',
                       hasDeadline: false,
                       overdue: false,
                       showCompleted: true,
