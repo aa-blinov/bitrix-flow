@@ -8,6 +8,7 @@ import {
   Circle,
   ExternalLink,
   MoreHorizontal,
+  Filter,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -128,6 +129,7 @@ const DEFAULT_COLUMNS: ColumnKey[] = [
   'project',
   'stage',
   'assignee',
+  'priority',
   'estimate',
   'actual',
   'deadline',
@@ -543,6 +545,7 @@ export default function TaskGrid({
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(initialAssigneeId);
   const [draftProjectFilter, setDraftProjectFilter] = useState('all');
   const [draftGroupBy, setDraftGroupBy] = useState<GroupBy>(initialGroupBy);
+  const [showFilters, setShowFilters] = useState(false);
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
@@ -554,6 +557,14 @@ export default function TaskGrid({
   const [addingStageId, setAddingStageId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<string>>(new Set());
+  const activeFilterCount = [
+    draftStatusFilter !== 'all',
+    draftHideDone,
+    draftAssigneeFilter !== 'all',
+    showProject && draftProjectFilter !== 'all',
+    draftGroupBy !== 'none',
+  ].filter(Boolean).length;
+
   const orderedTasks = useMemo(() => {
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
@@ -1015,100 +1026,114 @@ export default function TaskGrid({
                   ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
-              <Checkbox
-                checked={draftHideDone}
-                onCheckedChange={(value) => setDraftHideDone(value === true)}
-                aria-label="Скрыть закрытые задачи"
-              />
-              <span>Скрыть закрытые</span>
-            </label>
-            <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
-              <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все задачи</SelectItem>
-                <SelectItem value="active">Активные задачи</SelectItem>
-                <SelectItem value="attention">Требуют внимания</SelectItem>
-                <SelectItem value="week">Дедлайн на неделе</SelectItem>
-                <SelectItem value="no_deadline">Без дедлайна</SelectItem>
-                <SelectItem value="overdue">Просрочено</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
-              <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все исполнители</SelectItem>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {showProject && (
-              <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
-                <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все проекты</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <select
-              aria-label="Группировка"
-              value={draftGroupBy}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (isGroupBy(value)) setDraftGroupBy(value);
-              }}
-              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
-            >
-              {GROUP_BY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
             <Button
-              variant="secondary"
+              variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
               className="h-8 rounded-md"
-              disabled={!filtersDirty}
-              onClick={applyFilters}
+              onClick={() => setShowFilters((open) => !open)}
             >
-              Применить
+              <Filter size={14} />
+              Фильтры
+              {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount}</Badge>}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
-              disabled={
-                !draftQuery &&
-                draftStatusFilter === 'all' &&
-                !draftHideDone &&
-                draftAssigneeFilter === 'all' &&
-                draftProjectFilter === 'all' &&
-                draftGroupBy === 'none'
-              }
-              onClick={resetFilters}
-            >
-              Сбросить
-            </Button>
+            {showFilters && (
+              <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2.5">
+                <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
+                  <Checkbox
+                    checked={draftHideDone}
+                    onCheckedChange={(value) => setDraftHideDone(value === true)}
+                    aria-label="Скрыть закрытые задачи"
+                  />
+                  <span>Скрыть закрытые</span>
+                </label>
+                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+                  <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все задачи</SelectItem>
+                    <SelectItem value="active">Активные задачи</SelectItem>
+                    <SelectItem value="attention">Требуют внимания</SelectItem>
+                    <SelectItem value="week">Дедлайн на неделе</SelectItem>
+                    <SelectItem value="no_deadline">Без дедлайна</SelectItem>
+                    <SelectItem value="overdue">Просрочено</SelectItem>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
+                  <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все исполнители</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {showProject && (
+                  <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
+                    <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все проекты</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <select
+                  aria-label="Группировка"
+                  value={draftGroupBy}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (isGroupBy(value)) setDraftGroupBy(value);
+                  }}
+                  className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
+                >
+                  {GROUP_BY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 rounded-md"
+                  disabled={!filtersDirty}
+                  onClick={applyFilters}
+                >
+                  Применить
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                  disabled={
+                    !draftQuery &&
+                    draftStatusFilter === 'all' &&
+                    !draftHideDone &&
+                    draftAssigneeFilter === 'all' &&
+                    draftProjectFilter === 'all' &&
+                    draftGroupBy === 'none'
+                  }
+                  onClick={resetFilters}
+                >
+                  Сбросить
+                </Button>
+              </div>
+            )}
           </div>
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
