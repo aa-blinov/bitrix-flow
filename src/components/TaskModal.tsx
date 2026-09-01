@@ -942,7 +942,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       type="number"
                       step="0.5"
                       min="0.5"
-                      placeholder="Часы"
+                      placeholder="Часы (ч)"
                       value={timeHours}
                       onChange={(e) => setTimeHours(Number(e.target.value))}
                       className="w-full"
@@ -977,7 +977,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                   <div className="pt-2 border-t space-y-1">
                     <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">План:</span>
+                      <span className="text-muted-foreground">План, ч:</span>
                       {editingField === 'estimate' ? (
                         <Input
                           type="number"
@@ -1009,7 +1009,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       )}
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Затрачено:</span>
+                      <span className="text-muted-foreground">Факт, ч:</span>
                       <span
                         className={`font-medium ${task.actualTime > task.estimate ? 'text-red-500' : 'text-green-600'}`}
                       >

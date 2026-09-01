@@ -1022,10 +1022,12 @@ function TaskCard({
             <Calendar size={12} />
             {dueDate || 'Без срока'}
           </span>
-          {task.actualTime > 0 && (
+          {(task.estimate > 0 || task.actualTime > 0) && (
             <span className="flex items-center gap-1 shrink-0">
               <Timer size={12} />
-              {task.actualTime} ч
+              {task.estimate > 0 && `План ${task.estimate} ч`}
+              {task.estimate > 0 && task.actualTime > 0 && ' · '}
+              {task.actualTime > 0 && `Факт ${task.actualTime} ч`}
             </span>
           )}
           {totalSubtasks > 0 && (

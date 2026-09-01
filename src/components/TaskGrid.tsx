@@ -139,8 +139,8 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   assignee: 'Исполнитель',
   priority: 'Приоритет',
   deadline: 'Дедлайн',
-  estimate: 'План',
-  actual: 'Факт',
+  estimate: 'План, ч',
+  actual: 'Факт, ч',
   description: 'Описание',
   created: 'Создана',
   updated: 'Обновлена',
@@ -432,7 +432,7 @@ function FieldControls({
       {label('Дедлайн', deadline)}
       {label('План, ч', estimate)}
       <div className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-xs text-muted-foreground">
-        <span>Факт</span>
+        <span>Факт, ч</span>
         <span className="px-2 text-sm text-foreground">{task.actualTime || 0} ч</span>
       </div>
     </div>
@@ -1313,8 +1313,8 @@ export default function TaskGrid({
                   {visibleColumns.includes('assignee') && sortableHead('assignee', 'Исполнитель')}
                   {visibleColumns.includes('priority') && sortableHead('priority', 'Приоритет')}
                   {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
-                  {visibleColumns.includes('estimate') && sortableHead('estimate', 'План')}
-                  {visibleColumns.includes('actual') && sortableHead('actual', 'Факт')}
+                  {visibleColumns.includes('estimate') && sortableHead('estimate', 'План, ч')}
+                  {visibleColumns.includes('actual') && sortableHead('actual', 'Факт, ч')}
                   {(
                     [
                       'description',
