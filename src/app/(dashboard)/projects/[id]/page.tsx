@@ -374,7 +374,7 @@ export default function ProjectPage() {
             tasks={visibleTasks}
             initialGroupBy="stage"
             initialStatus={initialStatus}
-            layoutScope={`project:${projectId}`}
+            layoutScope="projects"
             title={null}
           />
         </TabsContent>

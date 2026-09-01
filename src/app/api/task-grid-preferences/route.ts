@@ -25,9 +25,8 @@ async function memberId(request: NextRequest) {
   return getAuthorizedMemberId(request.cookies.get(sessionCookie.name)?.value);
 }
 
-function normalizeScope(value: unknown): string {
-  if (value === 'all' || value === 'my') return value;
-  return typeof value === 'string' && /^project:\d+$/.test(value) ? value : 'all';
+function normalizeScope(value: unknown): 'all' | 'my' | 'projects' {
+  return value === 'my' || value === 'projects' ? value : 'all';
 }
 
 export async function GET(request: NextRequest) {
