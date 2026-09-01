@@ -27,3 +27,19 @@ bitrix-flow.duckdns.org {
         encode gzip zstd
     }
 }
+
+# cast-team's own daemon — same DuckDNS account/Caddy instance, different
+# project (~/pet/cast-team). Reaches cast-server via the cast-team_default
+# network this caddy service also joined (see docker-compose.yml).
+cast-team.duckdns.org {
+    tls {
+        dns duckdns {env.DUCKDNS_TOKEN}
+    }
+
+    reverse_proxy cast-server:1337 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    encode gzip zstd
+}

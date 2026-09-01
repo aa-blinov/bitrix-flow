@@ -26,11 +26,16 @@ services:
       - '80:80'
       - '443:443'
     environment:
+      # Same DuckDNS account/token also covers the cast-team.duckdns.org
+      # site added below — DuckDNS tokens are per-account, not per-subdomain.
       DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in .env.local}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - default
+      - cast-team_default
     depends_on:
       app:
         condition: service_started
@@ -51,3 +56,11 @@ volumes:
   mongodb_data:
   caddy_data:
   caddy_config:
+
+networks:
+  default:
+  # cast-team's own compose network — lets this Caddy reach cast-team's
+  # cast-server container by name for the added cast-team.duckdns.org site,
+  # without publishing cast-server's port to the host.
+  cast-team_default:
+    external: true
