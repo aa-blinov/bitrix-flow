@@ -259,8 +259,8 @@ export default function TeamWorkload() {
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[1130px]">
-                <div className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)_minmax(130px,1fr)] border-b bg-muted/40 text-sm">
+              <div className="min-w-[1050px]">
+                <div className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b bg-muted/40 text-sm">
                   <div className="px-4 py-3 font-medium">Исполнитель</div>
                   {days.map((day, index) => (
                     <div key={calendarDayKey(day)} className="border-l px-2 py-3 text-center">
@@ -276,7 +276,7 @@ export default function TeamWorkload() {
                 {assignees.map((assignee) => (
                   <div
                     key={assignee.id}
-                    className="grid grid-cols-[minmax(190px,1.5fr)_repeat(7,minmax(105px,1fr))_minmax(130px,1fr)_minmax(130px,1fr)] border-b last:border-b-0"
+                    className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
                   >
                     <div className="flex min-w-0 items-center gap-2 px-4 py-3">
                       <UserAvatar user={assignee} />
