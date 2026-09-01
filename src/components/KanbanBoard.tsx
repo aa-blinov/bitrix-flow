@@ -1,8 +1,9 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
-import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import TaskModal from './TaskModal';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus,
   Filter,
@@ -158,6 +159,25 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     projects,
     currentUser,
   } = useKanbanStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const openTask = useCallback(
+    (taskId: string) => {
+      setSelectedTask(taskId);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('task', taskId);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams, setSelectedTask],
+  );
+  const closeTask = useCallback(() => {
+    setSelectedTask(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('task');
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams, setSelectedTask]);
 
   const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
   const filteredTasks = useMemo(
@@ -630,7 +650,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       task={task}
                       avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                       onDragStart={handleDragStart}
-                      onClick={() => setSelectedTask(task.id)}
+                      onClick={() => openTask(task.id)}
                       isDragging={draggedTask === task.id}
                     />
                   ))}
@@ -676,7 +696,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     task={task}
                     avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                     onDragStart={handleDragStart}
-                    onClick={() => setSelectedTask(task.id)}
+                    onClick={() => openTask(task.id)}
                     isDragging={draggedTask === task.id}
                   />
                 ))}
@@ -820,7 +840,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         </DialogContent>
       </Dialog>
 
-      {selectedTask && <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+      {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
     </div>
   );
 }

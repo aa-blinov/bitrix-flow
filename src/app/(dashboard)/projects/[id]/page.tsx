@@ -82,7 +82,10 @@ export default function ProjectPage() {
     [tasks, projectId],
   );
   useEffect(() => {
-    if (!notificationTaskId) return;
+    if (!notificationTaskId) {
+      setSelectedTask(null);
+      return;
+    }
     const openTask = async () => {
       const task =
         projectTasks.find((item) => item.id === notificationTaskId) ||
@@ -90,12 +93,9 @@ export default function ProjectPage() {
       if (!task || task.projectId !== projectId) return;
       if (useKanbanStore.getState().selectedTaskId === notificationTaskId) return;
       setSelectedTask(notificationTaskId);
-      // The query starts the modal once; remove it so closing the modal returns
-      // to this project instead of immediately opening the same task again.
-      router.replace(`/projects/${projectId}`);
     };
     void openTask();
-  }, [loadTaskById, notificationTaskId, projectId, projectTasks, router, setSelectedTask]);
+  }, [loadTaskById, notificationTaskId, projectId, projectTasks, setSelectedTask]);
 
   // Clear any stale modal state when the user leaves this project page so the
   // back button restores the project view without a stuck modal.
