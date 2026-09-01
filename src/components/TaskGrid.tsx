@@ -1001,7 +1001,7 @@ export default function TaskGrid({
                   Поля
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="min-w-52 max-w-[calc(100vw-2rem)]">
                 {(Object.keys(COLUMN_LABELS) as ColumnKey[])
                   .filter((column) => showProject || column !== 'project')
                   .map((column) => (
