@@ -12,8 +12,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Bitrix24 PM',
-  description: 'Управление проектами и задачами Bitrix24',
+  title: 'BitrixFlow',
+  description: 'BitrixFlow — управление задачами, проектами и процессами Bitrix24.',
+  applicationName: 'BitrixFlow',
 };
 
 export const viewport: Viewport = {
