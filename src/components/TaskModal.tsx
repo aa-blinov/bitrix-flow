@@ -148,7 +148,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [existingSubtaskQuery, task.projectId]);
 
   const taskSubtasks = subtasks[task.id] || [];
-  const taskTags = task.tags || extractTaskTags(task.title, task.description);
+  const taskTags = extractTaskTags(task.title, task.description);
   const projectStages = stages.filter(
     (stage) => !stage.entityId || String(stage.entityId) === String(task.projectId),
   );

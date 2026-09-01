@@ -299,7 +299,7 @@ function InlineSelect({
 }
 
 function TaskTags({ task }: { task: BxTask }) {
-  const tags = task.tags || extractTaskTags(task.title, task.description);
+  const tags = extractTaskTags(task.title, task.description);
   if (tags.length === 0) return <span className="text-muted-foreground">—</span>;
 
   return (
@@ -569,8 +569,7 @@ export default function TaskGrid({
       if (key === 'comments') return task.commentsCount ?? task.comments.length;
       if (key === 'parent') return task.parentId || '';
       if (key === 'storyPoints') return task.storyPoints || 0;
-      if (key === 'tags')
-        return (task.tags || extractTaskTags(task.title, task.description)).join(' ');
+      if (key === 'tags') return extractTaskTags(task.title, task.description).join(' ');
       return task.title;
     };
     const needle = query.trim().toLocaleLowerCase('ru');
