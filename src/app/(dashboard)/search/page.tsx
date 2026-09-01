@@ -2,7 +2,8 @@
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS } from '@/types/bitrix';
 import { Search, X, MessageSquare, Timer, Calendar, User } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from '@/components/TaskModal';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +12,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function SearchPage() {
+function SearchPageContent() {
   const { search, searchResults, isSearching, searchQuery, setSelectedTask, tasks } =
     useKanbanStore();
   const [query, setQuery] = useState(searchQuery);
-  const [selectedTaskId, setSelectedTaskLocal] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTaskId = searchParams.get('task');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -26,15 +30,24 @@ export default function SearchPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const selectedTask = tasks.find((t) => t.id === selectedTaskId);
+  useEffect(() => {
+    setSelectedTask(selectedTaskId);
+  }, [selectedTaskId, setSelectedTask]);
+
+  const selectedTask =
+    tasks.find((task) => task.id === selectedTaskId) ||
+    searchResults.find((task) => task.id === selectedTaskId);
 
   const openTask = (taskId: string) => {
-    setSelectedTask(taskId);
-    setSelectedTaskLocal(taskId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('task', taskId);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
   const closeTask = () => {
-    setSelectedTask(null);
-    setSelectedTaskLocal(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('task');
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
   return (
@@ -145,5 +158,13 @@ export default function SearchPage() {
 
       {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-muted/30" />}>
+      <SearchPageContent />
+    </Suspense>
   );
 }
