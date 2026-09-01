@@ -2,7 +2,7 @@
 import Sidebar from '@/components/Sidebar';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSSE } from '@/hooks/useSSE';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +28,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [rehydrate, setMemberId]);
 
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === '/connect') return;
+    const storedMemberId = localStorage.getItem('bitrix_member_id') || '';
+    void fetch('/api/oauth/check', {
+      headers: { 'X-Member-Id': storedMemberId },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.session && !data.connected) {
+          const next = `${window.location.pathname}${window.location.search}`;
+          router.replace(`/connect?next=${encodeURIComponent(next)}`);
+        }
+      })
+      .catch(() => {});
+  }, [pathname, router]);
+
   useSSE(memberId, (event) => {
     if (
       event?.type === 'tasks-changed' &&

@@ -21,7 +21,9 @@ export default function ConnectPage() {
           setMemberId(data.member_id);
           setStatus('connected');
           if (data.domain) setDomain(data.domain);
-          window.history.replaceState({}, '', '/connect');
+          const next = sessionStorage.getItem('bitrix-connect-next') || '/';
+          sessionStorage.removeItem('bitrix-connect-next');
+          window.location.replace(next.startsWith('/') ? next : '/');
         }
       });
       return;
@@ -51,6 +53,8 @@ export default function ConnectPage() {
   }
 
   const handleConnect = () => {
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (next?.startsWith('/')) sessionStorage.setItem('bitrix-connect-next', next);
     window.location.href = '/api/oauth';
   };
 
