@@ -16,6 +16,7 @@ import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -95,7 +96,8 @@ type SortKey =
   | 'created'
   | 'comments'
   | 'parent'
-  | 'storyPoints';
+  | 'storyPoints'
+  | 'tags';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 type ColumnKey = SortKey;
 type GroupBy = 'none' | 'stage' | 'assignee' | 'hierarchy';
@@ -144,6 +146,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   comments: 'Комментарии',
   parent: 'Родительская',
   storyPoints: 'Story points',
+  tags: 'Теги',
 };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 280,
@@ -160,6 +163,7 @@ const COLUMN_WIDTHS: Record<SortKey, number> = {
   comments: 110,
   parent: 130,
   storyPoints: 120,
+  tags: 220,
 };
 
 function EditableTitle({
@@ -290,6 +294,28 @@ function InlineSelect({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function TaskTags({ task }: { task: BxTask }) {
+  const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      <Badge className={`border-0 text-[10px] ${priority.bgColor} ${priority.color}`}>
+        {priority.label}
+      </Badge>
+      {task.parentId && (
+        <Badge variant="secondary" className="text-[10px]">
+          Подзадача
+        </Badge>
+      )}
+      {!task.dueDate && task.status !== 'done' && (
+        <Badge variant="secondary" className="text-[10px]">
+          Без срока
+        </Badge>
+      )}
+    </div>
   );
 }
 
@@ -549,6 +575,8 @@ export default function TaskGrid({
       if (key === 'comments') return task.commentsCount ?? task.comments.length;
       if (key === 'parent') return task.parentId || '';
       if (key === 'storyPoints') return task.storyPoints || 0;
+      if (key === 'tags')
+        return `${task.priority} ${task.parentId ? 'subtask' : ''} ${task.dueDate ? '' : 'no-deadline'}`;
       return task.title;
     };
     const needle = query.trim().toLocaleLowerCase('ru');
@@ -1262,6 +1290,7 @@ export default function TaskGrid({
                     'comments',
                     'parent',
                     'storyPoints',
+                    'tags',
                   ] as ColumnKey[]
                 ).map(
                   (column) =>
@@ -1301,6 +1330,7 @@ export default function TaskGrid({
                       'comments',
                       'parent',
                       'storyPoints',
+                      'tags',
                     ] as ColumnKey[]
                   ).map(
                     (column) =>
@@ -1409,6 +1439,11 @@ export default function TaskGrid({
                         {visibleColumns.includes('storyPoints') && (
                           <TableCell className="text-muted-foreground">
                             {task.storyPoints ?? '—'}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('tags') && (
+                          <TableCell>
+                            <TaskTags task={task} />
                           </TableCell>
                         )}
                         <TableCell>
