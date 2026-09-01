@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>BitrixFlow Kanban</title>
+  <rect width="64" height="64" rx="14" fill="#1d4ed8"/>
+  <rect x="12" y="13" width="11" height="38" rx="3" fill="#dbeafe"/>
+  <rect x="27" y="13" width="11" height="38" rx="3" fill="#bfdbfe"/>
+  <rect x="42" y="13" width="10" height="38" rx="3" fill="#93c5fd"/>
+  <rect x="15" y="18" width="5" height="10" rx="1.5" fill="#2563eb"/>
+  <rect x="15" y="33" width="5" height="13" rx="1.5" fill="#2563eb"/>
+  <rect x="30" y="18" width="5" height="15" rx="1.5" fill="#2563eb"/>
+  <rect x="30" y="38" width="5" height="8" rx="1.5" fill="#2563eb"/>
+  <rect x="45" y="18" width="4" height="24" rx="1.5" fill="#2563eb"/>
+</svg>
