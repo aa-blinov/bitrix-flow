@@ -485,6 +485,34 @@ export async function searchTasks(query: string): Promise<Bx24Task[]> {
   }
 }
 
+// Поиск задач в проекте не зависит от уже загруженной страницы Kanban.
+export async function searchProjectTasks(projectId: string, query: string): Promise<Bx24Task[]> {
+  const normalizedQuery = query.trim();
+  if (!projectId || !normalizedQuery) return [];
+
+  const key = `project-search:${projectId}:${normalizedQuery.toLocaleLowerCase('ru')}`;
+  const cached = await cacheGet<Bx24Task[]>(key);
+  if (cached) return cached;
+
+  try {
+    const params: Record<string, string> = {
+      'order[ID]': 'DESC',
+      start: '0',
+      'filter[GROUP_ID]': projectId,
+    };
+    addTaskListFields(params);
+    if (/^\d+$/.test(normalizedQuery)) params['filter[ID]'] = normalizedQuery;
+    else params['filter[%TITLE]'] = normalizedQuery;
+
+    const result = await bx24('tasks.task.list', params);
+    const tasks = (result.tasks || []).map((task: any): Bx24Task => mapTask(task));
+    await cacheSet(key, tasks, 30);
+    return tasks;
+  } catch {
+    return [];
+  }
+}
+
 // Подзадачи
 export async function fetchSubtasks(parentId: string): Promise<Bx24Task[]> {
   const key = `subtasks:${parentId}`;

@@ -46,7 +46,8 @@ import {
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
-import { fetchProjectMembers } from '@/lib/bitrix24';
+import { fetchProjectMembers, searchProjectTasks } from '@/lib/bitrix24';
+import type { Bx24Task } from '@/lib/bitrix24';
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
@@ -87,6 +88,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [parentQuery, setParentQuery] = useState('');
+  const [parentSearchResults, setParentSearchResults] = useState<Bx24Task[]>([]);
+  const [existingSubtaskResults, setExistingSubtaskResults] = useState<Bx24Task[]>([]);
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +107,44 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     const element = commentsRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [task.id, task.comments.length]);
+
+  useEffect(() => {
+    const query = parentQuery.trim();
+    const shouldSearch = /^\d+$/.test(query) || query.length >= 2;
+    if (!shouldSearch) {
+      setParentSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchProjectTasks(task.projectId, query).then((results) => {
+        if (!cancelled) setParentSearchResults(results);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [parentQuery, task.projectId]);
+
+  useEffect(() => {
+    const query = existingSubtaskQuery.trim();
+    const shouldSearch = /^\d+$/.test(query) || query.length >= 2;
+    if (!shouldSearch) {
+      setExistingSubtaskResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void searchProjectTasks(task.projectId, query).then((results) => {
+        if (!cancelled) setExistingSubtaskResults(results);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [existingSubtaskQuery, task.projectId]);
 
   const taskSubtasks = subtasks[task.id] || [];
   const projectStages = stages.filter(
@@ -393,16 +434,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         />
                         {existingSubtaskQuery && (
                           <div className="mt-2 max-h-40 overflow-y-auto rounded border bg-background p-1">
-                            {tasks
+                            {existingSubtaskResults
                               .filter(
                                 (candidate) =>
-                                  candidate.projectId === task.projectId &&
                                   candidate.id !== task.id &&
                                   candidate.id !== task.parentId &&
-                                  candidate.parentId !== task.id &&
-                                  `${candidate.id} ${candidate.title}`
-                                    .toLocaleLowerCase('ru')
-                                    .includes(existingSubtaskQuery.toLocaleLowerCase('ru')),
+                                  candidate.parentId !== task.id,
                               )
                               .slice(0, 10)
                               .map((candidate) => (
@@ -840,13 +877,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         />
                         {parentQuery && (
                           <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
-                            {tasks
+                            {parentSearchResults
                               .filter(
                                 (candidate) =>
                                   candidate.id !== task.id &&
-                                  `${candidate.id} ${candidate.title}`
-                                    .toLocaleLowerCase('ru')
-                                    .includes(parentQuery.toLocaleLowerCase('ru')),
+                                  !taskSubtasks.some((subtask) => subtask.id === candidate.id),
                               )
                               .slice(0, 10)
                               .map((candidate) => (
