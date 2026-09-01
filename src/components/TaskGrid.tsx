@@ -1142,6 +1142,32 @@ export default function TaskGrid({
                       aria-label={`Выбрать задачу ${task.title}`}
                       className="mt-1.5"
                     />
+                    {groupBy === 'hierarchy' && (hierarchy.childCount.get(task.id) || 0) > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="mt-0.5 size-6 shrink-0"
+                        aria-label={
+                          collapsedTaskIds.has(task.id)
+                            ? `Развернуть подзадачи ${task.title}`
+                            : `Свернуть подзадачи ${task.title}`
+                        }
+                        onClick={() =>
+                          setCollapsedTaskIds((ids) => {
+                            const next = new Set(ids);
+                            if (next.has(task.id)) next.delete(task.id);
+                            else next.add(task.id);
+                            return next;
+                          })
+                        }
+                      >
+                        {collapsedTaskIds.has(task.id) ? (
+                          <ChevronRight className="size-4" />
+                        ) : (
+                          <ChevronDown className="size-4" />
+                        )}
+                      </Button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openTask(task.id)}
