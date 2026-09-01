@@ -619,7 +619,8 @@ export default function TaskGrid({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
-  const [layoutLoaded, setLayoutLoaded] = useState(false);
+  const [loadedLayoutScope, setLoadedLayoutScope] = useState<string | null>(null);
+  const [layoutDirty, setLayoutDirty] = useState(false);
   const [views, setViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewOpen, setSaveViewOpen] = useState(false);
@@ -639,6 +640,7 @@ export default function TaskGrid({
   );
   const hiddenColumns = availableColumns.filter((column) => !visibleColumns.includes(column));
   const reorderColumns = (activeId: string, overId: string) => {
+    setLayoutDirty(true);
     setVisibleColumns((columns) => {
       const oldIndex = columns.indexOf(activeId as ColumnKey);
       const newIndex = columns.indexOf(overId as ColumnKey);
@@ -646,6 +648,7 @@ export default function TaskGrid({
     });
   };
   const toggleColumn = (column: ColumnKey, checked: boolean) => {
+    setLayoutDirty(true);
     setVisibleColumns((columns) =>
       checked ? [...columns, column] : columns.filter((item) => item !== column),
     );
@@ -855,7 +858,8 @@ export default function TaskGrid({
 
   useEffect(() => {
     let cancelled = false;
-    setLayoutLoaded(false);
+    setLoadedLayoutScope(null);
+    setLayoutDirty(false);
     setVisibleColumns(DEFAULT_COLUMNS);
     setColumnWidths(COLUMN_WIDTHS);
     void fetch(`/api/task-grid-preferences?scope=${encodeURIComponent(layoutScope)}`)
@@ -869,7 +873,7 @@ export default function TaskGrid({
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setLayoutLoaded(true);
+        if (!cancelled) setLoadedLayoutScope(layoutScope);
       });
     return () => {
       cancelled = true;
@@ -877,7 +881,7 @@ export default function TaskGrid({
   }, [layoutScope]);
 
   useEffect(() => {
-    if (!layoutLoaded) return;
+    if (loadedLayoutScope !== layoutScope || !layoutDirty) return;
     const timer = window.setTimeout(() => {
       void fetch('/api/task-grid-preferences', {
         method: 'PUT',
@@ -886,7 +890,7 @@ export default function TaskGrid({
       });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [columnWidths, layoutLoaded, layoutScope, visibleColumns]);
+  }, [columnWidths, layoutDirty, layoutScope, loadedLayoutScope, visibleColumns]);
 
   useEffect(() => {
     setPage(1);
@@ -938,6 +942,7 @@ export default function TaskGrid({
       setSorts([{ key: 'updated', direction: 'desc' }]);
       setVisibleColumns(DEFAULT_COLUMNS);
       setColumnWidths(COLUMN_WIDTHS);
+      setLayoutDirty(true);
       return;
     }
     setActiveViewId(id);
@@ -957,6 +962,7 @@ export default function TaskGrid({
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
     if (config.columnWidths) setColumnWidths((current) => ({ ...current, ...config.columnWidths }));
+    setLayoutDirty(false);
   };
   const saveView = async () => {
     const name = viewName.trim();
@@ -1017,6 +1023,7 @@ export default function TaskGrid({
       : `${sorts[index].direction === 'asc' ? '↑' : '↓'}${sorts.length > 1 ? index + 1 : ''}`;
   };
   const resizeColumn = (key: SortKey, startX: number, startWidth: number) => {
+    setLayoutDirty(true);
     const move = (event: PointerEvent) =>
       setColumnWidths((widths) => ({
         ...widths,
