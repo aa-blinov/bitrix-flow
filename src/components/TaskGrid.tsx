@@ -2,6 +2,22 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   ChevronDown,
   ChevronRight,
   CheckCircle2,
@@ -9,6 +25,7 @@ import {
   ExternalLink,
   MoreHorizontal,
   Filter,
+  GripVertical,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -168,6 +185,46 @@ const COLUMN_WIDTHS: Record<SortKey, number> = {
   storyPoints: 120,
   tags: 220,
 };
+
+function SortableVisibleColumn({
+  column,
+  onToggle,
+}: {
+  column: ColumnKey;
+  onToggle: (column: ColumnKey, checked: boolean) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column,
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center rounded-md ${isDragging ? 'bg-accent opacity-60' : ''}`}
+    >
+      <button
+        type="button"
+        className="cursor-grab touch-none px-1 text-muted-foreground active:cursor-grabbing"
+        aria-label={`Изменить порядок поля ${COLUMN_LABELS[column]}`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={14} />
+      </button>
+      <DropdownMenuCheckboxItem
+        className="flex-1"
+        checked
+        disabled={column === 'title'}
+        onSelect={(event) => event.preventDefault()}
+        onCheckedChange={(checked) => onToggle(column, checked)}
+      >
+        {COLUMN_LABELS[column]}
+      </DropdownMenuCheckboxItem>
+    </div>
+  );
+}
 
 function EditableTitle({
   task,
@@ -557,12 +614,34 @@ export default function TaskGrid({
   const [addingStageId, setAddingStageId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<string>>(new Set());
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const availableColumns = (Object.keys(COLUMN_LABELS) as ColumnKey[]).filter(
+    (column) => showProject || column !== 'project',
+  );
+  const orderedVisibleColumns = visibleColumns.filter((column) =>
+    availableColumns.includes(column),
+  );
+  const hiddenColumns = availableColumns.filter((column) => !visibleColumns.includes(column));
+  const reorderColumns = (activeId: string, overId: string) => {
+    setVisibleColumns((columns) => {
+      const oldIndex = columns.indexOf(activeId as ColumnKey);
+      const newIndex = columns.indexOf(overId as ColumnKey);
+      return oldIndex < 0 || newIndex < 0 ? columns : arrayMove(columns, oldIndex, newIndex);
+    });
+  };
+  const toggleColumn = (column: ColumnKey, checked: boolean) => {
+    setVisibleColumns((columns) =>
+      checked ? [...columns, column] : columns.filter((item) => item !== column),
+    );
+  };
   const activeFilterCount = [
     draftStatusFilter !== 'all',
     draftHideDone,
     draftAssigneeFilter !== 'all',
     showProject && draftProjectFilter !== 'all',
-    draftGroupBy !== 'none',
   ].filter(Boolean).length;
 
   const orderedTasks = useMemo(() => {
@@ -721,8 +800,7 @@ export default function TaskGrid({
       tasks: groupedTasks,
     }));
   }, [displayPageTasks, groupBy, stages, users]);
-  const tableColumnCount =
-    visibleColumns.filter((column) => column !== 'project' || showProject).length + 2;
+  const tableColumnCount = orderedVisibleColumns.length + 2;
   // Data arrives in PAGE_SIZE-sized chunks, so a short unfiltered list may
   // still be incomplete. Let only a deliberately narrowed, partial result
   // grow with its content; otherwise preserve the compact scrollport.
@@ -784,21 +862,18 @@ export default function TaskGrid({
     setDraftHideDone(false);
     setDraftAssigneeFilter('all');
     setDraftProjectFilter('all');
-    setDraftGroupBy('none');
     setQuery('');
     setStatusFilter('all');
     setHideDone(false);
     setAssigneeFilter('all');
     setProjectFilter('all');
-    setGroupBy('none');
   };
   const filtersDirty =
     draftQuery !== query ||
     draftStatusFilter !== statusFilter ||
     draftHideDone !== hideDone ||
     draftAssigneeFilter !== assigneeFilter ||
-    draftProjectFilter !== projectFilter ||
-    draftGroupBy !== groupBy;
+    draftProjectFilter !== projectFilter;
   const applyView = (id: string) => {
     if (id === 'default') {
       setActiveViewId('');
@@ -1005,27 +1080,55 @@ export default function TaskGrid({
                   Поля
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-52 max-w-[calc(100vw-2rem)]">
-                {(Object.keys(COLUMN_LABELS) as ColumnKey[])
-                  .filter((column) => showProject || column !== 'project')
-                  .map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column}
-                      checked={visibleColumns.includes(column)}
-                      disabled={column === 'title'}
-                      onCheckedChange={(checked) =>
-                        setVisibleColumns((columns) =>
-                          checked
-                            ? [...columns, column]
-                            : columns.filter((item) => item !== column),
-                        )
-                      }
-                    >
-                      {COLUMN_LABELS[column]}
-                    </DropdownMenuCheckboxItem>
-                  ))}
+              <DropdownMenuContent align="end" className="min-w-56 max-w-[calc(100vw-2rem)]">
+                <DropdownMenuLabel>Перетащите, чтобы изменить порядок</DropdownMenuLabel>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={({ active, over }) => {
+                    if (over && active.id !== over.id)
+                      reorderColumns(String(active.id), String(over.id));
+                  }}
+                >
+                  <SortableContext
+                    items={orderedVisibleColumns}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {orderedVisibleColumns.map((column) => (
+                      <SortableVisibleColumn key={column} column={column} onToggle={toggleColumn} />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+                {hiddenColumns.length > 0 && <DropdownMenuSeparator />}
+                {hiddenColumns.map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column}
+                    checked={false}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={(checked) => toggleColumn(column, checked)}
+                  >
+                    {COLUMN_LABELS[column]}
+                  </DropdownMenuCheckboxItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <select
+              aria-label="Группировка"
+              value={draftGroupBy}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (!isGroupBy(value)) return;
+                setDraftGroupBy(value);
+                setGroupBy(value);
+              }}
+              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
+            >
+              {GROUP_BY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
@@ -1092,21 +1195,6 @@ export default function TaskGrid({
                     </SelectContent>
                   </Select>
                 )}
-                <select
-                  aria-label="Группировка"
-                  value={draftGroupBy}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (isGroupBy(value)) setDraftGroupBy(value);
-                  }}
-                  className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
-                >
-                  {GROUP_BY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -1125,8 +1213,7 @@ export default function TaskGrid({
                     draftStatusFilter === 'all' &&
                     !draftHideDone &&
                     draftAssigneeFilter === 'all' &&
-                    draftProjectFilter === 'all' &&
-                    draftGroupBy === 'none'
+                    draftProjectFilter === 'all'
                   }
                   onClick={resetFilters}
                 >
@@ -1280,42 +1367,9 @@ export default function TaskGrid({
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
-                {visibleColumns.includes('title') && <col style={{ width: columnWidths.title }} />}
-                {showProject && visibleColumns.includes('project') && (
-                  <col style={{ width: columnWidths.project }} />
-                )}
-                {visibleColumns.includes('stage') && <col style={{ width: columnWidths.stage }} />}
-                {visibleColumns.includes('assignee') && (
-                  <col style={{ width: columnWidths.assignee }} />
-                )}
-                {visibleColumns.includes('priority') && (
-                  <col style={{ width: columnWidths.priority }} />
-                )}
-                {visibleColumns.includes('deadline') && (
-                  <col style={{ width: columnWidths.deadline }} />
-                )}
-                {visibleColumns.includes('estimate') && (
-                  <col style={{ width: columnWidths.estimate }} />
-                )}
-                {visibleColumns.includes('actual') && (
-                  <col style={{ width: columnWidths.actual }} />
-                )}
-                {(
-                  [
-                    'description',
-                    'created',
-                    'updated',
-                    'comments',
-                    'parent',
-                    'storyPoints',
-                    'tags',
-                  ] as ColumnKey[]
-                ).map(
-                  (column) =>
-                    visibleColumns.includes(column) && (
-                      <col key={column} style={{ width: columnWidths[column] }} />
-                    ),
-                )}
+                {orderedVisibleColumns.map((column) => (
+                  <col key={column} style={{ width: columnWidths[column] }} />
+                ))}
                 <col className="w-20" />
               </colgroup>
               <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-background [&_th]:shadow-[0_1px_0_0_var(--border)]">
@@ -1329,31 +1383,17 @@ export default function TaskGrid({
                       aria-label="Выбрать задачи на странице"
                     />
                   </TableHead>
-                  {visibleColumns.includes('title') && sortableHead('title', 'Задача')}
-                  {showProject &&
-                    visibleColumns.includes('project') &&
-                    sortableHead('project', 'Проект')}
-                  {visibleColumns.includes('stage') &&
-                    sortableHead('stage', showProject ? 'Статус' : 'Фаза')}
-                  {visibleColumns.includes('assignee') && sortableHead('assignee', 'Исполнитель')}
-                  {visibleColumns.includes('priority') && sortableHead('priority', 'Приоритет')}
-                  {visibleColumns.includes('deadline') && sortableHead('deadline', 'Дедлайн')}
-                  {visibleColumns.includes('estimate') && sortableHead('estimate', 'План, ч')}
-                  {visibleColumns.includes('actual') && sortableHead('actual', 'Факт, ч')}
-                  {(
-                    [
-                      'description',
-                      'created',
-                      'updated',
-                      'comments',
-                      'parent',
-                      'storyPoints',
-                      'tags',
-                    ] as ColumnKey[]
-                  ).map(
-                    (column) =>
-                      visibleColumns.includes(column) &&
-                      sortableHead(column, COLUMN_LABELS[column]),
+                  {orderedVisibleColumns.map((column) =>
+                    sortableHead(
+                      column,
+                      column === 'stage' && showProject
+                        ? 'Статус'
+                        : column === 'estimate'
+                          ? 'План, ч'
+                          : column === 'actual'
+                            ? 'Факт, ч'
+                            : COLUMN_LABELS[column],
+                    ),
                   )}
                   <TableHead className="w-20">
                     <span className="sr-only">Действия</span>
@@ -1391,79 +1431,109 @@ export default function TaskGrid({
                             aria-label={`Выбрать задачу ${task.title}`}
                           />
                         </TableCell>
-                        {visibleColumns.includes('title') && (
-                          <TableCell>
-                            <EditableTitle
-                              task={task}
-                              tree={
-                                groupBy === 'hierarchy'
-                                  ? {
-                                      depth: hierarchy.depthById.get(task.id) || 0,
-                                      hasChildren: (hierarchy.childCount.get(task.id) || 0) > 0,
-                                      expanded: !collapsedTaskIds.has(task.id),
-                                      onToggle: () =>
-                                        setCollapsedTaskIds((ids) => {
-                                          const next = new Set(ids);
-                                          if (next.has(task.id)) next.delete(task.id);
-                                          else next.add(task.id);
-                                          return next;
-                                        }),
-                                    }
-                                  : undefined
-                              }
-                            />
-                          </TableCell>
-                        )}
-                        {showProject && visibleColumns.includes('project') && (
-                          <TableCell>
-                            <ProjectField task={task} readOnly={false} />
-                          </TableCell>
-                        )}
-                        <FieldControls
-                          task={task}
-                          readOnly={isReadOnly}
-                          visibleColumns={visibleColumns}
-                        />
-                        {visibleColumns.includes('actual') && (
-                          <TableCell className="text-muted-foreground">
-                            {task.actualTime || 0} ч
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('description') && (
-                          <TableCell className="max-w-64 truncate text-muted-foreground">
-                            {task.description || '—'}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('created') && (
-                          <TableCell className="text-muted-foreground">
-                            {formatBitrixDateTime(task.createdDate)}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('updated') && (
-                          <TableCell className="text-muted-foreground">
-                            {formatBitrixDateTime(task.updatedDate)}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('comments') && (
-                          <TableCell className="text-muted-foreground">
-                            {task.commentsCount ?? task.comments.length}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('parent') && (
-                          <TableCell className="text-muted-foreground">
-                            {task.parentId ? `#${task.parentId}` : '—'}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('storyPoints') && (
-                          <TableCell className="text-muted-foreground">
-                            {task.storyPoints ?? '—'}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('tags') && (
-                          <TableCell>
-                            <TaskTags task={task} />
-                          </TableCell>
-                        )}
+                        {orderedVisibleColumns.map((column) => {
+                          if (column === 'title') {
+                            return (
+                              <TableCell key={column}>
+                                <EditableTitle
+                                  task={task}
+                                  tree={
+                                    groupBy === 'hierarchy'
+                                      ? {
+                                          depth: hierarchy.depthById.get(task.id) || 0,
+                                          hasChildren: (hierarchy.childCount.get(task.id) || 0) > 0,
+                                          expanded: !collapsedTaskIds.has(task.id),
+                                          onToggle: () =>
+                                            setCollapsedTaskIds((ids) => {
+                                              const next = new Set(ids);
+                                              if (next.has(task.id)) next.delete(task.id);
+                                              else next.add(task.id);
+                                              return next;
+                                            }),
+                                        }
+                                      : undefined
+                                  }
+                                />
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'project') {
+                            return (
+                              <TableCell key={column}>
+                                <ProjectField task={task} readOnly={false} />
+                              </TableCell>
+                            );
+                          }
+                          if (
+                            column === 'stage' ||
+                            column === 'assignee' ||
+                            column === 'priority' ||
+                            column === 'deadline' ||
+                            column === 'estimate'
+                          ) {
+                            return (
+                              <Fragment key={column}>
+                                <FieldControls
+                                  task={task}
+                                  readOnly={isReadOnly}
+                                  visibleColumns={[column]}
+                                />
+                              </Fragment>
+                            );
+                          }
+                          if (column === 'actual') {
+                            return (
+                              <TableCell key={column} className="text-muted-foreground">
+                                {task.actualTime || 0} ч
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'description') {
+                            return (
+                              <TableCell
+                                key={column}
+                                className="max-w-64 truncate text-muted-foreground"
+                              >
+                                {task.description || '—'}
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'created' || column === 'updated') {
+                            return (
+                              <TableCell key={column} className="text-muted-foreground">
+                                {formatBitrixDateTime(
+                                  column === 'created' ? task.createdDate : task.updatedDate,
+                                )}
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'comments') {
+                            return (
+                              <TableCell key={column} className="text-muted-foreground">
+                                {task.commentsCount ?? task.comments.length}
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'parent') {
+                            return (
+                              <TableCell key={column} className="text-muted-foreground">
+                                {task.parentId ? `#${task.parentId}` : '—'}
+                              </TableCell>
+                            );
+                          }
+                          if (column === 'storyPoints') {
+                            return (
+                              <TableCell key={column} className="text-muted-foreground">
+                                {task.storyPoints ?? '—'}
+                              </TableCell>
+                            );
+                          }
+                          return (
+                            <TableCell key={column}>
+                              <TaskTags task={task} />
+                            </TableCell>
+                          );
+                        })}
                         <TableCell>
                           <TaskActions task={task} />
                         </TableCell>
