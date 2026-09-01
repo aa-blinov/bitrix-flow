@@ -149,30 +149,32 @@ export default function ProjectsSummaryPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex h-8 items-center gap-1.5 text-sm">
+              <div className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
                 <span className="shrink-0 text-muted-foreground">Период:</span>
-                <label htmlFor="summary-date-from" className="text-muted-foreground">
-                  с
-                </label>
-                <Input
-                  id="summary-date-from"
-                  type="date"
-                  value={fromDate}
-                  onChange={(event) => setFromDate(event.target.value)}
-                  className="h-8 w-36 rounded-md"
-                  aria-label="Начальная дата периода"
-                />
-                <label htmlFor="summary-date-to" className="text-muted-foreground">
-                  по
-                </label>
-                <Input
-                  id="summary-date-to"
-                  type="date"
-                  value={toDate}
-                  onChange={(event) => setToDate(event.target.value)}
-                  className="h-8 w-36 rounded-md"
-                  aria-label="Конечная дата периода"
-                />
+                <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:w-auto">
+                  <label htmlFor="summary-date-from" className="text-muted-foreground">
+                    с
+                  </label>
+                  <Input
+                    id="summary-date-from"
+                    type="date"
+                    value={fromDate}
+                    onChange={(event) => setFromDate(event.target.value)}
+                    className="h-8 min-w-0 w-full rounded-md sm:w-36"
+                    aria-label="Начальная дата периода"
+                  />
+                  <label htmlFor="summary-date-to" className="text-muted-foreground">
+                    по
+                  </label>
+                  <Input
+                    id="summary-date-to"
+                    type="date"
+                    value={toDate}
+                    onChange={(event) => setToDate(event.target.value)}
+                    className="h-8 min-w-0 w-full rounded-md sm:w-36"
+                    aria-label="Конечная дата периода"
+                  />
+                </div>
               </div>
               <Button
                 variant="secondary"
@@ -204,23 +206,13 @@ export default function ProjectsSummaryPage() {
             ) : isLoading ? (
               <LoadingState className="min-h-72 bg-transparent" />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Проект</TableHead>
-                    <TableHead>Часы</TableHead>
-                    <TableHead>Прогресс</TableHead>
-                    <TableHead>Задачи</TableHead>
-                    <TableHead>Статус</TableHead>
-                    <TableHead>Изменения</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="divide-y md:hidden">
                   {shown.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell>
+                    <article key={project.id} className="space-y-3 py-3">
+                      <div>
                         <Link
-                          className="font-medium hover:underline"
+                          className="font-medium leading-snug hover:underline"
                           href={`/projects/${project.id}`}
                         >
                           {project.name}
@@ -232,73 +224,141 @@ export default function ProjectsSummaryPage() {
                           </span>
                           <span>{project.comments} сообщений</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <span className="font-medium">{hours(project.plannedHours)}</span>
-                          <span className="mx-1 text-muted-foreground">/</span>
-                          <span className="font-medium">{hours(project.actualHours)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="font-medium">
+                            {hours(project.plannedHours)} / {hours(project.actualHours)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">план / факт</p>
                         </div>
-                        <div className="text-xs text-muted-foreground">план / факт</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium">{project.progress}%</span>
+                        <div>
+                          <p className="font-medium">{project.progress}% выполнено</p>
+                          <p className="text-xs text-muted-foreground">
+                            {project.completed} из {project.leafTaskCount} задач
+                          </p>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {project.completed} из {project.leafTaskCount} выполнено
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <span className="font-medium">{project.taskCount}</span>
-                          <span className="ml-1 text-muted-foreground">всего</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {project.leafTaskCount} исполнителей
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {project.overdue > 0 && (
-                            <Badge asChild variant="destructive">
-                              <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
-                                {project.overdue} просроч.
-                              </Link>
-                            </Badge>
-                          )}
-                          <Badge asChild variant="secondary">
-                            <Link href={`/projects/${project.id}?view=grid&status=active`}>
-                              {project.inProgress} в работе
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {project.overdue > 0 && (
+                          <Badge asChild variant="destructive">
+                            <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
+                              {project.overdue} просроч.
                             </Link>
                           </Badge>
-                          {project.noDeadline > 0 && (
-                            <Badge asChild variant="outline">
-                              <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
-                                {project.noDeadline} без срока
+                        )}
+                        <Badge asChild variant="secondary">
+                          <Link href={`/projects/${project.id}?view=grid&status=active`}>
+                            {project.inProgress} в работе
+                          </Link>
+                        </Badge>
+                        {project.noDeadline > 0 && (
+                          <Badge asChild variant="outline">
+                            <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
+                              {project.noDeadline} без срока
+                            </Link>
+                          </Badge>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Проект</TableHead>
+                      <TableHead>Часы</TableHead>
+                      <TableHead>Прогресс</TableHead>
+                      <TableHead>Задачи</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead>Изменения</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {shown.map((project) => (
+                      <TableRow key={project.id}>
+                        <TableCell>
+                          <Link
+                            className="font-medium hover:underline"
+                            href={`/projects/${project.id}`}
+                          >
+                            {project.name}
+                          </Link>
+                          <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Users size={12} />
+                              {project.membersCount}
+                            </span>
+                            <span>{project.comments} сообщений</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <span className="font-medium">{hours(project.plannedHours)}</span>
+                            <span className="mx-1 text-muted-foreground">/</span>
+                            <span className="font-medium">{hours(project.actualHours)}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">план / факт</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium">{project.progress}%</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {project.completed} из {project.leafTaskCount} выполнено
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <span className="font-medium">{project.taskCount}</span>
+                            <span className="ml-1 text-muted-foreground">всего</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {project.leafTaskCount} исполнителей
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {project.overdue > 0 && (
+                              <Badge asChild variant="destructive">
+                                <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
+                                  {project.overdue} просроч.
+                                </Link>
+                              </Badge>
+                            )}
+                            <Badge asChild variant="secondary">
+                              <Link href={`/projects/${project.id}?view=grid&status=active`}>
+                                {project.inProgress} в работе
                               </Link>
                             </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {project.changedAt
-                          ? new Intl.DateTimeFormat('ru-RU', {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            }).format(new Date(project.changedAt))
-                          : 'Нет задач'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {project.noDeadline > 0 && (
+                              <Badge asChild variant="outline">
+                                <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
+                                  {project.noDeadline} без срока
+                                </Link>
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {project.changedAt
+                            ? new Intl.DateTimeFormat('ru-RU', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              }).format(new Date(project.changedAt))
+                            : 'Нет задач'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </>
             )}
           </CardContent>
         </Card>

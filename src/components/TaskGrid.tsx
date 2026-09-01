@@ -1292,8 +1292,14 @@ export default function TaskGrid({
             <p className="text-sm text-muted-foreground">
               {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из {tasks.length}
             </p>
-            <div className="flex items-center gap-1" aria-label="Пагинация">
-              <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}>
+            <div className="flex flex-wrap items-center justify-end gap-1" aria-label="Пагинация">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:inline-flex"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              >
                 Первая
               </Button>
               <Button
@@ -1326,6 +1332,7 @@ export default function TaskGrid({
               <Button
                 variant="outline"
                 size="sm"
+                className="hidden sm:inline-flex"
                 onClick={() => setPage(pageCount)}
                 disabled={page === pageCount}
               >
