@@ -390,14 +390,16 @@ async function callBitrix24(
     return `https://${domain}/${apiPath}/${method}?auth=${accessToken}`;
   };
   const url = getUrl(token.access_token);
+  const isMutation = MUTATION_METHODS.has(method);
 
   let lastError: any;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < (isMutation ? 1 : 3); attempt++) {
     try {
       const data = await postBitrixJson(
         url,
         getPayload(method, params),
         JSON_PAYLOAD_METHODS.has(method),
+        !isMutation,
       );
 
       if (data.error === 'expired_token' || data.error === 'invalid_token') {
@@ -408,6 +410,7 @@ async function callBitrix24(
             retryUrl,
             getPayload(method, params),
             JSON_PAYLOAD_METHODS.has(method),
+            !isMutation,
           );
           if (!retryData.error) return getBitrixResult(method, retryData);
         }

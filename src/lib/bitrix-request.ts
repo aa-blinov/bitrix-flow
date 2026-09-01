@@ -85,10 +85,14 @@ export async function postBitrixJson(
   url: string,
   params: Record<string, string> | Record<string, unknown>,
   sendJson = false,
+  parallel = false,
 ): Promise<any> {
   const hostname = new URL(url).hostname;
   const pool = await resolveAddresses(hostname);
-  const probes = pickProbes(pool, MAX_PARALLEL);
+  // POST mutations are not idempotent: racing them across several Bitrix IPs
+  // can create duplicate tasks, comments and time entries. Parallel probes are
+  // therefore opt-in for known read-only callers only.
+  const probes = pickProbes(pool, parallel ? MAX_PARALLEL : 1);
   const body = sendJson
     ? JSON.stringify(params)
     : new URLSearchParams(params as Record<string, string>).toString();
