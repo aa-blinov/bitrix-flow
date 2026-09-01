@@ -10,6 +10,7 @@ import {
   Bell,
   Plus,
   UserCheck,
+  CalendarDays,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -174,6 +175,7 @@ export default function Sidebar() {
           <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
           <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
           <NavItem href="/my-tasks" icon={UserCheck} label="Мои задачи" />
+          <NavItem href="/team-workload" icon={CalendarDays} label="Нагрузка команды" />
           <NavItem href="/notifications" icon={Bell} label="Уведомления" />
         </div>
 
