@@ -75,6 +75,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [commentError, setCommentError] = useState<string | null>(null);
   const [showTimeEntry, setShowTimeEntry] = useState(false);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
+  const [showExistingSubtaskPicker, setShowExistingSubtaskPicker] = useState(false);
+  const [existingSubtaskQuery, setExistingSubtaskQuery] = useState('');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [timeHours, setTimeHours] = useState(1);
   const [timeDesc, setTimeDesc] = useState('');
@@ -173,8 +175,15 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       });
       setNewSubtaskTitle('');
       setShowSubtaskAdd(false);
-      loadSubtasks(task.id);
+      void loadSubtasks(task.id);
     }
+  };
+
+  const handleAttachExistingSubtask = async (subtaskId: string) => {
+    await updateTaskField(subtaskId, 'parentId', task.id);
+    setExistingSubtaskQuery('');
+    setShowExistingSubtaskPicker(false);
+    await loadSubtasks(task.id);
   };
 
   const formatDate = (dateStr: string) => (dateStr ? formatBitrixDateTime(dateStr) : '');
@@ -347,7 +356,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     ))}
 
                     {showSubtaskAdd ? (
-                      <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2 rounded-lg bg-muted p-2">
                         <Square size={16} className="text-muted-foreground/70" />
                         <Input
                           type="text"
@@ -356,9 +365,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           placeholder="Название подзадачи…"
                           className="h-8 flex-1 text-sm"
                           autoFocus
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
+                          onKeyDown={(e) => e.key === 'Enter' && void handleAddSubtask()}
                         />
-                        <Button onClick={handleAddSubtask} variant="ghost" size="icon-xs">
+                        <Button
+                          onClick={() => void handleAddSubtask()}
+                          variant="ghost"
+                          size="icon-xs"
+                        >
                           <Plus size={16} />
                         </Button>
                         <Button
@@ -369,15 +382,73 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           <X size={16} />
                         </Button>
                       </div>
+                    ) : showExistingSubtaskPicker ? (
+                      <div className="relative rounded-lg bg-muted p-2">
+                        <Input
+                          value={existingSubtaskQuery}
+                          onChange={(event) => setExistingSubtaskQuery(event.target.value)}
+                          placeholder="Найти существующую задачу…"
+                          className="h-8"
+                          autoFocus
+                        />
+                        {existingSubtaskQuery && (
+                          <div className="mt-2 max-h-40 overflow-y-auto rounded border bg-background p-1">
+                            {tasks
+                              .filter(
+                                (candidate) =>
+                                  candidate.projectId === task.projectId &&
+                                  candidate.id !== task.id &&
+                                  candidate.id !== task.parentId &&
+                                  candidate.parentId !== task.id &&
+                                  `${candidate.id} ${candidate.title}`
+                                    .toLocaleLowerCase('ru')
+                                    .includes(existingSubtaskQuery.toLocaleLowerCase('ru')),
+                              )
+                              .slice(0, 10)
+                              .map((candidate) => (
+                                <Button
+                                  key={candidate.id}
+                                  variant="ghost"
+                                  className="h-auto w-full justify-start px-2 py-1.5 text-left"
+                                  onClick={() => void handleAttachExistingSubtask(candidate.id)}
+                                >
+                                  <span className="truncate">
+                                    #{candidate.id} · {candidate.title}
+                                  </span>
+                                </Button>
+                              ))}
+                          </div>
+                        )}
+                        <Button
+                          onClick={() => {
+                            setExistingSubtaskQuery('');
+                            setShowExistingSubtaskPicker(false);
+                          }}
+                          variant="ghost"
+                          className="mt-1 h-7 w-full text-xs"
+                        >
+                          Отмена
+                        </Button>
+                      </div>
                     ) : (
-                      <Button
-                        onClick={() => setShowSubtaskAdd(true)}
-                        variant="ghost"
-                        className="w-full justify-start text-muted-foreground"
-                      >
-                        <Plus size={14} />
-                        Добавить подзадачу
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setShowExistingSubtaskPicker(true)}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <Plus size={14} />
+                          Выбрать существующую
+                        </Button>
+                        <Button
+                          onClick={() => setShowSubtaskAdd(true)}
+                          variant="ghost"
+                          className="flex-1 text-muted-foreground"
+                        >
+                          <Plus size={14} />
+                          Создать новую
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}
