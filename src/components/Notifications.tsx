@@ -37,6 +37,7 @@ function icon(type: string) {
 export default function Notifications() {
   const [items, setItems] = useState<Notice[]>([]);
   const [open, setOpen] = useState(false);
+  const [seenAt, setSeenAt] = useState(0);
   const selectedProjectId = useKanbanStore((state) => state.selectedProjectId);
   const loadTasks = useKanbanStore((state) => state.loadTasks);
   const memberId =
@@ -53,9 +54,27 @@ export default function Notifications() {
   }, [memberId]);
 
   useEffect(() => {
+    if (!memberId) return;
+    const saved = Number(localStorage.getItem(`bitrix-notifications-seen:${memberId}`));
+    setSeenAt(Number.isFinite(saved) && saved > 0 ? saved : Date.now());
+  }, [memberId]);
+
+  useEffect(() => {
     if (!open || !memberId) return;
     void loadHistory();
   }, [loadHistory, memberId, open]);
+
+  const markAsSeen = useCallback(() => {
+    if (!memberId) return;
+    const timestamp = Date.now();
+    localStorage.setItem(`bitrix-notifications-seen:${memberId}`, String(timestamp));
+    setSeenAt(timestamp);
+  }, [memberId]);
+
+  const unreadCount = items.filter((item) => {
+    const timestamp = new Date(item.createdAt || item.created_at || 0).getTime();
+    return Number.isFinite(timestamp) && timestamp > seenAt;
+  }).length;
 
   const onEvent = useCallback(
     (event: Notice) => {
@@ -81,15 +100,15 @@ export default function Notifications() {
       open={open}
       onOpenChange={(value) => {
         setOpen(value);
-        if (value) void loadHistory();
+        if (value) markAsSeen();
       }}
     >
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label="Уведомления" className="relative">
           <Bell className="size-4" />
-          {items.length > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full p-0 text-[9px]">
-              {Math.min(items.length, 9)}
+          {unreadCount > 0 && (
+            <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px]">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
           )}
         </Button>
