@@ -20,8 +20,15 @@ export async function getDb(): Promise<Db> {
 
   await setupIndexes(db);
   startSyncWorker();
+  startWorkloadTimeScheduler();
 
   return db;
+}
+
+function startWorkloadTimeScheduler() {
+  void import('./workload-time-scheduler')
+    .then(({ startWorkloadTimeScheduler: start }) => start())
+    .catch((error) => console.error('Workload-time scheduler failed to start', error));
 }
 
 function startSyncWorker() {
