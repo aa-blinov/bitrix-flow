@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ClipboardList, Clock3, UsersRound } from 'lu
 import { BxTask, Bx24Project, Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
+import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -124,11 +125,6 @@ export default function TeamWorkload() {
     [weekStart],
   );
   const weekKeys = useMemo(() => new Set(days.map(calendarDayKey)), [days]);
-  const projectNames = useMemo(
-    () => new Map(projects.map((project) => [project.id, project.name])),
-    [projects],
-  );
-
   const openTasks = useMemo(() => allTasks.filter((task) => task.status !== 'done'), [allTasks]);
   // Bitrix user.get identifies company staff as USER_TYPE=employee. Extranet
   // users must not influence an internal workload plan.
@@ -355,26 +351,14 @@ export default function TeamWorkload() {
       </div>
 
       <Dialog open={selectedCell !== null} onOpenChange={(open) => !open && setSelectedCell(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:max-w-6xl">
+          <DialogHeader className="border-b px-5 py-4">
             <DialogTitle>
               {selectedCell?.assigneeName} · {selectedCell?.dateLabel}
             </DialogTitle>
           </DialogHeader>
-          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
-            {selectedCell?.tasks.map((task) => (
-              <div key={task.id} className="rounded-lg border p-3">
-                <div className="mb-1 flex items-start justify-between gap-3">
-                  <p className="font-medium leading-snug">{task.title}</p>
-                  <Badge variant="secondary" className="shrink-0">
-                    {formatHours(task.estimate)}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  #{task.id} · {projectNames.get(task.projectId) || 'Без проекта'}
-                </p>
-              </div>
-            ))}
+          <div className="max-h-[calc(90vh-4.5rem)] overflow-y-auto pb-4">
+            {selectedCell && <TaskGrid tasks={selectedCell.tasks} showProject title={null} />}
           </div>
         </DialogContent>
       </Dialog>
