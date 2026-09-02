@@ -135,6 +135,7 @@ export default function TeamWorkload() {
   const [selectedActual, setSelectedActual] = useState<{ userId: string; day: string } | null>(
     null,
   );
+  const [timeError, setTimeError] = useState<string | null>(null);
   const [timeRefreshing, setTimeRefreshing] = useState(false);
 
   useEffect(() => {
@@ -145,15 +146,22 @@ export default function TeamWorkload() {
   const weekStartKey = calendarDayKey(weekStart);
   const weekEndKey = calendarDayKey(addDays(weekStart, 6));
 
-  const loadActualTime = () =>
-    fetch(`/api/workload/time?start=${weekStartKey}`, { cache: 'no-store' })
-      .then((response) => response.json())
-      .then(({ data, refreshing }) => {
-        setTimeRows(data?.rows || []);
-        setTimeDetails(data?.details || []);
-        setTimeRefreshing(Boolean(refreshing));
-      })
-      .catch(() => {});
+  const loadActualTime = async () => {
+    try {
+      const response = await fetch(`/api/workload/time?start=${weekStartKey}`, {
+        cache: 'no-store',
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
+      setTimeRows(payload.data?.rows || []);
+      setTimeDetails(payload.data?.details || []);
+      setTimeRefreshing(Boolean(payload.refreshing));
+      setTimeError(null);
+    } catch (error) {
+      console.error('[workload-time] failed to load actual time', error);
+      setTimeError('Не удалось загрузить факт времени');
+    }
+  };
 
   useEffect(() => {
     setTimeRows([]);
