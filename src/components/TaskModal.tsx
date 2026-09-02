@@ -76,6 +76,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [comment, setComment] = useState('');
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [showTimeEntry, setShowTimeEntry] = useState(false);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
   const [showExistingSubtaskPicker, setShowExistingSubtaskPicker] = useState(false);
@@ -169,8 +170,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
           .slice(0, 5);
 
   const handleUpdateField = async (field: string, value: any) => {
-    await updateTaskField(task.id, field, value);
-    setEditingField(null);
+    try {
+      setFieldError(null);
+      await updateTaskField(task.id, field, value);
+      setEditingField(null);
+    } catch (error) {
+      setFieldError(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+    }
   };
 
   const handleMoveProject = async (projectId: string) => {
@@ -254,6 +260,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         onFocusOutside={(event) => event.preventDefault()}
         className="top-0 left-0 h-dvh w-dvw max-h-none max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none p-0 lg:left-auto lg:right-0 lg:flex lg:w-[60rem] lg:max-w-[calc(100vw-4rem)] lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-l-xl"
       >
+        {fieldError && (
+          <p
+            className="mx-4 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {fieldError}
+          </p>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
