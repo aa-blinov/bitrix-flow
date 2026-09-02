@@ -18,6 +18,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
@@ -314,22 +321,22 @@ export default function TeamWorkload() {
               <p className="text-sm text-muted-foreground">План по срокам и списания времени</p>
             </div>
             <div className="flex items-center gap-1">
-              <select
-                aria-label="Проект"
-                value={selectedProjectId}
-                onChange={(event) => setSelectedProjectId(event.target.value)}
-                className="h-8 max-w-52 rounded-md border bg-background px-2 text-sm"
-              >
-                <option value="all">Все проекты</option>
-                {projects
-                  .filter((project) => !project.isArchived)
-                  .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
-                  .map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-              </select>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger aria-label="Проект" className="max-w-52">
+                  <SelectValue placeholder="Все проекты" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="all">Все проекты</SelectItem>
+                  {projects
+                    .filter((project) => !project.isArchived)
+                    .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
+                    .map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant="outline"
                 size="sm"
