@@ -1,5 +1,5 @@
 'use client';
-import { BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
+import { Bx24User, BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -94,6 +94,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [parentSearchResults, setParentSearchResults] = useState<Bx24Task[]>([]);
   const [existingSubtaskResults, setExistingSubtaskResults] = useState<Bx24Task[]>([]);
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
+  const userLabel = (user: Bx24User) =>
+    users.filter((candidate) => candidate.name === user.name).length > 1 && user.email
+      ? `${user.name} (${user.email})`
+      : user.name;
   const commentsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -680,7 +684,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             <SelectItem value="unassigned">Не назначен</SelectItem>
                             {users.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
-                                {u.name}
+                                {userLabel(u)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -749,7 +753,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                   )
                                 }
                               >
-                                {user.name}
+                                {userLabel(user)}
                               </DropdownMenuCheckboxItem>
                             ))}
                         </DropdownMenuContent>
@@ -810,7 +814,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                   )
                                 }
                               >
-                                {user.name}
+                                {userLabel(user)}
                               </DropdownMenuCheckboxItem>
                             ))}
                         </DropdownMenuContent>
