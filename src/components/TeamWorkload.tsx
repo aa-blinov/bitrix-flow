@@ -62,12 +62,8 @@ function taskLabel(count: number) {
   return 'задач';
 }
 
-function loadTone(count: number, hours: number) {
-  if (count >= 5 || hours > 6)
-    return 'border-red-300 bg-red-500/10 text-red-800 dark:border-red-900 dark:text-red-200';
-  if (count >= 4 || hours >= 4)
-    return 'border-amber-300 bg-amber-500/10 text-amber-800 dark:border-amber-900 dark:text-amber-200';
-  return 'border-emerald-300 bg-emerald-500/10 text-emerald-800 dark:border-emerald-900 dark:text-emerald-200';
+function loadTone(_count: number, _hours: number) {
+  return 'border-border bg-background/40 hover:bg-muted/70';
 }
 
 function UserAvatar({ user }: { user: Bx24User }) {
@@ -145,6 +141,7 @@ export default function TeamWorkload() {
     null,
   );
   const [timeError, setTimeError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [timeRefreshing, setTimeRefreshing] = useState(false);
 
   useEffect(() => {
@@ -218,8 +215,12 @@ export default function TeamWorkload() {
   );
   const workloadTasks = useMemo(() => {
     const employeeIds = new Set(employees.map((user) => user.id));
-    return openTasks.filter((task) => !task.assigneeId || employeeIds.has(task.assigneeId));
-  }, [employees, openTasks]);
+    return openTasks.filter(
+      (task) =>
+        (!task.assigneeId || employeeIds.has(task.assigneeId)) &&
+        (selectedProjectId === 'all' || task.projectId === selectedProjectId),
+    );
+  }, [employees, openTasks, selectedProjectId]);
   const assignees = useMemo(() => {
     const ids = new Set(workloadTasks.map((task) => task.assigneeId || 'unassigned'));
     const known = employees
@@ -310,11 +311,25 @@ export default function TeamWorkload() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
             <div>
               <h2 className="font-semibold">Календарь нагрузки</h2>
-              <p className="text-sm text-muted-foreground">
-                Красный: ≥5 задач или &gt;6 ч · жёлтый: ≥4 задачи или ≥4 ч
-              </p>
+              <p className="text-sm text-muted-foreground">План по срокам и списания времени</p>
             </div>
             <div className="flex items-center gap-1">
+              <select
+                aria-label="Проект"
+                value={selectedProjectId}
+                onChange={(event) => setSelectedProjectId(event.target.value)}
+                className="h-8 max-w-52 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="all">Все проекты</option>
+                {projects
+                  .filter((project) => !project.isArchived)
+                  .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
+                  .map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+              </select>
               <Button
                 variant="outline"
                 size="sm"
@@ -421,7 +436,7 @@ export default function TeamWorkload() {
                         <button
                           type="button"
                           onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-red-300 bg-red-500/10 text-red-800 hover:ring-2 hover:ring-red-500/30 dark:border-red-900 dark:text-red-200' : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-border bg-background/40 hover:bg-muted/70' : 'border-border bg-background/40 hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
                         </button>
