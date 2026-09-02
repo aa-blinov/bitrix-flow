@@ -99,13 +99,18 @@ function UserAvatar({ user }: { user: Bx24User }) {
 
 function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: number }) {
   const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
-  if (tasks.length === 0) return <span className="text-muted-foreground">—</span>;
+  if (tasks.length === 0 && actualHours === undefined)
+    return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex flex-col items-center gap-0.5 leading-tight">
-      <strong className="font-semibold">
-        {tasks.length} {taskLabel(tasks.length)}
-      </strong>
-      <span className="text-xs opacity-80">План {formatHours(hours)}</span>
+      {tasks.length > 0 && (
+        <>
+          <strong className="font-semibold">
+            {tasks.length} {taskLabel(tasks.length)}
+          </strong>
+          <span className="text-xs opacity-80">План {formatHours(hours)}</span>
+        </>
+      )}
       {actualHours !== undefined && (
         <span
           className={
