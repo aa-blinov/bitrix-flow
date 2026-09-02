@@ -269,7 +269,7 @@ export default function TeamWorkload() {
               <ClipboardList className="size-5 text-primary" />
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{weekTasks.length}</p>
-                <p className="text-sm text-muted-foreground">задач со сроком на неделю</p>
+                <p className="text-sm text-muted-foreground">задач со сроком на текущую неделю</p>
               </div>
             </CardContent>
           </Card>
@@ -278,7 +278,7 @@ export default function TeamWorkload() {
               <Clock3 className="size-5 text-primary" />
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{formatHours(weekHours)}</p>
-                <p className="text-sm text-muted-foreground">плановая нагрузка</p>
+                <p className="text-sm text-muted-foreground">плановая нагрузка на текущую неделю</p>
               </div>
             </CardContent>
           </Card>
