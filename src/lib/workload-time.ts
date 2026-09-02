@@ -12,7 +12,19 @@ function dayKey(value: unknown) {
 }
 
 async function taskEntries(memberId: string, taskId: string, start: string, end: string) {
-  const result = await bx24OAuth(memberId, 'task.elapseditem.getlist', { TASKID: taskId });
+  let result: unknown;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      result = await bx24OAuth(memberId, 'task.elapseditem.getlist', { TASKID: taskId });
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (lastError) throw lastError;
   return (Array.isArray(result) ? result : [])
     .map((item: any): TimeEntry | null => {
       const day = dayKey(item.DATE_PLAN || item.CREATED_DATE);
@@ -59,15 +71,19 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
     for (let index = 0; index < candidates.length; index += MAX_CONCURRENT_REQUESTS) {
       await Promise.all(
         candidates.slice(index, index + MAX_CONCURRENT_REQUESTS).map(async (task) => {
-          const taskId = String(task.id);
-          const entries = await taskEntries(memberId, taskId, start, end);
-          await db
-            .collection('workload_time_task')
-            .updateOne(
-              { member_id: memberId, start, task_id: taskId },
-              { $set: { entries, updated_at: new Date() } },
-              { upsert: true },
-            );
+          try {
+            const taskId = String(task.id);
+            const entries = await taskEntries(memberId, taskId, start, end);
+            await db
+              .collection('workload_time_task')
+              .updateOne(
+                { member_id: memberId, start, task_id: taskId },
+                { $set: { entries, updated_at: new Date() } },
+                { upsert: true },
+              );
+          } catch (error) {
+            console.warn('[workload-time] skipped task', task.id, String(error));
+          }
         }),
       );
     }
