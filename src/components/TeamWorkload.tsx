@@ -386,7 +386,7 @@ export default function TeamWorkload() {
                               setSelectedActual({ userId: assignee.id, day: key });
                             else if (tasks.length) openTaskList(assignee.id, key);
                           }}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
+                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
                         >
                           <WorkloadValue
                             tasks={tasks}
@@ -402,7 +402,7 @@ export default function TeamWorkload() {
                         <button
                           type="button"
                           onClick={() => tasks.length && openTaskList(assignee.id, 'no_deadline')}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
+                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
                         </button>
@@ -417,7 +417,7 @@ export default function TeamWorkload() {
                         <button
                           type="button"
                           onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-red-300 bg-red-500/10 text-red-800 hover:ring-2 hover:ring-red-500/30 dark:border-red-900 dark:text-red-200' : 'border-transparent hover:bg-muted/70'}`}
+                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-red-300 bg-red-500/10 text-red-800 hover:ring-2 hover:ring-red-500/30 dark:border-red-900 dark:text-red-200' : 'border-border bg-background/40 hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
                         </button>
