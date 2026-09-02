@@ -146,7 +146,7 @@ export default function TeamWorkload() {
   const weekEndKey = calendarDayKey(addDays(weekStart, 6));
 
   const loadActualTime = () =>
-    fetch(`/api/workload/time?start=${weekStartKey}`)
+    fetch(`/api/workload/time?start=${weekStartKey}`, { cache: 'no-store' })
       .then((response) => response.json())
       .then(({ data, refreshing }) => {
         setTimeRows(data?.rows || []);

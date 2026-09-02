@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
     getWorkloadTime(member, start!),
     (await getDb()).collection('workload_time_status').findOne({ member_id: member, start }),
   ]);
-  return NextResponse.json({ data: aggregate || null, refreshing: Boolean(status?.refreshing) });
+  return NextResponse.json(
+    { data: aggregate || null, refreshing: Boolean(status?.refreshing) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 export async function POST(request: NextRequest) {
