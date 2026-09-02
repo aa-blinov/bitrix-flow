@@ -109,7 +109,7 @@ async function enrichComment(memberId: string, details: ReturnType<typeof eventD
       if (message?.text) {
         return {
           ...details,
-          title: task?.title ? `Комментарий · ${task.title}` : details.title,
+          title: task?.title ? `Комментарий к задаче «${task.title}»` : details.title,
           message: message.text,
         };
       }
@@ -130,7 +130,7 @@ async function enrichTaskTitle(memberId: string, details: ReturnType<typeof even
     if (!taskTitle) return details;
     const projectId = String(task?.group?.id || task?.groupId || task?.group_id || '');
     return details.type === 'comment_added'
-      ? { ...details, title: `Комментарий · ${taskTitle}`, projectId }
+      ? { ...details, title: `Комментарий к задаче «${taskTitle}»`, projectId }
       : { ...details, message: taskTitle, projectId };
   } catch {
     return details;

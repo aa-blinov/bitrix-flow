@@ -407,7 +407,7 @@ export default function TeamWorkload() {
                             {assignee.name}
                           </span>
                           <span className="block text-xs text-muted-foreground">
-                            План {formatHours(memberPlannedHours)} · Факт{' '}
+                            План {formatHours(memberPlannedHours)}, факт{' '}
                             {formatHours(memberActualHours)}
                           </span>
                         </div>
@@ -498,7 +498,7 @@ export default function TeamWorkload() {
                 >
                   <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {formatHours(entry.seconds / 3600)} · #{entry.taskId}
+                    {formatHours(entry.seconds / 3600)}, задача #{entry.taskId}
                   </p>
                 </button>
               );

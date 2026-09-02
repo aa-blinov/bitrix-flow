@@ -1026,7 +1026,7 @@ function TaskCard({
             <span className="flex items-center gap-1 shrink-0">
               <Timer size={12} />
               {task.estimate > 0 && `План ${task.estimate} ч`}
-              {task.estimate > 0 && task.actualTime > 0 && ' · '}
+              {task.estimate > 0 && task.actualTime > 0 && ', '}
               {task.actualTime > 0 && `Факт ${task.actualTime} ч`}
             </span>
           )}

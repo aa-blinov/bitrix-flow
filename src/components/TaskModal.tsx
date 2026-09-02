@@ -466,7 +466,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                   onClick={() => void handleAttachExistingSubtask(candidate.id)}
                                 >
                                   <span className="truncate">
-                                    #{candidate.id} · {candidate.title}
+                                    #{candidate.id}, {candidate.title}
                                   </span>
                                 </Button>
                               ))}
@@ -911,7 +911,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                   }}
                                 >
                                   <span className="truncate">
-                                    #{candidate.id} · {candidate.title}
+                                    #{candidate.id}, {candidate.title}
                                   </span>
                                 </Button>
                               ))}
@@ -1051,7 +1051,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     >
                       <div className="mb-1 flex items-center gap-1.5 text-xs font-medium">
                         <Settings2 size={13} /> Система
-                        <span className="font-normal">· {formatDate(commentItem.createdDate)}</span>
+                        <span className="font-normal">
+                          от {formatDate(commentItem.createdDate)}
+                        </span>
                       </div>
                       <div className="leading-relaxed text-foreground/75">
                         <BitrixText text={commentItem.text} />

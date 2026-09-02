@@ -231,7 +231,7 @@ export default function ProjectPage() {
                   )}
                   {unassignedTasks > 0 && (
                     <span>
-                      {overdueTasks ? ' · ' : ''}
+                      {overdueTasks ? ', ' : ''}
                       {unassignedTasks} без исполнителя
                     </span>
                   )}

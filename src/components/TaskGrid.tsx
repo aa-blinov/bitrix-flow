@@ -1387,14 +1387,14 @@ export default function TaskGrid({
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{STATUS_LABELS[task.status] || task.status}</span>
-                        <span>· {priority}</span>
-                        {showProject && <span>· {projectById[task.projectId]?.name ?? '—'}</span>}
+                        <span>{priority}</span>
+                        {showProject && <span>{projectById[task.projectId]?.name ?? '—'}</span>}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{assignee}</span>
                         {!task.dueDate && task.status !== 'done' && (
                           <span className="font-medium text-violet-700 dark:text-violet-300">
-                            · без срока
+                            без срока
                           </span>
                         )}
                         {task.dueDate && (
@@ -1405,12 +1405,12 @@ export default function TaskGrid({
                                 : undefined
                             }
                           >
-                            · до {formatBitrixDateTime(task.dueDate)}
+                            до {formatBitrixDateTime(task.dueDate)}
                           </span>
                         )}
                         {task.estimate || task.actualTime ? (
                           <span>
-                            · {task.actualTime || 0} / {task.estimate || 0} ч
+                            факт {task.actualTime || 0} ч, план {task.estimate || 0} ч
                           </span>
                         ) : null}
                       </div>
