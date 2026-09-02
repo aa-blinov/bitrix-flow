@@ -219,10 +219,8 @@ export default function ProjectPage() {
                   <Users size={14} />
                   {currentProject.membersCount || 0} участников
                 </Button>
-                <span>•</span>
-                <span>{projectTasks.length} задач</span>
-                <span>•</span>
-                <span className="text-emerald-600">{completedTasks} завершено</span>
+                <span>Задач: {projectTasks.length}</span>
+                <span className="text-emerald-600">Завершено: {completedTasks}</span>
               </div>
               {(overdueTasks || unassignedTasks) && (
                 <p className="mt-2 text-xs text-muted-foreground">
