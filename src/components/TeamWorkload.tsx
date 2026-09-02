@@ -382,68 +382,90 @@ export default function TeamWorkload() {
                     Просрочено
                   </div>
                 </div>
-                {assignees.map((assignee) => (
-                  <div
-                    key={assignee.id}
-                    className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
-                  >
-                    <div className="flex min-w-0 items-center gap-2 px-4 py-3">
-                      <UserAvatar user={assignee} />
-                      <span className="truncate text-sm font-medium">{assignee.name}</span>
+                {assignees.map((assignee) => {
+                  const memberWeekTasks = weekTasks.filter(
+                    (task) => (task.assigneeId || 'unassigned') === assignee.id,
+                  );
+                  const memberPlannedHours = memberWeekTasks.reduce(
+                    (sum, task) => sum + task.estimate,
+                    0,
+                  );
+                  const memberActualHours = timeRows
+                    .filter(
+                      (row) => String(row.userId) === String(assignee.id) && weekKeys.has(row.day),
+                    )
+                    .reduce((sum, row) => sum + row.seconds / 3600, 0);
+                  return (
+                    <div
+                      key={assignee.id}
+                      className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
+                    >
+                      <div className="flex min-w-0 items-center gap-2 px-4 py-3">
+                        <UserAvatar user={assignee} />
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-medium">
+                            {assignee.name}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            План {formatHours(memberPlannedHours)} · Факт{' '}
+                            {formatHours(memberActualHours)}
+                          </span>
+                        </div>
+                      </div>
+                      {days.map((day) => {
+                        const key = calendarDayKey(day);
+                        const tasks = tasksFor(assignee.id, key);
+                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              const actual = actualHoursFor(assignee.id, key);
+                              if (actual !== undefined)
+                                setSelectedActual({ userId: assignee.id, day: key });
+                              else if (tasks.length) openTaskList(assignee.id, key);
+                            }}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                          >
+                            <WorkloadValue
+                              tasks={tasks}
+                              actualHours={actualHoursFor(assignee.id, key)}
+                            />
+                          </button>
+                        );
+                      })}
+                      {(() => {
+                        const tasks = tasksFor(assignee.id, null);
+                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => tasks.length && openTaskList(assignee.id, 'no_deadline')}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                          >
+                            <WorkloadValue tasks={tasks} />
+                          </button>
+                        );
+                      })()}
+                      {(() => {
+                        const tasks = overdueTasks.filter(
+                          (task) => (task.assigneeId || 'unassigned') === assignee.id,
+                        );
+                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-border bg-background/40 hover:bg-muted/70' : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                          >
+                            <WorkloadValue tasks={tasks} />
+                          </button>
+                        );
+                      })()}
                     </div>
-                    {days.map((day) => {
-                      const key = calendarDayKey(day);
-                      const tasks = tasksFor(assignee.id, key);
-                      const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => {
-                            const actual = actualHoursFor(assignee.id, key);
-                            if (actual !== undefined)
-                              setSelectedActual({ userId: assignee.id, day: key });
-                            else if (tasks.length) openTaskList(assignee.id, key);
-                          }}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
-                        >
-                          <WorkloadValue
-                            tasks={tasks}
-                            actualHours={actualHoursFor(assignee.id, key)}
-                          />
-                        </button>
-                      );
-                    })}
-                    {(() => {
-                      const tasks = tasksFor(assignee.id, null);
-                      const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => tasks.length && openTaskList(assignee.id, 'no_deadline')}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
-                        >
-                          <WorkloadValue tasks={tasks} />
-                        </button>
-                      );
-                    })()}
-                    {(() => {
-                      const tasks = overdueTasks.filter(
-                        (task) => (task.assigneeId || 'unassigned') === assignee.id,
-                      );
-                      const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
-                          className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-border bg-background/40 hover:bg-muted/70' : 'border-border bg-background/40 hover:bg-muted/70'}`}
-                        >
-                          <WorkloadValue tasks={tasks} />
-                        </button>
-                      );
-                    })()}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -465,12 +487,20 @@ export default function TeamWorkload() {
             {selectedEntries.map((entry, index) => {
               const task = allTasks.find((item) => item.id === entry.taskId);
               return (
-                <div key={`${entry.taskId}-${index}`} className="rounded-lg border p-3">
+                <button
+                  key={`${entry.taskId}-${index}`}
+                  type="button"
+                  className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/70"
+                  onClick={() => {
+                    setSelectedActual(null);
+                    router.push(`/team-workload?task=${entry.taskId}`);
+                  }}
+                >
                   <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {formatHours(entry.seconds / 3600)} · #{entry.taskId}
                   </p>
-                </div>
+                </button>
               );
             })}
             {selectedEntries.length === 0 && (
