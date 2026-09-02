@@ -65,6 +65,39 @@ async function globalEntries(memberId: string, start: string, end: string) {
   return entries;
 }
 
+async function fallbackEntries(memberId: string, start: string, end: string) {
+  const db = await getDb();
+  const [mirrored, recent] = await Promise.all([
+    db
+      .collection('task_mirror')
+      .find({ member_id: memberId }, { projection: { id: 1 } })
+      .toArray(),
+    db
+      .collection('tasks')
+      .find({ member_id: memberId }, { projection: { id: 1 } })
+      .toArray(),
+  ]);
+  const taskIds = [
+    ...new Set([...mirrored, ...recent].map((task) => String(task.id)).filter(Boolean)),
+  ];
+  const entries: TimeEntry[] = [];
+
+  for (let index = 0; index < taskIds.length; index += MAX_CONCURRENT_REQUESTS) {
+    const batch = await Promise.all(
+      taskIds.slice(index, index + MAX_CONCURRENT_REQUESTS).map(async (taskId) => {
+        try {
+          return await taskEntries(memberId, taskId, start, end);
+        } catch (error) {
+          console.warn('[workload-time] skipped fallback task', taskId, String(error));
+          return [];
+        }
+      }),
+    );
+    entries.push(...batch.flat());
+  }
+  return entries;
+}
+
 export async function getWorkloadTime(memberId: string, start: string) {
   const db = await getDb();
   return db.collection('workload_time_aggregate').findOne({ member_id: memberId, start });
@@ -72,8 +105,6 @@ export async function getWorkloadTime(memberId: string, start: string) {
 
 export async function refreshWorkloadTime(memberId: string, start: string, end: string) {
   const db = await getDb();
-  const aggregate = await getWorkloadTime(memberId, start);
-  const since = aggregate?.updated_at instanceof Date ? aggregate.updated_at : null;
   await db
     .collection('workload_time_status')
     .updateOne(
@@ -83,37 +114,26 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
     );
 
   try {
-    const entries = await globalEntries(memberId, start, end);
+    let entries: TimeEntry[];
+    let source = 'global';
+    try {
+      entries = await globalEntries(memberId, start, end);
+    } catch (error) {
+      source = 'task-fallback';
+      console.warn(
+        '[workload-time] global time-log query failed; using task fallback',
+        String(error),
+      );
+      entries = await fallbackEntries(memberId, start, end);
+    }
     await db.collection('workload_time_task').deleteMany({ member_id: memberId, start });
     await db.collection('workload_time_task').insertOne({
       member_id: memberId,
       start,
-      task_id: '__global__',
+      task_id: `__${source}__`,
       entries,
       updated_at: new Date(),
     });
-    const candidates: any[] = [];
-    void since;
-
-    for (let index = 0; index < candidates.length; index += MAX_CONCURRENT_REQUESTS) {
-      await Promise.all(
-        candidates.slice(index, index + MAX_CONCURRENT_REQUESTS).map(async (task) => {
-          try {
-            const taskId = String(task.id);
-            const entries = await taskEntries(memberId, taskId, start, end);
-            await db
-              .collection('workload_time_task')
-              .updateOne(
-                { member_id: memberId, start, task_id: taskId },
-                { $set: { entries, updated_at: new Date() } },
-                { upsert: true },
-              );
-          } catch (error) {
-            console.warn('[workload-time] skipped task', task.id, String(error));
-          }
-        }),
-      );
-    }
 
     const rows = new Map<string, number>();
     const details: TimeEntry[] = [];
