@@ -112,9 +112,9 @@ function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: 
     <span className="flex flex-col items-center gap-0.5 leading-tight">
       {tasks.length > 0 && (
         <>
-          <strong className="font-semibold">
+          <span>
             {tasks.length} {taskLabel(tasks.length)}
-          </strong>
+          </span>
           <span className="text-xs opacity-80">План {formatHours(hours)}</span>
         </>
       )}
