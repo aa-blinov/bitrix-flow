@@ -35,7 +35,9 @@ function AllTasksInner() {
   const initialStatus =
     workload === 'no_deadline' || workload === 'overdue'
       ? workload
-      : searchParams.get('status') || 'all';
+      : workload
+        ? 'active'
+        : searchParams.get('status') || 'all';
   const initialAssigneeId =
     requestedAssignee === 'me'
       ? currentUser.id
