@@ -17,6 +17,7 @@ import LoadingState from '@/components/LoadingState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
@@ -128,6 +129,12 @@ export default function TeamWorkload() {
   const [timeRows, setTimeRows] = useState<Array<{ userId: string; day: string; seconds: number }>>(
     [],
   );
+  const [timeDetails, setTimeDetails] = useState<
+    Array<{ userId: string; day: string; seconds: number; taskId: string }>
+  >([]);
+  const [selectedActual, setSelectedActual] = useState<{ userId: string; day: string } | null>(
+    null,
+  );
   const [timeRefreshing, setTimeRefreshing] = useState(false);
 
   useEffect(() => {
@@ -143,6 +150,7 @@ export default function TeamWorkload() {
       .then((response) => response.json())
       .then(({ data, refreshing }) => {
         setTimeRows(data?.rows || []);
+        setTimeDetails(data?.details || []);
         setTimeRefreshing(Boolean(refreshing));
       })
       .catch(() => {});
@@ -171,6 +179,11 @@ export default function TeamWorkload() {
     const row = timeRows.find((item) => item.userId === userId && item.day === day);
     return row ? row.seconds / 3600 : undefined;
   };
+  const selectedEntries = selectedActual
+    ? timeDetails.filter(
+        (entry) => entry.userId === selectedActual.userId && entry.day === selectedActual.day,
+      )
+    : [];
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -352,7 +365,12 @@ export default function TeamWorkload() {
                         <button
                           key={key}
                           type="button"
-                          onClick={() => tasks.length && openTaskList(assignee.id, key)}
+                          onClick={() => {
+                            const actual = actualHoursFor(assignee.id, key);
+                            if (actual !== undefined)
+                              setSelectedActual({ userId: assignee.id, day: key });
+                            else if (tasks.length) openTaskList(assignee.id, key);
+                          }}
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
                         >
                           <WorkloadValue
@@ -397,6 +415,36 @@ export default function TeamWorkload() {
           )}
         </Card>
       </div>
+
+      <Dialog
+        open={Boolean(selectedActual)}
+        onOpenChange={(open) => !open && setSelectedActual(null)}
+      >
+        <DialogContent>
+          <DialogTitle>Списания времени</DialogTitle>
+          <DialogDescription>
+            {selectedActual
+              ? `${assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник'}, ${selectedActual.day}`
+              : ''}
+          </DialogDescription>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {selectedEntries.map((entry, index) => {
+              const task = allTasks.find((item) => item.id === entry.taskId);
+              return (
+                <div key={`${entry.taskId}-${index}`} className="rounded-lg border p-3">
+                  <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatHours(entry.seconds / 3600)} · #{entry.taskId}
+                  </p>
+                </div>
+              );
+            })}
+            {selectedEntries.length === 0 && (
+              <p className="text-sm text-muted-foreground">Списаний за этот день нет.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
