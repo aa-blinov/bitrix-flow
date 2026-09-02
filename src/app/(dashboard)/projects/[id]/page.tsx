@@ -339,12 +339,12 @@ export default function ProjectPage() {
       <Tabs value={view} onValueChange={setView} className="pb-6">
         {view === 'grid' && (
           <div className="px-4 pt-5 sm:px-6">
-            <TabsList>
-              <TabsTrigger value="kanban">
+            <TabsList className="h-8 p-0">
+              <TabsTrigger value="kanban" className="h-full">
                 <Columns3 className="size-4" />
                 Канбан
               </TabsTrigger>
-              <TabsTrigger value="grid">
+              <TabsTrigger value="grid" className="h-full">
                 <TableProperties className="size-4" />
                 Список
               </TabsTrigger>
@@ -354,12 +354,12 @@ export default function ProjectPage() {
         <TabsContent value="kanban" className="mt-0">
           <KanbanBoard
             toolbar={
-              <TabsList>
-                <TabsTrigger value="kanban">
+              <TabsList className="h-8 p-0">
+                <TabsTrigger value="kanban" className="h-full">
                   <Columns3 className="size-4" />
                   Канбан
                 </TabsTrigger>
-                <TabsTrigger value="grid">
+                <TabsTrigger value="grid" className="h-full">
                   <TableProperties className="size-4" />
                   Список
                 </TabsTrigger>
