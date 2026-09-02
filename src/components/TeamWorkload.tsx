@@ -176,12 +176,14 @@ export default function TeamWorkload() {
   }, [timeRefreshing, weekStartKey]);
 
   const actualHoursFor = (userId: string, day: string) => {
-    const row = timeRows.find((item) => item.userId === userId && item.day === day);
+    const row = timeRows.find((item) => String(item.userId) === String(userId) && item.day === day);
     return row ? row.seconds / 3600 : undefined;
   };
   const selectedEntries = selectedActual
     ? timeDetails.filter(
-        (entry) => entry.userId === selectedActual.userId && entry.day === selectedActual.day,
+        (entry) =>
+          String(entry.userId) === String(selectedActual.userId) &&
+          entry.day === selectedActual.day,
       )
     : [];
 
