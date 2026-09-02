@@ -60,7 +60,11 @@ export async function bx24OAuth(
   if (!token) throw new Error('No token for user');
 
   const call = (accessToken: string) =>
-    postBitrixJson(`https://${token.domain}/rest/${method}?auth=${accessToken}`, params);
+    postBitrixJson(
+      `https://${token.domain}/rest/${method}?auth=${accessToken}`,
+      params,
+      Array.isArray(params),
+    );
 
   let data = await call(token.access_token);
   if (data.error === 'expired_token' || data.error === 'invalid_token') {
