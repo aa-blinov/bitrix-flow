@@ -113,11 +113,11 @@ export default function ConnectPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>• Запросы от вашего имени (нет лимитов)</li>
-              <li>• Real-time обновления через webhook</li>
-              <li>• Автоматический refresh токена</li>
-              <li>• Безопасное хранение в MongoDB</li>
-              <li>• Webhook больше НЕ используется</li>
+              <li>Запросы от вашего имени (нет лимитов)</li>
+              <li>Real-time обновления через webhook</li>
+              <li>Автоматический refresh токена</li>
+              <li>Безопасное хранение в MongoDB</li>
+              <li>Webhook больше НЕ используется</li>
             </ul>
           </CardContent>
         </Card>
