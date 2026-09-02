@@ -1,12 +1,22 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { useKanbanStore } from '@/store/kanban';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 
 import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import { Button } from '@/components/ui/button';
+
+function dueDayKey(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 function AllTasksInner() {
   const {
@@ -20,9 +30,40 @@ function AllTasksInner() {
     setSelectedTask,
   } = useKanbanStore();
   const searchParams = useSearchParams();
-  const initialStatus = searchParams.get('status') || 'all';
-  const initialAssigneeId = searchParams.get('assignee') === 'me' ? currentUser.id : 'all';
+  const workload = searchParams.get('workload');
+  const requestedAssignee = searchParams.get('assignee');
+  const initialStatus =
+    workload === 'no_deadline' || workload === 'overdue'
+      ? workload
+      : searchParams.get('status') || 'all';
+  const initialAssigneeId =
+    requestedAssignee === 'me'
+      ? currentUser.id
+      : requestedAssignee && requestedAssignee !== 'unassigned'
+        ? requestedAssignee
+        : 'all';
   const taskFromUrl = searchParams.get('task');
+  const tasksForList = useMemo(() => {
+    if (!workload && !requestedAssignee) return allTasks;
+    return allTasks.filter((task) => {
+      if (requestedAssignee === 'unassigned' && task.assigneeId) return false;
+      if (
+        requestedAssignee &&
+        requestedAssignee !== 'unassigned' &&
+        task.assigneeId !== requestedAssignee
+      )
+        return false;
+      return (
+        !workload ||
+        workload === 'no_deadline' ||
+        workload === 'overdue' ||
+        dueDayKey(task.dueDate) === workload
+      );
+    });
+  }, [allTasks, requestedAssignee, workload]);
+  const workloadDescription = workload
+    ? 'Задачи, открытые из календаря нагрузки. Фильтры списка можно уточнить ниже.'
+    : 'Задачи по всем доступным проектам';
 
   useEffect(() => {
     if (projects.length === 0) void loadProjects();
@@ -39,14 +80,26 @@ function AllTasksInner() {
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
-      <PageHeader title="Все задачи" description="Задачи по всем доступным проектам" />
+      <PageHeader
+        title="Все задачи"
+        description={workloadDescription}
+        actions={
+          searchParams.get('from') === 'workload' ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/team-workload">
+                <ArrowLeft /> К нагрузке
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div className="mt-4">
         {isLoadingAllTasks ? (
           <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
-            tasks={allTasks}
+            tasks={tasksForList}
             showProject
             initialStatus={initialStatus}
             initialAssigneeId={initialAssigneeId}

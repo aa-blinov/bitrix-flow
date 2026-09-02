@@ -1,26 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ClipboardList, Clock3, UsersRound } from 'lucide-react';
 import { BxTask, Bx24Project, Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
-import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
 const WEEK_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
-
-type WorkloadCell = {
-  assigneeName: string;
-  dateLabel: string;
-  tasks: BxTask[];
-};
 
 function startOfWeek(date: Date) {
   const result = new Date(date);
@@ -112,8 +105,8 @@ function WorkloadValue({ tasks }: { tasks: BxTask[] }) {
 export default function TeamWorkload() {
   const { allTasks, users, projects, isLoadingAllTasks, loadAllTasks, loadProjects } =
     useKanbanStore();
+  const router = useRouter();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [selectedCell, setSelectedCell] = useState<WorkloadCell | null>(null);
 
   useEffect(() => {
     if (allTasks.length === 0) void loadAllTasks();
@@ -145,6 +138,12 @@ export default function TeamWorkload() {
       ? [...known, { id: 'unassigned', name: 'Без исполнителя' } as Bx24User]
       : known;
   }, [employees, workloadTasks]);
+
+  const openTaskList = (assigneeId: string, workload: string) => {
+    const params = new URLSearchParams({ from: 'workload', workload });
+    params.set('assignee', assigneeId);
+    router.push(`/all-tasks?${params.toString()}`);
+  };
 
   const tasksFor = (assigneeId: string, key: string | null) =>
     workloadTasks.filter(
@@ -286,14 +285,7 @@ export default function TeamWorkload() {
                         <button
                           key={key}
                           type="button"
-                          onClick={() =>
-                            tasks.length &&
-                            setSelectedCell({
-                              assigneeName: assignee.name,
-                              dateLabel: DAY_FORMATTER.format(day),
-                              tasks,
-                            })
-                          }
+                          onClick={() => tasks.length && openTaskList(assignee.id, key)}
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
@@ -306,14 +298,7 @@ export default function TeamWorkload() {
                       return (
                         <button
                           type="button"
-                          onClick={() =>
-                            tasks.length &&
-                            setSelectedCell({
-                              assigneeName: assignee.name,
-                              dateLabel: 'Без срока',
-                              tasks,
-                            })
-                          }
+                          onClick={() => tasks.length && openTaskList(assignee.id, 'no_deadline')}
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
@@ -328,14 +313,7 @@ export default function TeamWorkload() {
                       return (
                         <button
                           type="button"
-                          onClick={() =>
-                            tasks.length &&
-                            setSelectedCell({
-                              assigneeName: assignee.name,
-                              dateLabel: 'Просрочено',
-                              tasks,
-                            })
-                          }
+                          onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-red-300 bg-red-500/10 text-red-800 hover:ring-2 hover:ring-red-500/30 dark:border-red-900 dark:text-red-200' : 'border-transparent hover:bg-muted/70'}`}
                         >
                           <WorkloadValue tasks={tasks} />
@@ -349,19 +327,6 @@ export default function TeamWorkload() {
           )}
         </Card>
       </div>
-
-      <Dialog open={selectedCell !== null} onOpenChange={(open) => !open && setSelectedCell(null)}>
-        <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:max-w-6xl">
-          <DialogHeader className="border-b px-5 py-4">
-            <DialogTitle>
-              {selectedCell?.assigneeName} · {selectedCell?.dateLabel}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[calc(90vh-4.5rem)] overflow-y-auto pb-4">
-            {selectedCell && <TaskGrid tasks={selectedCell.tasks} showProject title={null} />}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
