@@ -604,7 +604,7 @@ export default function TaskGrid({
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [hideDone, setHideDone] = useState(false);
+  const [hideDone, setHideDone] = useState(true);
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState('all');
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);

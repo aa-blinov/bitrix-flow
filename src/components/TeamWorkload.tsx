@@ -119,15 +119,7 @@ function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: 
         </>
       )}
       {actualHours !== undefined && (
-        <span
-          className={
-            actualHours > 6
-              ? 'text-xs font-medium text-red-700 dark:text-red-300'
-              : 'text-xs opacity-80'
-          }
-        >
-          Факт {formatHours(actualHours)}
-        </span>
+        <span className="text-xs opacity-80">Факт {formatHours(actualHours)}</span>
       )}
     </span>
   );
@@ -385,9 +377,7 @@ export default function TeamWorkload() {
                     </div>
                   ))}
                   <div className="border-l px-2 py-3 text-center font-medium">Без срока</div>
-                  <div className="border-l px-2 py-3 text-center font-medium text-red-700 dark:text-red-300">
-                    Просрочено
-                  </div>
+                  <div className="border-l px-2 py-3 text-center font-medium">Просрочено</div>
                 </div>
                 {assignees.map((assignee) => {
                   const memberWeekTasks = weekTasks.filter(
