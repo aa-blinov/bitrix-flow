@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, ClipboardList, Clock3, UsersRound } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock3,
+  RefreshCw,
+  UsersRound,
+} from 'lucide-react';
 import { BxTask, Bx24Project, Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
@@ -89,7 +96,7 @@ function UserAvatar({ user }: { user: Bx24User }) {
   );
 }
 
-function WorkloadValue({ tasks }: { tasks: BxTask[] }) {
+function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: number }) {
   const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
   if (tasks.length === 0) return <span className="text-muted-foreground">—</span>;
   return (
@@ -97,7 +104,18 @@ function WorkloadValue({ tasks }: { tasks: BxTask[] }) {
       <strong className="font-semibold">
         {tasks.length} {taskLabel(tasks.length)}
       </strong>
-      <span className="text-xs opacity-80">{formatHours(hours)}</span>
+      <span className="text-xs opacity-80">План {formatHours(hours)}</span>
+      {actualHours !== undefined && (
+        <span
+          className={
+            actualHours > 6
+              ? 'text-xs font-medium text-red-700 dark:text-red-300'
+              : 'text-xs opacity-80'
+          }
+        >
+          Факт {formatHours(actualHours)}
+        </span>
+      )}
     </span>
   );
 }
@@ -107,11 +125,52 @@ export default function TeamWorkload() {
     useKanbanStore();
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [timeRows, setTimeRows] = useState<Array<{ userId: string; day: string; seconds: number }>>(
+    [],
+  );
+  const [timeRefreshing, setTimeRefreshing] = useState(false);
 
   useEffect(() => {
     if (allTasks.length === 0) void loadAllTasks();
     if (projects.length === 0) void loadProjects();
   }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
+
+  const weekStartKey = calendarDayKey(weekStart);
+  const weekEndKey = calendarDayKey(addDays(weekStart, 6));
+
+  const loadActualTime = () =>
+    fetch(`/api/workload/time?start=${weekStartKey}`)
+      .then((response) => response.json())
+      .then(({ data, refreshing }) => {
+        setTimeRows(data?.rows || []);
+        setTimeRefreshing(Boolean(refreshing));
+      })
+      .catch(() => {});
+
+  useEffect(() => {
+    setTimeRows([]);
+    void loadActualTime();
+  }, [weekStartKey]);
+
+  const refreshActualTime = async () => {
+    setTimeRefreshing(true);
+    await fetch('/api/workload/time', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start: weekStartKey, end: weekEndKey }),
+    });
+  };
+
+  useEffect(() => {
+    if (!timeRefreshing) return;
+    const timer = window.setInterval(() => void loadActualTime(), 5000);
+    return () => window.clearInterval(timer);
+  }, [timeRefreshing, weekStartKey]);
+
+  const actualHoursFor = (userId: string, day: string) => {
+    const row = timeRows.find((item) => item.userId === userId && item.day === day);
+    return row ? row.seconds / 3600 : undefined;
+  };
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -226,6 +285,14 @@ export default function TeamWorkload() {
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
+                size="sm"
+                onClick={() => void refreshActualTime()}
+                disabled={timeRefreshing}
+              >
+                <RefreshCw className={timeRefreshing ? 'animate-spin' : ''} /> Обновить факт
+              </Button>
+              <Button
+                variant="outline"
                 size="icon"
                 aria-label="Предыдущая неделя"
                 onClick={() => setWeekStart((current) => addDays(current, -7))}
@@ -288,7 +355,10 @@ export default function TeamWorkload() {
                           onClick={() => tasks.length && openTaskList(assignee.id, key)}
                           className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-transparent hover:bg-muted/70'}`}
                         >
-                          <WorkloadValue tasks={tasks} />
+                          <WorkloadValue
+                            tasks={tasks}
+                            actualHours={actualHoursFor(assignee.id, key)}
+                          />
                         </button>
                       );
                     })}
