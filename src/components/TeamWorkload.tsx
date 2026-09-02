@@ -98,6 +98,10 @@ function UserAvatar({ user }: { user: Bx24User }) {
 }
 
 function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: number }) {
+  // TODO: when hierarchy-aware planning is introduced, calculate an effective
+  // estimate per task branch: use the recursive sum of estimated descendants;
+  // if every descendant estimate is zero, fall back to the parent's estimate.
+  // Sum only root branches so parent and subtasks are never counted twice.
   const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
   if (tasks.length === 0 && actualHours === undefined)
     return <span className="text-muted-foreground">—</span>;
