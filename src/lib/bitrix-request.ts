@@ -83,7 +83,7 @@ function httpRequest(
 
 export async function postBitrixJson(
   url: string,
-  params: Record<string, string> | Record<string, unknown>,
+  params: Record<string, string> | Record<string, unknown> | unknown[],
   sendJson = false,
   parallel = false,
 ): Promise<any> {

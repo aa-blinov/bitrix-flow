@@ -39,6 +39,32 @@ async function taskEntries(memberId: string, taskId: string, start: string, end:
     .filter((entry): entry is TimeEntry => entry !== null && Boolean(entry.userId));
 }
 
+async function globalEntries(memberId: string, start: string, end: string) {
+  const entries: TimeEntry[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await bx24OAuth(memberId, 'task.elapseditem.getlist', [
+      { ID: 'asc' },
+      {},
+      ['ID', 'TASK_ID', 'USER_ID', 'SECONDS', 'CREATED_DATE'],
+      { NAV_PARAMS: { nPageSize: 50, iNumPage: page } },
+    ]);
+    const items = Array.isArray(result) ? result : result?.items || [];
+    for (const item of items) {
+      const day = dayKey(item.CREATED_DATE);
+      if (day && day >= start && day <= end && item.USER_ID) {
+        entries.push({
+          userId: String(item.USER_ID),
+          day,
+          seconds: Number(item.SECONDS) || 0,
+          taskId: String(item.TASK_ID),
+        });
+      }
+    }
+    if (items.length < 50) break;
+  }
+  return entries;
+}
+
 export async function getWorkloadTime(memberId: string, start: string) {
   const db = await getDb();
   return db.collection('workload_time_aggregate').findOne({ member_id: memberId, start });
@@ -57,16 +83,17 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
     );
 
   try {
-    const [mirrored, recent] = await Promise.all([
-      db.collection('task_mirror').find({ member_id: memberId }).toArray(),
-      db.collection('tasks').find({ member_id: memberId }).toArray(),
-    ]);
-    const tasks = new Map<string, any>();
-    for (const item of mirrored) tasks.set(String(item.id), item);
-    for (const item of recent) tasks.set(String(item.id), item);
-    const candidates = [...tasks.values()].filter(
-      (task) => !since || new Date(task.updated_at) > since,
-    );
+    const entries = await globalEntries(memberId, start, end);
+    await db.collection('workload_time_task').deleteMany({ member_id: memberId, start });
+    await db.collection('workload_time_task').insertOne({
+      member_id: memberId,
+      start,
+      task_id: '__global__',
+      entries,
+      updated_at: new Date(),
+    });
+    const candidates: any[] = [];
+    void since;
 
     for (let index = 0; index < candidates.length; index += MAX_CONCURRENT_REQUESTS) {
       await Promise.all(

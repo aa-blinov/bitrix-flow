@@ -52,7 +52,7 @@ async function refreshToken(member_id: string): Promise<string> {
 export async function bx24OAuth(
   member_id: string,
   method: string,
-  params: Record<string, any> = {},
+  params: Record<string, any> | unknown[] = {},
 ): Promise<any> {
   const db = await getDb();
   const token = await db.collection('user_tokens').findOne({ member_id });
@@ -60,10 +60,7 @@ export async function bx24OAuth(
   if (!token) throw new Error('No token for user');
 
   const call = (accessToken: string) =>
-    postBitrixJson(
-      `https://${token.domain}/rest/${method}?auth=${accessToken}`,
-      params as Record<string, string>,
-    );
+    postBitrixJson(`https://${token.domain}/rest/${method}?auth=${accessToken}`, params);
 
   let data = await call(token.access_token);
   if (data.error === 'expired_token' || data.error === 'invalid_token') {
