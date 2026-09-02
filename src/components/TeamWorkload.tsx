@@ -331,7 +331,6 @@ export default function TeamWorkload() {
               </Select>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => void refreshActualTime()}
                 disabled={timeRefreshing}
               >
@@ -345,11 +344,7 @@ export default function TeamWorkload() {
               >
                 <ChevronLeft className="size-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWeekStart(startOfWeek(new Date()))}
-              >
+              <Button variant="outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>
                 Сегодня
               </Button>
               <Button
