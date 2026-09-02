@@ -55,9 +55,9 @@ function taskLabel(count: number) {
 }
 
 function loadTone(count: number, hours: number) {
-  if (count >= 5 || hours >= 8)
+  if (count >= 5 || hours > 6)
     return 'border-red-300 bg-red-500/10 text-red-800 dark:border-red-900 dark:text-red-200';
-  if (count >= 3 || hours >= 5)
+  if (count >= 4 || hours >= 4)
     return 'border-amber-300 bg-amber-500/10 text-amber-800 dark:border-amber-900 dark:text-amber-200';
   return 'border-emerald-300 bg-emerald-500/10 text-emerald-800 dark:border-emerald-900 dark:text-emerald-200';
 }
@@ -220,7 +220,7 @@ export default function TeamWorkload() {
             <div>
               <h2 className="font-semibold">Календарь нагрузки</h2>
               <p className="text-sm text-muted-foreground">
-                Красный: ≥5 задач или ≥8 ч · жёлтый: ≥3 задачи или ≥5 ч
+                Красный: ≥5 задач или &gt;6 ч · жёлтый: ≥4 задачи или ≥4 ч
               </p>
             </div>
             <div className="flex items-center gap-1">
