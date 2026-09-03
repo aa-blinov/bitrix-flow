@@ -53,7 +53,7 @@ import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { extractTaskTags } from '@/lib/task-tags';
-import { fetchProjectMembers, searchProjectTasks } from '@/lib/bitrix24';
+import { fetchProjectMembers, fetchTaskById, searchProjectTasks } from '@/lib/bitrix24';
 import type { Bx24Task } from '@/lib/bitrix24';
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
@@ -102,6 +102,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [parentSearchResults, setParentSearchResults] = useState<Bx24Task[]>([]);
   const [existingSubtaskResults, setExistingSubtaskResults] = useState<Bx24Task[]>([]);
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
+  const [allowedActions, setAllowedActions] = useState<Record<string, boolean> | null>(
+    task.actions || null,
+  );
   const userLabel = (user: Bx24User) =>
     users.filter((candidate) => candidate.name === user.name).length > 1 && user.email
       ? `${user.name} (${user.email})`
@@ -180,6 +183,22 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             user.name.toLocaleLowerCase('ru').includes(mentionQuery.toLocaleLowerCase('ru')),
           )
           .slice(0, 5);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchTaskById(task.id)
+      .then((freshTask) => {
+        if (!cancelled) setAllowedActions(freshTask.actions || {});
+      })
+      .catch(() => {
+        if (!cancelled) setAllowedActions({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task.id]);
+
+  const can = (action: string) => allowedActions?.[action] === true;
 
   const handleUpdateField = async (field: string, value: any) => {
     try {
@@ -323,10 +342,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             <div className="flex shrink-0 items-center gap-1">
               {(task.status === 'new' || task.status === 'deferred') && (
                 <>
-                  <Button size="sm" onClick={() => void handleStartTask()}>
-                    <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
-                  </Button>
-                  {task.status === 'new' && (
+                  {can('start') && (
+                    <Button size="sm" onClick={() => void handleStartTask()}>
+                      <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
+                    </Button>
+                  )}
+                  {task.status === 'new' && can('defer') && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -339,40 +360,50 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               )}
               {task.status === 'in_progress' && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleUpdateField('status', 'new')}
-                  >
-                    <Pause /> Приостановить
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleUpdateField('status', 'deferred')}
-                  >
-                    <Clock3 /> Отложить
-                  </Button>
-                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                    <CircleCheck /> Завершить
-                  </Button>
+                  {can('pause') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleUpdateField('status', 'new')}
+                    >
+                      <Pause /> Приостановить
+                    </Button>
+                  )}
+                  {can('defer') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleUpdateField('status', 'deferred')}
+                    >
+                      <Clock3 /> Отложить
+                    </Button>
+                  )}
+                  {can('complete') && (
+                    <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                      <CircleCheck /> Завершить
+                    </Button>
+                  )}
                 </>
               )}
               {task.status === 'testing' && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleUpdateField('status', 'deferred')}
-                  >
-                    <Clock3 /> Отложить
-                  </Button>
-                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                    <CircleCheck /> Завершить
-                  </Button>
+                  {can('defer') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleUpdateField('status', 'deferred')}
+                    >
+                      <Clock3 /> Отложить
+                    </Button>
+                  )}
+                  {can('complete') && (
+                    <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                      <CircleCheck /> Завершить
+                    </Button>
+                  )}
                 </>
               )}
-              {task.status === 'done' && (
+              {task.status === 'done' && can('renew') && (
                 <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
                   <RotateCcw /> Возобновить
                 </Button>

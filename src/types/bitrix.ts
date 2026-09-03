@@ -25,6 +25,7 @@ export interface BxTask {
   accompliceIds?: string[];
   auditorIds?: string[];
   tags?: string[];
+  actions?: Record<string, boolean>;
 }
 
 export type TaskStatus = 'new' | 'in_progress' | 'testing' | 'done' | string;

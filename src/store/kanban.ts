@@ -188,6 +188,7 @@ function convertBxTask(bxTask: Bx24Task): BxTask {
     accompliceIds: bxTask.accompliceIds,
     auditorIds: bxTask.auditorIds,
     tags: bxTask.tags,
+    actions: bxTask.actions,
   };
 }
 

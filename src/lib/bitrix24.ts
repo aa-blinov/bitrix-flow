@@ -124,6 +124,7 @@ export interface Bx24Task {
   accompliceIds?: string[];
   auditorIds?: string[];
   tags: string[];
+  actions?: Record<string, boolean>;
 }
 
 export interface Bx24Project {
@@ -467,6 +468,7 @@ function mapTask(t: any): Bx24Task {
     accompliceIds: (t.accomplices || t.ACCOMPLICES || []).map(String),
     auditorIds: (t.auditors || t.AUDITORS || []).map(String),
     tags: extractTaskTags(t.title || t.TITLE, t.description || t.DESCRIPTION),
+    actions: t.action,
   };
 }
 
@@ -670,6 +672,7 @@ export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
     timeSpentInLogs: Number(task.timeSpentInLogs) || 0,
     groupId: String(task.groupId || task.group?.id || '0'),
     groupName: task.group?.name || '',
+    actions: task.action,
     responsibleId: String(task.responsibleId || task.responsible?.id || ''),
     responsibleName: task.responsible?.name || '',
     responsibleIcon: task.responsible?.icon,
