@@ -105,6 +105,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [allowedActions, setAllowedActions] = useState<Record<string, boolean> | null>(
     task.actions || null,
   );
+  const [focusConflict, setFocusConflict] = useState<BxTask | null>(null);
   const userLabel = (user: Bx24User) =>
     users.filter((candidate) => candidate.name === user.name).length > 1 && user.email
       ? `${user.name} (${user.email})`
@@ -225,22 +226,32 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     );
 
     if (activeTask) {
-      const approved = window.confirm(
-        `Сейчас в работе «${activeTask.title}». Приостановить её и начать эту задачу?`,
-      );
-      if (!approved) return;
-
-      try {
-        setFieldError(null);
-        await updateTaskField(activeTask.id, 'status', 'new');
-        await updateTaskField(task.id, 'status', 'in_progress');
-      } catch (error) {
-        setFieldError(error instanceof Error ? error.message : 'Не удалось изменить статус');
-      }
+      setFocusConflict(activeTask);
       return;
     }
 
     await handleUpdateField('status', 'in_progress');
+  };
+
+  const confirmFocusChange = async () => {
+    if (!focusConflict) return;
+    try {
+      setFieldError(null);
+      await updateTaskField(focusConflict.id, 'status', 'new');
+      await updateTaskField(task.id, 'status', 'in_progress');
+      setFocusConflict(null);
+    } catch (error) {
+      setFieldError(error instanceof Error ? error.message : 'Не удалось изменить статус');
+    }
+  };
+
+  const openFocusConflict = () => {
+    if (!focusConflict) return;
+    const taskId = focusConflict.id;
+    const projectId = focusConflict.projectId;
+    setFocusConflict(null);
+    onClose();
+    router.push(`/projects/${projectId}?task=${taskId}`);
   };
 
   const handleMoveProject = async (projectId: string) => {
@@ -1271,6 +1282,32 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             </div>
           </Card>
         </div>
+        <Dialog
+          open={Boolean(focusConflict)}
+          onOpenChange={(open) => !open && setFocusConflict(null)}
+        >
+          <DialogContent className="max-w-md">
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Уже есть задача в работе</h2>
+              <p className="text-sm text-muted-foreground">
+                {focusConflict ? `«${focusConflict.title}»` : ''}
+              </p>
+              {focusConflict && (
+                <p className="text-sm text-muted-foreground">
+                  Проект:{' '}
+                  {projects.find((project) => project.id === focusConflict.projectId)?.name ||
+                    'Без проекта'}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={openFocusConflict}>
+                Открыть задачу
+              </Button>
+              <Button onClick={() => void confirmFocusChange()}>Приостановить и начать</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
