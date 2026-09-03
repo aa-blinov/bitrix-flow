@@ -1,5 +1,5 @@
 'use client';
-import { Bx24User, BxTask, PRIORITY_LABELS, STATUS_LABELS, TaskStatus } from '@/types/bitrix';
+import { Bx24User, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -24,6 +24,11 @@ import {
   GripVertical,
   Trash2,
   Settings2,
+  Play,
+  Pause,
+  CircleCheck,
+  Clock3,
+  RotateCcw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,12 +59,15 @@ import type { Bx24Task } from '@/lib/bitrix24';
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
     updateTaskField,
+    currentUser,
     moveTaskToProject,
     addComment,
     addTimeEntry,
     users,
     projects,
     tasks,
+    allTasks,
+    loadAllTasks,
     subtasks,
     loadSubtasks,
     createTask,
@@ -183,6 +191,39 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     }
   };
 
+  const handleStartTask = async () => {
+    // The project board may not contain the user's task from another project.
+    // Load the complete task list before applying the single-focus interaction.
+    if (allTasks.length === 0) await loadAllTasks();
+    const knownTasks = new Map(
+      [...tasks, ...useKanbanStore.getState().allTasks].map((item) => [item.id, item]),
+    );
+    const activeTask = [...knownTasks.values()].find(
+      (item) =>
+        item.id !== task.id &&
+        item.status === 'in_progress' &&
+        String(item.assigneeId) === String(currentUser.id),
+    );
+
+    if (activeTask) {
+      const approved = window.confirm(
+        `Сейчас в работе «${activeTask.title}». Приостановить её и начать эту задачу?`,
+      );
+      if (!approved) return;
+
+      try {
+        setFieldError(null);
+        await updateTaskField(activeTask.id, 'status', 'new');
+        await updateTaskField(task.id, 'status', 'in_progress');
+      } catch (error) {
+        setFieldError(error instanceof Error ? error.message : 'Не удалось изменить статус');
+      }
+      return;
+    }
+
+    await handleUpdateField('status', 'in_progress');
+  };
+
   const handleMoveProject = async (projectId: string) => {
     await moveTaskToProject(task.id, projectId);
     onClose();
@@ -276,21 +317,56 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-sm text-muted-foreground font-mono">#{task.id}</span>
-            <Select
-              value={task.status}
-              onValueChange={(value) => handleUpdateField('status', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['new', 'in_progress', 'testing', 'done'].map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABELS[s] || s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Badge variant="outline" className="shrink-0">
+              {STATUS_LABELS[task.status] || task.status}
+            </Badge>
+            <div className="flex shrink-0 items-center gap-1">
+              {(task.status === 'new' || task.status === 'deferred') && (
+                <Button size="sm" onClick={() => void handleStartTask()}>
+                  <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
+                </Button>
+              )}
+              {task.status === 'in_progress' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'new')}
+                  >
+                    <Pause /> Приостановить
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'deferred')}
+                  >
+                    <Clock3 /> Отложить
+                  </Button>
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                    <CircleCheck /> Завершить
+                  </Button>
+                </>
+              )}
+              {task.status === 'testing' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'deferred')}
+                  >
+                    <Clock3 /> Отложить
+                  </Button>
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                    <CircleCheck /> Завершить
+                  </Button>
+                </>
+              )}
+              {task.status === 'done' && (
+                <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
+                  <RotateCcw /> Возобновить
+                </Button>
+              )}
+            </div>
             {projectStages.length > 0 && (
               <Select
                 value={selectedStageId}

@@ -30,6 +30,7 @@ import {
   createProject as bxCreateProject,
   updateProject as bxUpdateProject,
   updateTaskStatus as bxUpdateStatus,
+  runTaskStatusAction as bxRunTaskStatusAction,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
   addTimeEntry as bxAddTime,
@@ -633,21 +634,15 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     try {
       if (Object.keys(bxFields).length > 0) await bxUpdateTaskFull(id, bxFields);
-      // Status update
+      // Bitrix keeps its status transitions behind dedicated methods. Do not emulate
+      // them by writing STATUS/SUB_STATUS directly: that bypasses its permissions and history.
       if (field === 'status') {
-        let bxStatus = '2',
-          bxSubStatus = '-2';
-        if (value === 'done') {
-          bxStatus = '5';
-          bxSubStatus = '5';
-        } else if (value === 'in_progress') {
-          bxStatus = '2';
-          bxSubStatus = '-3';
-        } else if (value === 'testing') {
-          bxStatus = '2';
-          bxSubStatus = '-4';
-        }
-        await bxUpdateStatus(id, bxStatus, bxSubStatus);
+        if (value === 'in_progress') await bxRunTaskStatusAction(id, 'start');
+        else if (value === 'deferred') await bxRunTaskStatusAction(id, 'defer');
+        else if (value === 'done') await bxRunTaskStatusAction(id, 'complete');
+        else if (value === 'new')
+          await bxRunTaskStatusAction(id, previous.status === 'done' ? 'renew' : 'pause');
+        else if (value === 'testing') await bxUpdateStatus(id, '2', '-4');
       }
     } catch (error) {
       console.error('Task field update failed:', error);

@@ -601,6 +601,18 @@ export async function fetchTaskTimeLog(taskId: string): Promise<Bx24TimeEntry[]>
   }
 }
 
+export type BitrixTaskStatusAction = 'start' | 'pause' | 'defer' | 'complete' | 'renew';
+
+export async function runTaskStatusAction(
+  taskId: string,
+  action: BitrixTaskStatusAction,
+): Promise<void> {
+  await bx24(`tasks.task.${action}`, { taskId });
+  await cacheInvalidateByPrefix('tasks:');
+  await cacheInvalidateByPrefix('subtasks:');
+  await taskInvalidate(taskId);
+}
+
 // Обновление - инвалидирует кеш
 export async function updateTaskStatus(
   taskId: string,
