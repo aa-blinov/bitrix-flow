@@ -578,6 +578,9 @@ export default function TaskGrid({
   initialAssigneeId = 'all',
   viewScope,
   layoutScope = 'all',
+  onLoadMore,
+  hasMore = false,
+  totalCount,
 }: {
   tasks: BxTask[];
   showProject?: boolean;
@@ -587,6 +590,9 @@ export default function TaskGrid({
   initialAssigneeId?: string;
   viewScope?: 'all' | 'my';
   layoutScope?: string;
+  onLoadMore?: () => Promise<void>;
+  hasMore?: boolean;
+  totalCount?: number;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
@@ -768,6 +774,16 @@ export default function TaskGrid({
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const loadNextPage = async () => {
+    if (page < pageCount) {
+      setPage((value) => value + 1);
+      return;
+    }
+    if (hasMore && onLoadMore) {
+      await onLoadMore();
+      setPage((value) => value + 1);
+    }
+  };
   const hierarchy = useMemo(() => {
     const pageTaskIds = new Set(pageTasks.map((task) => task.id));
     const pageTaskById = new Map(pageTasks.map((task) => [task.id, task]));
@@ -1645,10 +1661,11 @@ export default function TaskGrid({
             </Table>
           </div>
         </CardContent>
-        {pageCount > 1 && (
+        {(pageCount > 1 || hasMore) && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
-              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из {tasks.length}
+              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из{' '}
+              {totalCount || tasks.length}
             </p>
             <div className="flex flex-wrap items-center justify-end gap-1" aria-label="Пагинация">
               <Button
@@ -1682,8 +1699,8 @@ export default function TaskGrid({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((value) => value + 1)}
-                disabled={page === pageCount}
+                onClick={() => void loadNextPage()}
+                disabled={page === pageCount && !hasMore}
               >
                 Вперёд
               </Button>

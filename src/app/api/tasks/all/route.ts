@@ -62,6 +62,8 @@ export async function GET(req: NextRequest) {
   }
 
   const db = await getDb();
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset')) || 0);
+  const limit = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get('limit')) || 50));
 
   // task_mirror — полный серверный снимок задач, обновляемый событиями Bitrix24.
   // Не ходим в Bitrix24 из HTTP-ответа: один отсутствующий проект раньше
@@ -111,8 +113,17 @@ export async function GET(req: NextRequest) {
         })),
       );
     }
-    return NextResponse.json({ tasks: allTasks.map(toTaskListItem) });
+    return NextResponse.json({
+      tasks: allTasks.slice(offset, offset + limit).map(toTaskListItem),
+      total: allTasks.length,
+      nextOffset: offset + limit < allTasks.length ? offset + limit : null,
+    });
   }
 
-  return NextResponse.json({ tasks: Array.from(byId.values(), toTaskListItem) });
+  const taskList = Array.from(byId.values(), toTaskListItem);
+  return NextResponse.json({
+    tasks: taskList.slice(offset, offset + limit),
+    total: taskList.length,
+    nextOffset: offset + limit < taskList.length ? offset + limit : null,
+  });
 }

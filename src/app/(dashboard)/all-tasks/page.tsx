@@ -23,6 +23,8 @@ function AllTasksInner() {
     projects,
     allTasks,
     isLoadingAllTasks,
+    allTasksTotal,
+    hasMoreAllTasks,
     loadAllTasks,
     loadProjects,
     currentUser,
@@ -97,7 +99,7 @@ function AllTasksInner() {
       />
 
       <div className="mt-4">
-        {isLoadingAllTasks ? (
+        {isLoadingAllTasks && allTasks.length === 0 ? (
           <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
@@ -108,6 +110,9 @@ function AllTasksInner() {
             viewScope="all"
             layoutScope="all"
             title={null}
+            hasMore={hasMoreAllTasks}
+            totalCount={allTasksTotal}
+            onLoadMore={() => loadAllTasks(true)}
           />
         )}
       </div>

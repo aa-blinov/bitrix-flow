@@ -85,6 +85,8 @@ interface KanbanStore {
   // Все задачи по всем доступным проектам (для /all-tasks)
   allTasks: BxTask[];
   isLoadingAllTasks: boolean;
+  allTasksTotal: number;
+  hasMoreAllTasks: boolean;
 
   // Фильтры
   filters: TaskFilters;
@@ -117,7 +119,7 @@ interface KanbanStore {
     fields: { name?: string; description?: string; archived?: boolean },
   ) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
-  loadAllTasks: () => Promise<void>;
+  loadAllTasks: (append?: boolean) => Promise<void>;
   loadMoreTasks: () => Promise<void>;
   loadSubtasks: (parentId: string) => Promise<void>;
   loadTaskDetails: (taskId: string) => Promise<void>;
@@ -215,6 +217,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   currentUser: { id: '', name: 'Не определён' },
   allTasks: [],
   isLoadingAllTasks: false,
+  allTasksTotal: 0,
+  hasMoreAllTasks: false,
   filters: defaultFilters,
   searchQuery: '',
   searchResults: [],
@@ -401,20 +405,29 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   // Загружает задачи по всем доступным проектам (для /all-tasks).
   // Прогоняем проекты параллельно, лимит per-project=50, обрезаем до ~500
   // суммарно чтобы не задушить Битрикс.
-  loadAllTasks: async () => {
+  loadAllTasks: async (append = false) => {
+    const { allTasks, isLoadingAllTasks } = get();
+    if (isLoadingAllTasks) return;
     set({ isLoadingAllTasks: true });
     try {
-      // Один server-side endpoint: сервер сначала читает MongoDB, для
-      // отсутствующих проектов параллельно фетчит из Битрикса, пишет обратно.
-      // На прогретом кэше — мгновенный read без обращения к Битриксу.
-      const res = await fetch('/api/tasks/all', {
+      const offset = append ? allTasks.length : 0;
+      const res = await fetch(`/api/tasks/all?offset=${offset}&limit=50`, {
         headers: getMemberIdHeader(),
       });
       if (!res.ok) throw new Error(`tasks/all HTTP ${res.status}`);
       const data = await res.json();
-      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      const mapped = tasks.map(convertBxTask);
-      set({ allTasks: mapped, isLoadingAllTasks: false });
+      const mapped: BxTask[] = (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask);
+      set((state) => ({
+        allTasks: append
+          ? [
+              ...state.allTasks,
+              ...mapped.filter((task) => !state.allTasks.some((item) => item.id === task.id)),
+            ]
+          : mapped,
+        allTasksTotal: Number(data.total) || mapped.length,
+        hasMoreAllTasks: data.nextOffset !== null && data.nextOffset !== undefined,
+        isLoadingAllTasks: false,
+      }));
     } catch (err: any) {
       set({ error: err.message, isLoadingAllTasks: false });
     }
