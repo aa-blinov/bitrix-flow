@@ -322,9 +322,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             </Badge>
             <div className="flex shrink-0 items-center gap-1">
               {(task.status === 'new' || task.status === 'deferred') && (
-                <Button size="sm" onClick={() => void handleStartTask()}>
-                  <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
-                </Button>
+                <>
+                  <Button size="sm" onClick={() => void handleStartTask()}>
+                    <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
+                  </Button>
+                  {task.status === 'new' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleUpdateField('status', 'deferred')}
+                    >
+                      <Clock3 /> Отложить
+                    </Button>
+                  )}
+                </>
               )}
               {task.status === 'in_progress' && (
                 <>
