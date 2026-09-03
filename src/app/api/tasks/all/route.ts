@@ -10,6 +10,38 @@ import { getDb } from '@/lib/mongo';
 import { postBitrixJson } from '@/lib/bitrix-request';
 export const dynamic = 'force-dynamic';
 
+// The Mongo mirror holds full Bitrix task payloads (checklists, group/user objects,
+// action maps, etc.). The grid only needs this compact shape; task details are
+// fetched when the user opens a card.
+function toTaskListItem(task: any) {
+  return {
+    id: String(task.id ?? task.ID),
+    title: task.title || task.TITLE || '',
+    description: task.description || task.DESCRIPTION || '',
+    status: String(task.status ?? task.STATUS ?? '1'),
+    subStatus: String(task.subStatus ?? task.SUB_STATUS ?? ''),
+    priority: String(task.priority ?? task.PRIORITY ?? '1'),
+    createdDate: task.createdDate || task.CREATED_DATE || '',
+    changedDate: task.changedDate || task.CHANGED_DATE || '',
+    deadline: task.deadline || task.DEADLINE || undefined,
+    timeEstimate: Number(task.timeEstimate ?? task.TIME_ESTIMATE) || 0,
+    timeSpentInLogs: Number(task.timeSpentInLogs ?? task.TIME_SPENT_IN_LOGS) || 0,
+    groupId: String(task.group?.id || task.groupId || task.GROUP_ID || '0'),
+    groupName: task.group?.name || task.groupName || task.GROUP_NAME || '',
+    responsibleId: String(task.responsible?.id || task.responsibleId || task.RESPONSIBLE_ID || ''),
+    responsibleName: task.responsible?.name || task.responsibleName || task.RESPONSIBLE_NAME || '',
+    responsibleIcon: task.responsible?.icon || task.responsibleIcon,
+    creatorId: String(task.creator?.id || task.creatorId || task.CREATED_BY || ''),
+    creatorName: task.creator?.name || task.creatorName || '',
+    commentsCount: Number(task.commentsCount ?? task.COMMENTS_COUNT) || 0,
+    parentId: task.parentId || task.PARENT_ID || undefined,
+    stageId: task.stageId || task.STAGE_ID || '0',
+    chatId: task.chatId || task.CHAT_ID || undefined,
+    accompliceIds: (task.accomplices || task.ACCOMPLICES || []).map(String),
+    auditorIds: (task.auditors || task.AUDITORS || []).map(String),
+  };
+}
+
 export async function GET(req: NextRequest) {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
   if (!memberId) {
@@ -79,8 +111,8 @@ export async function GET(req: NextRequest) {
         })),
       );
     }
-    return NextResponse.json({ tasks: allTasks });
+    return NextResponse.json({ tasks: allTasks.map(toTaskListItem) });
   }
 
-  return NextResponse.json({ tasks: Array.from(byId.values()) });
+  return NextResponse.json({ tasks: Array.from(byId.values(), toTaskListItem) });
 }
