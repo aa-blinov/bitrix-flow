@@ -49,6 +49,7 @@ async function setupIndexes(database: Db) {
     await database.collection('stages').createIndex({ entityId: 1, stageId: 1 }, { unique: true });
     await database.collection('tasks').createIndex({ id: 1 }, { unique: true });
     await database.collection('tasks').createIndex({ groupId: 1 });
+    await database.collection('tasks').createIndex({ member_id: 1, id: 1 });
     await database.collection('comments').createIndex({ taskId: 1, id: 1 }, { unique: true });
     await database.collection('time_entries').createIndex({ taskId: 1, id: 1 }, { unique: true });
     await database.collection('task_mirror').createIndex({ member_id: 1, id: 1 }, { unique: true });

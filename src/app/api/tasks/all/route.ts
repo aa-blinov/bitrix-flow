@@ -68,17 +68,34 @@ export async function GET(req: NextRequest) {
   // task_mirror — полный серверный снимок задач, обновляемый событиями Bitrix24.
   // Не ходим в Bitrix24 из HTTP-ответа: один отсутствующий проект раньше
   // превращал открытие «Все задачи» в десятки запросов и HTTP 500.
-  const [mirrored, recent] = await Promise.all([
-    db.collection('task_mirror').find({ member_id: memberId }).toArray(),
-    db.collection('tasks').find({ member_id: memberId }).toArray(),
-  ]);
-  const byId = new Map<string, any>();
-  for (const task of mirrored) byId.set(String(task.id), task.data);
-  // `tasks` содержит свежие записи, полученные background-sync, и перекрывает
-  // соответствующие документы из полного снимка.
-  for (const task of recent) byId.set(String(task.id), task.data);
+  // Merge the durable mirror with fresher background-sync records inside MongoDB.
+  // Pagination happens after de-duplication, so the app never transfers the full task set.
+  const page = await db
+    .collection('task_mirror')
+    .aggregate([
+      { $match: { member_id: memberId } },
+      { $set: { priority: 0 } },
+      {
+        $unionWith: {
+          coll: 'tasks',
+          pipeline: [{ $match: { member_id: memberId } }, { $set: { priority: 1 } }],
+        },
+      },
+      { $sort: { id: 1, priority: -1, updated_at: -1 } },
+      { $group: { _id: '$id', data: { $first: '$data' } } },
+      { $sort: { 'data.changedDate': -1, _id: -1 } },
+      {
+        $facet: {
+          tasks: [{ $skip: offset }, { $limit: limit }, { $replaceWith: '$data' }],
+          total: [{ $count: 'value' }],
+        },
+      },
+    ])
+    .next();
+  const mirroredTasks = page?.tasks || [];
+  const total = page?.total?.[0]?.value || 0;
 
-  if (byId.size === 0) {
+  if (total === 0) {
     const allTasks: any[] = [];
     let start = 0;
     const visited = new Set<number>();
@@ -120,10 +137,9 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const taskList = Array.from(byId.values(), toTaskListItem);
   return NextResponse.json({
-    tasks: taskList.slice(offset, offset + limit),
-    total: taskList.length,
-    nextOffset: offset + limit < taskList.length ? offset + limit : null,
+    tasks: mirroredTasks.map(toTaskListItem),
+    total,
+    nextOffset: offset + limit < total ? offset + limit : null,
   });
 }
