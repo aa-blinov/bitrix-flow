@@ -35,6 +35,7 @@ async function mongoTasksCacheRead(
   if (!groupId) return null;
 
   const since = params['filter[>=CHANGED_DATE]'] || params['filter%5B%3E%3DCHANGED_DATE%5D'];
+  const offset = Math.max(0, Number(params.start) || 0);
 
   try {
     const db = await getDb();
@@ -52,9 +53,11 @@ async function mongoTasksCacheRead(
     }
     const docs = await db.collection('tasks').find({ groupId }).toArray();
     if (docs.length === 0) return null;
+    const pageSize = 50;
+    const tasks = docs.slice(offset, offset + pageSize).map((d) => d.data);
     return {
-      tasks: docs.map((d) => d.data),
-      next: undefined,
+      tasks,
+      next: offset + pageSize < docs.length ? offset + pageSize : undefined,
       total: docs.length,
     };
   } catch {

@@ -381,7 +381,7 @@ export async function fetchTasksByProject(
     };
   } = {},
 ): Promise<{ tasks: Bx24Task[]; hasMore: boolean; total: number }> {
-  const { offset = 0, status = 'active', filter = {} } = options;
+  const { limit = 50, offset = 0, status = 'active', filter = {} } = options;
 
   const cacheKey = `tasks:v3:${groupId}:${offset}:${status}:${filter.responsibleId || ''}:${filter.priority || ''}`;
 
@@ -389,7 +389,8 @@ export async function fetchTasksByProject(
   if (offset === 0 && status === 'all') {
     const cached = await tasksCacheGet(groupId);
     if (cached && cached.length > 0) {
-      return { tasks: cached.map(mapTask), hasMore: false, total: cached.length };
+      const page = cached.slice(offset, offset + limit).map(mapTask);
+      return { tasks: page, hasMore: offset + limit < cached.length, total: cached.length };
     }
   }
 

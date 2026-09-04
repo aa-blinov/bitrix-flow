@@ -56,6 +56,8 @@ export default function ProjectPage() {
     setSelectedTask,
     loadTaskById,
     tasks,
+    hasMoreTasks,
+    loadMoreTasks,
     isRehydrated,
     updateProject,
     users,
@@ -374,6 +376,9 @@ export default function ProjectPage() {
             initialStatus={initialStatus}
             layoutScope="projects"
             title={null}
+            hasMore={hasMoreTasks}
+            totalCount={undefined}
+            onLoadMore={loadMoreTasks}
           />
         </TabsContent>
       </Tabs>
