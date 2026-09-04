@@ -771,11 +771,13 @@ export default function TaskGrid({
     tasks,
     groupBy,
   ]);
+  const loadedPageCount = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
   const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
+  const totalPageCount = totalCount ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) : pageCount;
   const pageStart = (page - 1) * PAGE_SIZE;
   const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
   const loadNextPage = async () => {
-    if (page < pageCount) {
+    if (page < loadedPageCount) {
       setPage((value) => value + 1);
       return;
     }
@@ -852,7 +854,9 @@ export default function TaskGrid({
     tableHeightClass === 'max-h-none' ? 'overflow-x-auto' : 'overflow-auto overscroll-contain';
   const pageNumbers = Array.from(
     new Set(
-      [1, page - 1, page, page + 1, pageCount].filter((value) => value >= 1 && value <= pageCount),
+      [1, page - 1, page, page + 1, loadedPageCount].filter(
+        (value) => value >= 1 && value <= loadedPageCount,
+      ),
     ),
   ).sort((left, right) => left - right);
 
@@ -1661,11 +1665,12 @@ export default function TaskGrid({
             </Table>
           </div>
         </CardContent>
-        {(pageCount > 1 || hasMore) && (
+        {(loadedPageCount > 1 || hasMore) && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
               {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из{' '}
               {totalCount || tasks.length}
+              {totalCount ? `, страница ${page} из ${totalPageCount}` : ''}
             </p>
             <div className="flex flex-wrap items-center justify-end gap-1" aria-label="Пагинация">
               <Button
@@ -1700,7 +1705,7 @@ export default function TaskGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => void loadNextPage()}
-                disabled={page === pageCount && !hasMore}
+                disabled={page >= loadedPageCount && !hasMore}
               >
                 Вперёд
               </Button>
@@ -1709,7 +1714,7 @@ export default function TaskGrid({
                 size="sm"
                 className="hidden sm:inline-flex"
                 onClick={() => setPage(pageCount)}
-                disabled={page === pageCount}
+                disabled={hasMore || page === loadedPageCount}
               >
                 Последняя
               </Button>
