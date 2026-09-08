@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
+import { taskMirrorStages } from '@/lib/task-mirror-query';
 import { postBitrixJson } from '@/lib/bitrix-request';
 export const dynamic = 'force-dynamic';
 
@@ -62,28 +63,129 @@ export async function GET(req: NextRequest) {
   }
 
   const db = await getDb();
-  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset')) || 0);
+  const hasMirroredTasks = Boolean(
+    await db.collection('task_mirror').findOne({ member_id: memberId }, { projection: { _id: 1 } }),
+  );
+  const requestedPage = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 0);
   const limit = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get('limit')) || 50));
+  const offset = req.nextUrl.searchParams.has('page')
+    ? (requestedPage - 1) * limit
+    : Math.max(0, Number(req.nextUrl.searchParams.get('offset')) || 0);
+  const query = req.nextUrl.searchParams.get('query')?.trim() || '';
+  const status = req.nextUrl.searchParams.get('status') || 'all';
+  const assigneeId = req.nextUrl.searchParams.get('assigneeId') || 'all';
+  const projectId = req.nextUrl.searchParams.get('projectId') || 'all';
+  const stageId = req.nextUrl.searchParams.get('stageId') || 'all';
+  const priority = req.nextUrl.searchParams.get('priority') || 'all';
+  const hasDeadline = req.nextUrl.searchParams.get('hasDeadline') === 'true';
+  const hideDone = req.nextUrl.searchParams.get('hideDone') === 'true';
+  const unassigned = req.nextUrl.searchParams.get('unassigned') === 'true';
+  const deadlineDay = req.nextUrl.searchParams.get('deadlineDay');
+  const sortKey = req.nextUrl.searchParams.get('sortKey') || 'updated';
+  const sortDirection = req.nextUrl.searchParams.get('sortDirection') === 'asc' ? 1 : -1;
+  const requestedSorts = (req.nextUrl.searchParams.get('sorts') || '')
+    .split(',')
+    .map((value) => value.split(':'))
+    .filter(([key, direction]) => key && (direction === 'asc' || direction === 'desc'));
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 2);
+  const weekEnd = new Date(today);
+  weekEnd.setDate(weekEnd.getDate() + 8);
+
+  const filter: Record<string, any> = {};
+  if (query) {
+    filter.$or = [
+      { taskId: { $regex: escapedQuery, $options: 'i' } },
+      { title: { $regex: escapedQuery, $options: 'i' } },
+      { description: { $regex: escapedQuery, $options: 'i' } },
+      { groupName: { $regex: escapedQuery, $options: 'i' } },
+      { responsibleName: { $regex: escapedQuery, $options: 'i' } },
+    ];
+  }
+  if (assigneeId !== 'all') filter.responsibleId = assigneeId;
+  if (unassigned) filter.responsibleId = { $in: ['', '0'] };
+  if (projectId !== 'all') filter.groupId = projectId;
+  if (stageId !== 'all') filter.stageId = stageId;
+  if (priority === 'high') filter.priorityValue = { $in: ['2', 2, '3', 3, '4', 4] };
+  if (hasDeadline) {
+    filter.$and = [...(filter.$and || []), { deadline: { $exists: true, $nin: [null, ''] } }];
+  }
+  if (hideDone) filter.rawStatus = { $ne: '5' };
+  if (status === 'active') filter.rawStatus = { $ne: '5' };
+  else if (status === 'new') filter.rawStatus = { $in: ['1', '2'] };
+  else if (['in_progress', 'testing', 'done', 'deferred'].includes(status)) {
+    filter.rawStatus = { in_progress: '3', testing: '4', done: '5', deferred: '6' }[status];
+  } else if (status === 'no_deadline') {
+    filter.$and = [
+      ...(filter.$and || []),
+      { $or: [{ deadline: null }, { deadline: '' }] },
+      { rawStatus: { $ne: '5' } },
+    ];
+  } else if (['overdue', 'attention', 'week'].includes(status)) {
+    const deadlineMatch =
+      status === 'overdue'
+        ? { $lt: ['$deadlineDate', today] }
+        : status === 'attention'
+          ? { $lt: ['$deadlineDate', tomorrow] }
+          : { $and: [{ $gte: ['$deadlineDate', today] }, { $lt: ['$deadlineDate', weekEnd] }] };
+    filter.$and = [
+      ...(filter.$and || []),
+      { rawStatus: { $ne: '5' } },
+      { deadlineDate: { $ne: null } },
+      { $expr: deadlineMatch },
+    ];
+  }
+  if (hideDone && status === 'done') {
+    filter.$and = [...(filter.$and || []), { rawStatus: { $ne: '5' } }];
+  }
+  if (deadlineDay) {
+    const dayStart = new Date(`${deadlineDay}T00:00:00`);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    if (!Number.isNaN(dayStart.getTime())) {
+      filter.$and = [...(filter.$and || []), { deadlineDate: { $gte: dayStart, $lt: dayEnd } }];
+    }
+  }
+  const sortField: Record<string, string> = {
+    title: 'title',
+    project: 'groupName',
+    stage: 'stageId',
+    assignee: 'responsibleName',
+    priority: 'priorityValue',
+    deadline: 'deadlineDate',
+    estimate: 'estimate',
+    actual: 'actual',
+    updated: 'changedDate',
+    description: 'description',
+    created: 'createdDate',
+    comments: 'comments',
+    parent: 'parent',
+  };
+  const sort = Object.fromEntries(
+    (requestedSorts.length
+      ? requestedSorts.map(([key, direction]) => [
+          sortField[key] || 'changedDate',
+          direction === 'asc' ? 1 : -1,
+        ])
+      : [[sortField[sortKey] || 'changedDate', sortDirection]]
+    ).concat([['taskId', -1]]),
+  );
 
   // task_mirror — полный серверный снимок задач, обновляемый событиями Bitrix24.
   // Не ходим в Bitrix24 из HTTP-ответа: один отсутствующий проект раньше
   // превращал открытие «Все задачи» в десятки запросов и HTTP 500.
   // Merge the durable mirror with fresher background-sync records inside MongoDB.
   // Pagination happens after de-duplication, so the app never transfers the full task set.
+  const { stages } = await taskMirrorStages(memberId);
   const page = await db
     .collection('task_mirror')
     .aggregate([
-      { $match: { member_id: memberId } },
-      { $set: { priority: 0 } },
-      {
-        $unionWith: {
-          coll: 'tasks',
-          pipeline: [{ $match: { member_id: memberId } }, { $set: { priority: 1 } }],
-        },
-      },
-      { $sort: { id: 1, priority: -1, updated_at: -1 } },
-      { $group: { _id: '$id', data: { $first: '$data' } } },
-      { $sort: { 'data.changedDate': -1, _id: -1 } },
+      ...stages,
+      { $match: filter },
+      { $sort: sort },
       {
         $facet: {
           tasks: [{ $skip: offset }, { $limit: limit }, { $replaceWith: '$data' }],
@@ -95,7 +197,7 @@ export async function GET(req: NextRequest) {
   const mirroredTasks = page?.tasks || [];
   const total = page?.total?.[0]?.value || 0;
 
-  if (total === 0) {
+  if (total === 0 && !hasMirroredTasks) {
     const allTasks: any[] = [];
     let start = 0;
     const visited = new Set<number>();
@@ -130,16 +232,16 @@ export async function GET(req: NextRequest) {
         })),
       );
     }
-    return NextResponse.json({
-      tasks: allTasks.slice(offset, offset + limit).map(toTaskListItem),
-      total: allTasks.length,
-      nextOffset: offset + limit < allTasks.length ? offset + limit : null,
-    });
+    if (allTasks.length === 0) {
+      return NextResponse.json({ tasks: [], total: 0, nextOffset: null, page: requestedPage });
+    }
+    return GET(req);
   }
 
   return NextResponse.json({
     tasks: mirroredTasks.map(toTaskListItem),
     total,
     nextOffset: offset + limit < total ? offset + limit : null,
+    page: requestedPage,
   });
 }

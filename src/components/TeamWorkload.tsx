@@ -10,7 +10,7 @@ import {
   RefreshCw,
   UsersRound,
 } from 'lucide-react';
-import { BxTask, Bx24Project, Bx24User } from '@/types/bitrix';
+import { Bx24Project, Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
 import LoadingState from '@/components/LoadingState';
@@ -26,6 +26,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+type WorkloadBucket = { userId: string; count: number; hours: number };
+type WorkloadSummary = {
+  days: Array<WorkloadBucket & { day: string }>;
+  noDeadline: WorkloadBucket[];
+  overdue: WorkloadBucket[];
+};
+
+const EMPTY_BUCKET: WorkloadBucket = { userId: '', count: 0, hours: 0 };
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
 const WEEK_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
@@ -46,12 +54,6 @@ function addDays(date: Date, days: number) {
 
 function calendarDayKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function dayKey(value?: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : calendarDayKey(date);
 }
 
 function formatHours(hours: number) {
@@ -100,20 +102,27 @@ function UserAvatar({ user }: { user: Bx24User }) {
   );
 }
 
-function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: number }) {
+function WorkloadValue({
+  count,
+  hours,
+  actualHours,
+}: {
+  count: number;
+  hours: number;
+  actualHours?: number;
+}) {
   // TODO: when hierarchy-aware planning is introduced, calculate an effective
   // estimate per task branch: use the recursive sum of estimated descendants;
   // if every descendant estimate is zero, fall back to the parent's estimate.
   // Sum only root branches so parent and subtasks are never counted twice.
-  const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
-  if (tasks.length === 0 && actualHours === undefined)
+  if (count === 0 && actualHours === undefined)
     return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex flex-col items-center gap-0.5 leading-tight">
-      {tasks.length > 0 && (
+      {count > 0 && (
         <>
           <span>
-            {tasks.length} {taskLabel(tasks.length)}
+            {count} {taskLabel(count)}
           </span>
           <span className="text-xs opacity-80">План {formatHours(hours)}</span>
         </>
@@ -126,8 +135,11 @@ function WorkloadValue({ tasks, actualHours }: { tasks: BxTask[]; actualHours?: 
 }
 
 export default function TeamWorkload() {
-  const { allTasks, users, projects, isLoadingAllTasks, loadAllTasks, loadProjects } =
-    useKanbanStore();
+  const allTasks = useKanbanStore((state) => state.allTasks);
+  const users = useKanbanStore((state) => state.users);
+  const projects = useKanbanStore((state) => state.projects);
+  const loadAllTasks = useKanbanStore((state) => state.loadAllTasks);
+  const loadProjects = useKanbanStore((state) => state.loadProjects);
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [timeRows, setTimeRows] = useState<Array<{ userId: string; day: string; seconds: number }>>(
@@ -142,6 +154,8 @@ export default function TeamWorkload() {
   const [timeError, setTimeError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [timeRefreshing, setTimeRefreshing] = useState(false);
+  const [summary, setSummary] = useState<WorkloadSummary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (allTasks.length === 0) void loadAllTasks();
@@ -172,6 +186,27 @@ export default function TeamWorkload() {
     setTimeRows([]);
     void loadActualTime();
   }, [weekStartKey]);
+
+  // Счётчики ячеек приходят с сервера по всему зеркалу задач — теми же
+  // фильтрами, что применит /all-tasks при клике.
+  useEffect(() => {
+    let cancelled = false;
+    setSummary(null);
+    setSummaryError(null);
+    const params = new URLSearchParams({ start: weekStartKey, projectId: selectedProjectId });
+    void fetch(`/api/workload/summary?${params.toString()}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
+        if (!cancelled) setSummary(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setSummaryError('Не удалось загрузить нагрузку');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, weekStartKey]);
 
   const refreshActualTime = async () => {
     setTimeRefreshing(true);
@@ -205,59 +240,64 @@ export default function TeamWorkload() {
     [weekStart],
   );
   const weekKeys = useMemo(() => new Set(days.map(calendarDayKey)), [days]);
-  const openTasks = useMemo(() => allTasks.filter((task) => task.status !== 'done'), [allTasks]);
   // Bitrix user.get identifies company staff as USER_TYPE=employee. Extranet
   // users must not influence an internal workload plan.
   const employees = useMemo(
     () => users.filter((user) => user.userType !== 'extranet' && user.userType !== 'email'),
     [users],
   );
-  const workloadTasks = useMemo(() => {
-    const employeeIds = new Set(employees.map((user) => user.id));
-    return openTasks.filter(
-      (task) =>
-        (!task.assigneeId || employeeIds.has(task.assigneeId)) &&
-        (selectedProjectId === 'all' || task.projectId === selectedProjectId),
-    );
-  }, [employees, openTasks, selectedProjectId]);
+  const dayBuckets = useMemo(() => {
+    const map = new Map<string, WorkloadBucket>();
+    for (const row of summary?.days || []) map.set(`${row.userId}|${row.day}`, row);
+    return map;
+  }, [summary]);
+  const noDeadlineBuckets = useMemo(
+    () => new Map((summary?.noDeadline || []).map((row) => [row.userId, row])),
+    [summary],
+  );
+  const overdueBuckets = useMemo(
+    () => new Map((summary?.overdue || []).map((row) => [row.userId, row])),
+    [summary],
+  );
+  const bucketFor = (assigneeId: string, key: string | null) =>
+    (key ? dayBuckets.get(`${assigneeId}|${key}`) : noDeadlineBuckets.get(assigneeId)) ||
+    EMPTY_BUCKET;
   const assignees = useMemo(() => {
-    const ids = new Set(workloadTasks.map((task) => task.assigneeId || 'unassigned'));
+    const ids = new Set<string>(
+      [...dayBuckets.values(), ...noDeadlineBuckets.values(), ...overdueBuckets.values()].map(
+        (row) => row.userId,
+      ),
+    );
     const known = employees
       .filter((user) => ids.has(user.id))
       .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
     return ids.has('unassigned')
       ? [...known, { id: 'unassigned', name: 'Без исполнителя' } as Bx24User]
       : known;
-  }, [employees, workloadTasks]);
+  }, [dayBuckets, employees, noDeadlineBuckets, overdueBuckets]);
 
   const openTaskList = (assigneeId: string, workload: string) => {
     const params = new URLSearchParams({ from: 'workload', workload });
     params.set('assignee', assigneeId);
+    // Календарь отфильтрован по проекту — список должен открыться так же,
+    // иначе число задач по клику не совпадёт с числом в ячейке.
+    if (selectedProjectId !== 'all') params.set('project', selectedProjectId);
     router.push(`/all-tasks?${params.toString()}`);
   };
 
-  const tasksFor = (assigneeId: string, key: string | null) =>
-    workloadTasks.filter(
-      (task) =>
-        (task.assigneeId || 'unassigned') === assigneeId &&
-        (key ? dayKey(task.dueDate) === key : !task.dueDate),
-    );
-
-  const weekTasks = useMemo(
-    () =>
-      workloadTasks.filter((task) => {
-        const dueKey = dayKey(task.dueDate);
-        return dueKey !== null && weekKeys.has(dueKey);
-      }),
-    [weekKeys, workloadTasks],
-  );
-  const noDeadlineCount = workloadTasks.filter((task) => !task.dueDate).length;
-  const todayKey = calendarDayKey(new Date());
-  const overdueTasks = workloadTasks.filter((task) => {
-    const dueKey = dayKey(task.dueDate);
-    return dueKey !== null && dueKey < todayKey;
-  });
-  const weekHours = weekTasks.reduce((sum, task) => sum + task.estimate, 0);
+  // Сводка суммирует только тех исполнителей, кто попал в таблицу: extranet
+  // не влияет на внутренний план, иначе карточки не сходятся со строками.
+  const visibleIds = useMemo(() => new Set(assignees.map((user) => user.id)), [assignees]);
+  const sumOf = (rows: WorkloadBucket[]) => {
+    const visible = rows.filter((row) => visibleIds.has(row.userId));
+    return {
+      count: visible.reduce((total, row) => total + row.count, 0),
+      hours: visible.reduce((total, row) => total + row.hours, 0),
+    };
+  };
+  const weekTotals = sumOf(summary?.days || []);
+  const noDeadlineCount = sumOf(summary?.noDeadline || []).count;
+  const overdueCount = sumOf(summary?.overdue || []).count;
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
@@ -272,7 +312,7 @@ export default function TeamWorkload() {
             <CardContent className="flex items-center gap-3 p-4">
               <ClipboardList className="size-5 text-primary" />
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{weekTasks.length}</p>
+                <p className="text-2xl font-semibold tabular-nums">{weekTotals.count}</p>
                 <p className="text-sm text-muted-foreground">задач со сроком на текущую неделю</p>
               </div>
             </CardContent>
@@ -281,7 +321,9 @@ export default function TeamWorkload() {
             <CardContent className="flex items-center gap-3 p-4">
               <Clock3 className="size-5 text-primary" />
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{formatHours(weekHours)}</p>
+                <p className="text-2xl font-semibold tabular-nums">
+                  {formatHours(weekTotals.hours)}
+                </p>
                 <p className="text-sm text-muted-foreground">плановая нагрузка на текущую неделю</p>
               </div>
             </CardContent>
@@ -299,7 +341,7 @@ export default function TeamWorkload() {
             <CardContent className="flex items-center gap-3 p-4">
               <ClipboardList className="size-5 text-red-600" />
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{overdueTasks.length}</p>
+                <p className="text-2xl font-semibold tabular-nums">{overdueCount}</p>
                 <p className="text-sm text-muted-foreground">просроченных задач</p>
               </div>
             </CardContent>
@@ -358,7 +400,9 @@ export default function TeamWorkload() {
             </div>
           </div>
 
-          {isLoadingAllTasks ? (
+          {summaryError ? (
+            <p className="p-6 text-sm text-destructive">{summaryError}</p>
+          ) : !summary ? (
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div className="overflow-x-auto">
@@ -375,13 +419,9 @@ export default function TeamWorkload() {
                   <div className="border-l px-2 py-3 text-center font-medium">Просрочено</div>
                 </div>
                 {assignees.map((assignee) => {
-                  const memberWeekTasks = weekTasks.filter(
-                    (task) => (task.assigneeId || 'unassigned') === assignee.id,
-                  );
-                  const memberPlannedHours = memberWeekTasks.reduce(
-                    (sum, task) => sum + task.estimate,
-                    0,
-                  );
+                  const memberPlannedHours = (summary?.days || [])
+                    .filter((row) => row.userId === assignee.id)
+                    .reduce((sum, row) => sum + row.hours, 0);
                   const memberActualHours = timeRows
                     .filter(
                       (row) => String(row.userId) === String(assignee.id) && weekKeys.has(row.day),
@@ -406,8 +446,7 @@ export default function TeamWorkload() {
                       </div>
                       {days.map((day) => {
                         const key = calendarDayKey(day);
-                        const tasks = tasksFor(assignee.id, key);
-                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        const bucket = bucketFor(assignee.id, key);
                         return (
                           <button
                             key={key}
@@ -416,42 +455,39 @@ export default function TeamWorkload() {
                               const actual = actualHoursFor(assignee.id, key);
                               if (actual !== undefined)
                                 setSelectedActual({ userId: assignee.id, day: key });
-                              else if (tasks.length) openTaskList(assignee.id, key);
+                              else if (bucket.count) openTaskList(assignee.id, key);
                             }}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? `${loadTone(bucket.count, bucket.hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
                           >
                             <WorkloadValue
-                              tasks={tasks}
+                              count={bucket.count}
+                              hours={bucket.hours}
                               actualHours={actualHoursFor(assignee.id, key)}
                             />
                           </button>
                         );
                       })}
                       {(() => {
-                        const tasks = tasksFor(assignee.id, null);
-                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        const bucket = bucketFor(assignee.id, null);
                         return (
                           <button
                             type="button"
-                            onClick={() => tasks.length && openTaskList(assignee.id, 'no_deadline')}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? `${loadTone(tasks.length, hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                            onClick={() => bucket.count && openTaskList(assignee.id, 'no_deadline')}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? `${loadTone(bucket.count, bucket.hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
                           >
-                            <WorkloadValue tasks={tasks} />
+                            <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
                         );
                       })()}
                       {(() => {
-                        const tasks = overdueTasks.filter(
-                          (task) => (task.assigneeId || 'unassigned') === assignee.id,
-                        );
-                        const hours = tasks.reduce((sum, task) => sum + task.estimate, 0);
+                        const bucket = overdueBuckets.get(assignee.id) || EMPTY_BUCKET;
                         return (
                           <button
                             type="button"
-                            onClick={() => tasks.length && openTaskList(assignee.id, 'overdue')}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${tasks.length ? 'border-border bg-background/40 hover:bg-muted/70' : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                            onClick={() => bucket.count && openTaskList(assignee.id, 'overdue')}
+                            className="m-1 min-h-16 rounded-lg border border-border bg-background/40 px-1 py-2 text-center transition-colors hover:bg-muted/70"
                           >
-                            <WorkloadValue tasks={tasks} />
+                            <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
                         );
                       })()}
