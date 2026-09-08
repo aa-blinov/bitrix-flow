@@ -1107,6 +1107,9 @@ export default function TaskGrid({
   ]);
 
   const applyFilters = () => {
+    // На телефоне фильтры живут в шторке: после применения её надо убрать,
+    // иначе результат остаётся за ней.
+    if (isMobile) setShowFilters(false);
     setQuery(draftQuery);
     setStatusFilter(draftStatusFilter);
     setHideDone(draftHideDone);
@@ -1116,6 +1119,7 @@ export default function TaskGrid({
     setGroupBy(draftGroupBy);
   };
   const resetFilters = () => {
+    if (isMobile) setShowFilters(false);
     setDraftQuery('');
     setDraftStatusFilter('all');
     setDraftHideDone(false);
