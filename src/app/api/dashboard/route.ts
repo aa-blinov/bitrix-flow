@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { usableAvatar } from '@/lib/utils';
 import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
         id: u.ID,
         name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
         email: u.EMAIL,
-        icon: u.PERSONAL_PHOTO,
+        icon: usableAvatar(u.PERSONAL_PHOTO),
         userType: u.USER_TYPE,
       })),
       currentUser: rawCurrentUser
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       id: u.ID,
       name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
       email: u.EMAIL,
-      icon: u.PERSONAL_PHOTO,
+      icon: usableAvatar(u.PERSONAL_PHOTO),
       userType: u.USER_TYPE,
     }));
 

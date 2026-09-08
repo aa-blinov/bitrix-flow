@@ -273,13 +273,16 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     const requestVersion = ++stageRequestVersion.current;
     setBoardReady(false);
     startTransition(() => setStagePages({}));
-    void Promise.all(
-      (stageKey ? stageKey.split(',') : []).map((stageId) =>
-        loadStagePage(stageId, 1, true, requestVersion),
-      ),
-    ).finally(() => {
+    const requests = (stageKey ? stageKey.split(',') : []).map((stageId) =>
+      loadStagePage(stageId, 1, true, requestVersion),
+    );
+    // Снимаем спиннер по первому ответу, а не по последнему: доска рисуется
+    // сразу, остальные колонки наполняются по мере готовности.
+    const reveal = () => {
       if (requestVersion === stageRequestVersion.current) setBoardReady(true);
-    });
+    };
+    if (!requests.length) reveal();
+    requests.forEach((request) => void request.then(reveal).catch(reveal));
   }, [loadStagePage, selectedProjectId, stageKey]);
   const filteredTasks = useMemo(
     () => Object.values(stagePages).flatMap((stage) => stage.tasks),

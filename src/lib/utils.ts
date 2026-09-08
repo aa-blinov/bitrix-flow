@@ -48,3 +48,13 @@ export function getProjectInitials(name: string): string {
     .slice(0, 2)
     .join('');
 }
+
+// Битрикс отдаёт для пользователей без фото относительный путь
+// /bitrix/images/tasks/default_avatar.png — браузер просит его с нашего домена
+// и получает 404. Берём только абсолютные адреса реальных фото.
+export function usableAvatar(url: unknown): string | undefined {
+  if (typeof url !== 'string' || !url) return undefined;
+  if (!/^https?:\/\//i.test(url)) return undefined;
+  if (/default_avatar/i.test(url)) return undefined;
+  return url;
+}

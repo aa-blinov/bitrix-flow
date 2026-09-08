@@ -4,6 +4,7 @@
 // моментальный read без обращения к Битриксу.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { usableAvatar } from '@/lib/utils';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
@@ -32,7 +33,7 @@ function toTaskListItem(task: any) {
     groupName: task.group?.name || task.groupName || task.GROUP_NAME || '',
     responsibleId: String(task.responsible?.id || task.responsibleId || task.RESPONSIBLE_ID || ''),
     responsibleName: task.responsible?.name || task.responsibleName || task.RESPONSIBLE_NAME || '',
-    responsibleIcon: task.responsible?.icon || task.responsibleIcon,
+    responsibleIcon: usableAvatar(task.responsible?.icon || task.responsibleIcon),
     creatorId: String(task.creator?.id || task.creatorId || task.CREATED_BY || ''),
     creatorName: task.creator?.name || task.creatorName || '',
     commentsCount: Number(task.commentsCount ?? task.COMMENTS_COUNT) || 0,
