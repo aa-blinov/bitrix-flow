@@ -22,6 +22,8 @@ export interface BxTask {
   subtasks: BxTask[];
   stageId: string;
   chatId?: string;
+  // Файлы, прикреплённые к описанию задачи (UF_TASK_WEBDAV_FILES).
+  attachments?: BxFile[];
   accompliceIds?: string[];
   auditorIds?: string[];
   tags?: string[];
@@ -39,6 +41,17 @@ export interface BxChecklistItem {
   completed: boolean;
 }
 
+export interface BxFile {
+  id: string;
+  name: string;
+  size: number;
+  // 'image' | 'video' | 'audio' | 'file' — как отдаёт im.dialog.messages.get
+  type: string;
+  extension: string;
+  width?: number;
+  height?: number;
+}
+
 export interface BxComment {
   id: string;
   taskId: string;
@@ -47,6 +60,7 @@ export interface BxComment {
   isSystem?: boolean;
   text: string;
   createdDate: string;
+  files?: BxFile[];
 }
 
 export interface TimeEntry {

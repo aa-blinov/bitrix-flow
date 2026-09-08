@@ -1,5 +1,5 @@
 'use client';
-import { Bx24User, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
+import { Bx24User, BxFile, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,6 +29,7 @@ import {
   CircleCheck,
   Clock3,
   RotateCcw,
+  Paperclip,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,56 @@ import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { extractTaskTags } from '@/lib/task-tags';
 import { fetchProjectMembers, fetchTaskById, searchProjectTasks } from '@/lib/bitrix24';
 import type { Bx24Task } from '@/lib/bitrix24';
+
+function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boolean }) {
+  if (!files?.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {files.map((file) => {
+        const href = `/api/task-file/${file.id}${attached ? '?attached=1' : ''}`;
+        if (file.type === 'image') {
+          return (
+            <a
+              key={file.id}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              title={file.name}
+              className="block overflow-hidden rounded-lg border"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={href}
+                alt={file.name}
+                loading="lazy"
+                className="max-h-56 w-auto max-w-full object-contain"
+              />
+            </a>
+          );
+        }
+        return (
+          <a
+            key={file.id}
+            href={`${href}${attached ? '&' : '?'}download=1`}
+            className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted"
+          >
+            <Paperclip size={13} className="shrink-0 text-muted-foreground" />
+            <span className="max-w-56 truncate">{file.name}</span>
+            <span className="shrink-0 text-muted-foreground">{formatFileSize(file.size)}</span>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number) {
+  if (!bytes) return '';
+  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / 1024 ** index;
+  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 })} ${units[index]}`;
+}
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
   const {
@@ -502,6 +553,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     )}
                   </div>
                 )}
+                {/* Вложения описания кликабельны и вне режима редактирования */}
+                <FileAttachments files={task.attachments} attached />
               </div>
 
               {taskTags.length > 0 && (
@@ -1204,6 +1257,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       </div>
                       <div className="leading-relaxed text-foreground/75">
                         <BitrixText text={commentItem.text} />
+                        <FileAttachments files={commentItem.files} />
                       </div>
                     </div>
                   ) : (
@@ -1223,6 +1277,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         </div>
                         <div className="break-words text-sm leading-relaxed text-foreground/85">
                           <BitrixText text={commentItem.text} />
+                          <FileAttachments files={commentItem.files} />
                         </div>
                       </div>
                     </article>

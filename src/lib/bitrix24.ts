@@ -151,6 +151,17 @@ export interface Bx24Comment {
   authorName: string;
   text: string;
   createdDate: string;
+  files?: Bx24File[];
+}
+
+export interface Bx24File {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  extension: string;
+  width?: number;
+  height?: number;
 }
 
 export interface Bx24TimeEntry {
@@ -562,6 +573,29 @@ export async function fetchTaskComments(
       DIALOG_ID: `chat${chatId}`,
       LIMIT: '50',
     });
+    // Вложения приходят отдельным узлом `files`, сообщение ссылается на них
+    // идентификаторами в `files` или в params.FILE_ID.
+    const filesNode = dialog?.files;
+    const filesById = new Map<string, any>(
+      (Array.isArray(filesNode) ? filesNode : Object.values(filesNode || {})).map((file: any) => [
+        String(file.id ?? file.ID),
+        file,
+      ]),
+    );
+    const messageFiles = (message: any): Bx24File[] =>
+      [...(message.files || []), ...(message.params?.FILE_ID || [])]
+        .map((id: any) => filesById.get(String(id)))
+        .filter(Boolean)
+        .map((file: any) => ({
+          id: String(file.id ?? file.ID),
+          name: file.name || 'Файл',
+          size: Number(file.size) || 0,
+          type: file.type || 'file',
+          extension: file.extension || '',
+          width: file.image?.width,
+          height: file.image?.height,
+        }));
+
     const comments = (dialog?.messages || [])
       .map((message: any): Bx24Comment => ({
         id: String(message.id || message.ID),
@@ -569,6 +603,7 @@ export async function fetchTaskComments(
         authorName: message.author_name || message.authorName || '',
         text: message.text || message.TEXT || '',
         createdDate: message.date || message.DATE || '',
+        files: messageFiles(message),
       }))
       .sort(
         (left: Bx24Comment, right: Bx24Comment) =>
@@ -654,6 +689,58 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   });
   await cacheInvalidateByPrefix('tasks:');
   await taskInvalidate(taskId);
+}
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+
+// Вложения описания задачи. tasks.task.get отдаёт UF_TASK_WEBDAV_FILES только
+// при явном select, и там лежат id прикреплений (disk.attachedObject), а не
+// файлов на диске — имя и размер приходится добирать вторым вызовом.
+export async function fetchTaskAttachments(taskId: string): Promise<Bx24File[]> {
+  const key = `attachments:${taskId}`;
+  const cached = await cacheGet<Bx24File[]>(key);
+  if (cached) return cached;
+
+  let ids: string[] = [];
+  try {
+    const result = await bx24('tasks.task.get', {
+      taskId,
+      'select[0]': 'ID',
+      'select[1]': 'UF_TASK_WEBDAV_FILES',
+    });
+    const task = result?.task || result;
+    ids = (task?.ufTaskWebdavFiles || task?.UF_TASK_WEBDAV_FILES || []).map(String);
+  } catch {
+    return [];
+  }
+  if (!ids.length) {
+    await cacheSet(key, [], 300);
+    return [];
+  }
+
+  const files = await Promise.all(
+    ids.map(async (rawId) => {
+      const id = rawId.replace(/^n/, '');
+      try {
+        const result = await bx24('disk.attachedObject.get', { id });
+        const object = result?.result || result;
+        if (!object?.NAME) return null;
+        const extension = String(object.NAME).split('.').pop()?.toLowerCase() || '';
+        return {
+          id,
+          name: object.NAME,
+          size: Number(object.SIZE) || 0,
+          type: IMAGE_EXTENSIONS.has(extension) ? 'image' : 'file',
+          extension,
+        } satisfies Bx24File;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const resolved = files.filter((file): file is Bx24File => Boolean(file));
+  await cacheSet(key, resolved, 300);
+  return resolved;
 }
 
 export async function fetchTaskById(taskId: string): Promise<Bx24Task> {

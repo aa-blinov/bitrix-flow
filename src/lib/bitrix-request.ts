@@ -81,6 +81,49 @@ function httpRequest(
   });
 }
 
+// Скачивание вложения. Тот же обход мёртвых edge-адресов, что и для REST, но
+// GET и стримом: плейн fetch() висит 10 с на первом же неотвечающем адресе.
+// Адреса пробуем по одному — параллельная гонка тянула бы файл дважды.
+export async function getBitrixFileStream(url: string): Promise<{
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  stream: import('node:stream').Readable;
+}> {
+  const hostname = new URL(url).hostname;
+  const pool = await resolveAddresses(hostname);
+  const probes = pickProbes(pool, MAX_PARALLEL);
+  let lastError: unknown = new Error('BITRIX24_REQUEST_FAILED');
+  for (const entry of probes) {
+    try {
+      const response = await new Promise<import('node:http').IncomingMessage>((resolve, reject) => {
+        const req = request(url, {
+          method: 'GET',
+          agent: ipv4Agent,
+          lookup: (_host, _opts, cb) => cb(null, entry.address, 4),
+          servername: hostname,
+          timeout: CONNECT_TIMEOUT_MS,
+        });
+        req.on('timeout', () => req.destroy(new Error('BITRIX24_CONNECT_TIMEOUT')));
+        req.on('error', reject);
+        req.on('response', (res) => {
+          if ((res.statusCode || 0) >= 400) {
+            res.resume();
+            reject(new Error(`BITRIX24_HTTP_${res.statusCode}`));
+            return;
+          }
+          resolve(res);
+        });
+        req.end();
+      });
+      lastGoodAddress = entry.address;
+      return { status: response.statusCode || 200, headers: response.headers, stream: response };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('BITRIX24_REQUEST_FAILED');
+}
+
 export async function postBitrixJson(
   url: string,
   params: Record<string, string> | Record<string, unknown> | unknown[],

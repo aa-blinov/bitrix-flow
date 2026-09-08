@@ -13,6 +13,7 @@ import {
   fetchTasksByProject,
   fetchProjectList,
   fetchSubtasks,
+  fetchTaskAttachments,
   fetchTaskComments,
   fetchTaskById,
   fetchTaskTimeLog,
@@ -516,6 +517,17 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       get().tasks.find((item) => item.id === taskId) ||
       get().allTasks.find((item) => item.id === taskId);
     const commentsPromise = fetchTaskComments(taskId, task?.chatId);
+    // Вложения описания: id известны из задачи, имя и размер — из disk.
+    void fetchTaskAttachments(taskId)
+      .then((attachments) => {
+        if (!attachments.length) return;
+        const withFiles = (item: BxTask) => (item.id === taskId ? { ...item, attachments } : item);
+        set((state) => ({
+          tasks: state.tasks.map(withFiles),
+          allTasks: state.allTasks.map(withFiles),
+        }));
+      })
+      .catch(() => {});
     const detailsPromise = Promise.all([fetchTaskTimeLog(taskId), fetchSubtasks(taskId)]);
 
     void detailsPromise
