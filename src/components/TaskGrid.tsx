@@ -1,6 +1,10 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+// These effects synchronize controlled props and persisted grid state with the
+// interactive client model; they intentionally update local state after mount.
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -118,6 +122,16 @@ type SortKey =
   | 'storyPoints'
   | 'tags';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
+export type TaskGridPageQuery = {
+  page: number;
+  query: string;
+  status: string;
+  hideDone: boolean;
+  assigneeId: string;
+  projectId: string;
+  sorts: Sort[];
+};
+type TaskGridPage = { tasks: BxTask[]; total: number };
 type ColumnKey = SortKey;
 type GroupBy = 'none' | 'stage' | 'assignee' | 'hierarchy';
 const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
@@ -333,10 +347,13 @@ function InlineSelect({
 }) {
   const [open, setOpen] = useState(false);
   if (!open) {
+    // aria-label обязателен: иначе скринридер читает только значение
+    // («Обычный») и не говорит, какое это поле.
     return (
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-label={`${ariaLabel}: ${label}`}
         className="max-w-full truncate rounded px-1 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       >
         {label}
@@ -570,17 +587,19 @@ function TaskActions({ task, compact = false }: { task: BxTask; compact?: boolea
 }
 
 export default function TaskGrid({
-  tasks,
+  tasks: initialTasks,
   showProject = false,
   title,
   initialStatus = 'all',
   initialGroupBy = 'none',
   initialAssigneeId = 'all',
+  initialProjectId = 'all',
   viewScope,
   layoutScope = 'all',
   onLoadMore,
   hasMore = false,
   totalCount,
+  loadPage,
 }: {
   tasks: BxTask[];
   showProject?: boolean;
@@ -588,14 +607,17 @@ export default function TaskGrid({
   initialStatus?: string;
   initialGroupBy?: GroupBy;
   initialAssigneeId?: string;
+  initialProjectId?: string;
   viewScope?: 'all' | 'my';
   layoutScope?: string;
   onLoadMore?: () => Promise<void>;
   hasMore?: boolean;
   totalCount?: number;
+  loadPage?: (query: TaskGridPageQuery) => Promise<TaskGridPage>;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
-  const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
+  const setPagedTasks = useKanbanStore((state) => state.setPagedTasks);
+  const storedTasks = useKanbanStore((state) => state.allTasks);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
   const { openTask, closeTask } = useTaskUrl();
   const createTask = useKanbanStore((state) => state.createTask);
@@ -603,6 +625,27 @@ export default function TaskGrid({
   const users = useKanbanStore((state) => state.users);
   const stages = useKanbanStore((state) => state.stages);
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
+  const [serverPage, setServerPage] = useState<TaskGridPage>({
+    tasks: initialTasks,
+    total: totalCount ?? initialTasks.length,
+  });
+  const [isServerPageLoading, setIsServerPageLoading] = useState(false);
+  const [serverPageError, setServerPageError] = useState<string | null>(null);
+  const [serverPageRetry, setServerPageRetry] = useState(0);
+  const loadPageRef = useRef(loadPage);
+  useEffect(() => {
+    loadPageRef.current = loadPage;
+  }, [loadPage]);
+  // Строки серверной страницы подменяем версией из стора: инлайн-правки
+  // (дата, исполнитель, приоритет, оценка) обновляют его оптимистично.
+  const storedById = useMemo(
+    () => new Map(storedTasks.map((task) => [task.id, task])),
+    [storedTasks],
+  );
+  const tasks = loadPage
+    ? serverPage.tasks.map((task) => storedById.get(task.id) || task)
+    : initialTasks;
+  const effectiveTotal = loadPage ? serverPage.total : totalCount;
   const selectedTask = useMemo(
     () => tasks.find((task) => task.id === selectedTaskId),
     [tasks, selectedTaskId],
@@ -610,15 +653,15 @@ export default function TaskGrid({
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [hideDone, setHideDone] = useState(true);
+  const [hideDone, setHideDone] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
-  const [projectFilter, setProjectFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId);
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
   const [draftQuery, setDraftQuery] = useState('');
   const [draftStatusFilter, setDraftStatusFilter] = useState(initialStatus);
   const [draftHideDone, setDraftHideDone] = useState(false);
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(initialAssigneeId);
-  const [draftProjectFilter, setDraftProjectFilter] = useState('all');
+  const [draftProjectFilter, setDraftProjectFilter] = useState(initialProjectId);
   const [draftGroupBy, setDraftGroupBy] = useState<GroupBy>(initialGroupBy);
   const [showFilters, setShowFilters] = useState(false);
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
@@ -665,8 +708,8 @@ export default function TaskGrid({
     draftAssigneeFilter !== 'all',
     showProject && draftProjectFilter !== 'all',
   ].filter(Boolean).length;
-
   const orderedTasks = useMemo(() => {
+    if (loadPage) return tasks;
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
       if (key === 'stage') return task.stageId;
@@ -770,14 +813,23 @@ export default function TaskGrid({
     hideDone,
     tasks,
     groupBy,
+    loadPage,
   ]);
   const loadedPageCount = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
-  const pageCount = Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
-  const totalPageCount = totalCount ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) : pageCount;
+  const pageCount = loadPage
+    ? Math.max(1, Math.ceil(serverPage.total / PAGE_SIZE))
+    : Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
+  const totalPageCount = effectiveTotal
+    ? Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE))
+    : pageCount;
   const pageStart = (page - 1) * PAGE_SIZE;
-  const pageTasks = orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageTasks = loadPage ? orderedTasks : orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
   const loadNextPage = async () => {
-    if (page < loadedPageCount) {
+    if (loadPage) {
+      if (page < pageCount) setPage((value) => value + 1);
+      return;
+    }
+    if (page < pageCount) {
       setPage((value) => value + 1);
       return;
     }
@@ -847,18 +899,34 @@ export default function TaskGrid({
   const tableHeightClass =
     hasNarrowingFilter && orderedTasks.length < PAGE_SIZE
       ? 'max-h-none'
-      : showProject
+      : showProject || layoutScope === 'projects'
         ? 'max-h-[calc(100dvh-17rem)]'
         : 'max-h-[calc(100dvh-28rem)]';
   const tableScrollClass =
     tableHeightClass === 'max-h-none' ? 'overflow-x-auto' : 'overflow-auto overscroll-contain';
+  const visiblePageCount = loadPage
+    ? totalPageCount
+    : !hasNarrowingFilter && totalCount
+      ? totalPageCount
+      : pageCount;
   const pageNumbers = Array.from(
     new Set(
-      [1, page - 1, page, page + 1, loadedPageCount].filter(
-        (value) => value >= 1 && value <= loadedPageCount,
+      [1, page - 1, page, page + 1, visiblePageCount].filter(
+        (value) => value >= 1 && value <= visiblePageCount,
       ),
     ),
   ).sort((left, right) => left - right);
+  const goToPage = (nextPage: number) => {
+    if (loadPage && nextPage <= pageCount) {
+      setPage(nextPage);
+      return;
+    }
+    if (nextPage <= pageCount) {
+      setPage(nextPage);
+      return;
+    }
+    if (nextPage === page + 1) void loadNextPage();
+  };
 
   useEffect(() => {
     setStatusFilter(initialStatus);
@@ -868,6 +936,10 @@ export default function TaskGrid({
     setAssigneeFilter(initialAssigneeId);
     setDraftAssigneeFilter(initialAssigneeId);
   }, [initialAssigneeId]);
+  useEffect(() => {
+    setProjectFilter(initialProjectId);
+    setDraftProjectFilter(initialProjectId);
+  }, [initialProjectId]);
 
   useEffect(() => {
     if (!viewScope) return;
@@ -915,10 +987,55 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tasks]);
+  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone]);
+  useEffect(() => {
+    setPage((currentPage) => Math.min(currentPage, pageCount));
+  }, [pageCount]);
   useEffect(() => {
     setCollapsedTaskIds(new Set());
   }, [groupBy]);
+
+  useEffect(() => {
+    if (!loadPageRef.current) return;
+    let cancelled = false;
+    setIsServerPageLoading(true);
+    setServerPageError(null);
+    void loadPageRef
+      .current({
+        page,
+        query,
+        status: statusFilter,
+        hideDone,
+        assigneeId: assigneeFilter,
+        projectId: showProject ? projectFilter : 'all',
+        sorts,
+      })
+      .then((nextPage) => {
+        if (cancelled) return;
+        setServerPage(nextPage);
+        setPagedTasks(nextPage.tasks, nextPage.total);
+      })
+      .catch(() => {
+        if (!cancelled) setServerPageError('Не удалось загрузить страницу. Повторите попытку.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsServerPageLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    setPagedTasks,
+    assigneeFilter,
+    hideDone,
+    page,
+    projectFilter,
+    query,
+    serverPageRetry,
+    showProject,
+    sorts,
+    statusFilter,
+  ]);
 
   const applyFilters = () => {
     setQuery(draftQuery);
@@ -1013,7 +1130,8 @@ export default function TaskGrid({
   const toggleSelected = (id: string) =>
     setSelectedIds((current) => {
       const next = new Set(current);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   const togglePage = () =>
@@ -1100,7 +1218,7 @@ export default function TaskGrid({
   const isReadOnly = showProject;
   return (
     <>
-      <Card className="mx-4 mt-5 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6">
+      <Card className="mx-4 mt-5 w-[calc(100%-2rem)] min-w-0 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6 sm:w-[calc(100%-3rem)]">
         <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
           <div className="flex flex-wrap items-center gap-2">
             {title !== null && (
@@ -1332,6 +1450,21 @@ export default function TaskGrid({
           )}
         </CardHeader>
         <CardContent className="p-0">
+          {serverPageError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 border-b px-4 py-2 text-sm text-destructive sm:px-6"
+            >
+              {serverPageError}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setServerPageRetry((value) => value + 1)}
+              >
+                Повторить
+              </Button>
+            </div>
+          )}
           <div className="divide-y md:hidden">
             {displayPageTasks.map((task) => {
               const assignee =
@@ -1665,12 +1798,15 @@ export default function TaskGrid({
             </Table>
           </div>
         </CardContent>
-        {(loadedPageCount > 1 || hasMore) && (
+        {(pageCount > 1 || hasMore) && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
-              {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, tasks.length)} из{' '}
-              {totalCount || tasks.length}
-              {totalCount ? `, страница ${page} из ${totalPageCount}` : ''}
+              {orderedTasks.length ? pageStart + 1 : 0}–
+              {loadPage
+                ? pageStart + orderedTasks.length
+                : Math.min(pageStart + PAGE_SIZE, orderedTasks.length)}{' '}
+              из {effectiveTotal || tasks.length}
+              {effectiveTotal ? `, страница ${page} из ${totalPageCount}` : ''}
             </p>
             <div className="flex flex-wrap items-center justify-end gap-1" aria-label="Пагинация">
               <Button
@@ -1678,7 +1814,7 @@ export default function TaskGrid({
                 size="sm"
                 className="hidden sm:inline-flex"
                 onClick={() => setPage(1)}
-                disabled={page === 1}
+                disabled={isServerPageLoading || page === 1}
               >
                 Первая
               </Button>
@@ -1686,7 +1822,7 @@ export default function TaskGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((value) => value - 1)}
-                disabled={page === 1}
+                disabled={isServerPageLoading || page === 1}
               >
                 Назад
               </Button>
@@ -1696,7 +1832,11 @@ export default function TaskGrid({
                   variant={number === page ? 'default' : 'outline'}
                   size="sm"
                   className="w-9 px-0"
-                  onClick={() => setPage(number)}
+                  onClick={() => goToPage(number)}
+                  disabled={
+                    isServerPageLoading ||
+                    (!loadPage && number > loadedPageCount && number !== page + 1)
+                  }
                 >
                   {number}
                 </Button>
@@ -1705,7 +1845,7 @@ export default function TaskGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => void loadNextPage()}
-                disabled={page >= loadedPageCount && !hasMore}
+                disabled={isServerPageLoading || (page >= pageCount && !hasMore)}
               >
                 Вперёд
               </Button>
@@ -1714,7 +1854,7 @@ export default function TaskGrid({
                 size="sm"
                 className="hidden sm:inline-flex"
                 onClick={() => setPage(pageCount)}
-                disabled={hasMore || page === loadedPageCount}
+                disabled={isServerPageLoading || hasMore || page === pageCount}
               >
                 Последняя
               </Button>

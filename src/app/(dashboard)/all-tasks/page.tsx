@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useMemo } from 'react';
-import { useKanbanStore } from '@/store/kanban';
+import { Suspense, useCallback, useEffect } from 'react';
+import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -11,20 +12,12 @@ import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 
-function dueDayKey(value?: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 function AllTasksInner() {
   const {
     projects,
     allTasks,
     isLoadingAllTasks,
     allTasksTotal,
-    hasMoreAllTasks,
     loadAllTasks,
     loadProjects,
     currentUser,
@@ -34,6 +27,7 @@ function AllTasksInner() {
   const searchParams = useSearchParams();
   const workload = searchParams.get('workload');
   const requestedAssignee = searchParams.get('assignee');
+  const requestedProject = searchParams.get('project') || 'all';
   const initialStatus =
     workload === 'no_deadline' || workload === 'overdue'
       ? workload
@@ -47,24 +41,32 @@ function AllTasksInner() {
         ? requestedAssignee
         : 'all';
   const taskFromUrl = searchParams.get('task');
-  const tasksForList = useMemo(() => {
-    if (!workload && !requestedAssignee) return allTasks;
-    return allTasks.filter((task) => {
-      if (requestedAssignee === 'unassigned' && task.assigneeId) return false;
-      if (
-        requestedAssignee &&
-        requestedAssignee !== 'unassigned' &&
-        task.assigneeId !== requestedAssignee
-      )
-        return false;
-      return (
-        !workload ||
-        workload === 'no_deadline' ||
-        workload === 'overdue' ||
-        dueDayKey(task.dueDate) === workload
-      );
-    });
-  }, [allTasks, requestedAssignee, workload]);
+  const loadPage = useCallback(
+    async (request: TaskGridPageQuery) => {
+      const params = new URLSearchParams({
+        page: String(request.page),
+        limit: '50',
+        query: request.query,
+        status: request.status,
+        hideDone: String(request.hideDone),
+        assigneeId: request.assigneeId,
+        projectId: request.projectId,
+        sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
+      });
+      if (requestedAssignee === 'unassigned') params.set('unassigned', 'true');
+      if (workload && workload !== 'no_deadline' && workload !== 'overdue') {
+        params.set('deadlineDay', workload);
+      }
+      const response = await fetch(`/api/tasks/all?${params.toString()}`);
+      if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
+      const data = await response.json();
+      return {
+        tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        total: Number(data.total) || 0,
+      };
+    },
+    [requestedAssignee, workload],
+  );
   const workloadDescription = workload
     ? 'Задачи, открытые из календаря нагрузки. Фильтры списка можно уточнить ниже.'
     : 'Задачи по всем доступным проектам';
@@ -103,16 +105,16 @@ function AllTasksInner() {
           <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
-            tasks={tasksForList}
+            tasks={allTasks}
             showProject
             initialStatus={initialStatus}
             initialAssigneeId={initialAssigneeId}
+            initialProjectId={requestedProject}
             viewScope="all"
             layoutScope="all"
             title={null}
-            hasMore={hasMoreAllTasks}
             totalCount={allTasksTotal}
-            onLoadMore={() => loadAllTasks(true)}
+            loadPage={loadPage}
           />
         )}
       </div>

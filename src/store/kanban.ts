@@ -120,6 +120,9 @@ interface KanbanStore {
   ) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: (append?: boolean) => Promise<void>;
+  // Серверная страница списка становится источником правды для инлайн-правок:
+  // без этого updateTaskField не находит задачу и молча теряет изменение.
+  setPagedTasks: (tasks: BxTask[], total: number) => void;
   loadMoreTasks: () => Promise<void>;
   loadSubtasks: (parentId: string) => Promise<void>;
   loadTaskDetails: (taskId: string) => Promise<void>;
@@ -160,7 +163,7 @@ interface KanbanStore {
   getGlobalCounts: () => { overdue: number; in_progress: number; done: number };
 }
 
-function convertBxTask(bxTask: Bx24Task): BxTask {
+export function convertBxTask(bxTask: Bx24Task): BxTask {
   return {
     id: bxTask.id,
     projectId: bxTask.groupId,
@@ -294,6 +297,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       set({ error: err.message, isLoading: false });
     }
   },
+
+  setPagedTasks: (tasks, total) =>
+    set((state) => {
+      const byId = new Map(tasks.map((task) => [task.id, task]));
+      return {
+        allTasks: [
+          ...tasks,
+          // Задачи из других выборок сохраняем: главная страница считает по ним сводку.
+          ...state.allTasks.filter((task) => !byId.has(task.id)),
+        ],
+        allTasksTotal: total,
+      };
+    }),
 
   loadStages: async (entityId: string) => {
     try {
