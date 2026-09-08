@@ -15,9 +15,16 @@ import { convertBxTask } from '@/store/kanban';
 import TaskModal from './TaskModal';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Filter, Calendar, Timer, AlignLeft, Search } from 'lucide-react';
+import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
 import {
   Dialog,
@@ -456,7 +463,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     <div className="flex min-w-0 flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
-        <div className="flex w-full min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
+        {/* На узком экране скрытый горизонтальный скролл прятал «Фильтр» и
+            «Добавить задачу» без всякого намёка — переносим строки. */}
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:flex-nowrap md:gap-3 md:overflow-x-auto md:overflow-y-hidden md:scrollbar-hide">
           {toolbar}
           <Select value={kanbanSort} onValueChange={(value) => setKanbanSort(value as KanbanSort)}>
             <SelectTrigger
@@ -719,6 +728,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       task={task}
                       avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                       onDragStart={handleDragStart}
+                      stages={allStages}
+                      onMoveToStage={(taskId, stageId) => void moveTaskToStage(taskId, stageId)}
                       onClick={() => {
                         void loadTaskById(task.id);
                         openTask(task.id);
@@ -785,6 +796,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     task={task}
                     avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                     onDragStart={handleDragStart}
+                    stages={allStages}
+                    onMoveToStage={(taskId, stageId) => void moveTaskToStage(taskId, stageId)}
                     onClick={() => openTask(task.id)}
                     isDragging={draggedTask === task.id}
                   />
@@ -1030,12 +1043,16 @@ function TaskCard({
   onDragStart,
   onClick,
   isDragging,
+  stages,
+  onMoveToStage,
 }: {
   task: BxTask;
   avatarUrl?: string;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onClick: () => void;
   isDragging: boolean;
+  stages: Array<{ id: string; name: string }>;
+  onMoveToStage: (taskId: string, stageId: string) => void;
 }) {
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
   const taskTags = extractTaskTags(task.title, task.description);
@@ -1054,32 +1071,60 @@ function TaskCard({
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
-      {/* Tags row */}
-      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-        <span
-          className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
-        >
-          {priority.label}
-        </span>
-        {taskTags.slice(0, 3).map((tag) => (
+      {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
+          фазу можно выбрать и списком. */}
+      <div className="mb-2 flex items-start gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <span
-            key={tag}
-            title={tag}
-            className="max-w-28 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
           >
-            {tag}
+            {priority.label}
           </span>
-        ))}
-        {taskTags.length > 3 && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            +{taskTags.length - 3}
-          </span>
-        )}
-        {task.parentId && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
-            Подзадача
-          </span>
-        )}
+          {taskTags.slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              title={tag}
+              className="max-w-28 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            >
+              {tag}
+            </span>
+          ))}
+          {taskTags.length > 3 && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              +{taskTags.length - 3}
+            </span>
+          )}
+          {task.parentId && (
+            <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+              Подзадача
+            </span>
+          )}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mt-1 -mr-1 size-9 shrink-0"
+              aria-label={`Переместить задачу ${task.title}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <MoveHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuLabel>Переместить в фазу</DropdownMenuLabel>
+            {stages.map((stage) => (
+              <DropdownMenuItem
+                key={stage.id}
+                disabled={stage.id === task.stageId}
+                onClick={() => onMoveToStage(task.id, stage.id)}
+              >
+                {stage.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Title and description indicator share one row so the icon never changes card height. */}
