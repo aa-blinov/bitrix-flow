@@ -1603,13 +1603,21 @@ export default function TaskGrid({
                   }`}
                 >
                   <div className="flex items-start gap-2">
-                    {/* Сам чекбокс маленький, но область касания — 40px */}
-                    <Checkbox
-                      checked={selectedIds.has(task.id)}
-                      onCheckedChange={() => toggleSelected(task.id)}
-                      aria-label={`Выбрать задачу ${task.title}`}
-                      className="mt-1 size-5 shrink-0 p-2.5 -m-2.5 box-content"
-                    />
+                    {/* Галка обычного размера, но область касания — 40px:
+                        padding даёт обёртка, иначе раздувается сама рамка. */}
+                    <span
+                      className="-m-2.5 shrink-0 p-2.5"
+                      onClick={(event) => {
+                        if (event.target === event.currentTarget) toggleSelected(task.id);
+                      }}
+                    >
+                      <Checkbox
+                        checked={selectedIds.has(task.id)}
+                        onCheckedChange={() => toggleSelected(task.id)}
+                        aria-label={`Выбрать задачу ${task.title}`}
+                        className="mt-0.5"
+                      />
+                    </span>
                     {groupBy === 'hierarchy' && (hierarchy.childCount.get(task.id) || 0) > 0 && (
                       <Button
                         variant="ghost"
