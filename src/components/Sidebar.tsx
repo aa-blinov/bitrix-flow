@@ -41,9 +41,45 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  badge,
+  pathname,
+  onNavigate,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  badge?: number;
+  pathname: string;
+  onNavigate: () => void;
+}) {
+  const active = pathname === href;
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+        active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
+      }`}
+    >
+      <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
+      <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 && <Badge variant="secondary">{badge}</Badge>}
+    </Link>
+  );
+}
+
 export default function Sidebar() {
-  const { projects, setSelectedProject, currentUser, isLoading, loadProjects, createProject } =
-    useKanbanStore();
+  // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
+  // (загрузка задач, стадий, SSE) и меню моргает во время первой загрузки.
+  const projects = useKanbanStore((s) => s.projects);
+  const currentUser = useKanbanStore((s) => s.currentUser);
+  const isLoading = useKanbanStore((s) => s.isLoading);
+  const loadProjects = useKanbanStore((s) => s.loadProjects);
+  const createProject = useKanbanStore((s) => s.createProject);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [projectQuery, setProjectQuery] = useState('');
@@ -63,6 +99,7 @@ export default function Sidebar() {
     if (!projects.length && !isLoading) void loadProjects();
   }, [isLoading, loadProjects, projects.length]);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const closeMobile = () => setMobileOpen(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -130,33 +167,6 @@ export default function Sidebar() {
     window.location.assign('/login');
   }
 
-  const NavItem = ({
-    href,
-    icon: Icon,
-    label,
-    badge,
-  }: {
-    href: string;
-    icon: any;
-    label: string;
-    badge?: number;
-  }) => {
-    const active = pathname === href;
-    return (
-      <Link
-        href={href}
-        onClick={() => setMobileOpen(false)}
-        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-          active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
-        }`}
-      >
-        <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
-        <span className="flex-1 truncate">{label}</span>
-        {badge !== undefined && badge > 0 && <Badge variant="secondary">{badge}</Badge>}
-      </Link>
-    );
-  };
-
   const SidebarContent = () => (
     // ponytail: w-full + min-w-0 — без этого flex-child растягивается по
     // самому широкому контенту (поиск проектов) и вылезает за w-64 родителя.
@@ -171,12 +181,48 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 py-4">
         <div className="space-y-0.5">
-          <NavItem href="/" icon={LayoutDashboard} label="Главная" />
-          <NavItem href="/projects-summary" icon={TableProperties} label="Сводка проектов" />
-          <NavItem href="/all-tasks" icon={ListChecks} label="Все задачи" />
-          <NavItem href="/my-tasks" icon={UserCheck} label="Мои задачи" />
-          <NavItem href="/team-workload" icon={CalendarDays} label="Нагрузка команды" />
-          <NavItem href="/notifications" icon={Bell} label="Уведомления" />
+          <NavItem
+            href="/"
+            icon={LayoutDashboard}
+            label="Главная"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
+            href="/projects-summary"
+            icon={TableProperties}
+            label="Сводка проектов"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
+            href="/all-tasks"
+            icon={ListChecks}
+            label="Все задачи"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
+            href="/my-tasks"
+            icon={UserCheck}
+            label="Мои задачи"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
+            href="/team-workload"
+            icon={CalendarDays}
+            label="Нагрузка команды"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
+            href="/notifications"
+            icon={Bell}
+            label="Уведомления"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
         </div>
 
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
@@ -325,13 +371,13 @@ export default function Sidebar() {
           className="w-[86vw] max-w-sm p-0 md:hidden"
           onOpenAutoFocus={(event) => event.preventDefault()}
         >
-          <SidebarContent />
+          {SidebarContent()}
         </SheetContent>
       </Sheet>
 
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r bg-background md:flex">
-        <SidebarContent />
+        {SidebarContent()}
       </aside>
 
       <Dialog
