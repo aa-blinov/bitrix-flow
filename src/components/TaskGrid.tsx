@@ -4,7 +4,7 @@
 // interactive client model; they intentionally update local state after mount.
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -620,6 +620,7 @@ export default function TaskGrid({
   initialAssigneeId = 'all',
   initialProjectId = 'all',
   tagsProjectId,
+  toolbarLeading,
   viewScope,
   layoutScope = 'all',
   onLoadMore,
@@ -643,6 +644,9 @@ export default function TaskGrid({
   // Список тегов на странице проекта должен быть только его: фильтра проекта
   // там нет, поэтому область берём из пропа.
   tagsProjectId?: string;
+  // Переключатель вида приходит снаружи и живёт в той же строке панели, что и
+  // на доске: иначе при смене режима навбар прыгает на другую высоту.
+  toolbarLeading?: ReactNode;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setPagedTasks = useKanbanStore((state) => state.setPagedTasks);
@@ -1400,9 +1404,12 @@ export default function TaskGrid({
 
   return (
     <>
-      <Card className="mx-4 mt-5 w-[calc(100%-2rem)] min-w-0 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6 sm:w-[calc(100%-3rem)]">
-        <CardHeader className="gap-2 rounded-none border-0 bg-transparent px-0 py-3">
+      <Card className="mx-4 w-[calc(100%-2rem)] min-w-0 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6 sm:w-[calc(100%-3rem)]">
+        {/* Те же отступы, что у панели доски, иначе при переключении вида
+              навбар перескакивает на другую высоту. */}
+        <CardHeader className="sticky top-0 z-10 gap-2 rounded-none border-0 border-b bg-background px-0 py-4">
           <div className="flex flex-wrap items-center gap-2">
+            {toolbarLeading}
             {title !== null && (
               <CardTitle className="shrink-0 text-base">{title ?? 'Задачи проекта'}</CardTitle>
             )}

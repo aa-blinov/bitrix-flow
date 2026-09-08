@@ -364,20 +364,6 @@ export default function ProjectPage() {
       </Dialog>
 
       <Tabs value={view} onValueChange={setView} className="w-full min-w-0 pb-6">
-        {view === 'grid' && (
-          <div className="px-4 pt-5 sm:px-6">
-            <TabsList className="h-8 p-0">
-              <TabsTrigger value="kanban" className="h-full">
-                <Columns3 className="size-4" />
-                Канбан
-              </TabsTrigger>
-              <TabsTrigger value="grid" className="h-full">
-                <TableProperties className="size-4" />
-                Список
-              </TabsTrigger>
-            </TabsList>
-          </div>
-        )}
         <TabsContent value="kanban" className="mt-0 w-full min-w-0">
           <KanbanBoard
             toolbar={
@@ -403,6 +389,18 @@ export default function ProjectPage() {
             title={null}
             loadPage={loadGridPage}
             tagsProjectId={projectId}
+            toolbarLeading={
+              <TabsList className="h-8 p-0">
+                <TabsTrigger value="kanban" className="h-full">
+                  <Columns3 className="size-4" />
+                  Канбан
+                </TabsTrigger>
+                <TabsTrigger value="grid" className="h-full">
+                  <TableProperties className="size-4" />
+                  Список
+                </TabsTrigger>
+              </TabsList>
+            }
           />
         </TabsContent>
       </Tabs>
