@@ -1,6 +1,6 @@
 'use client';
-import { useKanbanStore } from '@/store/kanban';
-import { useEffect, useMemo, useState } from 'react';
+import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
 import {
@@ -13,7 +13,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import TaskGrid from '@/components/TaskGrid';
+import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
@@ -56,8 +56,6 @@ export default function ProjectPage() {
     setSelectedTask,
     loadTaskById,
     tasks,
-    hasMoreTasks,
-    loadMoreTasks,
     isRehydrated,
     updateProject,
     users,
@@ -107,6 +105,28 @@ export default function ProjectPage() {
     };
   }, [projectId, setSelectedTask]);
   const visibleTasks = getFilteredTasks();
+  const loadGridPage = useCallback(
+    async (request: TaskGridPageQuery) => {
+      const params = new URLSearchParams({
+        page: String(request.page),
+        limit: '50',
+        query: request.query,
+        status: request.status,
+        hideDone: String(request.hideDone),
+        assigneeId: request.assigneeId,
+        projectId,
+        sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
+      });
+      const response = await fetch(`/api/tasks/all?${params.toString()}`);
+      if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
+      const data = await response.json();
+      return {
+        tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        total: Number(data.total) || 0,
+      };
+    },
+    [projectId],
+  );
   const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
   const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
   const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
@@ -121,9 +141,13 @@ export default function ProjectPage() {
     void fetchProjectMembers(currentProject.id)
       .then((result) =>
         setMemberIds(
-          (Array.isArray(result) ? result : []).map((item: any) =>
-            String(item.USER_ID || item.userId || item),
-          ),
+          (Array.isArray(result) ? result : []).map((item: unknown) => {
+            if (item && typeof item === 'object') {
+              const value = item as Record<string, unknown>;
+              return String(value.USER_ID ?? value.userId ?? '');
+            }
+            return String(item);
+          }),
         ),
       )
       .catch(() => setMemberIds([]));
@@ -338,7 +362,7 @@ export default function ProjectPage() {
         </DialogContent>
       </Dialog>
 
-      <Tabs value={view} onValueChange={setView} className="pb-6">
+      <Tabs value={view} onValueChange={setView} className="w-full min-w-0 pb-6">
         {view === 'grid' && (
           <div className="px-4 pt-5 sm:px-6">
             <TabsList className="h-8 p-0">
@@ -353,7 +377,7 @@ export default function ProjectPage() {
             </TabsList>
           </div>
         )}
-        <TabsContent value="kanban" className="mt-0">
+        <TabsContent value="kanban" className="mt-0 w-full min-w-0">
           <KanbanBoard
             toolbar={
               <TabsList className="h-8 p-0">
@@ -369,16 +393,14 @@ export default function ProjectPage() {
             }
           />
         </TabsContent>
-        <TabsContent value="grid" className="mt-0">
+        <TabsContent value="grid" className="mt-0 w-full min-w-0">
           <TaskGrid
             tasks={visibleTasks}
             initialGroupBy="stage"
             initialStatus={initialStatus}
             layoutScope="projects"
             title={null}
-            hasMore={hasMoreTasks}
-            totalCount={undefined}
-            onLoadMore={loadMoreTasks}
+            loadPage={loadGridPage}
           />
         </TabsContent>
       </Tabs>

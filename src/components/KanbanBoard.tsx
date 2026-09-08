@@ -1,27 +1,24 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
-import { useCallback, useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import TaskModal from './TaskModal';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  Plus,
-  Filter,
-  X,
-  Users,
-  Calendar,
-  Timer,
-  Eye,
-  Clock,
-  AlignLeft,
-  Paperclip,
-  MessageSquare,
-  ChevronDown,
-  Search,
-} from 'lucide-react';
+  useCallback,
+  useDeferredValue,
+  startTransition,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from 'react';
+import { convertBxTask } from '@/store/kanban';
+import TaskModal from './TaskModal';
+import Image from 'next/image';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Plus, Filter, Calendar, Timer, AlignLeft, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -39,47 +36,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import LoadingState from '@/components/LoadingState';
-import { sortKanbanTasks, type KanbanSort } from '@/lib/kanban-sort';
+import { type KanbanSort } from '@/lib/kanban-sort';
 import { extractTaskTags } from '@/lib/task-tags';
-
-function getStageColor(hex: string): { bg: string; text: string; border: string } {
-  // ponytail: используем opacity-варианты (bg-X-500/15) — одинаково
-  // читаются и в светлой, и в тёмной теме без dark: префикса.
-  const colors: Record<string, { bg: string; text: string; border: string }> = {
-    '47d1e2': {
-      bg: 'bg-cyan-500/15',
-      text: 'text-cyan-700 dark:text-cyan-300',
-      border: 'border-cyan-500/30',
-    },
-    '75d900': {
-      bg: 'bg-green-500/15',
-      text: 'text-green-700 dark:text-green-300',
-      border: 'border-green-500/30',
-    },
-    ffab00: {
-      bg: 'bg-amber-500/15',
-      text: 'text-amber-700 dark:text-amber-300',
-      border: 'border-amber-500/30',
-    },
-    ff5752: {
-      bg: 'bg-red-500/15',
-      text: 'text-red-700 dark:text-red-300',
-      border: 'border-red-500/30',
-    },
-    '1eae43': {
-      bg: 'bg-emerald-500/15',
-      text: 'text-emerald-700 dark:text-emerald-300',
-      border: 'border-emerald-500/30',
-    },
-  };
-  return (
-    colors[hex?.toLowerCase()] || {
-      bg: 'bg-muted',
-      text: 'text-muted-foreground',
-      border: 'border-border',
-    }
-  );
-}
 
 function getStageDotColor(hex: string): string {
   const colors: Record<string, string> = {
@@ -144,6 +102,9 @@ function formatDeadline(dateStr: string | undefined): string {
   }
 }
 
+type KanbanStagePage = { tasks: BxTask[]; total: number; loading: boolean };
+const KANBAN_PAGE_SIZE = 50;
+
 export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const {
     tasks,
@@ -158,9 +119,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     filters,
     setFilters,
     users,
-    getFilteredTasks,
     projects,
     currentUser,
+    loadTaskById,
   } = useKanbanStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -183,11 +144,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   }, [pathname, router, searchParams, setSelectedTask]);
 
   const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
-  const filteredTasks = useMemo(
-    () => sortKanbanTasks(getFilteredTasks(), kanbanSort),
-    [filters, getFilteredTasks, kanbanSort, selectedProjectId, tasks],
-  );
-
   // Добавляем дефолтные системные стадии
   const defaultStages = [
     { id: '0', name: 'New', color: '47d1e2', sort: 0, systemType: 'NEW', entityId: '' },
@@ -206,6 +162,96 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const allStages = (stages.length > 0 ? stages : defaultStages)
     .slice()
     .sort((a, b) => a.sort - b.sort);
+  const deferredSearch = useDeferredValue(filters.search);
+  const stageKey = allStages.map((stage) => stage.id).join(',');
+  const [stagePages, setStagePages] = useState<Record<string, KanbanStagePage>>({});
+  const stageRequestVersion = useRef(0);
+  const loadStagePage = useCallback(
+    async (
+      stageId: string,
+      page: number,
+      replace = false,
+      requestVersion = stageRequestVersion.current,
+    ) => {
+      if (!selectedProjectId) return;
+      setStagePages((current) => ({
+        ...current,
+        [stageId]: {
+          tasks: current[stageId]?.tasks || [],
+          total: current[stageId]?.total || 0,
+          loading: true,
+        },
+      }));
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(KANBAN_PAGE_SIZE),
+        projectId: selectedProjectId,
+        stageId,
+        query: deferredSearch,
+        assigneeId: filters.assigneeId || 'all',
+        priority: filters.priority || 'all',
+        hasDeadline: String(filters.hasDeadline),
+        status: filters.overdue ? 'overdue' : filters.showCompleted ? 'all' : 'active',
+        sortKey: kanbanSort === 'urgency' ? 'deadline' : kanbanSort,
+        sortDirection: 'asc',
+      });
+      try {
+        const response = await fetch(`/api/tasks/all?${params.toString()}`);
+        if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
+        const data = await response.json();
+        if (requestVersion !== stageRequestVersion.current) return;
+        const nextTasks: BxTask[] = (Array.isArray(data.tasks) ? data.tasks : []).map(
+          convertBxTask,
+        );
+        setStagePages((current) => {
+          const previous = current[stageId]?.tasks || [];
+          return {
+            ...current,
+            [stageId]: {
+              tasks: replace
+                ? nextTasks
+                : [
+                    ...previous,
+                    ...nextTasks.filter((task) => !previous.some((item) => item.id === task.id)),
+                  ],
+              total: Number(data.total) || 0,
+              loading: false,
+            },
+          };
+        });
+      } catch {
+        if (requestVersion !== stageRequestVersion.current) return;
+        setStagePages((current) => ({
+          ...current,
+          [stageId]: { ...(current[stageId] || { tasks: [], total: 0 }), loading: false },
+        }));
+      }
+    },
+    [
+      deferredSearch,
+      filters.assigneeId,
+      filters.hasDeadline,
+      filters.overdue,
+      filters.priority,
+      filters.showCompleted,
+      kanbanSort,
+      selectedProjectId,
+    ],
+  );
+  useEffect(() => {
+    if (!selectedProjectId || !stageKey) return;
+    const requestVersion = ++stageRequestVersion.current;
+    startTransition(() => setStagePages({}));
+    void Promise.all(
+      (stageKey ? stageKey.split(',') : []).map((stageId) =>
+        loadStagePage(stageId, 1, true, requestVersion),
+      ),
+    );
+  }, [loadStagePage, selectedProjectId, stageKey]);
+  const filteredTasks = useMemo(
+    () => Object.values(stagePages).flatMap((stage) => stage.tasks),
+    [stagePages],
+  );
   const newStageId = allStages.find((stage) => stage.systemType === 'NEW')?.id;
   // Older Bitrix tasks may retain stage "0" after a project switches to
   // custom stages. Render them in the project's system "New" phase instead
@@ -237,7 +283,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     stageId: '',
   });
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
-  const [activeColumn, setActiveColumn] = useState<string>(stages[0]?.id || 'new');
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   // Inline "+ задача" в колонке: stageId открытой формы. null = нигде не открыта.
   const [inlineAddStage, setInlineAddStage] = useState<string | null>(null);
@@ -258,12 +303,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   );
   const currentProject = projects.find((p) => p.id === selectedProjectId);
   const avatarByUserId = new Map(users.map((user) => [user.id, user.icon]));
-
-  useEffect(() => {
-    if (stages.length > 0 && !stages.find((s) => s.id === activeColumn)) {
-      setActiveColumn(stages[0].id);
-    }
-  }, [stages]);
 
   if (!selectedProjectId) {
     return (
@@ -305,10 +344,39 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     setDragOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, stageId: string) => {
+  const handleDrop = async (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
     if (draggedTask) {
-      moveTaskToStage(draggedTask, stageId);
+      const taskId = draggedTask;
+      await loadTaskById(taskId);
+      await moveTaskToStage(taskId, stageId);
+      setStagePages((current) => {
+        const moved = Object.values(current)
+          .flatMap((item) => item.tasks)
+          .find((task) => task.id === taskId);
+        if (!moved) return current;
+        const sourceStageId = Object.entries(current).find(([, item]) =>
+          item.tasks.some((task) => task.id === taskId),
+        )?.[0];
+        if (!sourceStageId || sourceStageId === stageId) return current;
+        const next = Object.fromEntries(
+          Object.entries(current).map(([id, item]) => [
+            id,
+            {
+              ...item,
+              tasks: item.tasks.filter((task) => task.id !== taskId),
+              total: id === sourceStageId ? Math.max(0, item.total - 1) : item.total,
+            },
+          ]),
+        );
+        const destination = next[stageId] || { tasks: [], total: 0, loading: false };
+        next[stageId] = {
+          ...destination,
+          tasks: [{ ...moved, stageId }, ...destination.tasks],
+          total: destination.total + 1,
+        };
+        return next;
+      });
       setDraggedTask(null);
       setDragOverColumn(null);
     }
@@ -326,6 +394,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         stageId: newTask.stageId || undefined,
       });
       if (created) {
+        void loadStagePage(newTask.stageId || newStageId || '0', 1, true);
         setNewTask({
           title: '',
           description: '',
@@ -353,6 +422,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       priority: data.priority,
       stageId,
     });
+    if (created) void loadStagePage(stageId, 1, true);
     return !!created;
   };
 
@@ -536,18 +606,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           navigation row duplicated them and made labels overlap. */}
       <div className="hidden">
         <div className="flex overflow-x-auto scrollbar-hide">
-          {allStages.map((stage: any) => {
+          {allStages.map((stage) => {
             const count = filteredTasks.filter((t) => t.stageId === stage.id).length;
             return (
               <Button
                 key={stage.id}
-                onClick={() => setActiveColumn(stage.id)}
                 variant="ghost"
-                className={`h-auto min-w-[120px] flex-1 rounded-none border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap ${
-                  activeColumn === stage.id
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted-foreground'
-                }`}
+                className={`h-auto min-w-[120px] flex-1 rounded-none border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap ${'border-transparent text-muted-foreground'}`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
@@ -587,9 +652,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-background scrollbar-hide lg:snap-none"
       >
         <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
-          {allStages.map((stage: any) => {
+          {allStages.map((stage) => {
             const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
-            const colors = getStageColor(stage.color);
             const isDragOver = dragOverColumn === stage.id;
 
             return (
@@ -600,7 +664,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, stage.id)}
+                onDrop={(e) => void handleDrop(e, stage.id)}
               >
                 {/* Column header */}
                 <div className="flex items-center gap-2 border-b px-3 py-2.5">
@@ -634,6 +698,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   )}
                   <span className="text-xs font-medium text-muted-foreground">
                     {colTasks.length}
+                    {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
                   </span>
                   <Button
                     variant="ghost"
@@ -654,19 +719,39 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       task={task}
                       avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                       onDragStart={handleDragStart}
-                      onClick={() => openTask(task.id)}
+                      onClick={() => {
+                        void loadTaskById(task.id);
+                        openTask(task.id);
+                      }}
                       isDragging={draggedTask === task.id}
                     />
                   ))}
 
                   {inlineAddStage === stage.id && (
                     <InlineAddForm
-                      stageId={stage.id}
                       defaultAssigneeId={currentUser.id}
                       users={users}
                       onSubmit={(data) => handleInlineAdd(stage.id, data)}
                       onCancel={() => setInlineAddStage(null)}
                     />
+                  )}
+                  {(stagePages[stage.id]?.tasks.length || 0) <
+                    (stagePages[stage.id]?.total || 0) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full"
+                      disabled={stagePages[stage.id]?.loading}
+                      onClick={() =>
+                        void loadStagePage(
+                          stage.id,
+                          Math.floor((stagePages[stage.id]?.tasks.length || 0) / KANBAN_PAGE_SIZE) +
+                            1,
+                        )
+                      }
+                    >
+                      {stagePages[stage.id]?.loading ? 'Загружаем…' : 'Показать ещё'}
+                    </Button>
                   )}
                 </div>
               </Card>
@@ -850,13 +935,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 }
 
 function InlineAddForm({
-  stageId,
   onSubmit,
   onCancel,
   users,
   defaultAssigneeId,
 }: {
-  stageId: string;
   onSubmit: (data: { title: string; assigneeId: string; priority: string }) => Promise<boolean>;
   onCancel: () => void;
   users: Bx24User[];
@@ -1038,7 +1121,13 @@ function TaskCard({
           )}
         </div>
 
-        {task.assigneeName && <AssigneeAvatar name={task.assigneeName} avatarUrl={avatarUrl} />}
+        {task.assigneeName && (
+          <AssigneeAvatar
+            key={avatarUrl || 'no-avatar'}
+            name={task.assigneeName}
+            avatarUrl={avatarUrl}
+          />
+        )}
       </div>
     </Card>
   );
@@ -1046,10 +1135,6 @@ function TaskCard({
 
 function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
   const [imageFailed, setImageFailed] = useState(!avatarUrl);
-
-  useEffect(() => {
-    setImageFailed(!avatarUrl);
-  }, [avatarUrl]);
 
   if (!avatarUrl || imageFailed) {
     return (
@@ -1063,10 +1148,13 @@ function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string 
   }
 
   return (
-    <img
+    <Image
       src={avatarUrl}
       alt={name}
       title={name}
+      width={24}
+      height={24}
+      unoptimized
       onError={() => setImageFailed(true)}
       className="size-6 shrink-0 rounded-full object-cover ring-2 ring-card"
     />
