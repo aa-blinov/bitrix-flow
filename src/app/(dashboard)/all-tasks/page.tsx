@@ -45,7 +45,7 @@ function AllTasksInner() {
     async (request: TaskGridPageQuery) => {
       const params = new URLSearchParams({
         page: String(request.page),
-        limit: '50',
+        limit: String(request.limit),
         query: request.query,
         status: request.status,
         hideDone: String(request.hideDone),

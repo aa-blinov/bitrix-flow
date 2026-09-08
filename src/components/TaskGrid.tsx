@@ -30,6 +30,11 @@ import {
   MoreHorizontal,
   Filter,
   GripVertical,
+  Folder,
+  User,
+  CalendarDays,
+  Clock,
+  Pencil,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -40,6 +45,7 @@ import { useKanbanStore } from '@/store/kanban';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -105,6 +111,20 @@ function useTaskUrl() {
 }
 const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
 const PAGE_SIZE = 50;
+// На телефоне 50 карточек — семь экранов прокрутки до пагинации.
+const MOBILE_PAGE_SIZE = 20;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)');
+    const apply = () => setIsMobile(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+  return isMobile;
+}
 type SortKey =
   | 'title'
   | 'project'
@@ -130,6 +150,7 @@ export type TaskGridPageQuery = {
   assigneeId: string;
   projectId: string;
   tag: string;
+  limit: number;
   sorts: Sort[];
 };
 type TaskGridPage = { tasks: BxTask[]; total: number };
@@ -664,6 +685,8 @@ export default function TaskGrid({
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState(initialProjectId);
   const [tagFilter, setTagFilter] = useState('all');
+  const isMobile = useIsMobile();
+  const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
   const [draftQuery, setDraftQuery] = useState('');
   const [draftStatusFilter, setDraftStatusFilter] = useState(initialStatus);
@@ -689,6 +712,9 @@ export default function TaskGrid({
   const [addingStageId, setAddingStageId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [collapsedTaskIds, setCollapsedTaskIds] = useState<Set<string>>(new Set());
+  // На телефоне поля правятся в раскрывающемся блоке карточки: иначе список
+  // превращается в простыню контролов.
+  const [editingCardIds, setEditingCardIds] = useState<Set<string>>(new Set());
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -828,15 +854,15 @@ export default function TaskGrid({
     groupBy,
     loadPage,
   ]);
-  const loadedPageCount = Math.max(1, Math.ceil(tasks.length / PAGE_SIZE));
+  const loadedPageCount = Math.max(1, Math.ceil(tasks.length / pageSize));
   const pageCount = loadPage
-    ? Math.max(1, Math.ceil(serverPage.total / PAGE_SIZE))
-    : Math.max(1, Math.ceil(orderedTasks.length / PAGE_SIZE));
+    ? Math.max(1, Math.ceil(serverPage.total / pageSize))
+    : Math.max(1, Math.ceil(orderedTasks.length / pageSize));
   const totalPageCount = effectiveTotal
-    ? Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE))
+    ? Math.max(1, Math.ceil(effectiveTotal / pageSize))
     : pageCount;
-  const pageStart = (page - 1) * PAGE_SIZE;
-  const pageTasks = loadPage ? orderedTasks : orderedTasks.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageStart = (page - 1) * pageSize;
+  const pageTasks = loadPage ? orderedTasks : orderedTasks.slice(pageStart, pageStart + pageSize);
   const loadNextPage = async () => {
     if (loadPage) {
       if (page < pageCount) setPage((value) => value + 1);
@@ -910,7 +936,7 @@ export default function TaskGrid({
     assigneeFilter !== 'all' ||
     (showProject && projectFilter !== 'all');
   const tableHeightClass =
-    hasNarrowingFilter && orderedTasks.length < PAGE_SIZE
+    hasNarrowingFilter && orderedTasks.length < pageSize
       ? 'max-h-none'
       : showProject || layoutScope === 'projects'
         ? 'max-h-[calc(100dvh-17rem)]'
@@ -1016,7 +1042,17 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tagFilter]);
+  }, [
+    assigneeFilter,
+    groupBy,
+    pageSize,
+    projectFilter,
+    query,
+    sorts,
+    statusFilter,
+    hideDone,
+    tagFilter,
+  ]);
   useEffect(() => {
     setPage((currentPage) => Math.min(currentPage, pageCount));
   }, [pageCount]);
@@ -1038,6 +1074,7 @@ export default function TaskGrid({
         assigneeId: assigneeFilter,
         projectId: showProject ? projectFilter : 'all',
         tag: tagFilter,
+        limit: pageSize,
         sorts,
       })
       .then((nextPage) => {
@@ -1055,6 +1092,7 @@ export default function TaskGrid({
       cancelled = true;
     };
   }, [
+    pageSize,
     tagFilter,
     setPagedTasks,
     assigneeFilter,
@@ -1256,6 +1294,105 @@ export default function TaskGrid({
       </Card>
     );
   const isReadOnly = showProject;
+  // Одна разметка на два места: инлайн-панель на десктопе и шторка на телефоне.
+  const filterControls = (
+    <>
+      <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
+        <Checkbox
+          checked={draftHideDone}
+          onCheckedChange={(value) => setDraftHideDone(value === true)}
+          aria-label="Скрыть закрытые задачи"
+        />
+        <span>Скрыть закрытые</span>
+      </label>
+      <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
+        <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все задачи</SelectItem>
+          <SelectItem value="active">Активные задачи</SelectItem>
+          <SelectItem value="attention">Требуют внимания</SelectItem>
+          <SelectItem value="week">Дедлайн на неделе</SelectItem>
+          <SelectItem value="no_deadline">Без дедлайна</SelectItem>
+          <SelectItem value="overdue">Просрочено</SelectItem>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => (
+            <SelectItem key={value} value={value}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
+        <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все исполнители</SelectItem>
+          {users.map((user) => (
+            <SelectItem key={user.id} value={user.id}>
+              {user.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {showProject && (
+        <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
+          <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все проекты</SelectItem>
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {availableTags.length > 0 && (
+        <Select value={draftTagFilter} onValueChange={setDraftTagFilter}>
+          <SelectTrigger className="w-40 rounded-md" aria-label="Тег">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все теги</SelectItem>
+            {availableTags.map((item) => (
+              <SelectItem key={item.tag} value={item.tag}>
+                {item.label} ({item.count})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <Button
+        variant="secondary"
+        size="sm"
+        className="h-8 rounded-md"
+        disabled={!filtersDirty}
+        onClick={applyFilters}
+      >
+        Применить
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+        disabled={
+          !draftQuery &&
+          draftStatusFilter === 'all' &&
+          !draftHideDone &&
+          draftAssigneeFilter === 'all' &&
+          draftProjectFilter === 'all'
+        }
+        onClick={resetFilters}
+      >
+        Сбросить
+      </Button>
+    </>
+  );
+
   return (
     <>
       <Card className="mx-4 mt-5 w-[calc(100%-2rem)] min-w-0 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6 sm:w-[calc(100%-3rem)]">
@@ -1365,6 +1502,25 @@ export default function TaskGrid({
                 </option>
               ))}
             </select>
+            {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
+            <select
+              value={`${sorts[0]?.key || 'updated'}:${sorts[0]?.direction || 'desc'}`}
+              onChange={(event) => {
+                const [key, direction] = event.target.value.split(':');
+                setSorts([{ key: key as SortKey, direction: direction as Sort['direction'] }]);
+              }}
+              aria-label="Сортировка"
+              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 md:hidden dark:bg-input/30"
+            >
+              {(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
+                <option key={`${column}:desc`} value={`${column}:desc`}>
+                  {COLUMN_LABELS[column]} ↓
+                </option>,
+                <option key={`${column}:asc`} value={`${column}:asc`}>
+                  {COLUMN_LABELS[column]} ↑
+                </option>,
+              ])}
+            </select>
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
@@ -1376,100 +1532,8 @@ export default function TaskGrid({
               {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount}</Badge>}
             </Button>
             {showFilters && (
-              <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2.5">
-                <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
-                  <Checkbox
-                    checked={draftHideDone}
-                    onCheckedChange={(value) => setDraftHideDone(value === true)}
-                    aria-label="Скрыть закрытые задачи"
-                  />
-                  <span>Скрыть закрытые</span>
-                </label>
-                <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
-                  <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все задачи</SelectItem>
-                    <SelectItem value="active">Активные задачи</SelectItem>
-                    <SelectItem value="attention">Требуют внимания</SelectItem>
-                    <SelectItem value="week">Дедлайн на неделе</SelectItem>
-                    <SelectItem value="no_deadline">Без дедлайна</SelectItem>
-                    <SelectItem value="overdue">Просрочено</SelectItem>
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
-                  <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все исполнители</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {showProject && (
-                  <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
-                    <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Все проекты</SelectItem>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {availableTags.length > 0 && (
-                  <Select value={draftTagFilter} onValueChange={setDraftTagFilter}>
-                    <SelectTrigger className="w-40 rounded-md" aria-label="Тег">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Все теги</SelectItem>
-                      {availableTags.map((item) => (
-                        <SelectItem key={item.tag} value={item.tag}>
-                          {item.label} ({item.count})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 rounded-md"
-                  disabled={!filtersDirty}
-                  onClick={applyFilters}
-                >
-                  Применить
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
-                  disabled={
-                    !draftQuery &&
-                    draftStatusFilter === 'all' &&
-                    !draftHideDone &&
-                    draftAssigneeFilter === 'all' &&
-                    draftProjectFilter === 'all'
-                  }
-                  onClick={resetFilters}
-                >
-                  Сбросить
-                </Button>
+              <div className="hidden w-full flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2.5 md:flex">
+                {filterControls}
               </div>
             )}
           </div>
@@ -1523,7 +1587,9 @@ export default function TaskGrid({
           <div className="divide-y md:hidden">
             {displayPageTasks.map((task) => {
               const assignee =
-                users.find((user) => user.id === task.assigneeId)?.name || 'Не назначен';
+                task.assigneeName ||
+                users.find((user) => user.id === task.assigneeId)?.name ||
+                'Не назначен';
               const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
               return (
                 <article
@@ -1537,11 +1603,12 @@ export default function TaskGrid({
                   }`}
                 >
                   <div className="flex items-start gap-2">
+                    {/* Сам чекбокс маленький, но область касания — 40px */}
                     <Checkbox
                       checked={selectedIds.has(task.id)}
                       onCheckedChange={() => toggleSelected(task.id)}
                       aria-label={`Выбрать задачу ${task.title}`}
-                      className="mt-1.5"
+                      className="mt-1 size-5 shrink-0 p-2.5 -m-2.5 box-content"
                     />
                     {groupBy === 'hierarchy' && (hierarchy.childCount.get(task.id) || 0) > 0 && (
                       <Button
@@ -1593,38 +1660,79 @@ export default function TaskGrid({
                           {task.title}
                         </p>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                        <span>{STATUS_LABELS[task.status] || task.status}</span>
-                        <span>{priority}</span>
-                        {showProject && <span>{projectById[task.projectId]?.name ?? '—'}</span>}
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <Badge variant="secondary">
+                          {STATUS_LABELS[task.status] || task.status}
+                        </Badge>
+                        {task.priority !== 'medium' && <Badge variant="outline">{priority}</Badge>}
+                        {showProject && task.projectId && task.projectId !== '0' && (
+                          <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                            <Folder className="size-3 shrink-0" />
+                            <span className="truncate">
+                              {projectById[task.projectId]?.name || `Проект ${task.projectId}`}
+                            </span>
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                        <span>{assignee}</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <User className="size-3 shrink-0" />
+                          {assignee}
+                        </span>
                         {!task.dueDate && task.status !== 'done' && (
-                          <span className="font-medium text-violet-700 dark:text-violet-300">
+                          <span className="inline-flex items-center gap-1 font-medium text-violet-700 dark:text-violet-300">
+                            <CalendarDays className="size-3 shrink-0" />
                             без срока
                           </span>
                         )}
                         {task.dueDate && (
                           <span
-                            className={
+                            className={`inline-flex items-center gap-1 ${
                               needsDeadlineAttention(task)
                                 ? 'font-medium text-yellow-800 dark:text-yellow-200'
-                                : undefined
-                            }
+                                : ''
+                            }`}
                           >
-                            до {formatBitrixDateTime(task.dueDate)}
+                            <CalendarDays className="size-3 shrink-0" />
+                            {formatBitrixDateTime(task.dueDate)}
                           </span>
                         )}
-                        {task.estimate || task.actualTime ? (
-                          <span>
-                            факт {task.actualTime || 0} ч, план {task.estimate || 0} ч
+                        {Boolean(task.estimate || task.actualTime) && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="size-3 shrink-0" />
+                            {task.actualTime || 0} / {task.estimate || 0} ч
                           </span>
-                        ) : null}
+                        )}
                       </div>
                     </button>
-                    <TaskActions task={task} />
+                    <div className="flex shrink-0 items-center [&_button]:size-11">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={
+                          editingCardIds.has(task.id)
+                            ? `Скрыть поля задачи ${task.title}`
+                            : `Изменить поля задачи ${task.title}`
+                        }
+                        onClick={() =>
+                          setEditingCardIds((ids) => {
+                            const next = new Set(ids);
+                            if (next.has(task.id)) next.delete(task.id);
+                            else next.add(task.id);
+                            return next;
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <TaskActions task={task} compact />
+                    </div>
                   </div>
+                  {editingCardIds.has(task.id) && (
+                    <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+                      <FieldControls task={task} compact />
+                    </div>
+                  )}
                 </article>
               );
             })}
@@ -1859,7 +1967,7 @@ export default function TaskGrid({
               {orderedTasks.length ? pageStart + 1 : 0}–
               {loadPage
                 ? pageStart + orderedTasks.length
-                : Math.min(pageStart + PAGE_SIZE, orderedTasks.length)}{' '}
+                : Math.min(pageStart + pageSize, orderedTasks.length)}{' '}
               из {effectiveTotal || tasks.length}
               {effectiveTotal ? `, страница ${page} из ${totalPageCount}` : ''}
             </p>
@@ -1937,6 +2045,17 @@ export default function TaskGrid({
         </DialogContent>
       </Dialog>
       {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
+      {/* Фильтры на телефоне: панель занимала пол-экрана над списком */}
+      <Sheet open={showFilters} onOpenChange={setShowFilters}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto md:hidden">
+          <SheetHeader>
+            <SheetTitle>Фильтры</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-3 px-4 pb-6 [&_[data-slot=select-trigger]]:h-11 [&_[data-slot=select-trigger]]:w-full [&_label]:h-11 [&_button:not([role=checkbox])]:h-11">
+            {filterControls}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
