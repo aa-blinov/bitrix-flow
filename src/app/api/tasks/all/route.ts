@@ -8,6 +8,7 @@ import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
 import { taskMirrorStages } from '@/lib/task-mirror-query';
+import { mongoHashtagMatch } from '@/lib/task-tags';
 import { postBitrixJson } from '@/lib/bitrix-request';
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,7 @@ export async function GET(req: NextRequest) {
   const hideDone = req.nextUrl.searchParams.get('hideDone') === 'true';
   const unassigned = req.nextUrl.searchParams.get('unassigned') === 'true';
   const deadlineDay = req.nextUrl.searchParams.get('deadlineDay');
+  const tag = req.nextUrl.searchParams.get('tag') || 'all';
   const sortKey = req.nextUrl.searchParams.get('sortKey') || 'updated';
   const sortDirection = req.nextUrl.searchParams.get('sortDirection') === 'asc' ? 1 : -1;
   const requestedSorts = (req.nextUrl.searchParams.get('sorts') || '')
@@ -140,6 +142,24 @@ export async function GET(req: NextRequest) {
   }
   if (hideDone && status === 'done') {
     filter.$and = [...(filter.$and || []), { rawStatus: { $ne: '5' } }];
+  }
+  // Теги живут в тексте задачи, а не отдельным полем, поэтому фильтруем
+  // выражением по названию и описанию — тем же разбором, что и в UI.
+  if (tag !== 'all') {
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $expr: {
+          $regexMatch: {
+            input: {
+              $concat: [' ', { $ifNull: ['$title', ''] }, ' ', { $ifNull: ['$description', ''] }],
+            },
+            regex: mongoHashtagMatch(tag),
+            options: 'i',
+          },
+        },
+      },
+    ];
   }
   if (deadlineDay) {
     const dayStart = new Date(`${deadlineDay}T00:00:00`);

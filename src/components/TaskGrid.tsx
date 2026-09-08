@@ -129,6 +129,7 @@ export type TaskGridPageQuery = {
   hideDone: boolean;
   assigneeId: string;
   projectId: string;
+  tag: string;
   sorts: Sort[];
 };
 type TaskGridPage = { tasks: BxTask[]; total: number };
@@ -149,6 +150,8 @@ type SavedView = {
     statusFilter: string;
     assigneeFilter: string;
     projectFilter: string;
+    // Появился позже сохранённых вью, поэтому необязателен.
+    tagFilter?: string;
     groupBy: GroupBy;
     hideDone: boolean;
     sorts: Sort[];
@@ -594,6 +597,7 @@ export default function TaskGrid({
   initialGroupBy = 'none',
   initialAssigneeId = 'all',
   initialProjectId = 'all',
+  tagsProjectId,
   viewScope,
   layoutScope = 'all',
   onLoadMore,
@@ -614,6 +618,9 @@ export default function TaskGrid({
   hasMore?: boolean;
   totalCount?: number;
   loadPage?: (query: TaskGridPageQuery) => Promise<TaskGridPage>;
+  // Список тегов на странице проекта должен быть только его: фильтра проекта
+  // там нет, поэтому область берём из пропа.
+  tagsProjectId?: string;
 }) {
   const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setPagedTasks = useKanbanStore((state) => state.setPagedTasks);
@@ -656,12 +663,17 @@ export default function TaskGrid({
   const [hideDone, setHideDone] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
   const [projectFilter, setProjectFilter] = useState(initialProjectId);
+  const [tagFilter, setTagFilter] = useState('all');
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
   const [draftQuery, setDraftQuery] = useState('');
   const [draftStatusFilter, setDraftStatusFilter] = useState(initialStatus);
   const [draftHideDone, setDraftHideDone] = useState(false);
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(initialAssigneeId);
   const [draftProjectFilter, setDraftProjectFilter] = useState(initialProjectId);
+  const [draftTagFilter, setDraftTagFilter] = useState('all');
+  const [availableTags, setAvailableTags] = useState<
+    Array<{ tag: string; label: string; count: number }>
+  >([]);
   const [draftGroupBy, setDraftGroupBy] = useState<GroupBy>(initialGroupBy);
   const [showFilters, setShowFilters] = useState(false);
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
@@ -707,6 +719,7 @@ export default function TaskGrid({
     draftHideDone,
     draftAssigneeFilter !== 'all',
     showProject && draftProjectFilter !== 'all',
+    draftTagFilter !== 'all',
   ].filter(Boolean).length;
   const orderedTasks = useMemo(() => {
     if (loadPage) return tasks;
@@ -941,6 +954,22 @@ export default function TaskGrid({
     setDraftProjectFilter(initialProjectId);
   }, [initialProjectId]);
 
+  // Теги подтягиваем под текущую область: проект страницы либо выбранный
+  // в фильтре проект, иначе все доступные задачи.
+  const tagScope = tagsProjectId || (showProject ? projectFilter : 'all');
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/tasks/tags?projectId=${encodeURIComponent(tagScope)}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled) setAvailableTags(Array.isArray(data.tags) ? data.tags : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [tagScope]);
+
   useEffect(() => {
     if (!viewScope) return;
     void fetch(`/api/task-views?scope=${viewScope}`)
@@ -987,7 +1016,7 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone]);
+  }, [assigneeFilter, groupBy, projectFilter, query, sorts, statusFilter, hideDone, tagFilter]);
   useEffect(() => {
     setPage((currentPage) => Math.min(currentPage, pageCount));
   }, [pageCount]);
@@ -1008,6 +1037,7 @@ export default function TaskGrid({
         hideDone,
         assigneeId: assigneeFilter,
         projectId: showProject ? projectFilter : 'all',
+        tag: tagFilter,
         sorts,
       })
       .then((nextPage) => {
@@ -1025,6 +1055,7 @@ export default function TaskGrid({
       cancelled = true;
     };
   }, [
+    tagFilter,
     setPagedTasks,
     assigneeFilter,
     hideDone,
@@ -1043,6 +1074,7 @@ export default function TaskGrid({
     setHideDone(draftHideDone);
     setAssigneeFilter(draftAssigneeFilter);
     setProjectFilter(draftProjectFilter);
+    setTagFilter(draftTagFilter);
     setGroupBy(draftGroupBy);
   };
   const resetFilters = () => {
@@ -1051,18 +1083,21 @@ export default function TaskGrid({
     setDraftHideDone(false);
     setDraftAssigneeFilter('all');
     setDraftProjectFilter('all');
+    setDraftTagFilter('all');
     setQuery('');
     setStatusFilter('all');
     setHideDone(false);
     setAssigneeFilter('all');
     setProjectFilter('all');
+    setTagFilter('all');
   };
   const filtersDirty =
     draftQuery !== query ||
     draftStatusFilter !== statusFilter ||
     draftHideDone !== hideDone ||
     draftAssigneeFilter !== assigneeFilter ||
-    draftProjectFilter !== projectFilter;
+    draftProjectFilter !== projectFilter ||
+    draftTagFilter !== tagFilter;
   const applyView = (id: string) => {
     if (id === 'default') {
       setActiveViewId('');
@@ -1070,11 +1105,13 @@ export default function TaskGrid({
       setDraftHideDone(false);
       setDraftAssigneeFilter('all');
       setDraftProjectFilter('all');
+      setDraftTagFilter('all');
       setDraftGroupBy('none');
       setStatusFilter(initialStatus);
       setHideDone(false);
       setAssigneeFilter('all');
       setProjectFilter('all');
+      setTagFilter('all');
       setGroupBy('none');
       setSorts([{ key: 'updated', direction: 'desc' }]);
       setVisibleColumns(DEFAULT_COLUMNS);
@@ -1090,11 +1127,13 @@ export default function TaskGrid({
     setDraftHideDone(config.hideDone);
     setDraftAssigneeFilter(config.assigneeFilter);
     setDraftProjectFilter(config.projectFilter);
+    setDraftTagFilter(config.tagFilter || 'all');
     setDraftGroupBy(config.groupBy);
     setStatusFilter(config.statusFilter);
     setHideDone(config.hideDone);
     setAssigneeFilter(config.assigneeFilter);
     setProjectFilter(config.projectFilter);
+    setTagFilter(config.tagFilter || 'all');
     setGroupBy(config.groupBy);
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
@@ -1108,6 +1147,7 @@ export default function TaskGrid({
       statusFilter: draftStatusFilter,
       assigneeFilter: draftAssigneeFilter,
       projectFilter: draftProjectFilter,
+      tagFilter: draftTagFilter,
       groupBy: draftGroupBy,
       hideDone: draftHideDone,
       sorts,
@@ -1386,6 +1426,21 @@ export default function TaskGrid({
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {availableTags.length > 0 && (
+                  <Select value={draftTagFilter} onValueChange={setDraftTagFilter}>
+                    <SelectTrigger className="w-40 rounded-md" aria-label="Тег">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все теги</SelectItem>
+                      {availableTags.map((item) => (
+                        <SelectItem key={item.tag} value={item.tag}>
+                          {item.label} ({item.count})
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -114,6 +114,7 @@ export default function ProjectPage() {
         status: request.status,
         hideDone: String(request.hideDone),
         assigneeId: request.assigneeId,
+        tag: request.tag,
         projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
       });
@@ -401,6 +402,7 @@ export default function ProjectPage() {
             layoutScope="projects"
             title={null}
             loadPage={loadGridPage}
+            tagsProjectId={projectId}
           />
         </TabsContent>
       </Tabs>

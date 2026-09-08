@@ -50,6 +50,7 @@ function AllTasksInner() {
         status: request.status,
         hideDone: String(request.hideDone),
         assigneeId: request.assigneeId,
+        tag: request.tag,
         projectId: request.projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
       });

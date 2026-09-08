@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractTaskTags } from './task-tags';
+import { extractTaskTags, mongoHashtagMatch } from './task-tags';
 
 describe('extractTaskTags', () => {
   it('extracts unique Cyrillic and Latin hashtags from task text', () => {
@@ -12,5 +12,12 @@ describe('extractTaskTags', () => {
     expect(extractTaskTags('', 'https://example.com/page#section #реальный-тег')).toEqual([
       '#реальный-тег',
     ]);
+  });
+});
+
+describe('mongoHashtagMatch', () => {
+  it('escapes the tag and refuses a longer neighbour', () => {
+    expect(mongoHashtagMatch('#release_2026')).toBe('(*UCP)[\\s([{]#release_2026(?![\\w-])');
+    expect(mongoHashtagMatch('a.b')).toContain('a\\.b');
   });
 });
