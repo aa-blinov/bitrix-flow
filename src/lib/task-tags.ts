@@ -18,9 +18,13 @@ export function bitrixTaskTags(raw: unknown): string[] {
     .filter(Boolean);
 }
 
+export function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Регэксп, которым Mongo проверяет, что в тексте есть именно этот тег. */
 export function mongoHashtagMatch(tag: string): string {
-  const escaped = tag.replace(/^#/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapeRegex(tag.replace(/^#/, ''));
   return `(*UCP)[\\s([{]#${escaped}(?![\\w-])`;
 }
 

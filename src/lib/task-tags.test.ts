@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bitrixTaskTags, extractTaskTags, mongoHashtagMatch } from './task-tags';
+import { bitrixTaskTags, escapeRegex, extractTaskTags, mongoHashtagMatch } from './task-tags';
 
 describe('extractTaskTags', () => {
   it('extracts unique Cyrillic and Latin hashtags from task text', () => {
@@ -28,5 +28,12 @@ describe('bitrixTaskTags', () => {
       bitrixTaskTags({ '197': { id: 197, title: 'P1' }, '249': { title: 'R260916' } }),
     ).toEqual(['P1', 'R260916']);
     expect(bitrixTaskTags(undefined)).toEqual([]);
+  });
+});
+
+describe('escapeRegex', () => {
+  it('escapes the characters a tag may legitimately contain', () => {
+    expect(escapeRegex('C++ (v2)')).toBe('C\\+\\+ \\(v2\\)');
+    expect(escapeRegex('Спринт 2')).toBe('Спринт 2');
   });
 });

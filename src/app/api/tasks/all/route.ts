@@ -8,7 +8,7 @@ import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
 import { taskMirrorStages } from '@/lib/task-mirror-query';
-import { mongoHashtagMatch } from '@/lib/task-tags';
+import { escapeRegex, mongoHashtagMatch } from '@/lib/task-tags';
 import { postBitrixJson } from '@/lib/bitrix-request';
 export const dynamic = 'force-dynamic';
 
@@ -152,19 +152,24 @@ export async function GET(req: NextRequest) {
       ...(filter.$and || []),
       {
         $or: [
-          // Штатный тег задачи…
+          // Штатный тег задачи. Сравниваем регэкспом с опцией i, а не через
+          // $toLower: он не приводит кириллицу, из-за чего «Спринт 2» никогда
+          // не совпадал с выбранным в фильтре значением.
           {
             $expr: {
-              $in: [
-                tag.toLocaleLowerCase('ru'),
-                {
-                  $map: {
-                    input: { $ifNull: ['$bitrixTags', []] },
-                    as: 'name',
-                    in: { $toLower: { $ifNull: ['$$name', ''] } },
+              $anyElementTrue: {
+                $map: {
+                  input: { $ifNull: ['$bitrixTags', []] },
+                  as: 'name',
+                  in: {
+                    $regexMatch: {
+                      input: { $ifNull: ['$$name', ''] },
+                      regex: `^${escapeRegex(tag)}$`,
+                      options: 'i',
+                    },
                   },
                 },
-              ],
+              },
             },
           },
           // …либо #хэштег в названии или описании.

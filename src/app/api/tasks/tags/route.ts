@@ -23,52 +23,50 @@ export async function GET(req: NextRequest) {
   const { db, stages } = await taskMirrorStages(memberId);
   const rows = await db
     .collection('task_mirror')
-    .aggregate([
-      ...stages,
-      ...(Object.keys(match).length ? [{ $match: match }] : []),
-      {
-        $set: {
-          // Ведущий пробел заменяет ^ в разборе: тег может стоять первым словом.
-          text: {
-            $concat: [' ', { $ifNull: ['$title', ''] }, ' ', { $ifNull: ['$description', ''] }],
+    .aggregate(
+      [
+        ...stages,
+        ...(Object.keys(match).length ? [{ $match: match }] : []),
+        {
+          $set: {
+            // Ведущий пробел заменяет ^ в разборе: тег может стоять первым словом.
+            text: {
+              $concat: [' ', { $ifNull: ['$title', ''] }, ' ', { $ifNull: ['$description', ''] }],
+            },
           },
         },
-      },
-      { $set: { hits: { $regexFindAll: { input: '$text', regex: MONGO_HASHTAG_REGEX } } } },
-      {
-        $set: {
-          // Штатный тег Битрикса и #хэштег из текста для пользователя — одно
-          // и то же понятие, поэтому список общий.
-          allTags: {
-            $concatArrays: [
-              { $ifNull: ['$bitrixTags', []] },
-              {
-                $map: {
-                  input: { $ifNull: ['$hits', []] },
-                  as: 'hit',
-                  in: { $arrayElemAt: ['$$hit.captures', 0] },
+        { $set: { hits: { $regexFindAll: { input: '$text', regex: MONGO_HASHTAG_REGEX } } } },
+        {
+          $set: {
+            // Штатный тег Битрикса и #хэштег из текста для пользователя — одно
+            // и то же понятие, поэтому список общий.
+            allTags: {
+              $concatArrays: [
+                { $ifNull: ['$bitrixTags', []] },
+                {
+                  $map: {
+                    input: { $ifNull: ['$hits', []] },
+                    as: 'hit',
+                    in: { $arrayElemAt: ['$$hit.captures', 0] },
+                  },
                 },
-              },
-            ],
+              ],
+            },
           },
         },
-      },
-      { $unwind: '$allTags' },
-      { $match: { allTags: { $nin: [null, ''] } } },
-      // Одинаковые теги в разном регистре — один тег; показываем первое написание.
-      {
-        $group: {
-          _id: { $toLower: '$allTags' },
-          label: { $first: '$allTags' },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1, _id: 1 } },
-      { $limit: MAX_TAGS },
-    ])
+        { $unwind: '$allTags' },
+        { $match: { allTags: { $nin: [null, ''] } } },
+        // Одинаковые теги в разном регистре — один тег. Группируем с коллацией
+        // (strength 2), потому что $toLower не приводит кириллицу.
+        { $group: { _id: '$allTags', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
+        { $limit: MAX_TAGS },
+      ],
+      { collation: { locale: 'ru', strength: 2 } },
+    )
     .toArray();
 
   return NextResponse.json({
-    tags: rows.map((row) => ({ tag: String(row._id), label: String(row.label), count: row.count })),
+    tags: rows.map((row) => ({ tag: String(row._id), label: String(row._id), count: row.count })),
   });
 }
