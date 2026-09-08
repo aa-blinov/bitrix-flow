@@ -249,7 +249,7 @@ export default function ProjectPage() {
                 <span>Задач: {projectTasks.length}</span>
                 <span className="text-emerald-600">Завершено: {completedTasks}</span>
               </div>
-              {(overdueTasks || unassignedTasks) && (
+              {Boolean(overdueTasks || unassignedTasks) && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   {overdueTasks > 0 && (
                     <span className="font-medium text-destructive">{overdueTasks} просрочено</span>

@@ -46,6 +46,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1310,7 +1311,7 @@ export default function TaskGrid({
         <span>Скрыть закрытые</span>
       </label>
       <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
-        <SelectTrigger className="w-32 rounded-md" aria-label="Статус">
+        <SelectTrigger className={toolbarSelect} aria-label="Статус">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -1328,7 +1329,7 @@ export default function TaskGrid({
         </SelectContent>
       </Select>
       <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
-        <SelectTrigger className="w-40 rounded-md" aria-label="Исполнитель">
+        <SelectTrigger className={toolbarSelect} aria-label="Исполнитель">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -1342,7 +1343,7 @@ export default function TaskGrid({
       </Select>
       {showProject && (
         <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
-          <SelectTrigger className="w-40 rounded-md" aria-label="Проект">
+          <SelectTrigger className={toolbarSelect} aria-label="Проект">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1357,7 +1358,7 @@ export default function TaskGrid({
       )}
       {availableTags.length > 0 && (
         <Select value={draftTagFilter} onValueChange={setDraftTagFilter}>
-          <SelectTrigger className="w-40 rounded-md" aria-label="Тег">
+          <SelectTrigger className={toolbarSelect} aria-label="Тег">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1373,7 +1374,7 @@ export default function TaskGrid({
       <Button
         variant="secondary"
         size="sm"
-        className="h-8 rounded-md"
+        className={toolbarControl}
         disabled={!filtersDirty}
         onClick={applyFilters}
       >
@@ -1382,7 +1383,7 @@ export default function TaskGrid({
       <Button
         variant="outline"
         size="sm"
-        className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+        className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
         disabled={
           !draftQuery &&
           draftStatusFilter === 'all' &&
@@ -1453,7 +1454,7 @@ export default function TaskGrid({
             />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 rounded-md">
+                <Button variant="outline" size="sm" className={toolbarControl}>
                   Поля
                 </Button>
               </DropdownMenuTrigger>
@@ -1528,7 +1529,7 @@ export default function TaskGrid({
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
-              className="h-8 rounded-md"
+              className={toolbarControl}
               onClick={() => setShowFilters((open) => !open)}
             >
               <Filter size={14} />
@@ -1536,9 +1537,7 @@ export default function TaskGrid({
               {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount}</Badge>}
             </Button>
             {showFilters && (
-              <div className="hidden w-full flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2.5 md:flex">
-                {filterControls}
-              </div>
+              <div className={`hidden md:flex ${toolbarPanel}`}>{filterControls}</div>
             )}
           </div>
           {selectedIds.size > 0 && (

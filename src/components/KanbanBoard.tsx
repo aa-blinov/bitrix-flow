@@ -18,6 +18,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -489,7 +490,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           {toolbar}
           <Select value={kanbanSort} onValueChange={(value) => setKanbanSort(value as KanbanSort)}>
             <SelectTrigger
-              className="h-8 w-36 shrink-0 bg-background"
+              className={`${toolbarSelect} shrink-0 bg-background`}
               aria-label="Сортировка задач"
             >
               <SelectValue />
@@ -505,29 +506,32 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             value={filters.search}
             onChange={(event) => setFilters({ search: event.target.value })}
             placeholder="Поиск задач…"
-            className="h-8 w-48 shrink-0 bg-background"
+            className={`${toolbarControl} w-48 shrink-0 bg-background`}
             aria-label="Поиск задач на доске"
           />
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
-              variant={showFilters || activeFiltersCount > 0 ? 'default' : 'outline'}
+              variant={showFilters || activeFiltersCount > 0 ? 'secondary' : 'outline'}
+              size="sm"
+              className={toolbarControl}
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter size={14} />
-              <span>Фильтр</span>
-              {activeFiltersCount > 0 && (
-                <Badge variant="secondary" className="ml-0.5 bg-background/20 text-inherit">
-                  {activeFiltersCount}
-                </Badge>
-              )}
+              <span>Фильтры</span>
+              {activeFiltersCount > 0 && <Badge variant="secondary">{activeFiltersCount}</Badge>}
             </Button>
 
-            <Button variant="outline" onClick={() => setShowStageDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className={toolbarControl}
+              onClick={() => setShowStageDialog(true)}
+            >
               <Plus size={14} />
               <span>Фаза</span>
             </Button>
 
-            <Button onClick={openAddDialog}>
+            <Button size="sm" className={toolbarControl} onClick={openAddDialog}>
               <Plus size={14} />
               <span>Добавить задачу</span>
             </Button>
@@ -536,90 +540,99 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
         {/* Filters panel */}
         {showFilters && (
-          <div className="mt-3 animate-slideUp rounded-lg border bg-muted/50 p-3">
-            <div className="flex flex-wrap gap-2">
+          <div className={`mt-3 animate-slideUp ${toolbarPanel}`}>
+            <Select
+              value={filters.assigneeId}
+              onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
+            >
+              <SelectTrigger className={toolbarSelect}>
+                <SelectValue placeholder="Все исполнители" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все исполнители</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {boardTags.length > 0 && (
               <Select
-                value={filters.assigneeId}
-                onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
+                value={filters.tag || 'all'}
+                onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
               >
-                <SelectTrigger className="min-w-40">
-                  <SelectValue placeholder="Все исполнители" />
+                <SelectTrigger className={toolbarSelect} aria-label="Тег">
+                  <SelectValue placeholder="Все теги" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Все исполнители</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
+                  <SelectItem value="all">Все теги</SelectItem>
+                  {boardTags.map((item) => (
+                    <SelectItem key={item.tag} value={item.tag}>
+                      {item.label} ({item.count})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            )}
 
-              {boardTags.length > 0 && (
-                <Select
-                  value={filters.tag || 'all'}
-                  onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
-                >
-                  <SelectTrigger className="min-w-40" aria-label="Тег">
-                    <SelectValue placeholder="Все теги" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все теги</SelectItem>
-                    {boardTags.map((item) => (
-                      <SelectItem key={item.tag} value={item.tag}>
-                        {item.label} ({item.count})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <Button
+              variant={filters.priority === 'high' ? 'secondary' : 'outline'}
+              size="sm"
+              className={toolbarControl}
+              onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
+            >
+              Высокий приоритет
+            </Button>
 
+            <Button
+              variant={filters.overdue ? 'destructive' : 'outline'}
+              size="sm"
+              className={toolbarControl}
+              onClick={() => setFilters({ overdue: !filters.overdue })}
+            >
+              Просрочено
+            </Button>
+
+            <Button
+              variant={filters.hasDeadline ? 'secondary' : 'outline'}
+              size="sm"
+              className={toolbarControl}
+              onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
+            >
+              С дедлайном
+            </Button>
+
+            <Button
+              variant={!filters.showCompleted ? 'secondary' : 'outline'}
+              size="sm"
+              className={toolbarControl}
+              onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
+            >
+              {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
+            </Button>
+
+            {activeFiltersCount > 0 && (
               <Button
-                variant={filters.priority === 'high' ? 'secondary' : 'outline'}
-                onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
+                variant="outline"
+                size="sm"
+                className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
+                onClick={() =>
+                  setFilters({
+                    search: '',
+                    assigneeId: '',
+                    tag: '',
+                    priority: '',
+                    hasDeadline: false,
+                    overdue: false,
+                    showCompleted: true,
+                  })
+                }
               >
-                Высокий приоритет
+                Сбросить
               </Button>
-
-              <Button
-                variant={filters.overdue ? 'destructive' : 'outline'}
-                onClick={() => setFilters({ overdue: !filters.overdue })}
-              >
-                Просрочено
-              </Button>
-
-              <Button
-                variant={filters.hasDeadline ? 'secondary' : 'outline'}
-                onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
-              >
-                С дедлайном
-              </Button>
-
-              <Button
-                variant={!filters.showCompleted ? 'secondary' : 'outline'}
-                onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
-              >
-                {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
-              </Button>
-
-              {activeFiltersCount > 0 && (
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    setFilters({
-                      search: '',
-                      assigneeId: '',
-                      priority: '',
-                      hasDeadline: false,
-                      overdue: false,
-                      showCompleted: true,
-                    })
-                  }
-                >
-                  Сбросить
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         )}
       </header>
