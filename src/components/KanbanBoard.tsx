@@ -191,6 +191,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const stageKey = allStages.map((stage) => stage.id).join(',');
   const [stagePages, setStagePages] = useState<Record<string, KanbanStagePage>>({});
   const stageRequestVersion = useRef(0);
+  // Пока первая выборка колонок не пришла, доска показывает спиннер, а не
+  // пустые колонки: так же ведёт себя список задач.
+  const [boardReady, setBoardReady] = useState(false);
   const loadStagePage = useCallback(
     async (
       stageId: string,
@@ -268,12 +271,15 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   useEffect(() => {
     if (!selectedProjectId || !stageKey) return;
     const requestVersion = ++stageRequestVersion.current;
+    setBoardReady(false);
     startTransition(() => setStagePages({}));
     void Promise.all(
       (stageKey ? stageKey.split(',') : []).map((stageId) =>
         loadStagePage(stageId, 1, true, requestVersion),
       ),
-    );
+    ).finally(() => {
+      if (requestVersion === stageRequestVersion.current) setBoardReady(true);
+    });
   }, [loadStagePage, selectedProjectId, stageKey]);
   const filteredTasks = useMemo(
     () => Object.values(stagePages).flatMap((stage) => stage.tasks),
@@ -475,10 +481,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     }
     setIsCreatingStage(false);
   };
-
-  if (isLoading && tasks.length === 0) {
-    return <LoadingState className="min-h-[60vh] flex-1" />;
-  }
 
   return (
     <div className="flex min-w-0 flex-col bg-background">
@@ -704,7 +706,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       </div>
 
       {/* Board */}
+      {(!boardReady || (isLoading && !filteredTasks.length)) && (
+        <LoadingState className="min-h-72 flex-1 bg-transparent" />
+      )}
       <div
+        hidden={!boardReady || (isLoading && !filteredTasks.length)}
         ref={boardScrollRef}
         onScroll={(event) => {
           if (topScrollRef.current)
