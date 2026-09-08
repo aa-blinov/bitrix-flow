@@ -47,6 +47,7 @@ import TaskModal from './TaskModal';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
+import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -658,10 +659,15 @@ export default function TaskGrid({
   const users = useKanbanStore((state) => state.users);
   const stages = useKanbanStore((state) => state.stages);
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
-  const [serverPage, setServerPage] = useState<TaskGridPage>({
-    tasks: initialTasks,
-    total: totalCount ?? initialTasks.length,
-  });
+  // С loadPage контент всегда приходит с сервера. Раньше состояние стартовало
+  // с initialTasks, поэтому при переключении вида список рисовался дважды:
+  // сначала обрезанным набором из стора, через ~300мс — серверной страницей.
+  const [serverPage, setServerPage] = useState<TaskGridPage>(() =>
+    loadPage
+      ? { tasks: [], total: totalCount ?? 0 }
+      : { tasks: initialTasks, total: totalCount ?? initialTasks.length },
+  );
+  const [serverPageReady, setServerPageReady] = useState(!loadPage);
   const [isServerPageLoading, setIsServerPageLoading] = useState(false);
   const [serverPageError, setServerPageError] = useState<string | null>(null);
   const [serverPageRetry, setServerPageRetry] = useState(0);
@@ -1085,10 +1091,13 @@ export default function TaskGrid({
       .then((nextPage) => {
         if (cancelled) return;
         setServerPage(nextPage);
+        setServerPageReady(true);
         setPagedTasks(nextPage.tasks, nextPage.total);
       })
       .catch(() => {
-        if (!cancelled) setServerPageError('Не удалось загрузить страницу. Повторите попытку.');
+        if (cancelled) return;
+        setServerPageError('Не удалось загрузить страницу. Повторите попытку.');
+        setServerPageReady(true);
       })
       .finally(() => {
         if (!cancelled) setIsServerPageLoading(false);
@@ -1284,24 +1293,6 @@ export default function TaskGrid({
     </TableHead>
   );
 
-  if (tasks.length === 0)
-    return (
-      <Card className="mx-4 mt-5 border-dashed sm:mx-6">
-        <CardContent className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
-          <div className="rounded-full bg-muted p-3 text-muted-foreground">
-            <Circle className="size-6" />
-          </div>
-          <div>
-            <h2 className="font-semibold">Нет задач</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {showProject
-                ? 'По выбранным фильтрам ничего не найдено.'
-                : 'Измените фильтры или создайте первую задачу на доске.'}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
   const isReadOnly = showProject;
   // Одна разметка на два места: инлайн-панель на десктопе и шторка на телефоне.
   const filterControls = (
@@ -1579,6 +1570,24 @@ export default function TaskGrid({
           )}
         </CardHeader>
         <CardContent className="p-0">
+          {!serverPageReady && !serverPageError && (
+            <LoadingState className="min-h-72 bg-transparent" />
+          )}
+          {serverPageReady && tasks.length === 0 && !serverPageError && (
+            <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
+              <div className="rounded-full bg-muted p-3 text-muted-foreground">
+                <Circle className="size-6" />
+              </div>
+              <div>
+                <h2 className="font-semibold">Нет задач</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {showProject
+                    ? 'По выбранным фильтрам ничего не найдено.'
+                    : 'Измените фильтры или создайте первую задачу на доске.'}
+                </p>
+              </div>
+            </div>
+          )}
           {serverPageError && (
             <div
               role="alert"
@@ -1594,7 +1603,7 @@ export default function TaskGrid({
               </Button>
             </div>
           )}
-          <div className="divide-y md:hidden">
+          <div className={`divide-y md:hidden ${serverPageReady && tasks.length ? '' : 'hidden'}`}>
             {displayPageTasks.map((task) => {
               const assignee =
                 task.assigneeName ||
@@ -1755,7 +1764,9 @@ export default function TaskGrid({
               );
             })}
           </div>
-          <div className={`hidden md:block ${tableScrollClass} ${tableHeightClass}`}>
+          <div
+            className={`${serverPageReady && tasks.length ? 'hidden md:block' : 'hidden'} ${tableScrollClass} ${tableHeightClass}`}
+          >
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
                 <col className="w-10" />
