@@ -300,7 +300,7 @@ export default function TeamWorkload() {
   const overdueCount = sumOf(summary?.overdue || []).count;
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-12">
+    <div className="min-h-screen bg-background pb-12">
       <PageHeader
         title="Нагрузка команды"
         description="План по срокам: количество задач и часы на каждого исполнителя"

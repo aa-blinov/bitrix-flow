@@ -485,7 +485,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 lg:px-6">
+      <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 sm:px-6">
         {/* На узком экране скрытый горизонтальный скролл прятал «Фильтр» и
             «Добавить задачу» без всякого намёка — переносим строки. */}
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:flex-nowrap md:gap-3 md:overflow-x-auto md:overflow-y-hidden md:scrollbar-hide">

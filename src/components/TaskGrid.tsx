@@ -1398,10 +1398,12 @@ export default function TaskGrid({
 
   return (
     <>
-      <Card className="mx-4 w-[calc(100%-2rem)] min-w-0 gap-2 rounded-none bg-transparent py-0 shadow-none ring-0 sm:mx-6 sm:w-[calc(100%-3rem)]">
+      {/* Панель и содержимое тянутся во всю ширину, как у доски: раньше
+          карточка отступала на 24px и рамка панели не доходила до края. */}
+      <Card className="w-full min-w-0 gap-2 rounded-none border-0 bg-transparent py-0 shadow-none ring-0">
         {/* Те же отступы, что у панели доски, иначе при переключении вида
               навбар перескакивает на другую высоту. */}
-        <CardHeader className="sticky top-0 z-10 gap-2 rounded-none border-0 border-b bg-background px-0 py-4">
+        <CardHeader className="sticky top-0 z-10 gap-2 rounded-none border-0 border-b bg-background px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             {toolbarLeading}
             {title !== null && (
@@ -1606,7 +1608,9 @@ export default function TaskGrid({
               </Button>
             </div>
           )}
-          <div className={`divide-y md:hidden ${serverPageReady && tasks.length ? '' : 'hidden'}`}>
+          <div
+            className={`divide-y px-4 sm:px-6 md:hidden ${serverPageReady && tasks.length ? '' : 'hidden'}`}
+          >
             {displayPageTasks.map((task) => {
               const assignee =
                 task.assigneeName ||
@@ -1768,7 +1772,7 @@ export default function TaskGrid({
             })}
           </div>
           <div
-            className={`${serverPageReady && tasks.length ? 'hidden md:block' : 'hidden'} ${tableScrollClass} ${tableHeightClass}`}
+            className={`${serverPageReady && tasks.length ? 'hidden md:block' : 'hidden'} px-4 sm:px-6 ${tableScrollClass} ${tableHeightClass}`}
           >
             <Table className="min-w-max table-fixed" containerClassName="overflow-visible">
               <colgroup>
@@ -1994,7 +1998,7 @@ export default function TaskGrid({
           </div>
         </CardContent>
         {(pageCount > 1 || hasMore) && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
               {orderedTasks.length ? pageStart + 1 : 0}–
               {loadPage

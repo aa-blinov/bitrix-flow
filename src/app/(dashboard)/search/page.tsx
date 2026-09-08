@@ -51,7 +51,7 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
         <h1 className="pt-2 text-xl font-semibold text-foreground md:pt-0">Поиск</h1>
@@ -163,7 +163,7 @@ function SearchPageContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-muted/30" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <SearchPageContent />
     </Suspense>
   );

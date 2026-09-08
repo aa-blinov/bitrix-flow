@@ -61,7 +61,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Уведомления"
         description="Последние изменения в задачах Битрикс24"

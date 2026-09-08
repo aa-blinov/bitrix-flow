@@ -114,7 +114,7 @@ export default function ProjectsSummaryPage() {
   );
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-12">
+    <div className="min-h-screen bg-background pb-12">
       <PageHeader
         title="Сводка по проектам"
         description="План, факт и операционный статус по задачам проектов"

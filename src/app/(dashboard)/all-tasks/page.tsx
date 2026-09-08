@@ -86,7 +86,7 @@ function AllTasksInner() {
   }, [taskFromUrl, selectedTaskId, setSelectedTask]);
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-12">
+    <div className="min-h-screen bg-background pb-12">
       <PageHeader
         title="Все задачи"
         description={workloadDescription}
