@@ -33,6 +33,7 @@ type RawTask = {
 };
 
 const TASK_FIELDS = [
+  'TAGS',
   'ID',
   'TITLE',
   'STATUS',

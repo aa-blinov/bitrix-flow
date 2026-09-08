@@ -5,6 +5,19 @@ const HASHTAG_PATTERN = /(?:^|[\s([{])#([\p{L}\p{N}_-]+)/gu;
 // ведущим пробелом, который добавляет сам пайплайн.
 export const MONGO_HASHTAG_REGEX = '(*UCP)[\\s([{]#([\\w-]+)';
 
+/** Штатные теги задачи: Bitrix отдаёт их объектом id -> { id, title }. */
+export function bitrixTaskTags(raw: unknown): string[] {
+  if (!raw) return [];
+  const values = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>);
+  return values
+    .map((value) =>
+      typeof value === 'string'
+        ? value
+        : String((value as any)?.title || (value as any)?.TITLE || ''),
+    )
+    .filter(Boolean);
+}
+
 /** Регэксп, которым Mongo проверяет, что в тексте есть именно этот тег. */
 export function mongoHashtagMatch(tag: string): string {
   const escaped = tag.replace(/^#/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

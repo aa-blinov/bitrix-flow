@@ -2057,17 +2057,21 @@ export default function TaskGrid({
         </DialogContent>
       </Dialog>
       {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
-      {/* Фильтры на телефоне: панель занимала пол-экрана над списком */}
-      <Sheet open={showFilters} onOpenChange={setShowFilters}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto md:hidden">
-          <SheetHeader>
-            <SheetTitle>Фильтры</SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col gap-3 px-4 pb-6 [&_[data-slot=select-trigger]]:h-11 [&_[data-slot=select-trigger]]:w-full [&_label]:h-11 [&_button:not([role=checkbox])]:h-11">
-            {filterControls}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Фильтры на телефоне: панель занимала пол-экрана над списком.
+          Только при isMobile — иначе оверлей шторки перехватывает клики по
+          инлайн-панели на десктопе. */}
+      {isMobile && (
+        <Sheet open={showFilters} onOpenChange={setShowFilters}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Фильтры</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-3 px-4 pb-6 [&_[data-slot=select-trigger]]:h-11 [&_[data-slot=select-trigger]]:w-full [&_label]:h-11 [&_button:not([role=checkbox])]:h-11">
+              {filterControls}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </>
   );
 }

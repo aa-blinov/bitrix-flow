@@ -35,18 +35,40 @@ export async function GET(req: NextRequest) {
         },
       },
       { $set: { hits: { $regexFindAll: { input: '$text', regex: MONGO_HASHTAG_REGEX } } } },
-      { $match: { 'hits.0': { $exists: true } } },
-      { $unwind: '$hits' },
-      { $set: { tag: { $arrayElemAt: ['$hits.captures', 0] } } },
-      { $match: { tag: { $ne: null } } },
+      {
+        $set: {
+          // Штатный тег Битрикса и #хэштег из текста для пользователя — одно
+          // и то же понятие, поэтому список общий.
+          allTags: {
+            $concatArrays: [
+              { $ifNull: ['$bitrixTags', []] },
+              {
+                $map: {
+                  input: { $ifNull: ['$hits', []] },
+                  as: 'hit',
+                  in: { $arrayElemAt: ['$$hit.captures', 0] },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { $unwind: '$allTags' },
+      { $match: { allTags: { $nin: [null, ''] } } },
       // Одинаковые теги в разном регистре — один тег; показываем первое написание.
-      { $group: { _id: { $toLower: '$tag' }, label: { $first: '$tag' }, count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: { $toLower: '$allTags' },
+          label: { $first: '$allTags' },
+          count: { $sum: 1 },
+        },
+      },
       { $sort: { count: -1, _id: 1 } },
       { $limit: MAX_TAGS },
     ])
     .toArray();
 
   return NextResponse.json({
-    tags: rows.map((row) => ({ tag: String(row._id), label: `#${row.label}`, count: row.count })),
+    tags: rows.map((row) => ({ tag: String(row._id), label: String(row.label), count: row.count })),
   });
 }

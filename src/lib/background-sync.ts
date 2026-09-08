@@ -159,6 +159,10 @@ async function fetchChanged(memberId: string, projectId: string): Promise<any[]>
     const data = await bx24OAuth(memberId, 'tasks.task.list', {
       'filter[GROUP_ID]': projectId,
       'filter[>=CHANGED_DATE]': since.toISOString(),
+      // '*' сохраняет весь набор полей по умолчанию, TAGS добавляет штатные
+      // теги задачи — без него зеркало о них не знает.
+      'select[0]': '*',
+      'select[1]': 'TAGS',
       start: String(start),
     });
     const batch = data?.result?.tasks || data?.tasks || [];

@@ -69,6 +69,20 @@ export const normalizedTaskFields = {
   actual: { $ifNull: ['$data.timeSpentInLogs', '$data.TIME_SPENT_IN_LOGS'] },
   comments: { $ifNull: ['$data.commentsCount', '$data.COMMENTS_COUNT'] },
   parent: { $ifNull: ['$data.parentId', '$data.PARENT_ID'] },
+  // Штатные теги приходят объектом id -> { id, title }; нам нужны названия.
+  bitrixTags: {
+    $map: {
+      input: {
+        $cond: [
+          { $eq: [{ $type: { $ifNull: ['$data.tags', '$data.TAGS'] } }, 'object'] },
+          { $objectToArray: { $ifNull: ['$data.tags', '$data.TAGS'] } },
+          [],
+        ],
+      },
+      as: 'entry',
+      in: { $ifNull: ['$$entry.v.title', '$$entry.v.TITLE'] },
+    },
+  },
 };
 
 // Ключ дня в календаре нагрузки считает браузер по локальной зоне, поэтому

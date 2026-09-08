@@ -142,6 +142,7 @@ export interface Bx24User {
 export interface TaskFilters {
   search: string;
   assigneeId: string;
+  tag: string;
   priority: string;
   status: string;
   hasDeadline: boolean;

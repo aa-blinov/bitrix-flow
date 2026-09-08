@@ -40,6 +40,8 @@ function toTaskListItem(task: any) {
     stageId: task.stageId || task.STAGE_ID || '0',
     chatId: task.chatId || task.CHAT_ID || undefined,
     accompliceIds: (task.accomplices || task.ACCOMPLICES || []).map(String),
+    // Штатные теги нужны карточкам списка и доски, а не только фильтру.
+    tags: task.tags || task.TAGS || undefined,
     auditorIds: (task.auditors || task.AUDITORS || []).map(String),
   };
 }
@@ -149,15 +151,40 @@ export async function GET(req: NextRequest) {
     filter.$and = [
       ...(filter.$and || []),
       {
-        $expr: {
-          $regexMatch: {
-            input: {
-              $concat: [' ', { $ifNull: ['$title', ''] }, ' ', { $ifNull: ['$description', ''] }],
+        $or: [
+          // Штатный тег задачи…
+          {
+            $expr: {
+              $in: [
+                tag.toLocaleLowerCase('ru'),
+                {
+                  $map: {
+                    input: { $ifNull: ['$bitrixTags', []] },
+                    as: 'name',
+                    in: { $toLower: { $ifNull: ['$$name', ''] } },
+                  },
+                },
+              ],
             },
-            regex: mongoHashtagMatch(tag),
-            options: 'i',
           },
-        },
+          // …либо #хэштег в названии или описании.
+          {
+            $expr: {
+              $regexMatch: {
+                input: {
+                  $concat: [
+                    ' ',
+                    { $ifNull: ['$title', ''] },
+                    ' ',
+                    { $ifNull: ['$description', ''] },
+                  ],
+                },
+                regex: mongoHashtagMatch(tag),
+                options: 'i',
+              },
+            },
+          },
+        ],
       },
     ];
   }
@@ -225,7 +252,7 @@ export async function GET(req: NextRequest) {
       visited.add(start);
       const response = await postBitrixJson(
         `https://${token.domain}/rest/tasks.task.list?auth=${token.access_token}`,
-        { order: { ID: 'DESC' }, start },
+        { order: { ID: 'DESC' }, select: ['*', 'TAGS'], start },
         true,
       );
       if (response.error) throw new Error(`${response.error}: ${response.error_description}`);

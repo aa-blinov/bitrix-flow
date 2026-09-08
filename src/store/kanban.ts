@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { bitrixTaskTags, extractTaskTags } from '@/lib/task-tags';
 import {
   BxTask,
   BxComment,
@@ -193,7 +194,14 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
     chatId: bxTask.chatId,
     accompliceIds: bxTask.accompliceIds,
     auditorIds: bxTask.auditorIds,
-    tags: bxTask.tags,
+    // tags приходят и объектом Битрикса, и уже готовым массивом (из fetchTasks),
+    // плюс #хэштеги из текста — нормализуем в одном месте и убираем повторы.
+    tags: [
+      ...new Set([
+        ...bitrixTaskTags(bxTask.tags),
+        ...extractTaskTags(bxTask.title, bxTask.description),
+      ]),
+    ],
     actions: bxTask.actions,
   };
 }
@@ -201,6 +209,7 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
 const defaultFilters: TaskFilters = {
   search: '',
   assigneeId: '',
+  tag: '',
   priority: '',
   status: '',
   hasDeadline: false,

@@ -170,6 +170,23 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     .slice()
     .sort((a, b) => a.sort - b.sort);
   const deferredSearch = useDeferredValue(filters.search);
+  // Список тегов проекта — тот же источник, что у списка задач.
+  const [boardTags, setBoardTags] = useState<Array<{ tag: string; label: string; count: number }>>(
+    [],
+  );
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    let cancelled = false;
+    void fetch(`/api/tasks/tags?projectId=${encodeURIComponent(selectedProjectId)}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled) setBoardTags(Array.isArray(data.tags) ? data.tags : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId]);
   const stageKey = allStages.map((stage) => stage.id).join(',');
   const [stagePages, setStagePages] = useState<Record<string, KanbanStagePage>>({});
   const stageRequestVersion = useRef(0);
@@ -196,6 +213,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         stageId,
         query: deferredSearch,
         assigneeId: filters.assigneeId || 'all',
+        tag: filters.tag || 'all',
         priority: filters.priority || 'all',
         hasDeadline: String(filters.hasDeadline),
         status: filters.overdue ? 'overdue' : filters.showCompleted ? 'all' : 'active',
@@ -241,6 +259,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       filters.overdue,
       filters.priority,
       filters.showCompleted,
+      filters.tag,
       kanbanSort,
       selectedProjectId,
     ],
@@ -329,6 +348,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
   const activeFiltersCount = [
     filters.assigneeId,
+    filters.tag,
     filters.priority,
     filters.hasDeadline,
     filters.overdue,
@@ -534,6 +554,25 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   ))}
                 </SelectContent>
               </Select>
+
+              {boardTags.length > 0 && (
+                <Select
+                  value={filters.tag || 'all'}
+                  onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
+                >
+                  <SelectTrigger className="min-w-40" aria-label="Тег">
+                    <SelectValue placeholder="Все теги" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все теги</SelectItem>
+                    {boardTags.map((item) => (
+                      <SelectItem key={item.tag} value={item.tag}>
+                        {item.label} ({item.count})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               <Button
                 variant={filters.priority === 'high' ? 'secondary' : 'outline'}
