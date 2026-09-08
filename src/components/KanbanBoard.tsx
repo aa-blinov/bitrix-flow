@@ -1113,7 +1113,7 @@ function TaskCard({
   onMoveToStage: (taskId: string, stageId: string) => void;
 }) {
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
-  const taskTags = extractTaskTags(task.title, task.description);
+  const taskTags = task.tags?.length ? task.tags : extractTaskTags(task.title, task.description);
   const isCompleted = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
   const dueDate = formatDeadline(task.dueDate);
