@@ -1,31 +1,49 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useKanbanStore } from '@/store/kanban';
+import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import TaskGrid from '@/components/TaskGrid';
 
 function MyTasksInner() {
-  const {
-    projects,
-    allTasks,
-    isLoadingAllTasks,
-    loadAllTasks,
-    loadProjects,
-    currentUser,
-    selectedTaskId,
-    setSelectedTask,
-  } = useKanbanStore();
+  const projects = useKanbanStore((state) => state.projects);
+  const loadProjects = useKanbanStore((state) => state.loadProjects);
+  const currentUser = useKanbanStore((state) => state.currentUser);
+  const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
+  const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') || 'all';
   const taskFromUrl = searchParams.get('task');
+  const loadPage = useCallback(async (request: TaskGridPageQuery) => {
+    const params = new URLSearchParams({
+      page: String(request.page),
+      limit: '50',
+      query: request.query,
+      status: request.status,
+      hideDone: String(request.hideDone),
+      assigneeId: request.assigneeId,
+      projectId: request.projectId,
+      sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
+    });
+    const response = await fetch(`/api/tasks/all?${params.toString()}`);
+    if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
+    const data = await response.json();
+    return {
+      tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+      total: Number(data.total) || 0,
+    };
+  }, []);
 
   useEffect(() => {
-    if (projects.length === 0) void loadProjects();
-    if (allTasks.length === 0) void loadAllTasks();
-  }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
+    // Без currentUser.id сетка ушла бы за задачами с assigneeId='' — сервер
+    // читает это как 'all' и отдаёт чужие задачи, которые потом заменяются
+    // вторым запросом. Поэтому догружаем пользователя force-ом.
+    if (!currentUser.id) void loadProjects(true);
+    else if (projects.length === 0) void loadProjects();
+  }, [currentUser.id, loadProjects, projects.length]);
 
   useEffect(() => {
     const next = taskFromUrl || null;
@@ -37,17 +55,18 @@ function MyTasksInner() {
       <PageHeader title="Мои задачи" description="Задачи, где вы указаны исполнителем" />
 
       <div className="mt-4">
-        {isLoadingAllTasks ? (
+        {!currentUser.id ? (
           <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
-            tasks={allTasks}
+            tasks={[]}
             showProject
             initialStatus={initialStatus}
             initialAssigneeId={currentUser.id}
             title={null}
             viewScope="my"
             layoutScope="my"
+            loadPage={loadPage}
           />
         )}
       </div>
