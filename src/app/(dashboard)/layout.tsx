@@ -1,7 +1,7 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
 import { useKanbanStore } from '@/store/kanban';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSSE } from '@/hooks/useSSE';
 
@@ -30,8 +30,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
 
+  // Проверять подключение на каждой смене маршрута незачем: ответ один и тот
+  // же, а запрос уходил по три раза за одно открытие проекта.
+  const connectionChecked = useRef(false);
   useEffect(() => {
-    if (pathname === '/connect') return;
+    if (pathname === '/connect' || connectionChecked.current) return;
+    connectionChecked.current = true;
     const storedMemberId = localStorage.getItem('bitrix_member_id') || '';
     void fetch('/api/oauth/check', {
       headers: { 'X-Member-Id': storedMemberId },

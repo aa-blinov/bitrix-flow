@@ -28,7 +28,7 @@ vi.hoisted(() => {
 
 import { useKanbanStore } from './kanban';
 
-describe('setSelectedProject: stages load before tasks', () => {
+describe('setSelectedProject: грузит стадии и не выбирает задачи проекта', () => {
   const events: string[] = [];
   const originalFetch = global.fetch;
 
@@ -106,25 +106,18 @@ describe('setSelectedProject: stages load before tasks', () => {
     global.fetch = originalFetch;
   });
 
-  it('stages и tasks запускаются параллельно — tasks не ждут stages', async () => {
+  it('запрашивает стадии и не тянет задачи проекта: их грузят доска и список', async () => {
     await useKanbanStore.getState().setSelectedProject('group-1');
-    // Ждём пока оба промиса из цепочки отработают.
     await new Promise((r) => setTimeout(r, 200));
 
-    const stagesStart = events.indexOf('stages:start');
-    const stagesEnd = events.indexOf('stages:end');
-    const tasksStart = events.indexOf('tasks:start');
-    const tasksEnd = events.indexOf('tasks:end');
+    // Стадии нужны доске сразу.
+    expect(events.indexOf('stages:start')).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf('stages:end')).toBeGreaterThan(events.indexOf('stages:start'));
 
-    // Оба запроса стартовали и завершились.
-    expect(stagesStart).toBeGreaterThanOrEqual(0);
-    expect(stagesEnd).toBeGreaterThan(stagesStart);
-    expect(tasksStart).toBeGreaterThanOrEqual(0);
-    expect(tasksEnd).toBeGreaterThan(tasksStart);
-
-    // Параллельный запуск: tasks начинается до завершения stages. Иначе
-    // медленный Bitrix24 на /task.stages.get будет блокировать отрисовку
-    // списка задач.
-    expect(tasksStart).toBeLessThan(stagesEnd);
+    // А вот вторая выборка тех же задач из Битрикса не нужна: и доска, и
+    // список берут их постранично из зеркала, поэтому проект открывался
+    // с двойной загрузкой.
+    expect(events).not.toContain('tasks:start');
+    expect(useKanbanStore.getState().isLoading).toBe(false);
   });
 });

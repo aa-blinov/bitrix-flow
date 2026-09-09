@@ -33,6 +33,11 @@ export default function DashboardPage() {
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const hasBootstrapped = useRef(false);
+  // Проект выбираем, как только список появился — неважно, чей запрос его
+  // принёс: сайдбар обращается за проектами в том же тике.
+  useEffect(() => {
+    if (!selectedProjectId && projects.length > 0) setSelectedProject(projects[0].id);
+  }, [projects, selectedProjectId, setSelectedProject]);
 
   useEffect(() => {
     if (hasBootstrapped.current) return;

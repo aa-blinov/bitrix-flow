@@ -206,6 +206,9 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
   };
 }
 
+// Один общий запрос проектов на все одновременные вызовы loadProjects.
+let inFlightProjects: Promise<void> | null = null;
+
 const defaultFilters: TaskFilters = {
   search: '',
   assigneeId: '',
@@ -255,9 +258,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       isLoading: Boolean(id),
     });
     if (id) {
-      // Этапы не должны задерживать задачи: Bitrix может отвечать на них медленнее.
+      // Задачи проекта грузят сами доска и список (постранично, из зеркала).
+      // Раньше здесь дополнительно выбирался весь проект из Битрикса — те же
+      // данные во второй раз, из-за чего открытие проекта грузилось дважды.
       void get().loadStages(id);
-      void get().loadTasks(id, true);
+      set({ isLoading: false });
     }
   },
 
@@ -269,43 +274,50 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   setCurrentUser: (currentUser) => set({ currentUser }),
 
   loadProjects: async (force = false) => {
-    const { projects, isLoading } = get();
+    const { projects } = get();
 
-    // Защита от дублирующих вызовов
-    if (isLoading || (!force && projects.length > 0)) return;
+    // Общий промис отдаём и тем, кто пришёл во время загрузки: иначе вызывающий
+    // получал управление сразу и видел ещё пустой список проектов.
+    if (inFlightProjects) return inFlightProjects;
+    if (!force && projects.length > 0) return;
 
     set({ isLoading: true, error: null });
-    try {
-      const memberId =
-        typeof window !== 'undefined' ? localStorage.getItem('bitrix_member_id') || '' : '';
+    inFlightProjects = (async () => {
+      try {
+        const memberId =
+          typeof window !== 'undefined' ? localStorage.getItem('bitrix_member_id') || '' : '';
 
-      // Один batch запрос вместо двух параллельных
-      const res = await fetch('/api/dashboard', {
-        headers: { 'X-Member-Id': memberId },
-      });
+        // Один batch запрос вместо двух параллельных
+        const res = await fetch('/api/dashboard', {
+          headers: { 'X-Member-Id': memberId },
+        });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to load');
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to load');
+        }
+
+        const { projects: projectsResult, users: usersResult, currentUser } = await res.json();
+
+        set({
+          projects: projectsResult || [],
+          users: usersResult || [],
+          currentUser: currentUser?.id ? currentUser : get().currentUser,
+          isLoading: false,
+        });
+
+        if (typeof window !== 'undefined') {
+          try {
+            persist.saveToStorage({ projects: projectsResult, users: usersResult, currentUser });
+          } catch {}
+        }
+      } catch (err: any) {
+        set({ error: err.message, isLoading: false });
+      } finally {
+        inFlightProjects = null;
       }
-
-      const { projects: projectsResult, users: usersResult, currentUser } = await res.json();
-
-      set({
-        projects: projectsResult || [],
-        users: usersResult || [],
-        currentUser: currentUser?.id ? currentUser : get().currentUser,
-        isLoading: false,
-      });
-
-      if (typeof window !== 'undefined') {
-        try {
-          persist.saveToStorage({ projects: projectsResult, users: usersResult, currentUser });
-        } catch {}
-      }
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false });
-    }
+    })();
+    return inFlightProjects;
   },
 
   setPagedTasks: (tasks, total) =>

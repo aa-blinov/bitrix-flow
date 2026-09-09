@@ -128,14 +128,35 @@ export default function ProjectPage() {
     },
     [projectId],
   );
-  const completedTasks = projectTasks.filter((t) => t.status === 'done').length;
-  const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
-  const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
-  const activeTasks = projectTasks.filter((task) => task.status !== 'done');
-  const overdueTasks = activeTasks.filter(
-    (task) => task.dueDate && new Date(task.dueDate) < new Date(),
-  ).length;
-  const unassignedTasks = activeTasks.filter((task) => !task.assigneeId).length;
+  // Счётчики считает сервер по всему проекту: доска и список грузят только
+  // свою страницу, а выбирать ради шапки все задачи из Битрикса — вторая
+  // загрузка тех же данных.
+  const [stats, setStats] = useState({
+    total: 0,
+    done: 0,
+    overdue: 0,
+    unassigned: 0,
+    estimateHours: 0,
+    actualHours: 0,
+  });
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    void fetch(`/api/tasks/stats?projectId=${encodeURIComponent(projectId)}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled && data && typeof data.total === 'number') setStats(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+  const completedTasks = stats.done;
+  const totalEstimate = stats.estimateHours;
+  const totalActual = stats.actualHours;
+  const overdueTasks = stats.overdue;
+  const unassignedTasks = stats.unassigned;
 
   useEffect(() => {
     if (!membersOpen || !currentProject) return;
@@ -246,7 +267,7 @@ export default function ProjectPage() {
                   <Users size={14} />
                   {currentProject.membersCount || 0} участников
                 </Button>
-                <span>Задач: {projectTasks.length}</span>
+                <span>Задач: {stats.total}</span>
                 <span className="text-emerald-600">Завершено: {completedTasks}</span>
               </div>
               {Boolean(overdueTasks || unassignedTasks) && (
