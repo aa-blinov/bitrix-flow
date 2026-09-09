@@ -56,6 +56,7 @@ import TaskModal from './TaskModal';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,17 +126,6 @@ const PAGE_SIZE = 50;
 // На телефоне 50 карточек — семь экранов прокрутки до пагинации.
 const MOBILE_PAGE_SIZE = 20;
 
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 767px)');
-    const apply = () => setIsMobile(query.matches);
-    apply();
-    query.addEventListener('change', apply);
-    return () => query.removeEventListener('change', apply);
-  }, []);
-  return isMobile;
-}
 type SortKey =
   | 'title'
   | 'project'

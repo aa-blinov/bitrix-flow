@@ -19,6 +19,8 @@ import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -194,6 +196,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // Пока первая выборка колонок не пришла, доска показывает спиннер, а не
   // пустые колонки: так же ведёт себя список задач.
   const [boardReady, setBoardReady] = useState(false);
+  const isMobile = useIsMobile();
   const loadStagePage = useCallback(
     async (
       stageId: string,
@@ -485,6 +488,105 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     setIsCreatingStage(false);
   };
 
+  // Одна разметка на два места: инлайн-панель на десктопе и шторка на телефоне,
+  // как в списке задач.
+  const filterControls = (
+    <>
+      <Select
+        value={filters.assigneeId}
+        onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
+      >
+        <SelectTrigger className={toolbarSelect}>
+          <SelectValue placeholder="Все исполнители" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все исполнители</SelectItem>
+          {users.map((u) => (
+            <SelectItem key={u.id} value={u.id}>
+              {u.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {boardTags.length > 0 && (
+        <Select
+          value={filters.tag || 'all'}
+          onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
+        >
+          <SelectTrigger className={toolbarSelect} aria-label="Тег">
+            <SelectValue placeholder="Все теги" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все теги</SelectItem>
+            {boardTags.map((item) => (
+              <SelectItem key={item.tag} value={item.tag}>
+                {item.label} ({item.count})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      <Button
+        variant={filters.priority === 'high' ? 'secondary' : 'outline'}
+        size="sm"
+        className={toolbarControl}
+        onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
+      >
+        Высокий приоритет
+      </Button>
+
+      <Button
+        variant={filters.overdue ? 'destructive' : 'outline'}
+        size="sm"
+        className={toolbarControl}
+        onClick={() => setFilters({ overdue: !filters.overdue })}
+      >
+        Просрочено
+      </Button>
+
+      <Button
+        variant={filters.hasDeadline ? 'secondary' : 'outline'}
+        size="sm"
+        className={toolbarControl}
+        onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
+      >
+        С дедлайном
+      </Button>
+
+      <Button
+        variant={!filters.showCompleted ? 'secondary' : 'outline'}
+        size="sm"
+        className={toolbarControl}
+        onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
+      >
+        {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
+      </Button>
+
+      {activeFiltersCount > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
+          onClick={() =>
+            setFilters({
+              search: '',
+              assigneeId: '',
+              tag: '',
+              priority: '',
+              hasDeadline: false,
+              overdue: false,
+              showCompleted: true,
+            })
+          }
+        >
+          Сбросить
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="flex min-w-0 flex-col bg-background">
       {/* Header */}
@@ -543,104 +645,24 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           </div>
         </div>
 
-        {/* Filters panel */}
-        {showFilters && (
-          <div className={`mt-3 animate-slideUp ${toolbarPanel}`}>
-            <Select
-              value={filters.assigneeId}
-              onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
-            >
-              <SelectTrigger className={toolbarSelect}>
-                <SelectValue placeholder="Все исполнители" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все исполнители</SelectItem>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {boardTags.length > 0 && (
-              <Select
-                value={filters.tag || 'all'}
-                onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
-              >
-                <SelectTrigger className={toolbarSelect} aria-label="Тег">
-                  <SelectValue placeholder="Все теги" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все теги</SelectItem>
-                  {boardTags.map((item) => (
-                    <SelectItem key={item.tag} value={item.tag}>
-                      {item.label} ({item.count})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Button
-              variant={filters.priority === 'high' ? 'secondary' : 'outline'}
-              size="sm"
-              className={toolbarControl}
-              onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
-            >
-              Высокий приоритет
-            </Button>
-
-            <Button
-              variant={filters.overdue ? 'destructive' : 'outline'}
-              size="sm"
-              className={toolbarControl}
-              onClick={() => setFilters({ overdue: !filters.overdue })}
-            >
-              Просрочено
-            </Button>
-
-            <Button
-              variant={filters.hasDeadline ? 'secondary' : 'outline'}
-              size="sm"
-              className={toolbarControl}
-              onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
-            >
-              С дедлайном
-            </Button>
-
-            <Button
-              variant={!filters.showCompleted ? 'secondary' : 'outline'}
-              size="sm"
-              className={toolbarControl}
-              onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
-            >
-              {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
-            </Button>
-
-            {activeFiltersCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
-                onClick={() =>
-                  setFilters({
-                    search: '',
-                    assigneeId: '',
-                    tag: '',
-                    priority: '',
-                    hasDeadline: false,
-                    overdue: false,
-                    showCompleted: true,
-                  })
-                }
-              >
-                Сбросить
-              </Button>
-            )}
-          </div>
+        {/* Filters panel — на телефоне уезжает в нижнюю шторку */}
+        {showFilters && !isMobile && (
+          <div className={`mt-3 animate-slideUp ${toolbarPanel}`}>{filterControls}</div>
         )}
       </header>
+
+      {isMobile && (
+        <Sheet open={showFilters} onOpenChange={setShowFilters}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Фильтры</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-3 px-4 pb-6 [&_[data-slot=select-trigger]]:h-11 [&_[data-slot=select-trigger]]:w-full [&_button:not([role=checkbox])]:h-11">
+              {filterControls}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
 
       <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
         <DialogContent className="sm:max-w-md">
