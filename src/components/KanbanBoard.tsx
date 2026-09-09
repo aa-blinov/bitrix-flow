@@ -126,6 +126,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     createStage,
     renameStage,
     isLoading,
+    stagesLoadedFor,
     filters,
     setFilters,
     users,
@@ -168,8 +169,21 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     { id: 'done', name: 'Done', color: 'ff5752', sort: 999, systemType: 'SUCCESS', entityId: '' },
   ];
   // Project stages from Bitrix24 are authoritative. The generic columns are
-  // only a fallback for projects that do not have task stages configured.
-  const allStages = (stages.length > 0 ? stages : defaultStages)
+  // only a fallback for projects that do not have task stages configured —
+  // и только после ответа task.stages.get: иначе доска успевала нарисоваться
+  // по заглушкам New/In Progress/Done, загрузить по ним задачи и через
+  // полсекунды перестроиться на настоящие стадии. Это и было мигание.
+  // Если Битрикс не ответил на task.stages.get за пару секунд, рисуем
+  // системные колонки: лучше фолбэк, чем спиннер без конца.
+  const [stagesTimedOut, setStagesTimedOut] = useState(false);
+  useEffect(() => {
+    setStagesTimedOut(false);
+    if (!selectedProjectId) return;
+    const timer = window.setTimeout(() => setStagesTimedOut(true), 2500);
+    return () => window.clearTimeout(timer);
+  }, [selectedProjectId]);
+  const stagesReady = stages.length > 0 || stagesLoadedFor === selectedProjectId || stagesTimedOut;
+  const allStages = (stages.length > 0 ? stages : stagesReady ? defaultStages : [])
     .slice()
     .sort((a, b) => a.sort - b.sort);
   const deferredSearch = useDeferredValue(filters.search);

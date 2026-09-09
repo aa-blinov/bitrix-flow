@@ -113,6 +113,9 @@ interface KanbanStore {
   setCurrentUser: (user: { id: string; name: string; photo?: string }) => void;
   loadProjects: (force?: boolean) => Promise<void>;
   loadStages: (entityId: string) => Promise<void>;
+  // Проект, для которого стадии уже получены: до этого доска не должна
+  // строиться по системным заглушкам.
+  stagesLoadedFor: string | null;
   createStage: (title: string) => Promise<boolean>;
   renameStage: (stageId: string, title: string) => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<string>;
@@ -231,6 +234,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   selectedProjectId: null,
   selectedTaskId: null,
   currentUser: { id: '', name: 'Не определён' },
+  stagesLoadedFor: null,
   allTasks: [],
   isLoadingAllTasks: false,
   allTasksTotal: 0,
@@ -250,6 +254,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   setSelectedProject: (id) => {
     const cachedStages = id ? get().stages.filter((stage) => stage.entityId === id) : [];
     set({
+      stagesLoadedFor: cachedStages.length ? id : null,
       selectedProjectId: id,
       tasks: [],
       hasMoreTasks: false,
@@ -336,7 +341,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   loadStages: async (entityId: string) => {
     try {
       const stages = await fetchProjectStages(entityId);
-      set({ stages });
+      set({ stages, stagesLoadedFor: entityId });
       if (typeof window !== 'undefined') {
         try {
           const all = (persist.loadFromStorage().stages as any) || {};
@@ -345,6 +350,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         } catch {}
       }
     } catch (err) {
+      // Даже при ошибке доска не должна ждать вечно: пусть покажет фолбэк.
+      set({ stagesLoadedFor: entityId });
       console.error('Failed to load stages:', err);
     }
   },
