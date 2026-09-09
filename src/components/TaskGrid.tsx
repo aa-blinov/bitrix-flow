@@ -1365,21 +1365,25 @@ export default function TaskGrid({
           </SelectContent>
         </Select>
       )}
-      {availableTags.length > 0 && (
-        <Select value={draftTagFilter} onValueChange={setDraftTagFilter}>
-          <SelectTrigger className={toolbarSelect} aria-label="Тег">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все теги</SelectItem>
-            {availableTags.map((item) => (
-              <SelectItem key={item.tag} value={item.tag}>
-                {item.label} ({item.count})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      {/* Селект показываем всегда: пропадающий контрол читался как «фильтра
+          по тегам вообще нет», хотя он просто пустой для этого проекта. */}
+      <Select
+        value={draftTagFilter}
+        onValueChange={setDraftTagFilter}
+        disabled={availableTags.length === 0}
+      >
+        <SelectTrigger className={toolbarSelect} aria-label="Тег">
+          <SelectValue placeholder={availableTags.length ? 'Все теги' : 'Тегов нет'} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все теги</SelectItem>
+          {availableTags.map((item) => (
+            <SelectItem key={item.tag} value={item.tag}>
+              {item.label} ({item.count})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button
         variant="secondary"
         size="sm"

@@ -523,24 +523,24 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         </SelectContent>
       </Select>
 
-      {boardTags.length > 0 && (
-        <Select
-          value={filters.tag || 'all'}
-          onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
-        >
-          <SelectTrigger className={toolbarSelect} aria-label="Тег">
-            <SelectValue placeholder="Все теги" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все теги</SelectItem>
-            {boardTags.map((item) => (
-              <SelectItem key={item.tag} value={item.tag}>
-                {item.label} ({item.count})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      {/* Как и в списке: контрол на месте всегда, пустой — просто неактивен. */}
+      <Select
+        value={filters.tag || 'all'}
+        onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
+        disabled={boardTags.length === 0}
+      >
+        <SelectTrigger className={toolbarSelect} aria-label="Тег">
+          <SelectValue placeholder={boardTags.length ? 'Все теги' : 'Тегов нет'} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все теги</SelectItem>
+          {boardTags.map((item) => (
+            <SelectItem key={item.tag} value={item.tag}>
+              {item.label} ({item.count})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       <Button
         variant={filters.priority === 'high' ? 'secondary' : 'outline'}
