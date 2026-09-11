@@ -40,8 +40,7 @@ export default function Notifications() {
   const [seenAt, setSeenAt] = useState(0);
   const selectedProjectId = useKanbanStore((state) => state.selectedProjectId);
   const loadTasks = useKanbanStore((state) => state.loadTasks);
-  const memberId =
-    typeof window === 'undefined' ? '' : localStorage.getItem('bitrix_member_id') || '';
+  const memberId = useKanbanStore((state) => state.memberId);
 
   const loadHistory = useCallback(async () => {
     if (!memberId) return;
@@ -119,10 +118,14 @@ export default function Notifications() {
         <div className="max-h-96 overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => {
-              const href =
-                item.projectId && item.taskId
+              // Проект в событии есть не всегда (883 записи из 3870 без него),
+              // а задача есть почти везде: без проекта открываем её в общем
+              // списке, иначе уведомление просто не кликалось.
+              const href = item.taskId
+                ? item.projectId && item.projectId !== '0'
                   ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
-                  : null;
+                  : `/all-tasks?task=${encodeURIComponent(item.taskId)}`
+                : null;
               const row = (
                 <>
                   <span className="mt-0.5">{icon(item.type)}</span>

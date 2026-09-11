@@ -159,6 +159,10 @@ interface KanbanStore {
   // Восстановление из localStorage (вызывать в useEffect чтобы избежать hydration mismatch)
   rehydrateFromStorage: () => void;
   setMemberId: (id: string) => void;
+  // member_id держим в сторе, а не только в localStorage: компоненты читали
+  // его на первом рендере и, если он появлялся позже, так и оставались с
+  // пустым значением (колокольчик уведомлений не подписывался на события).
+  memberId: string;
 
   // Computed
   getFilteredTasks: () => BxTask[];
@@ -235,6 +239,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   selectedTaskId: null,
   currentUser: { id: '', name: 'Не определён' },
   stagesLoadedFor: null,
+  memberId: '',
   allTasks: [],
   isLoadingAllTasks: false,
   allTasksTotal: 0,
@@ -928,6 +933,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     try {
       const data = persist.loadFromStorage();
       set({
+        memberId: localStorage.getItem('bitrix_member_id') || get().memberId,
         projects: data.projects || [],
         users: data.users || [],
         currentUser: data.currentUser || get().currentUser,
@@ -945,6 +951,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   setMemberId: (id: string) => {
     if (typeof window === 'undefined') return;
     if (id) localStorage.setItem('bitrix_member_id', id);
+    if (id !== get().memberId) set({ memberId: id });
   },
 
   createTask: async (data) => {

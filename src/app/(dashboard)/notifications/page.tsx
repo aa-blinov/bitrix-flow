@@ -82,10 +82,14 @@ export default function NotificationsPage() {
         ) : items.length ? (
           <div className="space-y-2">
             {items.map((item) => {
-              const href =
-                item.projectId && item.taskId
+              // Проект в событии есть не всегда (883 записи из 3870 без него),
+              // а задача есть почти везде: без проекта открываем её в общем
+              // списке, иначе уведомление просто не кликалось.
+              const href = item.taskId
+                ? item.projectId && item.projectId !== '0'
                   ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
-                  : null;
+                  : `/all-tasks?task=${encodeURIComponent(item.taskId)}`
+                : null;
               const createdAt = item.created_at || item.createdAt;
               const typeLabel = noticeLabel(item.type);
               const titleIncludesType = item.title

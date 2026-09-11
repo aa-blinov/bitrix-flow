@@ -8,10 +8,7 @@ import { useSSE } from '@/hooks/useSSE';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const rehydrate = useKanbanStore((s) => s.rehydrateFromStorage);
   const setMemberId = useKanbanStore((s) => s.setMemberId);
-  const memberId = useKanbanStore((s) => {
-    if (typeof window === 'undefined') return '';
-    return localStorage.getItem('bitrix_member_id') || '';
-  });
+  const memberId = useKanbanStore((s) => s.memberId);
 
   useEffect(() => {
     rehydrate();
@@ -42,13 +39,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })
       .then((response) => response.json())
       .then((data) => {
+        // Единственный надёжный источник member_id: сессия. В localStorage он
+        // появляется только после OAuth-редиректа, а без него молчали и
+        // уведомления, и подписка на события.
+        if (data.member_id) setMemberId(data.member_id);
         if (data.session && !data.connected) {
           const next = `${window.location.pathname}${window.location.search}`;
           router.replace(`/connect?next=${encodeURIComponent(next)}`);
         }
       })
       .catch(() => {});
-  }, [pathname, router]);
+  }, [pathname, router, setMemberId]);
 
   useSSE(memberId, (event) => {
     if (

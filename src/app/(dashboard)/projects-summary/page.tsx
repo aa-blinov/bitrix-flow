@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useKanbanStore } from '@/store/kanban';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -52,7 +53,7 @@ export default function ProjectsSummaryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [calculatedAt, setCalculatedAt] = useState('');
-  const [memberId, setMemberId] = useState('');
+  const memberId = useKanbanStore((state) => state.memberId);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [dateField, setDateField] = useState<'changed' | 'created'>('changed');
@@ -92,7 +93,6 @@ export default function ProjectsSummaryPage() {
   }, []);
 
   useEffect(() => {
-    setMemberId(localStorage.getItem('bitrix_member_id') || '');
     void load();
     return () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
