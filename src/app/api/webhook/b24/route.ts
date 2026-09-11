@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { removeTask } from '@/lib/task-mirror';
 import { getDb } from '@/lib/mongo';
 
 // Bitrix24 шлет события сюда когда что-то меняется
@@ -57,11 +58,7 @@ async function handleTaskChange(memberId: string, taskData: any) {
 }
 
 async function handleTaskDelete(memberId: string, taskData: any) {
-  const db = await getDb();
-  await db.collection('tasks').deleteOne({
-    id: taskData.ID,
-    member_id: memberId,
-  });
+  await removeTask(memberId, String(taskData.ID));
 
   await notifySubscribers(memberId, {
     type: 'task_delete',

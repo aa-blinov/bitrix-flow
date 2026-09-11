@@ -14,12 +14,23 @@ function parentId(task: any) {
   return String(task?.parentId || task?.parent_id || task?.PARENT_ID || '');
 }
 
+// Удалённая задача должна исчезнуть из обеих коллекций: список склеивает
+// task_mirror и tasks, поэтому запись, снесённая только в одной, возвращалась
+// призраком из второй.
+export async function removeTask(memberId: string, id: string) {
+  const db = await getDb();
+  await Promise.all([
+    db.collection('task_mirror').deleteMany({ member_id: memberId, id }),
+    db.collection('tasks').deleteMany({ id }),
+  ]);
+}
+
 export async function syncTaskMirror(memberId: string, id: string, event: string) {
   if (!id) return;
   const db = await getDb();
   const mirror = db.collection('task_mirror');
   if (event === 'ONTASKDELETE') {
-    await mirror.deleteOne({ member_id: memberId, id });
+    await removeTask(memberId, id);
     return;
   }
   const response = await bx24OAuth(memberId, 'tasks.task.get', { taskId: id });
