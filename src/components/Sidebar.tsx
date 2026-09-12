@@ -382,7 +382,7 @@ export default function Sidebar() {
         size="icon-lg"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Открыть меню"
-        className="fixed right-4 bottom-4 z-40 size-14 rounded-full border-border bg-background text-foreground shadow-xl md:hidden dark:bg-popover"
+        className="fixed right-4 bottom-4 z-40 size-14 rounded-full border-border bg-background text-foreground shadow-xl lg:hidden dark:bg-popover"
       >
         <Menu size={26} strokeWidth={2.5} />
       </Button>
@@ -392,7 +392,7 @@ export default function Sidebar() {
           side="left"
           showCloseButton={false}
           aria-label="Меню навигации"
-          className="w-[86vw] max-w-sm p-0 md:hidden"
+          className="w-[86vw] max-w-sm p-0 lg:hidden"
           onOpenAutoFocus={(event) => event.preventDefault()}
         >
           {SidebarContent()}
@@ -400,7 +400,8 @@ export default function Sidebar() {
       </Sheet>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r bg-background md:flex">
+      {/* Постоянное меню — с 1024px: на планшете в портрете 256px съедали доску. */}
+      <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r bg-background lg:flex">
         {SidebarContent()}
       </aside>
 
