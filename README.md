@@ -46,6 +46,16 @@ records are hashed and stored in MongoDB, so logging out revokes the current dev
 3. Add a remote and push only after reviewing `git diff --cached`.
 4. Put deployment values in GitHub/hosting secrets, never in repository variables or workflow files.
 
+### Backups
+
+```bash
+./scripts/backup-mongo.sh          # dump into ./backups, keeps 14 days
+KEEP_DAYS=30 ./scripts/backup-mongo.sh
+```
+
+Schedule it from the host's cron; the dump is a gzipped archive restorable with
+`mongorestore --archive --gzip`. `backups/` is git-ignored.
+
 ### Health and monitoring
 
 `GET /api/health` answers without a session and pings MongoDB, so `docker compose ps` shows

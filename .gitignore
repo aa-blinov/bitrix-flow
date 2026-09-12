@@ -52,3 +52,4 @@ next-env.d.ts
 # stray screenshots dropped in the repo root
 Снимок экрана*.png
 Screenshot*.png
+backups/

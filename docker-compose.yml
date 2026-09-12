@@ -1,8 +1,15 @@
+x-logging: &logging # Без ротации journald/json-файлы растут до заполнения диска.
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
 services:
   app:
     build:
       context: .
     restart: unless-stopped
+    logging: *logging
     env_file:
       - .env.local
     environment:
@@ -30,6 +37,7 @@ services:
       context: .
       dockerfile: caddy.Dockerfile
     restart: unless-stopped
+    logging: *logging
     ports:
       - '80:80'
       - '443:443'
