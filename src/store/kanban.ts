@@ -1,14 +1,6 @@
 import { create } from 'zustand';
 import { bitrixTaskTags, extractTaskTags } from '@/lib/task-tags';
-import {
-  BxTask,
-  BxComment,
-  TimeEntry,
-  TaskStatus,
-  TaskFilters,
-  DashboardStats,
-  Bx24User,
-} from '@/types/bitrix';
+import { BxTask, BxComment, TimeEntry, TaskStatus, DashboardStats, Bx24User } from '@/types/bitrix';
 import * as persist from './persist';
 import {
   fetchTasksByProject,
@@ -47,6 +39,16 @@ import {
   getMemberId,
 } from '@/lib/bitrix24';
 import { mapBitrixTaskStatus } from '@/lib/task-status';
+import {
+  EMPTY_FILTERS,
+  splitValues,
+  type FilterFieldKey,
+  type FilterValues,
+} from '@/lib/task-filters';
+
+// Битрикс принимает одного исполнителя, поэтому мультивыбор сужаем до первого:
+// остальное отфильтрует /api/tasks/all, откуда доска и список и берут данные.
+const singleFilterValue = (value: string) => splitValues(value, 'all')[0];
 
 function getMemberIdHeader(): Record<string, string> {
   const id = getMemberId();
@@ -90,8 +92,13 @@ interface KanbanStore {
   allTasksTotal: number;
   hasMoreAllTasks: boolean;
 
-  // Фильтры
-  filters: TaskFilters;
+  // Фильтры: один набор на список и доску, чтобы переключение вида их не сбрасывало
+  taskFilters: FilterValues;
+  taskSearch: string;
+  /** Экран, для которого набран текущий фильтр: при смене страницы сбрасываем. */
+  taskFiltersScope: string;
+  /** Раскрытая строка фильтров тоже общая: вид переключается без скачка. */
+  filtersPanelOpen: boolean;
 
   // Поиск
   searchQuery: string;
@@ -132,7 +139,12 @@ interface KanbanStore {
   loadSubtasks: (parentId: string) => Promise<void>;
   loadTaskDetails: (taskId: string) => Promise<void>;
   loadTaskById: (taskId: string) => Promise<BxTask | null>;
-  setFilters: (filters: Partial<TaskFilters>) => void;
+  setTaskFilter: (key: FilterFieldKey, value: string) => void;
+  setTaskFilters: (values: FilterValues) => void;
+  setTaskSearch: (value: string) => void;
+  setFiltersPanelOpen: (open: boolean) => void;
+  /** Ставит фильтры экрана, если он сменился; иначе оставляет набранное. */
+  enterFilterScope: (scope: string, values: FilterValues) => void;
   search: (query: string) => Promise<void>;
   toggleSearch: () => void;
   updateTaskField: (id: string, field: string, value: any) => Promise<void>;
@@ -216,17 +228,6 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
 // Один общий запрос проектов на все одновременные вызовы loadProjects.
 let inFlightProjects: Promise<void> | null = null;
 
-const defaultFilters: TaskFilters = {
-  search: '',
-  assigneeId: '',
-  tag: '',
-  priority: '',
-  status: '',
-  hasDeadline: false,
-  overdue: false,
-  showCompleted: true, // По умолчанию показываем завершённые
-};
-
 // Кэш поднимается в DashboardLayout после гидратации. Не читаем localStorage
 // при инициализации стора: сервер и первый клиентский рендер должны совпадать.
 export const useKanbanStore = create<KanbanStore>((set, get) => ({
@@ -244,7 +245,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   isLoadingAllTasks: false,
   allTasksTotal: 0,
   hasMoreAllTasks: false,
-  filters: defaultFilters,
+  taskFilters: EMPTY_FILTERS,
+  taskSearch: '',
+  taskFiltersScope: '',
+  filtersPanelOpen: false,
   searchQuery: '',
   searchResults: [],
   isSearching: false,
@@ -263,7 +267,6 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       selectedProjectId: id,
       tasks: [],
       hasMoreTasks: false,
-      filters: defaultFilters,
       stages: cachedStages,
       isLoading: Boolean(id),
     });
@@ -420,7 +423,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   loadTasks: async (groupId?: string | boolean, reset: boolean = true) => {
-    const { selectedProjectId, filters } = get();
+    const { selectedProjectId, taskFilters } = get();
     const projectId = typeof groupId === 'string' ? groupId : selectedProjectId;
 
     if (!projectId) return;
@@ -434,8 +437,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         // Hiding them made a fully completed project look empty.
         status: 'all',
         filter: {
-          responsibleId: filters.assigneeId || undefined,
-          priority: filters.priority || undefined,
+          responsibleId: singleFilterValue(taskFilters.assignee),
+          priority: taskFilters.priority === 'all' ? undefined : taskFilters.priority,
         },
       });
 
@@ -484,7 +487,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   loadMoreTasks: async () => {
-    const { isLoadingMore, hasMoreTasks, selectedProjectId, tasks, filters } = get();
+    const { isLoadingMore, hasMoreTasks, selectedProjectId, tasks, taskFilters } = get();
     if (isLoadingMore || !hasMoreTasks || !selectedProjectId) return;
 
     set({ isLoadingMore: true });
@@ -495,8 +498,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         offset: tasks.length,
         status: 'all',
         filter: {
-          responsibleId: filters.assigneeId || undefined,
-          priority: filters.priority || undefined,
+          responsibleId: singleFilterValue(taskFilters.assignee),
+          priority: taskFilters.priority === 'all' ? undefined : taskFilters.priority,
         },
       });
 
@@ -627,9 +630,15 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
   },
 
-  setFilters: (newFilters) => {
-    set((state) => ({ filters: { ...state.filters, ...newFilters } }));
-    get().loadTasks(true);
+  setTaskFilter: (key, value) => {
+    set((state) => ({ taskFilters: { ...state.taskFilters, [key]: value } }));
+  },
+  setTaskFilters: (values) => set({ taskFilters: values }),
+  setTaskSearch: (value) => set({ taskSearch: value }),
+  setFiltersPanelOpen: (open) => set({ filtersPanelOpen: open }),
+  enterFilterScope: (scope, values) => {
+    if (get().taskFiltersScope === scope) return;
+    set({ taskFiltersScope: scope, taskFilters: values, taskSearch: '' });
   },
 
   search: async (query: string) => {
@@ -972,24 +981,20 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   getFilteredTasks: () => {
-    const { tasks, filters, selectedProjectId } = get();
+    const { tasks, taskFilters, taskSearch, selectedProjectId } = get();
+    const assignees = splitValues(taskFilters.assignee, 'all');
+    const needle = taskSearch.trim().toLocaleLowerCase('ru');
     return tasks.filter((t) => {
       if (selectedProjectId && t.projectId !== selectedProjectId) return false;
-      if (!filters.showCompleted && t.status === 'done') return false;
-      if (filters.assigneeId && t.assigneeId !== filters.assigneeId) return false;
-      if (
-        filters.search &&
-        !`${t.title} ${t.description} ${t.id}`
-          .toLocaleLowerCase('ru')
-          .includes(filters.search.toLocaleLowerCase('ru'))
-      )
+      if (taskFilters.hideDone === 'on' && t.status === 'done') return false;
+      if (assignees.length && !assignees.includes(t.assigneeId || '')) return false;
+      if (needle && !`${t.title} ${t.description} ${t.id}`.toLocaleLowerCase('ru').includes(needle))
         return false;
-      if (filters.priority && t.priority !== filters.priority) return false;
-      if (filters.hasDeadline && !t.dueDate) return false;
-      if (filters.overdue && t.dueDate) {
-        const deadline = new Date(t.dueDate);
-        const now = new Date();
-        if (deadline >= now || t.status === 'done') return false;
+      if (taskFilters.priority === 'high' && t.priority !== 'high') return false;
+      if (taskFilters.deadline === 'has' && !t.dueDate) return false;
+      if (taskFilters.deadline === 'none' && t.dueDate) return false;
+      if (taskFilters.deadline === 'overdue') {
+        if (!t.dueDate || t.status === 'done' || new Date(t.dueDate) >= new Date()) return false;
       }
       return true;
     });

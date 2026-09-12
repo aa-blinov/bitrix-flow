@@ -1,6 +1,15 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { PRIORITY_LABELS, BxTask, Bx24User } from '@/types/bitrix';
+import { PRIORITY_LABELS, STATUS_LABELS, BxTask, Bx24User } from '@/types/bitrix';
+import TaskFilterBar from '@/components/TaskFilterBar';
+import {
+  EMPTY_FILTERS,
+  filterQueryParams,
+  initialFilterValues,
+  taskFilterFields,
+  taskFilterPresets,
+  type FilterFieldKey,
+} from '@/lib/task-filters';
 import {
   useCallback,
   useDeferredValue,
@@ -127,8 +136,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     renameStage,
     isLoading,
     stagesLoadedFor,
-    filters,
-    setFilters,
+    taskFilters,
+    taskSearch,
+    setTaskFilter,
+    setTaskFilters,
+    setTaskSearch,
+    enterFilterScope,
     users,
     projects,
     currentUser,
@@ -153,6 +166,14 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [pathname, router, searchParams, setSelectedTask]);
+
+  // Доска и список проекта делят один набор фильтров: входим в тот же scope,
+  // тогда переключение вида их не сбрасывает, а смена проекта — сбрасывает.
+  const statusFromUrl = searchParams.get('status') || 'all';
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    enterFilterScope(`project:${selectedProjectId}`, initialFilterValues(statusFromUrl));
+  }, [enterFilterScope, selectedProjectId, statusFromUrl]);
 
   const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
   // Добавляем дефолтные системные стадии
@@ -186,7 +207,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const allStages = (stages.length > 0 ? stages : stagesReady ? defaultStages : [])
     .slice()
     .sort((a, b) => a.sort - b.sort);
-  const deferredSearch = useDeferredValue(filters.search);
+  const deferredSearch = useDeferredValue(taskSearch);
   // Список тегов проекта — тот же источник, что у списка задач.
   const [boardTags, setBoardTags] = useState<Array<{ tag: string; label: string; count: number }>>(
     [],
@@ -228,16 +249,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         },
       }));
       const params = new URLSearchParams({
+        // Те же параметры, что шлёт список: фильтры общие, значит и запрос один.
+        ...filterQueryParams(taskFilters),
         page: String(page),
         limit: String(KANBAN_PAGE_SIZE),
         projectId: selectedProjectId,
         stageId,
         query: deferredSearch,
-        assigneeId: filters.assigneeId || 'all',
-        tag: filters.tag || 'all',
-        priority: filters.priority || 'all',
-        hasDeadline: String(filters.hasDeadline),
-        status: filters.overdue ? 'overdue' : filters.showCompleted ? 'all' : 'active',
         sortKey: kanbanSort === 'urgency' ? 'deadline' : kanbanSort,
         sortDirection: 'asc',
       });
@@ -273,17 +291,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         }));
       }
     },
-    [
-      deferredSearch,
-      filters.assigneeId,
-      filters.hasDeadline,
-      filters.overdue,
-      filters.priority,
-      filters.showCompleted,
-      filters.tag,
-      kanbanSort,
-      selectedProjectId,
-    ],
+    [deferredSearch, taskFilters, kanbanSort, selectedProjectId],
   );
   useEffect(() => {
     if (!selectedProjectId || !stageKey) return;
@@ -324,7 +332,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     );
   }
 
-  const [showFilters, setShowFilters] = useState(false);
+  const showFilters = useKanbanStore((state) => state.filtersPanelOpen);
+  const setShowFilters = useKanbanStore((state) => state.setFiltersPanelOpen);
+  const [activePreset, setActivePreset] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
@@ -373,14 +383,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     );
   }
 
-  const activeFiltersCount = [
-    filters.assigneeId,
-    filters.tag,
-    filters.priority,
-    filters.hasDeadline,
-    filters.overdue,
-    !filters.showCompleted,
-  ].filter(Boolean).length;
+  const activeFiltersCount = Object.entries(taskFilters).filter(
+    ([key, value]) => value !== EMPTY_FILTERS[key as FilterFieldKey],
+  ).length;
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     setDraggedTask(taskId);
@@ -502,103 +507,35 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     setIsCreatingStage(false);
   };
 
-  // Одна разметка на два места: инлайн-панель на десктопе и шторка на телефоне,
-  // как в списке задач.
+  // Ровно та же строка фильтров, что в списке задач: поля, пресеты и чипы
+  // общие, состояние — одно на оба вида.
   const filterControls = (
-    <>
-      <Select
-        value={filters.assigneeId}
-        onValueChange={(value) => setFilters({ assigneeId: value === 'all' ? '' : value })}
-      >
-        <SelectTrigger className={toolbarSelect}>
-          <SelectValue placeholder="Все исполнители" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все исполнители</SelectItem>
-          {users.map((u) => (
-            <SelectItem key={u.id} value={u.id}>
-              {u.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Как и в списке: контрол на месте всегда, пустой — просто неактивен. */}
-      <Select
-        value={filters.tag || 'all'}
-        onValueChange={(value) => setFilters({ tag: value === 'all' ? '' : value })}
-        disabled={boardTags.length === 0}
-      >
-        <SelectTrigger className={toolbarSelect} aria-label="Тег">
-          <SelectValue placeholder={boardTags.length ? 'Все теги' : 'Тегов нет'} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все теги</SelectItem>
-          {boardTags.map((item) => (
-            <SelectItem key={item.tag} value={item.tag}>
-              {item.label} ({item.count})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Button
-        variant={filters.priority === 'high' ? 'secondary' : 'outline'}
-        size="sm"
-        className={toolbarControl}
-        onClick={() => setFilters({ priority: filters.priority === 'high' ? '' : 'high' })}
-      >
-        Высокий приоритет
-      </Button>
-
-      <Button
-        variant={filters.overdue ? 'destructive' : 'outline'}
-        size="sm"
-        className={toolbarControl}
-        onClick={() => setFilters({ overdue: !filters.overdue })}
-      >
-        Просрочено
-      </Button>
-
-      <Button
-        variant={filters.hasDeadline ? 'secondary' : 'outline'}
-        size="sm"
-        className={toolbarControl}
-        onClick={() => setFilters({ hasDeadline: !filters.hasDeadline })}
-      >
-        С дедлайном
-      </Button>
-
-      <Button
-        variant={!filters.showCompleted ? 'secondary' : 'outline'}
-        size="sm"
-        className={toolbarControl}
-        onClick={() => setFilters({ showCompleted: !filters.showCompleted })}
-      >
-        {filters.showCompleted ? 'Скрыть завершённые' : 'Показать завершённые'}
-      </Button>
-
-      {activeFiltersCount > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
-          onClick={() =>
-            setFilters({
-              search: '',
-              assigneeId: '',
-              tag: '',
-              priority: '',
-              hasDeadline: false,
-              overdue: false,
-              showCompleted: true,
-            })
-          }
-        >
-          Сбросить
-        </Button>
-      )}
-    </>
+    <TaskFilterBar
+      fields={taskFilterFields({
+        users,
+        tags: boardTags,
+        statusLabels: STATUS_LABELS,
+      })}
+      values={taskFilters}
+      presets={taskFilterPresets(currentUser.id)}
+      activePreset={activePreset}
+      onChange={(key, value) => {
+        setActivePreset('');
+        setTaskFilter(key, value);
+      }}
+      onApplyPreset={(preset) => {
+        const next = activePreset === preset.id ? null : preset;
+        setActivePreset(next ? next.id : '');
+        setTaskFilters({ ...EMPTY_FILTERS, ...(next?.values ?? {}) });
+      }}
+      onReset={() => {
+        setActivePreset('');
+        setTaskFilters(EMPTY_FILTERS);
+        setTaskSearch('');
+        if (isMobile) setShowFilters(false);
+      }}
+      stacked={isMobile}
+    />
   );
 
   return (
@@ -624,8 +561,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             </SelectContent>
           </Select>
           <Input
-            value={filters.search}
-            onChange={(event) => setFilters({ search: event.target.value })}
+            value={taskSearch}
+            onChange={(event) => setTaskSearch(event.target.value)}
             placeholder="Поиск задач…"
             className={`${toolbarControl} w-48 shrink-0 bg-background`}
             aria-label="Поиск задач на доске"

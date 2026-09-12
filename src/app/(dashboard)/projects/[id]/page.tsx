@@ -425,6 +425,7 @@ export default function ProjectPage() {
             title={null}
             loadPage={loadGridPage}
             tagsProjectId={projectId}
+            filterScope={`project:${projectId}`}
             toolbarLeading={
               isNoProject ? null : (
                 <TabsList className="h-8 p-0">
