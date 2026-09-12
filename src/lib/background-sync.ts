@@ -13,7 +13,7 @@ import { getDb } from './mongo';
 
 const POLL_INTERVAL_MS = 60_000; // 60 сек между полными проходами
 const FIRST_RUN_DELAY_MS = 15_000; // первый проход после старта сервера
-const RECONCILE_EVERY_MS = 60 * 60_000; // полная сверка состава раз в час
+const RECONCILE_EVERY_MS = 10 * 60_000; // полная сверка состава раз в 10 минут
 const OVERLAP_MS = 2 * 60_000; // перехлёст окна, чтобы не терять правки на границе прохода
 const LOOKBACK_MS = 5 * 60_000; // первый запуск смотрит на 5 мин назад, чтобы поймать задачи, изменённые пока сервер лежал
 const PAGE_SIZE = 50; // Bitrix24 tasks.task.list возвращает максимум 50 за раз
@@ -145,6 +145,7 @@ async function syncMember(memberId: string, since: Date): Promise<void> {
   if (updated.length === 0) return;
 
   await upsertTasks(memberId, updated);
+  await markSummaryStale(memberId);
   console.log(`[task-sync] обновлено задач: ${updated.length} (с ${since.toISOString()})`);
 
   // Клиентам сообщаем по проектам: доска слушает свой projectId.
@@ -179,14 +180,19 @@ async function fetchChanged(memberId: string, since: Date): Promise<any[]> {
   let start = 0;
   // На всякий случай — защита от бесконечного цикла (макс 1000 задач за проход)
   for (let page = 0; page < 20; page += 1) {
-    const data = await bx24OAuth(memberId, 'tasks.task.list', {
-      'filter[>=CHANGED_DATE]': since.toISOString(),
-      // '*' сохраняет весь набор полей по умолчанию, TAGS добавляет штатные
-      // теги задачи — без него зеркало о них не знает.
-      'select[0]': '*',
-      'select[1]': 'TAGS',
-      start: String(start),
-    });
+    const data = await bx24OAuth(
+      memberId,
+      'tasks.task.list',
+      {
+        'filter[>=CHANGED_DATE]': since.toISOString(),
+        // '*' сохраняет весь набор полей по умолчанию, TAGS добавляет штатные
+        // теги задачи — без него зеркало о них не знает.
+        'select[0]': '*',
+        'select[1]': 'TAGS',
+        start: String(start),
+      },
+      { parallel: true },
+    );
     const batch = data?.result?.tasks || data?.tasks || [];
     if (!Array.isArray(batch) || batch.length === 0) break;
     allTasks.push(...batch);
@@ -199,8 +205,8 @@ async function fetchChanged(memberId: string, since: Date): Promise<any[]> {
 // Изменения ловятся по CHANGED_DATE, а удаление даты не меняет: задача просто
 // исчезает из Битрикса. Вебхук ONTASKDELETE её убирает, но если он потерялся
 // (или задачу удалили, пока сервер лежал), запись остаётся навсегда — на
-// проверке 300 задач зеркала таких призраков нашлось 52. Раз в час сверяем
-// состав и подчищаем.
+// проверке 300 задач зеркала таких призраков нашлось 52. Поэтому регулярно
+// сверяем состав и подчищаем: 40 запросов по 50 id на пару тысяч задач.
 async function reconcileDeleted(memberId: string): Promise<void> {
   const db = await getDb();
   const alive = new Set<string>();
@@ -208,10 +214,12 @@ async function reconcileDeleted(memberId: string): Promise<void> {
   for (let page = 0; page < 200; page += 1) {
     let data: any;
     try {
-      data = await bx24OAuth(memberId, 'tasks.task.list', {
-        'select[0]': 'ID',
-        start: String(start),
-      });
+      data = await bx24OAuth(
+        memberId,
+        'tasks.task.list',
+        { 'select[0]': 'ID', start: String(start) },
+        { parallel: true },
+      );
     } catch (e) {
       // Неполный список — не повод удалять: пропускаем сверку до следующего раза.
       console.error('[task-sync] reconcile aborted', memberId, e);
@@ -233,7 +241,22 @@ async function reconcileDeleted(memberId: string): Promise<void> {
     db.collection('task_mirror').deleteMany({ member_id: memberId, id: { $in: stale } }),
     db.collection('tasks').deleteMany({ id: { $in: stale } }),
   ]);
+  await markSummaryStale(memberId);
   console.log(`[task-sync] удалено задач, которых больше нет в Битриксе: ${stale.length}`);
+}
+
+// Сводка проектов живёт отдельным снимком и пересчитывается, только когда её
+// пометили устаревшей. Делал это лишь вебхук, поэтому при потере события
+// сводка могла показывать вчерашние числа сколь угодно долго.
+async function markSummaryStale(memberId: string): Promise<void> {
+  try {
+    const db = await getDb();
+    await db
+      .collection('project_summary_snapshots')
+      .updateOne({ member_id: memberId }, { $set: { stale: true, stale_at: new Date() } });
+  } catch (e) {
+    console.error('[task-sync] не удалось пометить сводку устаревшей', e);
+  }
 }
 
 async function upsertTasks(memberId: string, tasks: any[]): Promise<void> {

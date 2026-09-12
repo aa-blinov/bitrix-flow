@@ -53,6 +53,9 @@ export async function bx24OAuth(
   member_id: string,
   method: string,
   params: Record<string, any> | unknown[] = {},
+  // Гонку по нескольким адресам портала включаем только для чтения: часть
+  // адресов регулярно не отвечает, и одиночная попытка роняла фоновый проход.
+  options: { parallel?: boolean } = {},
 ): Promise<any> {
   const db = await getDb();
   const token = await db.collection('user_tokens').findOne({ member_id });
@@ -64,6 +67,7 @@ export async function bx24OAuth(
       `https://${token.domain}/rest/${method}?auth=${accessToken}`,
       params,
       Array.isArray(params),
+      options.parallel === true,
     );
 
   let data = await call(token.access_token);

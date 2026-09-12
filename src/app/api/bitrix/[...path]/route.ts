@@ -39,6 +39,17 @@ async function mongoTasksCacheRead(
 
   try {
     const db = await getDb();
+    // Кэш живёт ровно до следующего прохода поллера. Раньше проверки свежести
+    // не было вовсе: если фоновая синхронизация отставала (а она умела молчать
+    // часами), клиент бесконечно получал старый список и обойти это не мог.
+    const freshest = await db
+      .collection('tasks')
+      .find({ groupId })
+      .sort({ updated_at: -1 })
+      .limit(1)
+      .toArray();
+    const updatedAt = freshest[0]?.updated_at ? new Date(freshest[0].updated_at).getTime() : 0;
+    if (Date.now() - updatedAt > TASKS_CACHE_MAX_AGE_MS) return null;
     if (since) {
       const docs = await db.collection('tasks').find({ groupId }).toArray();
       if (docs.length === 0) return null;
@@ -107,6 +118,8 @@ const CACHE_TTL = 30 * 1000; // 30 секунд для задач
 const PROJECTS_TTL = 5 * 60 * 1000; // 5 минут для проектов/пользователей
 const BITRIX24_TIMEOUT_MS = 12_000;
 const TASK_DETAILS_TTL = 60 * 1000;
+// Поллер обходит задачи раз в минуту, даём запас на длительность прохода.
+const TASKS_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 
 const MUTATION_METHODS = new Set([
   'tasks.task.add',
@@ -157,6 +170,37 @@ function getBitrixResult(method: string, data: any) {
   }
 
   return data.result;
+}
+
+// id задачи из параметров мутации: у разных методов он лежит по-разному.
+function mutatedTaskId(params: Record<string, string>, result: any): string {
+  const candidates = [
+    params.taskId,
+    params.TASKID,
+    params.taskID,
+    params.id,
+    params.ID,
+    result?.task?.id,
+    result?.task?.ID,
+  ];
+  const found = candidates.find((value) => value !== undefined && value !== null && value !== '');
+  return found ? String(found) : '';
+}
+
+async function refreshMirrorAfterMutation(
+  memberId: string,
+  method: string,
+  params: Record<string, string>,
+  result: any,
+): Promise<void> {
+  const taskId = mutatedTaskId(params, result);
+  if (!taskId) return;
+  const { syncTaskMirror, removeTask } = await import('@/lib/task-mirror');
+  if (method === 'tasks.task.delete') {
+    await removeTask(memberId, taskId);
+    return;
+  }
+  await syncTaskMirror(memberId, taskId, 'ONTASKUPDATE');
 }
 
 async function handleRequest(req: NextRequest, method: string) {
@@ -295,6 +339,10 @@ async function handleRequest(req: NextRequest, method: string) {
     if (MUTATION_METHODS.has(method)) {
       result = await callBitrix24(token, method, params);
       invalidateByPrefix(`${memberId}:`);
+      // Зеркало узнавало о правке только от вебхука или следующего прохода
+      // поллера, поэтому сразу после сохранения перезагруженная страница
+      // показывала старое значение. Обновляем задачу точечно.
+      void refreshMirrorAfterMutation(memberId, method, params, result).catch(() => {});
     } else {
       // ponytail: на холодном старте serverCache пуст, и каждый запрос летит
       // в Битрикс напрямую (10+ проектов × 200-800мс = секунды на первый рендер).
