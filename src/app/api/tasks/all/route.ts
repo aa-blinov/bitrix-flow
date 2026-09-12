@@ -86,6 +86,11 @@ export async function GET(req: NextRequest) {
   // Срок отдельным полем: раньше «просрочено» и «без дедлайна» жили внутри
   // статуса, поэтому «в работе и просрочено» выбрать было нельзя.
   const deadlineFilter = req.nextUrl.searchParams.get('deadline') || 'all';
+  const createdWithin = req.nextUrl.searchParams.get('created') || 'all';
+  const changedWithin = req.nextUrl.searchParams.get('changed') || 'all';
+  // Переработка: по факту потрачено больше, чем планировали.
+  const overrun = req.nextUrl.searchParams.get('overrun') === 'true';
+  const taskKind = req.nextUrl.searchParams.get('kind') || 'all';
   const priority = req.nextUrl.searchParams.get('priority') || 'all';
   const hasDeadline = req.nextUrl.searchParams.get('hasDeadline') === 'true';
   const hideDone = req.nextUrl.searchParams.get('hideDone') === 'true';
@@ -172,6 +177,37 @@ export async function GET(req: NextRequest) {
   };
   if (deadlineFilter !== 'all') {
     filter.$and = [...(filter.$and || []), ...deadlineConditions(deadlineFilter)];
+  }
+  // Периоды считаем от начала сегодняшнего дня: «за неделю» — это семь полных
+  // дней плюс текущий, а не «минус 168 часов от сейчас».
+  const sinceDays: Record<string, number> = { today: 0, week: 7, month: 30 };
+  const periodStart = (value: string) => {
+    if (!(value in sinceDays)) return null;
+    const start = new Date(today);
+    start.setDate(start.getDate() - sinceDays[value]);
+    return start;
+  };
+  const createdFrom = periodStart(createdWithin);
+  if (createdFrom) filter.$and = [...(filter.$and || []), { createdAt: { $gte: createdFrom } }];
+  const changedFrom = periodStart(changedWithin);
+  if (changedFrom) filter.$and = [...(filter.$and || []), { changedAt: { $gte: changedFrom } }];
+  if (overrun) {
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $expr: {
+          $and: [{ $gt: ['$estimate', 0] }, { $gt: ['$actual', '$estimate'] }],
+        },
+      },
+    ];
+  }
+  if (taskKind === 'subtask' || taskKind === 'root') {
+    // Корневая задача у Битрикса — parentId «0», пусто или отсутствует.
+    const isRoot = { $in: [{ $ifNull: ['$parent', '0'] }, ['0', 0, '', null]] };
+    filter.$and = [
+      ...(filter.$and || []),
+      { $expr: taskKind === 'root' ? isRoot : { $not: isRoot } },
+    ];
   }
   if (hideDone) filter.rawStatus = { $ne: '5' };
   if (status === 'active') filter.rawStatus = { $ne: '5' };

@@ -149,12 +149,3 @@ export interface TaskFilters {
   overdue: boolean;
   showCompleted: boolean;
 }
-
-export interface DashboardStats {
-  total: number;
-  completed: number;
-  inProgress: number;
-  overdue: number;
-  totalEstimate: number;
-  totalActual: number;
-}

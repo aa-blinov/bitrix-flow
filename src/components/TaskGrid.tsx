@@ -178,13 +178,8 @@ type SavedView = {
   id: string;
   name: string;
   config: {
-    // Старая раскладка полей: вью, сохранённые до объединения фильтров.
-    statusFilter: string;
-    assigneeFilter: string;
-    projectFilter: string;
-    tagFilter?: string;
-    hideDone: boolean;
-    filters?: Partial<FilterValues>;
+    // Плоские поля старых вью приводит к этому виду /api/task-views.
+    filters: FilterValues;
     groupBy: GroupBy;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
@@ -636,7 +631,7 @@ const TaskActions = memo(function TaskActions({
 });
 
 export default function TaskGrid({
-  tasks: initialTasks,
+  tasks: initialTasks = [],
   showProject = false,
   title,
   initialStatus = 'all',
@@ -653,7 +648,7 @@ export default function TaskGrid({
   totalCount,
   loadPage,
 }: {
-  tasks: BxTask[];
+  tasks?: BxTask[];
   showProject?: boolean;
   title?: string | null;
   initialStatus?: string;
@@ -1166,16 +1161,9 @@ export default function TaskGrid({
     const view = views.find((item) => item.id === id);
     if (!view) return;
     const config = view.config;
-    setFilters({
-      ...EMPTY_FILTERS,
-      ...(config.filters || {}),
-      // Вью, сохранённые до объединения фильтров в один объект.
-      status: config.filters?.status ?? config.statusFilter,
-      assignee: config.filters?.assignee ?? config.assigneeFilter,
-      project: config.filters?.project ?? config.projectFilter,
-      tag: config.filters?.tag ?? config.tagFilter ?? 'all',
-      hideDone: config.filters?.hideDone ?? (config.hideDone ? 'on' : 'off'),
-    });
+    setFilters({ ...EMPTY_FILTERS, ...config.filters });
+    // Иначе применённое вью видно только по счётчику у свёрнутой панели.
+    setShowFilters(true);
     setGroupBy(config.groupBy);
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
@@ -1187,13 +1175,7 @@ export default function TaskGrid({
     if (!name || !viewScope) return;
     const config = {
       filters,
-      // Дублируем в старых полях, чтобы вью открывалось и на прежней версии.
-      statusFilter,
-      assigneeFilter,
-      projectFilter,
-      tagFilter,
       groupBy,
-      hideDone,
       sorts,
       visibleColumns,
       columnWidths,

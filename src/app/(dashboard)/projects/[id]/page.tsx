@@ -92,7 +92,6 @@ export default function ProjectPage() {
         isArchived: false,
       } as (typeof projects)[number])
     : projects.find((p) => p.id === projectId);
-  const getFilteredTasks = useKanbanStore((state) => state.getFilteredTasks);
   const projectTasks = useMemo(
     () => tasks.filter((t) => t.projectId === projectId),
     [tasks, projectId],
@@ -120,7 +119,6 @@ export default function ProjectPage() {
       setSelectedTask(null);
     };
   }, [projectId, setSelectedTask]);
-  const visibleTasks = getFilteredTasks();
   const loadGridPage = useCallback(
     async (request: TaskGridPageQuery) => {
       const params = new URLSearchParams({
@@ -418,7 +416,6 @@ export default function ProjectPage() {
         </TabsContent>
         <TabsContent value="grid" className="mt-0 w-full min-w-0">
           <TaskGrid
-            tasks={visibleTasks}
             initialGroupBy="stage"
             initialStatus={initialStatus}
             layoutScope="projects"

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { bitrixTaskTags, extractTaskTags } from '@/lib/task-tags';
-import { BxTask, BxComment, TimeEntry, TaskStatus, DashboardStats, Bx24User } from '@/types/bitrix';
+import { BxTask, BxComment, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
 import * as persist from './persist';
 import {
   fetchTasksByProject,
@@ -179,11 +179,6 @@ interface KanbanStore {
   memberId: string;
 
   // Computed
-  getFilteredTasks: () => BxTask[];
-  getDashboardStats: () => DashboardStats;
-  getMyTasks: () => BxTask[];
-  getOverdueTasks: () => BxTask[];
-  getGlobalCounts: () => { overdue: number; in_progress: number; done: number };
 }
 
 export function convertBxTask(bxTask: Bx24Task): BxTask {
@@ -1006,67 +1001,5 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       console.error('Failed to create task:', err);
       return null;
     }
-  },
-
-  getFilteredTasks: () => {
-    const { tasks, taskFilters, taskSearch, selectedProjectId } = get();
-    const assignees = splitValues(taskFilters.assignee, 'all');
-    const needle = taskSearch.trim().toLocaleLowerCase('ru');
-    return tasks.filter((t) => {
-      if (selectedProjectId && t.projectId !== selectedProjectId) return false;
-      if (taskFilters.hideDone === 'on' && t.status === 'done') return false;
-      if (assignees.length && !assignees.includes(t.assigneeId || '')) return false;
-      if (needle && !`${t.title} ${t.description} ${t.id}`.toLocaleLowerCase('ru').includes(needle))
-        return false;
-      if (taskFilters.priority === 'high' && t.priority !== 'high') return false;
-      if (taskFilters.deadline === 'has' && !t.dueDate) return false;
-      if (taskFilters.deadline === 'none' && t.dueDate) return false;
-      if (taskFilters.deadline === 'overdue') {
-        if (!t.dueDate || t.status === 'done' || new Date(t.dueDate) >= new Date()) return false;
-      }
-      return true;
-    });
-  },
-
-  getDashboardStats: () => {
-    const tasks = get().getFilteredTasks();
-    return {
-      total: tasks.length,
-      completed: tasks.filter((t) => t.status === 'done').length,
-      inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-      overdue: tasks.filter((t) => {
-        if (!t.dueDate || t.status === 'done') return false;
-        return new Date(t.dueDate) < new Date();
-      }).length,
-      totalEstimate: tasks.reduce((sum, t) => sum + t.estimate, 0),
-      totalActual: tasks.reduce((sum, t) => sum + t.actualTime, 0),
-    };
-  },
-
-  getMyTasks: () => {
-    const { allTasks, currentUser } = get();
-    return allTasks.filter((task) => String(task.assigneeId) === String(currentUser.id));
-  },
-
-  getOverdueTasks: () => {
-    const tasks = get().getFilteredTasks();
-    return tasks.filter((t) => {
-      if (!t.dueDate || t.status === 'done') return false;
-      return new Date(t.dueDate) < new Date();
-    });
-  },
-
-  // Глобальные счётчики по всем доступным задачам (allTasks).
-  // Используются в сайдбаре, чтобы статусы «Просрочено / В работе / Готово»
-  // совпадали с тем, что видит пользователь на /all-tasks.
-  getGlobalCounts: () => {
-    const now = new Date();
-    const all = get().allTasks;
-    return {
-      overdue: all.filter((t) => t.dueDate && t.status !== 'done' && new Date(t.dueDate) < now)
-        .length,
-      in_progress: all.filter((t) => t.status === 'in_progress').length,
-      done: all.filter((t) => t.status === 'done').length,
-    };
   },
 }));

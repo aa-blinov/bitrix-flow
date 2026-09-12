@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
+import { viewFilters } from '@/lib/task-filters';
 
 async function member(req: NextRequest) {
   return getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
@@ -18,7 +19,21 @@ export async function GET(req: NextRequest) {
     .find({ memberId, scope })
     .sort({ name: 1 })
     .toArray();
-  return NextResponse.json({ views: views.map(({ _id, memberId: _, ...view }) => view) });
+  // Старые вью хранили фильтры плоскими полями: отдаём всем один формат,
+  // чтобы клиенту не приходилось помнить обе раскладки.
+  return NextResponse.json({
+    views: views.map(({ _id, memberId: _, config, ...view }) => {
+      const {
+        statusFilter: _s,
+        assigneeFilter: _a,
+        projectFilter: _p,
+        tagFilter: _t,
+        hideDone: _h,
+        ...rest
+      } = config || {};
+      return { ...view, config: { ...rest, filters: viewFilters(config) } };
+    }),
+  });
 }
 
 export async function POST(req: NextRequest) {

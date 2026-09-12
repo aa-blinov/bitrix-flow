@@ -57,7 +57,6 @@ function MyTasksInner() {
           <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
         ) : (
           <TaskGrid
-            tasks={[]}
             showProject
             initialStatus={initialStatus}
             initialAssigneeId={currentUser.id}

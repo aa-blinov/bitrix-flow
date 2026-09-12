@@ -13,6 +13,10 @@ export type FilterFieldKey =
   | 'stage'
   | 'tag'
   | 'priority'
+  | 'created'
+  | 'changed'
+  | 'overrun'
+  | 'kind'
   | 'hideDone';
 
 export type FilterOption = { value: string; label: string; hint?: string };
@@ -50,6 +54,10 @@ export const EMPTY_FILTERS: FilterValues = {
   stage: 'all',
   tag: 'all',
   priority: 'all',
+  created: 'all',
+  changed: 'all',
+  overrun: 'off',
+  kind: 'all',
   hideDone: 'off',
 };
 
@@ -59,7 +67,7 @@ export function splitValues(value: string, empty: string): string[] {
 }
 
 /** Имена параметров /api/tasks/all для каждого поля фильтра. */
-const QUERY_KEYS: Record<Exclude<FilterFieldKey, 'hideDone'>, string> = {
+const QUERY_KEYS: Record<Exclude<FilterFieldKey, 'hideDone' | 'overrun'>, string> = {
   status: 'status',
   deadline: 'deadline',
   assignee: 'assigneeId',
@@ -70,10 +78,16 @@ const QUERY_KEYS: Record<Exclude<FilterFieldKey, 'hideDone'>, string> = {
   stage: 'stageId',
   tag: 'tag',
   priority: 'priority',
+  created: 'created',
+  changed: 'changed',
+  kind: 'kind',
 };
 
 export function filterQueryParams(filters: FilterValues): Record<string, string> {
-  const params: Record<string, string> = { hideDone: String(filters.hideDone === 'on') };
+  const params: Record<string, string> = {
+    hideDone: String(filters.hideDone === 'on'),
+    overrun: String(filters.overrun === 'on'),
+  };
   for (const [key, name] of Object.entries(QUERY_KEYS)) {
     params[name] = filters[key as FilterFieldKey] ?? 'all';
   }
@@ -175,6 +189,43 @@ export function taskFilterFields({
       ],
     },
     {
+      key: 'created',
+      label: 'Создана',
+      empty: 'all',
+      options: [
+        { value: 'today', label: 'Сегодня' },
+        { value: 'week', label: 'За неделю' },
+        { value: 'month', label: 'За месяц' },
+      ],
+    },
+    {
+      key: 'changed',
+      label: 'Изменена',
+      empty: 'all',
+      options: [
+        { value: 'today', label: 'Сегодня' },
+        { value: 'week', label: 'За неделю' },
+        { value: 'month', label: 'За месяц' },
+      ],
+    },
+    {
+      key: 'kind',
+      label: 'Тип задачи',
+      empty: 'all',
+      options: [
+        { value: 'root', label: 'Только корневые' },
+        { value: 'subtask', label: 'Только подзадачи' },
+      ],
+    },
+    {
+      // Факт больше плана: где оценка не сошлась с реальностью.
+      key: 'overrun',
+      label: 'Переработка',
+      empty: 'off',
+      toggle: true,
+      options: [{ value: 'on', label: 'Переработка' }],
+    },
+    {
       key: 'hideDone',
       label: 'Скрыть закрытые',
       empty: 'off',
@@ -216,5 +267,29 @@ export function initialFilterValues(
     deadline,
     assignee,
     project,
+  };
+}
+
+/**
+ * Сохранённые вью до объединения фильтров держали плоские поля
+ * (statusFilter/assigneeFilter/...). Приводим их к общему набору один раз — в
+ * API, чтобы клиент знал только актуальный формат.
+ */
+export function viewFilters(config: Record<string, unknown> | null | undefined): FilterValues {
+  const saved = (config?.filters as Partial<FilterValues>) || {};
+  const legacy = (key: string) =>
+    typeof config?.[key] === 'string' ? (config[key] as string) : undefined;
+  // Старый «статус» держал в себе и срок («week», «overdue»): раскладываем той
+  // же функцией, что разбирает ссылки, иначе чип показал бы сырое значение.
+  const legacyStatus = initialFilterValues(legacy('statusFilter') || EMPTY_FILTERS.status);
+  return {
+    ...EMPTY_FILTERS,
+    ...saved,
+    status: saved.status ?? legacyStatus.status,
+    deadline: saved.deadline ?? legacyStatus.deadline,
+    assignee: saved.assignee ?? legacy('assigneeFilter') ?? EMPTY_FILTERS.assignee,
+    project: saved.project ?? legacy('projectFilter') ?? EMPTY_FILTERS.project,
+    tag: saved.tag ?? legacy('tagFilter') ?? EMPTY_FILTERS.tag,
+    hideDone: saved.hideDone ?? (config?.hideDone ? 'on' : EMPTY_FILTERS.hideDone),
   };
 }

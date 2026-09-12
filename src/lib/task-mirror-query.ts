@@ -116,8 +116,25 @@ export const normalizedTaskFields = {
       onNull: '0',
     },
   },
-  estimate: { $ifNull: ['$data.timeEstimate', '$data.TIME_ESTIMATE'] },
-  actual: { $ifNull: ['$data.timeSpentInLogs', '$data.TIME_SPENT_IN_LOGS'] },
+  // Битрикс отдаёт часы строкой («108000»), а Mongo сравнивает строку с числом
+  // по типу, а не по значению: без приведения «факт больше плана» срабатывало
+  // почти на всех задачах, и сортировка по часам шла лексикографически.
+  estimate: {
+    $convert: {
+      input: { $ifNull: ['$data.timeEstimate', '$data.TIME_ESTIMATE'] },
+      to: 'double',
+      onError: 0,
+      onNull: 0,
+    },
+  },
+  actual: {
+    $convert: {
+      input: { $ifNull: ['$data.timeSpentInLogs', '$data.TIME_SPENT_IN_LOGS'] },
+      to: 'double',
+      onError: 0,
+      onNull: 0,
+    },
+  },
   comments: { $ifNull: ['$data.commentsCount', '$data.COMMENTS_COUNT'] },
   parent: { $ifNull: ['$data.parentId', '$data.PARENT_ID'] },
   // Штатные теги приходят объектом id -> { id, title }; нам нужны названия.
@@ -168,6 +185,12 @@ export async function taskMirrorStages(memberId: string) {
         $set: {
           deadlineDate: {
             $convert: { input: '$deadline', to: 'date', onError: null, onNull: null },
+          },
+          createdAt: {
+            $convert: { input: '$createdDate', to: 'date', onError: null, onNull: null },
+          },
+          changedAt: {
+            $convert: { input: '$changedDate', to: 'date', onError: null, onNull: null },
           },
         },
       },
