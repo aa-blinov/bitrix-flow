@@ -1,5 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import {
   LayoutDashboard,
   ListChecks,
@@ -252,6 +253,28 @@ export default function Sidebar() {
               <LoadingState className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (
               <>
+                {/* Задачи вне проектов иначе не увидеть: в Bitrix у них нет
+                    ни группы, ни страницы. */}
+                {!projectQuery && (
+                  <Link
+                    href={`/projects/${NO_PROJECT_ID}`}
+                    prefetch={false}
+                    onClick={closeMobile}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                      pathname === `/projects/${NO_PROJECT_ID}`
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <span
+                      className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      —
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{NO_PROJECT_NAME}</span>
+                  </Link>
+                )}
                 {activeProjects.map((project) => {
                   const active = pathname === `/projects/${project.id}`;
                   return (

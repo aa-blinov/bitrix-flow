@@ -1,5 +1,6 @@
 'use client';
 import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
@@ -43,6 +44,8 @@ export default function ProjectPage() {
   const notificationTaskId = searchParams.get('task');
   const initialStatus = searchParams.get('status') || 'all';
   const [view, setView] = useState(() => (searchParams.get('view') === 'grid' ? 'grid' : 'kanban'));
+  // У задач без проекта нет ни доски, ни стадий, поэтому только список.
+  const effectiveView = projectId === NO_PROJECT_ID ? 'grid' : view;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -75,7 +78,19 @@ export default function ProjectPage() {
   }, [isRehydrated, projectId, selectedProjectId, setSelectedProject]);
 
   // Computed values
-  const currentProject = projects.find((p) => p.id === projectId);
+  // Задачи вне проектов Bitrix никуда не показывает, а их 69 штук. Даём им
+  // собственную страницу с тем же списком: настоящего проекта с id 0 нет,
+  // поэтому подставляем псевдо-проект.
+  const isNoProject = projectId === NO_PROJECT_ID;
+  const currentProject = isNoProject
+    ? ({
+        id: NO_PROJECT_ID,
+        name: NO_PROJECT_NAME,
+        description: 'Задачи, не привязанные ни к одному проекту',
+        membersCount: 0,
+        isArchived: false,
+      } as (typeof projects)[number])
+    : projects.find((p) => p.id === projectId);
   const getFilteredTasks = useKanbanStore((state) => state.getFilteredTasks);
   const projectTasks = useMemo(
     () => tasks.filter((t) => t.projectId === projectId),
@@ -296,11 +311,13 @@ export default function ProjectPage() {
                   <p className="font-semibold">{totalActual.toFixed(1)} ч</p>
                 </div>
               </div>
+              {/* У псевдо-проекта нечего настраивать: это не сущность Bitrix */}
               <Button
                 variant="ghost"
                 size="icon-sm"
                 title="Настройки проекта"
                 aria-label="Настройки проекта"
+                className={isNoProject ? 'hidden' : undefined}
                 onClick={() => {
                   setName(currentProject.name);
                   setDescription(currentProject.description);
@@ -384,7 +401,7 @@ export default function ProjectPage() {
         </DialogContent>
       </Dialog>
 
-      <Tabs value={view} onValueChange={setView} className="w-full min-w-0 pb-6">
+      <Tabs value={effectiveView} onValueChange={setView} className="w-full min-w-0 pb-6">
         <TabsContent value="kanban" className="mt-0 w-full min-w-0">
           <KanbanBoard
             toolbar={
@@ -411,16 +428,18 @@ export default function ProjectPage() {
             loadPage={loadGridPage}
             tagsProjectId={projectId}
             toolbarLeading={
-              <TabsList className="h-8 p-0">
-                <TabsTrigger value="kanban" className="h-full">
-                  <Columns3 className="size-4" />
-                  Канбан
-                </TabsTrigger>
-                <TabsTrigger value="grid" className="h-full">
-                  <TableProperties className="size-4" />
-                  Список
-                </TabsTrigger>
-              </TabsList>
+              isNoProject ? null : (
+                <TabsList className="h-8 p-0">
+                  <TabsTrigger value="kanban" className="h-full">
+                    <Columns3 className="size-4" />
+                    Канбан
+                  </TabsTrigger>
+                  <TabsTrigger value="grid" className="h-full">
+                    <TableProperties className="size-4" />
+                    Список
+                  </TabsTrigger>
+                </TabsList>
+              )
             }
           />
         </TabsContent>

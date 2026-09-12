@@ -57,6 +57,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -564,11 +565,13 @@ const ProjectField = memo(function ProjectField({
       .filter((project) => !project.isArchived)
       .map((project) => ({ value: project.id, label: project.name })),
   ];
-  if (readOnly)
-    return <>{projects.find((project) => project.id === task.projectId)?.name ?? '—'}</>;
+  const label =
+    projects.find((project) => project.id === task.projectId)?.name ??
+    (task.projectId && task.projectId !== NO_PROJECT_ID ? '—' : NO_PROJECT_NAME);
+  if (readOnly) return <>{label}</>;
   return (
     <InlineSelect
-      label={projects.find((project) => project.id === task.projectId)?.name ?? '—'}
+      label={label}
       value={task.projectId || 'none'}
       options={options}
       onChange={(value) => value !== 'none' && void moveTaskToProject(task.id, value)}
@@ -1357,6 +1360,7 @@ export default function TaskGrid({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Все проекты</SelectItem>
+            <SelectItem value={NO_PROJECT_ID}>{NO_PROJECT_NAME}</SelectItem>
             {projects.map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.name}

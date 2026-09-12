@@ -23,12 +23,28 @@ export const normalizedTaskFields = {
       onNull: '',
     },
   },
+  // У задачи вне проекта Bitrix отдаёт group пустым массивом, а $ifNull массив
+  // за null не считает — $convert падал, и groupId выходил пустой строкой
+  // вместо '0'. Из-за этого задачи без проекта не находились ни одним фильтром.
   groupId: {
-    $convert: {
-      input: { $ifNull: ['$data.group.id', { $ifNull: ['$data.groupId', '$data.GROUP_ID'] }] },
-      to: 'string',
-      onError: '',
-      onNull: '',
+    $let: {
+      vars: {
+        raw: {
+          $cond: [
+            { $eq: [{ $type: '$data.group' }, 'object'] },
+            '$data.group.id',
+            { $ifNull: ['$data.groupId', '$data.GROUP_ID'] },
+          ],
+        },
+      },
+      in: {
+        $let: {
+          vars: {
+            text: { $convert: { input: '$$raw', to: 'string', onError: '0', onNull: '0' } },
+          },
+          in: { $cond: [{ $eq: ['$$text', ''] }, '0', '$$text'] },
+        },
+      },
     },
   },
   groupName: {

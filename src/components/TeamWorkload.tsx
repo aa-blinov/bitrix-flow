@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useRouter } from 'next/navigation';
 import {
   ChevronLeft,
@@ -361,6 +362,7 @@ export default function TeamWorkload() {
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="all">Все проекты</SelectItem>
+                  <SelectItem value={NO_PROJECT_ID}>{NO_PROJECT_NAME}</SelectItem>
                   {projects
                     .filter((project) => !project.isArchived)
                     .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
