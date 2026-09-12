@@ -58,6 +58,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
+import TaskFilterBar, {
+  type FilterField,
+  type FilterFieldKey,
+  type FilterPreset,
+  type FilterValues,
+} from '@/components/TaskFilterBar';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -152,6 +158,7 @@ export type TaskGridPageQuery = {
   assigneeId: string;
   projectId: string;
   tag: string;
+  priority: string;
   limit: number;
   sorts: Sort[];
 };
@@ -713,16 +720,19 @@ export default function TaskGrid({
   const isMobile = useIsMobile();
   const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [activePreset, setActivePreset] = useState('');
+  const currentUserId = useKanbanStore((state) => state.currentUser.id);
   const [draftQuery, setDraftQuery] = useState('');
-  const [draftStatusFilter, setDraftStatusFilter] = useState(initialStatus);
-  const [draftHideDone, setDraftHideDone] = useState(false);
-  const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(initialAssigneeId);
-  const [draftProjectFilter, setDraftProjectFilter] = useState(initialProjectId);
-  const [draftTagFilter, setDraftTagFilter] = useState('all');
+  // Искать по Enter неудобно: подхватываем ввод сами, с паузой на дописывание.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(draftQuery), 350);
+    return () => window.clearTimeout(timer);
+  }, [draftQuery]);
   const [availableTags, setAvailableTags] = useState<
     Array<{ tag: string; label: string; count: number }>
   >([]);
-  const [draftGroupBy, setDraftGroupBy] = useState<GroupBy>(initialGroupBy);
+
   const [showFilters, setShowFilters] = useState(false);
   const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -766,11 +776,12 @@ export default function TaskGrid({
     );
   };
   const activeFilterCount = [
-    draftStatusFilter !== 'all',
-    draftHideDone,
-    draftAssigneeFilter !== 'all',
-    showProject && draftProjectFilter !== 'all',
-    draftTagFilter !== 'all',
+    statusFilter !== 'all',
+    hideDone,
+    assigneeFilter !== 'all',
+    showProject && projectFilter !== 'all',
+    tagFilter !== 'all',
+    priorityFilter !== 'all',
   ].filter(Boolean).length;
   const orderedTasks = useMemo(() => {
     if (loadPage) return tasks;
@@ -997,15 +1008,12 @@ export default function TaskGrid({
 
   useEffect(() => {
     setStatusFilter(initialStatus);
-    setDraftStatusFilter(initialStatus);
   }, [initialStatus]);
   useEffect(() => {
     setAssigneeFilter(initialAssigneeId);
-    setDraftAssigneeFilter(initialAssigneeId);
   }, [initialAssigneeId]);
   useEffect(() => {
     setProjectFilter(initialProjectId);
-    setDraftProjectFilter(initialProjectId);
   }, [initialProjectId]);
 
   // Теги подтягиваем под текущую область: проект страницы либо выбранный
@@ -1074,6 +1082,7 @@ export default function TaskGrid({
     assigneeFilter,
     groupBy,
     pageSize,
+    priorityFilter,
     projectFilter,
     query,
     sorts,
@@ -1102,6 +1111,7 @@ export default function TaskGrid({
         assigneeId: assigneeFilter,
         projectId: showProject ? projectFilter : 'all',
         tag: tagFilter,
+        priority: priorityFilter,
         limit: pageSize,
         sorts,
       })
@@ -1137,49 +1147,21 @@ export default function TaskGrid({
     statusFilter,
   ]);
 
-  const applyFilters = () => {
-    // На телефоне фильтры живут в шторке: после применения её надо убрать,
-    // иначе результат остаётся за ней.
-    if (isMobile) setShowFilters(false);
-    setQuery(draftQuery);
-    setStatusFilter(draftStatusFilter);
-    setHideDone(draftHideDone);
-    setAssigneeFilter(draftAssigneeFilter);
-    setProjectFilter(draftProjectFilter);
-    setTagFilter(draftTagFilter);
-    setGroupBy(draftGroupBy);
-  };
   const resetFilters = () => {
     if (isMobile) setShowFilters(false);
-    setDraftQuery('');
-    setDraftStatusFilter('all');
-    setDraftHideDone(false);
-    setDraftAssigneeFilter('all');
-    setDraftProjectFilter('all');
-    setDraftTagFilter('all');
     setQuery('');
+    setDraftQuery('');
     setStatusFilter('all');
     setHideDone(false);
     setAssigneeFilter('all');
     setProjectFilter('all');
     setTagFilter('all');
+    setPriorityFilter('all');
+    setActivePreset('');
   };
-  const filtersDirty =
-    draftQuery !== query ||
-    draftStatusFilter !== statusFilter ||
-    draftHideDone !== hideDone ||
-    draftAssigneeFilter !== assigneeFilter ||
-    draftProjectFilter !== projectFilter ||
-    draftTagFilter !== tagFilter;
   const applyView = (id: string) => {
     if (id === 'default') {
       setActiveViewId('');
-      setDraftStatusFilter(initialStatus);
-      setDraftHideDone(false);
-      setDraftAssigneeFilter('all');
-      setDraftProjectFilter('all');
-      setDraftTagFilter('all');
-      setDraftGroupBy('none');
       setStatusFilter(initialStatus);
       setHideDone(false);
       setAssigneeFilter('all');
@@ -1196,12 +1178,6 @@ export default function TaskGrid({
     const view = views.find((item) => item.id === id);
     if (!view) return;
     const config = view.config;
-    setDraftStatusFilter(config.statusFilter);
-    setDraftHideDone(config.hideDone);
-    setDraftAssigneeFilter(config.assigneeFilter);
-    setDraftProjectFilter(config.projectFilter);
-    setDraftTagFilter(config.tagFilter || 'all');
-    setDraftGroupBy(config.groupBy);
     setStatusFilter(config.statusFilter);
     setHideDone(config.hideDone);
     setAssigneeFilter(config.assigneeFilter);
@@ -1217,12 +1193,12 @@ export default function TaskGrid({
     const name = viewName.trim();
     if (!name || !viewScope) return;
     const config = {
-      statusFilter: draftStatusFilter,
-      assigneeFilter: draftAssigneeFilter,
-      projectFilter: draftProjectFilter,
-      tagFilter: draftTagFilter,
-      groupBy: draftGroupBy,
-      hideDone: draftHideDone,
+      statusFilter,
+      assigneeFilter,
+      projectFilter,
+      tagFilter,
+      groupBy,
+      hideDone,
       sorts,
       visibleColumns,
       columnWidths,
@@ -1311,108 +1287,115 @@ export default function TaskGrid({
   );
 
   const isReadOnly = showProject;
-  // Одна разметка на два места: инлайн-панель на десктопе и шторка на телефоне.
+  // Поля конструктора описываем ровно теми значениями, которые понимает
+  // /api/tasks/all: иначе фильтр обещал бы то, чего сервер не умеет.
+  const filterFields: FilterField[] = [
+    {
+      key: 'status',
+      label: 'Статус',
+      empty: 'all',
+      options: [
+        { value: 'active', label: 'Активные' },
+        { value: 'attention', label: 'Требуют внимания' },
+        { value: 'week', label: 'Дедлайн на неделе' },
+        { value: 'no_deadline', label: 'Без дедлайна' },
+        { value: 'overdue', label: 'Просрочено' },
+        ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+      ],
+    },
+    {
+      key: 'assignee',
+      label: 'Исполнитель',
+      empty: 'all',
+      options: users.map((user) => ({ value: user.id, label: user.name })),
+    },
+    ...(showProject
+      ? [
+          {
+            key: 'project' as const,
+            label: 'Проект',
+            empty: 'all',
+            options: [
+              { value: NO_PROJECT_ID, label: NO_PROJECT_NAME },
+              ...projects.map((project) => ({ value: project.id, label: project.name })),
+            ],
+          },
+        ]
+      : []),
+    {
+      key: 'tag',
+      label: 'Тег',
+      empty: 'all',
+      options: availableTags.map((item) => ({
+        value: item.tag,
+        label: item.label,
+        hint: `(${item.count})`,
+      })),
+    },
+    {
+      key: 'priority',
+      label: 'Приоритет',
+      empty: 'all',
+      options: [{ value: 'high', label: 'Высокий' }],
+    },
+    {
+      key: 'hideDone',
+      label: 'Скрыть закрытые',
+      empty: 'off',
+      toggle: true,
+      options: [{ value: 'on', label: 'Скрыть закрытые' }],
+    },
+  ];
+
+  const filterValues: FilterValues = {
+    status: statusFilter,
+    assignee: assigneeFilter,
+    project: projectFilter,
+    tag: tagFilter,
+    priority: priorityFilter,
+    deadline: 'all',
+    hideDone: hideDone ? 'on' : 'off',
+  };
+
+  const setFilterValue = (key: FilterFieldKey, value: string) => {
+    setActivePreset('');
+    if (key === 'status') setStatusFilter(value);
+    else if (key === 'assignee') setAssigneeFilter(value);
+    else if (key === 'project') setProjectFilter(value);
+    else if (key === 'tag') setTagFilter(value);
+    else if (key === 'priority') setPriorityFilter(value);
+    else if (key === 'hideDone') setHideDone(value === 'on');
+  };
+
+  // Шорткаты: то, что спрашивают каждый день, одним нажатием.
+  const filterPresets: FilterPreset[] = [
+    { id: 'mine', label: 'Мои', values: { assignee: currentUserId || 'all' } },
+    { id: 'overdue', label: 'Просроченные', values: { status: 'overdue' } },
+    { id: 'week', label: 'На неделе', values: { status: 'week' } },
+    { id: 'no_deadline', label: 'Без срока', values: { status: 'no_deadline' } },
+  ];
+
+  const applyPreset = (preset: FilterPreset) => {
+    const next = activePreset === preset.id ? null : preset;
+    setActivePreset(next ? next.id : '');
+    setStatusFilter(next?.values.status ?? 'all');
+    setAssigneeFilter(next?.values.assignee ?? 'all');
+    setTagFilter(next?.values.tag ?? 'all');
+    setPriorityFilter(next?.values.priority ?? 'all');
+    if (!next) setHideDone(false);
+  };
+
   const filterControls = (
-    <>
-      <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm dark:bg-input/30 dark:hover:bg-input/50">
-        <Checkbox
-          checked={draftHideDone}
-          onCheckedChange={(value) => setDraftHideDone(value === true)}
-          aria-label="Скрыть закрытые задачи"
-        />
-        <span>Скрыть закрытые</span>
-      </label>
-      <Select value={draftStatusFilter} onValueChange={setDraftStatusFilter}>
-        <SelectTrigger className={toolbarSelect} aria-label="Статус">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все задачи</SelectItem>
-          <SelectItem value="active">Активные задачи</SelectItem>
-          <SelectItem value="attention">Требуют внимания</SelectItem>
-          <SelectItem value="week">Дедлайн на неделе</SelectItem>
-          <SelectItem value="no_deadline">Без дедлайна</SelectItem>
-          <SelectItem value="overdue">Просрочено</SelectItem>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <SelectItem key={value} value={value}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={draftAssigneeFilter} onValueChange={setDraftAssigneeFilter}>
-        <SelectTrigger className={toolbarSelect} aria-label="Исполнитель">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все исполнители</SelectItem>
-          {users.map((user) => (
-            <SelectItem key={user.id} value={user.id}>
-              {user.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {showProject && (
-        <Select value={draftProjectFilter} onValueChange={setDraftProjectFilter}>
-          <SelectTrigger className={toolbarSelect} aria-label="Проект">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все проекты</SelectItem>
-            <SelectItem value={NO_PROJECT_ID}>{NO_PROJECT_NAME}</SelectItem>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      {/* Селект показываем всегда: пропадающий контрол читался как «фильтра
-          по тегам вообще нет», хотя он просто пустой для этого проекта. */}
-      <Select
-        value={draftTagFilter}
-        onValueChange={setDraftTagFilter}
-        disabled={availableTags.length === 0}
-      >
-        <SelectTrigger className={toolbarSelect} aria-label="Тег">
-          <SelectValue placeholder={availableTags.length ? 'Все теги' : 'Тегов нет'} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все теги</SelectItem>
-          {availableTags.map((item) => (
-            <SelectItem key={item.tag} value={item.tag}>
-              {item.label} ({item.count})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
-        variant="secondary"
-        size="sm"
-        className={toolbarControl}
-        disabled={!filtersDirty}
-        onClick={applyFilters}
-      >
-        Применить
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className={`${toolbarControl} border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive`}
-        disabled={
-          !draftQuery &&
-          draftStatusFilter === 'all' &&
-          !draftHideDone &&
-          draftAssigneeFilter === 'all' &&
-          draftProjectFilter === 'all'
-        }
-        onClick={resetFilters}
-      >
-        Сбросить
-      </Button>
-    </>
+    <TaskFilterBar
+      fields={filterFields}
+      values={filterValues}
+      presets={filterPresets}
+      activePreset={activePreset}
+      onChange={setFilterValue}
+      onApplyPreset={applyPreset}
+      onReset={resetFilters}
+      stacked={isMobile}
+    />
   );
 
   return (
@@ -1469,7 +1452,7 @@ export default function TaskGrid({
               value={draftQuery}
               onChange={(event) => setDraftQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') applyFilters();
+                if (event.key === 'Enter') setQuery(draftQuery);
               }}
               placeholder="Поиск задач…"
               className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
@@ -1514,11 +1497,10 @@ export default function TaskGrid({
             </DropdownMenu>
             <select
               aria-label="Группировка"
-              value={draftGroupBy}
+              value={groupBy}
               onChange={(event) => {
                 const value = event.target.value;
                 if (!isGroupBy(value)) return;
-                setDraftGroupBy(value);
                 setGroupBy(value);
               }}
               className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"

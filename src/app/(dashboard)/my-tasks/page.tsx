@@ -26,6 +26,7 @@ function MyTasksInner() {
       hideDone: String(request.hideDone),
       assigneeId: request.assigneeId,
       tag: request.tag,
+      priority: request.priority,
       projectId: request.projectId,
       sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
     });

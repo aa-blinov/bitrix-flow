@@ -130,6 +130,7 @@ export default function ProjectPage() {
         hideDone: String(request.hideDone),
         assigneeId: request.assigneeId,
         tag: request.tag,
+        priority: request.priority,
         projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
       });
