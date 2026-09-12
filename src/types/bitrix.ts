@@ -99,17 +99,17 @@ export const PRIORITY_LABELS: Record<
   },
   medium: {
     label: 'Обычный',
-    color: 'text-blue-700 dark:text-blue-300',
+    color: 'text-blue-800 dark:text-blue-300',
     bgColor: 'bg-blue-500/15',
   },
   high: {
     label: 'Высокий',
-    color: 'text-orange-700 dark:text-orange-300',
+    color: 'text-orange-800 dark:text-orange-300',
     bgColor: 'bg-orange-500/15',
   },
   critical: {
     label: 'Критический',
-    color: 'text-red-700 dark:text-red-300',
+    color: 'text-red-800 dark:text-red-300',
     bgColor: 'bg-red-500/15',
   },
 };

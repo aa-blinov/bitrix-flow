@@ -78,24 +78,27 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
+// Белые инициалы на заливке -500 давали контраст 2.5–4.1 (sky, emerald, lime и
+// прочие светлые цвета), поэтому берём ту же схему, что у иконок проектов:
+// мягкая подложка и тёмный текст.
 function getAvatarColor(name: string): string {
   const colors = [
-    'bg-rose-500',
-    'bg-pink-500',
-    'bg-fuchsia-500',
-    'bg-purple-500',
-    'bg-violet-500',
-    'bg-indigo-500',
-    'bg-blue-500',
-    'bg-sky-500',
-    'bg-cyan-500',
-    'bg-teal-500',
-    'bg-emerald-500',
-    'bg-green-500',
-    'bg-lime-500',
-    'bg-yellow-500',
-    'bg-amber-500',
-    'bg-orange-500',
+    'bg-rose-500/20 text-rose-800 dark:text-rose-200',
+    'bg-pink-500/20 text-pink-800 dark:text-pink-200',
+    'bg-fuchsia-500/20 text-fuchsia-800 dark:text-fuchsia-200',
+    'bg-purple-500/20 text-purple-800 dark:text-purple-200',
+    'bg-violet-500/20 text-violet-800 dark:text-violet-200',
+    'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200',
+    'bg-blue-500/20 text-blue-800 dark:text-blue-200',
+    'bg-sky-500/20 text-sky-800 dark:text-sky-200',
+    'bg-cyan-500/20 text-cyan-800 dark:text-cyan-200',
+    'bg-teal-500/20 text-teal-800 dark:text-teal-200',
+    'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200',
+    'bg-green-500/20 text-green-800 dark:text-green-200',
+    'bg-lime-500/20 text-lime-800 dark:text-lime-200',
+    'bg-yellow-500/20 text-yellow-800 dark:text-yellow-200',
+    'bg-amber-500/20 text-amber-800 dark:text-amber-200',
+    'bg-orange-500/20 text-orange-800 dark:text-orange-200',
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -729,7 +732,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       aria-label="Название фазы"
                     />
                   ) : (
-                    <h3
+                    <h2
                       className="flex-1 cursor-text text-sm font-semibold text-foreground"
                       onDoubleClick={() => {
                         setEditingStageId(stage.id);
@@ -737,7 +740,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       }}
                     >
                       {stage.name}
-                    </h3>
+                    </h2>
                   )}
                   <span className="text-xs font-medium text-muted-foreground">
                     {colTasks.length}
@@ -818,7 +821,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             >
               <div className="flex items-center gap-2 border-b px-3 py-2.5">
                 <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                <h3 className="flex-1 text-sm font-semibold text-foreground">Без фазы</h3>
+                <h2 className="flex-1 text-sm font-semibold text-foreground">Без фазы</h2>
                 <span className="text-xs font-medium text-muted-foreground">
                   {orphanTasks.length}
                 </span>
@@ -1027,7 +1030,7 @@ function InlineAddForm({
           if (e.key === 'Escape') onCancel();
         }}
         placeholder="Название задачи…"
-        className="h-8 text-sm"
+        className="h-10 text-sm sm:h-8"
         disabled={submitting}
       />
       <div className="mt-2 flex items-center gap-1">
@@ -1163,13 +1166,13 @@ function TaskCard({
 
       {/* Title and description indicator share one row so the icon never changes card height. */}
       <div className="mb-2 flex items-start gap-1">
-        <h4
+        <h3
           className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
             isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
           }`}
         >
           {task.title}
-        </h4>
+        </h3>
         {task.description && (
           <AlignLeft className="mt-0.5 shrink-0 text-muted-foreground" size={14} />
         )}
@@ -1218,7 +1221,7 @@ function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string 
   if (!avatarUrl || imageFailed) {
     return (
       <div
-        className={`flex size-6 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${getAvatarColor(name)} text-[10px] font-semibold text-white`}
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${getAvatarColor(name)} text-[10px] font-semibold`}
         title={name}
       >
         {getInitials(name)}

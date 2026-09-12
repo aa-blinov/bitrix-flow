@@ -12,15 +12,20 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'BitrixFlow',
+  // %s подставляет заголовок страницы: вкладки перестают быть одинаковыми.
+  title: { default: 'BitrixFlow', template: '%s · BitrixFlow' },
   description: 'BitrixFlow — управление задачами, проектами и процессами Bitrix24.',
   applicationName: 'BitrixFlow',
+  // Данные портала за логином: поисковикам тут делать нечего.
+  robots: { index: false, follow: false },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  // Зум не блокируем: maximum-scale=1 ломает увеличение текста на телефоне
+  // (WCAG 1.4.4) и ничего не давало взамен.
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

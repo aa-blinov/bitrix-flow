@@ -7,7 +7,9 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxP
     <CheckboxPrimitive.Root
       data-slot="checkbox"
       className={cn(
-        'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background text-primary-foreground shadow-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary',
+        // Зона нажатия шире самой галки: на телефоне палец попадает в 36px,
+        // а рамка остаётся аккуратной.
+        'relative flex size-5 shrink-0 before:absolute before:-inset-2 before:content-[""] sm:size-4 sm:before:hidden items-center justify-center rounded border border-input bg-background text-primary-foreground shadow-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary',
         className,
       )}
       {...props}

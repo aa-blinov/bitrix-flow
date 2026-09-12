@@ -26,6 +26,17 @@ bitrix-flow.duckdns.org {
         }
         encode gzip zstd
     }
+
+    # Базовая защита прокси: HSTS, запрет угадывания типов и утечки реферера,
+    # встраивание — только в собственный домен и порталы Битрикс24.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "frame-ancestors 'self' https://*.bitrix24.ru https://*.bitrix24.com"
+        -Server
+    }
 }
 
 # cast-team's own daemon — same DuckDNS account/Caddy instance, different

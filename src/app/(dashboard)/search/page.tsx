@@ -113,7 +113,7 @@ function SearchPageContent() {
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900">{task.title}</h3>
+                      <h2 className="font-medium text-gray-900">{task.title}</h2>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         <span className="font-mono">#{task.id}</span>
                         <Badge

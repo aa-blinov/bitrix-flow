@@ -281,7 +281,9 @@ export default function ProjectPage() {
                   {currentProject.membersCount || 0} участников
                 </Button>
                 <span>Задач: {stats.total}</span>
-                <span className="text-emerald-600">Завершено: {completedTasks}</span>
+                <span className="text-emerald-700 dark:text-emerald-400">
+                  Завершено: {completedTasks}
+                </span>
               </div>
               {Boolean(overdueTasks || unassignedTasks) && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -403,7 +405,7 @@ export default function ProjectPage() {
         <TabsContent value="kanban" className="mt-0 w-full min-w-0">
           <KanbanBoard
             toolbar={
-              <TabsList className="h-8 p-0">
+              <TabsList className="h-10 p-0 sm:h-8">
                 <TabsTrigger value="kanban" className="h-full">
                   <Columns3 className="size-4" />
                   Канбан
@@ -427,7 +429,7 @@ export default function ProjectPage() {
             filterScope={`project:${projectId}`}
             toolbarLeading={
               isNoProject ? null : (
-                <TabsList className="h-8 p-0">
+                <TabsList className="h-10 p-0 sm:h-8">
                   <TabsTrigger value="kanban" className="h-full">
                     <Columns3 className="size-4" />
                     Канбан

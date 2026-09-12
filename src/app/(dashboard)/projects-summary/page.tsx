@@ -124,12 +124,12 @@ export default function ProjectsSummaryPage() {
           </Button>
         }
       />
-      <main className="space-y-3 px-4 py-4 lg:px-6">
+      <div className="space-y-3 px-4 py-4 lg:px-6">
         <Card className="overflow-hidden rounded-none bg-transparent py-0 shadow-none ring-0">
           <CardHeader className="gap-3 rounded-none border-0 bg-transparent px-0 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <Input
-                className="h-8 w-full rounded-md sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1"
+                className="h-10 w-full rounded-md sm:h-8 sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1"
                 placeholder="Найти проект…"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -140,7 +140,10 @@ export default function ProjectsSummaryPage() {
                   value={dateField}
                   onValueChange={(value) => setDateField(value as 'changed' | 'created')}
                 >
-                  <SelectTrigger className="h-8 w-32 rounded-md" aria-label="Считать по дате">
+                  <SelectTrigger
+                    className="h-10 w-32 rounded-md sm:h-8"
+                    aria-label="Считать по дате"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -160,7 +163,7 @@ export default function ProjectsSummaryPage() {
                     type="date"
                     value={fromDate}
                     onChange={(event) => setFromDate(event.target.value)}
-                    className="h-8 min-w-0 w-full rounded-md sm:w-36"
+                    className="h-10 min-w-0 w-full rounded-md sm:h-8 sm:w-36"
                     aria-label="Начальная дата периода"
                   />
                   <label htmlFor="summary-date-to" className="text-muted-foreground">
@@ -171,7 +174,7 @@ export default function ProjectsSummaryPage() {
                     type="date"
                     value={toDate}
                     onChange={(event) => setToDate(event.target.value)}
-                    className="h-8 min-w-0 w-full rounded-md sm:w-36"
+                    className="h-10 min-w-0 w-full rounded-md sm:h-8 sm:w-36"
                     aria-label="Конечная дата периода"
                   />
                 </div>
@@ -179,7 +182,7 @@ export default function ProjectsSummaryPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-8 rounded-md"
+                className="h-10 rounded-md sm:h-8"
                 onClick={() => void load(false)}
                 disabled={isLoading}
               >
@@ -188,7 +191,7 @@ export default function ProjectsSummaryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-md border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                className="h-10 rounded-md sm:h-8 border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
                 disabled={!fromDate && !toDate}
                 onClick={() => {
                   setFromDate('');
@@ -370,7 +373,7 @@ export default function ProjectsSummaryPage() {
             )}
           </p>
         )}
-      </main>
+      </div>
     </div>
   );
 }

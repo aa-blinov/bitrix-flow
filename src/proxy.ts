@@ -9,6 +9,8 @@ const PUBLIC_PATHS = new Set([
   '/api/oauth',
   '/api/oauth/check',
   '/install',
+  // Проверка живости нужна docker/мониторингу, у которых сессии нет.
+  '/api/health',
 ]);
 
 export async function proxy(request: NextRequest) {

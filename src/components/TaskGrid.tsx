@@ -1301,7 +1301,7 @@ export default function TaskGrid({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 rounded-md focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground"
+                    className="h-10 rounded-md sm:h-8 focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground"
                   >
                     {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}
                   </Button>
@@ -1339,7 +1339,7 @@ export default function TaskGrid({
                 if (event.key === 'Enter') setQuery(draftQuery);
               }}
               placeholder="Поиск задач…"
-              className="h-8 rounded-md w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
+              className="h-10 rounded-md sm:h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1387,7 +1387,7 @@ export default function TaskGrid({
                 if (!isGroupBy(value)) return;
                 setGroupBy(value);
               }}
-              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
+              className="h-10 w-40 rounded-md border border-input sm:h-8 bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
             >
               {GROUP_BY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1403,7 +1403,7 @@ export default function TaskGrid({
                 setSorts([{ key: key as SortKey, direction: direction as Sort['direction'] }]);
               }}
               aria-label="Сортировка"
-              className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 md:hidden dark:bg-input/30"
+              className="h-10 w-40 rounded-md border border-input sm:h-8 bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 md:hidden dark:bg-input/30"
             >
               {(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
                 <option key={`${column}:desc`} value={`${column}:desc`}>

@@ -105,9 +105,9 @@ export default function DashboardPage() {
       .catch(() => router.replace('/login'));
   }, [loadAllTasks, loadProjects, router]);
 
-  if (isLoading || (!selectedProjectId && !showInstallBanner)) {
-    return <LoadingState className="min-h-screen bg-muted/30" />;
-  }
+  // Спиннер во весь экран прятал и шапку: страница оставалась без заголовка,
+  // пока грузились проекты. Каркас рисуем сразу, спиннер — на месте списка.
+  const isBootstrapping = isLoading || (!selectedProjectId && !showInstallBanner);
 
   // «Без проекта» — такой же вход, как в левой панели: у портала 69 задач вне
   // групп, и без этой карточки с главной до них было не добраться.
@@ -227,58 +227,62 @@ export default function DashboardPage() {
           </CardHeader>
 
           <div className="divide-y divide-gray-100">
-            {filteredProjects.map((project) => {
-              const progressPercent =
-                project.taskCount > 0
-                  ? Math.round((project.completed / project.taskCount) * 100)
-                  : 0;
+            {isBootstrapping && <LoadingState className="min-h-60 bg-transparent" />}
+            {!isBootstrapping &&
+              filteredProjects.map((project) => {
+                const progressPercent =
+                  project.taskCount > 0
+                    ? Math.round((project.completed / project.taskCount) * 100)
+                    : 0;
 
-              return (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors group"
-                >
-                  <div
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${getProjectColor(project.name)}`}
-                    aria-hidden="true"
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors group"
                   >
-                    {getProjectInitials(project.name)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h3 className="truncate text-sm font-medium text-foreground">{project.name}</h3>
-                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>Всего: {project.taskCount} задач</span>
-                      {project.overdue > 0 && (
-                        <span className="font-medium text-destructive">
-                          Просрочено: {project.overdue}
-                        </span>
-                      )}
+                    <div
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${getProjectColor(project.name)}`}
+                      aria-hidden="true"
+                    >
+                      {getProjectInitials(project.name)}
                     </div>
-                  </div>
 
-                  <div className="hidden w-48 items-center gap-3 md:flex">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          progressPercent === 100 ? 'bg-emerald-500' : 'bg-primary'
-                        }`}
-                        style={{ width: `${progressPercent}%` }}
-                      />
+                    <div className="flex-1 min-w-0">
+                      <h2 className="truncate text-sm font-medium text-foreground">
+                        {project.name}
+                      </h2>
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>Всего: {project.taskCount} задач</span>
+                        {project.overdue > 0 && (
+                          <span className="font-medium text-destructive">
+                            Просрочено: {project.overdue}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="w-8 text-right text-xs font-medium text-muted-foreground">
-                      {progressPercent}%
-                    </span>
-                  </div>
 
-                  <ArrowRight
-                    size={16}
-                    className="text-muted-foreground transition-colors group-hover:text-foreground"
-                  />
-                </Link>
-              );
-            })}
+                    <div className="hidden w-48 items-center gap-3 md:flex">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            progressPercent === 100 ? 'bg-emerald-500' : 'bg-primary'
+                          }`}
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-xs font-medium text-muted-foreground">
+                        {progressPercent}%
+                      </span>
+                    </div>
+
+                    <ArrowRight
+                      size={16}
+                      className="text-muted-foreground transition-colors group-hover:text-foreground"
+                    />
+                  </Link>
+                );
+              })}
 
             {filteredProjects.length === 0 && !isLoading && (
               <div className="py-12 text-center text-sm text-muted-foreground">

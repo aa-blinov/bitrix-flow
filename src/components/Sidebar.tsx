@@ -229,9 +229,9 @@ export default function Sidebar() {
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Проекты ({isLoading && !projects.length ? '…' : projects.length})
-            </h3>
+            </p>
             <Button
               variant="ghost"
               size="icon-xs"

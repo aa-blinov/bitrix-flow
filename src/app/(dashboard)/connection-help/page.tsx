@@ -29,7 +29,7 @@ export default function ConnectionHelpPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-xl shadow-sm">
         <CardHeader className="border-b bg-muted/20">
           <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
@@ -88,6 +88,6 @@ export default function ConnectionHelpPage() {
           </Button>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

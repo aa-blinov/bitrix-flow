@@ -76,7 +76,7 @@ export default function NotificationsPage() {
           </Button>
         }
       />
-      <main className="mx-auto max-w-4xl p-4 lg:p-6">
+      <div className="mx-auto max-w-4xl p-4 lg:p-6">
         {loading ? (
           <LoadingState className="min-h-72 bg-transparent" />
         ) : items.length ? (
@@ -144,7 +144,7 @@ export default function NotificationsPage() {
             </CardContent>
           </Card>
         )}
-      </main>
+      </div>
     </div>
   );
 }
