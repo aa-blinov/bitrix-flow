@@ -63,6 +63,7 @@ export function startBackgroundSync(): void {
   state.intervalId = setInterval(() => {
     void syncOnce().catch((e) => console.error('[task-sync] iteration failed', e));
   }, POLL_INTERVAL_MS);
+  console.log(`[task-sync] поллер запущен, интервал ${POLL_INTERVAL_MS / 1000}с`);
 }
 
 export function getLastSyncAt(): Date {

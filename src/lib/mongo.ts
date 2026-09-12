@@ -43,23 +43,36 @@ function startSyncWorker() {
 }
 
 async function setupIndexes(database: Db) {
-  try {
-    await database.collection('cache').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-    await database.collection('projects').createIndex({ id: 1 }, { unique: true });
-    await database.collection('stages').createIndex({ entityId: 1, stageId: 1 }, { unique: true });
-    await database.collection('tasks').createIndex({ id: 1 }, { unique: true });
-    await database.collection('tasks').createIndex({ groupId: 1 });
-    await database.collection('tasks').createIndex({ member_id: 1, id: 1 });
-    await database.collection('comments').createIndex({ taskId: 1, id: 1 }, { unique: true });
-    await database.collection('time_entries').createIndex({ taskId: 1, id: 1 }, { unique: true });
-    await database.collection('task_mirror').createIndex({ member_id: 1, id: 1 }, { unique: true });
-    await database.collection('task_mirror').createIndex({ member_id: 1, project_id: 1 });
-    await database
-      .collection('task_sync_jobs')
-      .createIndex({ member_id: 1, status: 1, next_run_at: 1 });
-    await database.collection('sessions').createIndex({ session_hash: 1 }, { unique: true });
-    await database.collection('sessions').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-  } catch {}
+  // Раньше все createIndex шли одной цепочкой в try/catch {}: первая же
+  // ошибка обрывала остальные, и молча — ни лога, ни индекса.
+  const specs: Array<[string, Record<string, 1 | -1>, Record<string, unknown>?]> = [
+    ['cache', { expiresAt: 1 }, { expireAfterSeconds: 0 }],
+    ['projects', { id: 1 }, { unique: true }],
+    ['stages', { entityId: 1, stageId: 1 }, { unique: true }],
+    ['tasks', { id: 1 }, { unique: true }],
+    ['tasks', { groupId: 1 }],
+    ['tasks', { member_id: 1, id: 1 }],
+    ['comments', { taskId: 1, id: 1 }, { unique: true }],
+    ['time_entries', { taskId: 1, id: 1 }, { unique: true }],
+    ['task_mirror', { member_id: 1, id: 1 }, { unique: true }],
+    ['task_mirror', { member_id: 1, project_id: 1 }],
+    ['task_sync_jobs', { member_id: 1, status: 1, next_run_at: 1 }],
+    ['sessions', { session_hash: 1 }, { unique: true }],
+    ['sessions', { expiresAt: 1 }, { expireAfterSeconds: 0 }],
+    // Поток событий и история уведомлений росли без границ (4655 и 3976
+    // записей, ни одного индекса): SSE и колокольчик читали их полным сканом.
+    ['events_stream', { member_id: 1, _id: 1 }],
+    ['events_stream', { created_at: 1 }, { expireAfterSeconds: 2 * 24 * 60 * 60 }],
+    ['notifications', { member_id: 1, created_at: -1 }],
+    ['notifications', { created_at: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 }],
+  ];
+  for (const [collection, key, options] of specs) {
+    try {
+      await database.collection(collection).createIndex(key, options ?? {});
+    } catch (error) {
+      console.error(`[mongo] индекс ${collection} ${JSON.stringify(key)} не создан`, error);
+    }
+  }
 }
 
 export interface CachedItem<T> {
