@@ -108,21 +108,15 @@ export default function TaskFilterBar({
               <Button
                 variant="secondary"
                 size="sm"
-                className={`${toolbarControl} ${stacked ? 'w-full justify-between' : ''} gap-1.5`}
+                className={`${toolbarControl} ${stacked ? 'w-full justify-start' : ''} gap-1.5`}
                 aria-label={field.label}
               >
-                {field.toggle ? (
-                  // У переключателя значение совпадает с названием: «Скрыть
-                  // закрытые: Скрыть закрытые» читалось как ошибка.
-                  <span>{field.label}</span>
-                ) : (
-                  <>
-                    <span className="text-muted-foreground">{field.label}:</span>
-                    <span className="max-w-40 truncate">
-                      {optionLabel(field, values[field.key])}
-                    </span>
-                  </>
-                )}
+                <span className="text-muted-foreground">{field.label}:</span>
+                {/* На узком экране значение прижимаем к названию, а крестик
+                    к правому краю: иначе оно болталось посередине кнопки. */}
+                <span className={stacked ? 'flex-1 truncate text-left' : 'max-w-40 truncate'}>
+                  {optionLabel(field, values[field.key])}
+                </span>
                 <span
                   role="button"
                   tabIndex={0}
