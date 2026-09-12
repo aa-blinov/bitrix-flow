@@ -13,6 +13,14 @@ services:
       MOCK_B24: ${MOCK_B24:-0}
     expose:
       - '3000'
+    # Живость приложения, а не только контейнера: /api/health пингует Mongo,
+    # поэтому зависший коннект виден снаружи и docker перезапустит сервис.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     depends_on:
       mongodb:
         condition: service_healthy

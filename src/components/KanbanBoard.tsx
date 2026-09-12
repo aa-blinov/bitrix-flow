@@ -1104,7 +1104,9 @@ function TaskCard({
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
-      className={`cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors hover:border-border hover:shadow-sm ${
+      // Колонка держит до 50 карточек, а видно от силы шесть: content-visibility
+      // позволяет браузеру не отрисовывать то, что за пределами экрана.
+      className={`cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-border hover:shadow-sm ${
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
