@@ -4,7 +4,8 @@
 // садится чипом в строку. До этого фильтры были фиксированным рядом селектов,
 // которые занимали место даже когда не нужны, и добавить поле было нельзя.
 
-import { Check, Filter, Plus, X } from 'lucide-react';
+import { ChevronLeft, Check, Filter, Plus, X } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -86,6 +87,12 @@ export default function TaskFilterBar({
   /** На телефоне контролы идут колонкой во всю ширину. */
   stacked?: boolean;
 }) {
+  // На телефоне вложенное подменю Radix уезжало за правый край (left 370 при
+  // ширине экрана 390), поэтому там вместо него drill-down: панель показывает
+  // либо список полей, либо значения выбранного поля.
+  const [drill, setDrill] = useState<FilterFieldKey | null>(null);
+  const drillField = stacked ? fields.find((field) => field.key === drill) : undefined;
+
   const active = fields.filter((field) => values[field.key] !== field.empty);
   // В меню держим все поля, а не только незанятые: иначе после первой галочки
   // поле уходило из списка, подменю размонтировалось и отметить второе
@@ -158,7 +165,11 @@ export default function TaskFilterBar({
                 </span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
+            <DropdownMenuContent
+              align="start"
+              collisionPadding={8}
+              className={`max-h-80 overflow-y-auto ${stacked ? 'w-[calc(100vw-2rem)]' : ''}`}
+            >
               <DropdownMenuLabel>{field.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {field.options.map((option) => (
@@ -194,7 +205,7 @@ export default function TaskFilterBar({
         ),
       )}
 
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(open) => !open && setDrill(null)}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
@@ -205,52 +216,114 @@ export default function TaskFilterBar({
             Фильтр
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuLabel>Фильтровать по полю</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {available.map((field) =>
-            field.toggle ? (
+        <DropdownMenuContent
+          align="start"
+          collisionPadding={8}
+          className={stacked ? 'max-h-80 w-[calc(100vw-2rem)] overflow-y-auto' : undefined}
+        >
+          {drillField ? (
+            <>
               <DropdownMenuItem
-                key={field.key}
-                onClick={() => onChange(field.key, field.options[0]?.value ?? '')}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setDrill(null);
+                }}
               >
-                <Check className="size-4 opacity-0" />
-                {field.label}
+                <ChevronLeft className="size-4" />
+                {drillField.label}
               </DropdownMenuItem>
-            ) : (
-              <DropdownMenuSub key={field.key}>
-                <DropdownMenuSubTrigger>{field.label}</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                  {field.options.map((option) =>
-                    field.multi ? (
-                      <DropdownMenuCheckboxItem
-                        key={option.value}
-                        checked={splitValues(values[field.key], field.empty).includes(option.value)}
-                        onSelect={(event) => event.preventDefault()}
-                        onCheckedChange={() =>
-                          onChange(field.key, toggleValue(field, values[field.key], option.value))
-                        }
-                      >
-                        {option.label}
-                        {option.hint ? (
-                          <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                        ) : null}
-                      </DropdownMenuCheckboxItem>
-                    ) : (
-                      <DropdownMenuItem
-                        key={option.value}
-                        onClick={() => onChange(field.key, option.value)}
-                      >
-                        {option.label}
-                        {option.hint ? (
-                          <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                        ) : null}
-                      </DropdownMenuItem>
-                    ),
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            ),
+              <DropdownMenuSeparator />
+              {drillField.options.map((option) => (
+                <DropdownMenuCheckboxItem
+                  key={option.value}
+                  checked={
+                    drillField.multi
+                      ? splitValues(values[drillField.key], drillField.empty).includes(option.value)
+                      : values[drillField.key] === option.value
+                  }
+                  onSelect={(event) => {
+                    if (drillField.multi) event.preventDefault();
+                  }}
+                  onCheckedChange={() =>
+                    onChange(
+                      drillField.key,
+                      drillField.multi
+                        ? toggleValue(drillField, values[drillField.key], option.value)
+                        : option.value,
+                    )
+                  }
+                >
+                  {option.label}
+                  {option.hint ? (
+                    <span className="ml-1 text-muted-foreground">{option.hint}</span>
+                  ) : null}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </>
+          ) : (
+            <>
+              <DropdownMenuLabel>Фильтровать по полю</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {available.map((field) =>
+                field.toggle ? (
+                  <DropdownMenuItem
+                    key={field.key}
+                    onClick={() => onChange(field.key, field.options[0]?.value ?? '')}
+                  >
+                    <Check className="size-4 opacity-0" />
+                    {field.label}
+                  </DropdownMenuItem>
+                ) : stacked ? (
+                  <DropdownMenuItem
+                    key={field.key}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setDrill(field.key);
+                    }}
+                  >
+                    {field.label}
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuSub key={field.key}>
+                    <DropdownMenuSubTrigger>{field.label}</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                      {field.options.map((option) =>
+                        field.multi ? (
+                          <DropdownMenuCheckboxItem
+                            key={option.value}
+                            checked={splitValues(values[field.key], field.empty).includes(
+                              option.value,
+                            )}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={() =>
+                              onChange(
+                                field.key,
+                                toggleValue(field, values[field.key], option.value),
+                              )
+                            }
+                          >
+                            {option.label}
+                            {option.hint ? (
+                              <span className="ml-1 text-muted-foreground">{option.hint}</span>
+                            ) : null}
+                          </DropdownMenuCheckboxItem>
+                        ) : (
+                          <DropdownMenuItem
+                            key={option.value}
+                            onClick={() => onChange(field.key, option.value)}
+                          >
+                            {option.label}
+                            {option.hint ? (
+                              <span className="ml-1 text-muted-foreground">{option.hint}</span>
+                            ) : null}
+                          </DropdownMenuItem>
+                        ),
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ),
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
