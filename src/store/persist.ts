@@ -5,6 +5,9 @@
 const STORAGE_KEY = 'bitrix-kanban-cache';
 
 interface CacheData {
+  /** Фильтры списка и доски по экранам: возврат на экран возвращает набор. */
+  taskFilters?: Record<string, unknown>;
+  filtersPanelOpen?: boolean;
   projects?: any[];
   users?: any[];
   currentUser?: { id: string; name: string; photo?: string };

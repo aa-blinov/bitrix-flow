@@ -99,6 +99,8 @@ interface KanbanStore {
   taskFiltersScope: string;
   /** Раскрытая строка фильтров тоже общая: вид переключается без скачка. */
   filtersPanelOpen: boolean;
+  /** Наборы по экранам: возврат на экран восстанавливает его фильтры. */
+  taskFiltersByScope: Record<string, FilterValues>;
 
   // Поиск
   searchQuery: string;
@@ -249,6 +251,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   taskSearch: '',
   taskFiltersScope: '',
   filtersPanelOpen: false,
+  taskFiltersByScope: {},
   searchQuery: '',
   searchResults: [],
   isSearching: false,
@@ -631,14 +634,34 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   setTaskFilter: (key, value) => {
-    set((state) => ({ taskFilters: { ...state.taskFilters, [key]: value } }));
+    get().setTaskFilters({ ...get().taskFilters, [key]: value });
   },
-  setTaskFilters: (values) => set({ taskFilters: values }),
+  setTaskFilters: (values) => {
+    const scope = get().taskFiltersScope;
+    const byScope = { ...get().taskFiltersByScope, ...(scope ? { [scope]: values } : {}) };
+    set({ taskFilters: values, taskFiltersByScope: byScope });
+    persist.saveToStorage({ taskFilters: byScope });
+  },
   setTaskSearch: (value) => set({ taskSearch: value }),
-  setFiltersPanelOpen: (open) => set({ filtersPanelOpen: open }),
+  setFiltersPanelOpen: (open) => {
+    set({ filtersPanelOpen: open });
+    persist.saveToStorage({ filtersPanelOpen: open });
+  },
   enterFilterScope: (scope, values) => {
     if (get().taskFiltersScope === scope) return;
-    set({ taskFiltersScope: scope, taskFilters: values, taskSearch: '' });
+    // Набор экрана переживает уход на другой экран и перезагрузку страницы;
+    // значения из ссылки (?status=overdue) важнее сохранённых.
+    const saved = get().taskFiltersByScope[scope];
+    const fromLink = Object.fromEntries(
+      Object.entries(values).filter(
+        ([key, value]) => value !== EMPTY_FILTERS[key as FilterFieldKey],
+      ),
+    );
+    set({
+      taskFiltersScope: scope,
+      taskFilters: saved ? { ...saved, ...fromLink } : values,
+      taskSearch: '',
+    });
   },
 
   search: async (query: string) => {
@@ -941,6 +964,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     if (typeof window === 'undefined') return;
     try {
       const data = persist.loadFromStorage();
+      const byScope = (data.taskFilters as Record<string, FilterValues>) || {};
       set({
         memberId: localStorage.getItem('bitrix_member_id') || get().memberId,
         projects: data.projects || [],
@@ -950,6 +974,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         // Route navigation may select a project before the layout effect restores
         // warm cache. Never let an old cache clear the active route selection.
         selectedProjectId: get().selectedProjectId || data.selectedProjectId || null,
+        taskFiltersByScope: byScope,
+        // Экран мог смонтироваться до регидратации: возвращаем ему его набор.
+        taskFilters: byScope[get().taskFiltersScope] || get().taskFilters,
+        filtersPanelOpen: Boolean(data.filtersPanelOpen),
         isRehydrated: true,
       });
     } catch {
