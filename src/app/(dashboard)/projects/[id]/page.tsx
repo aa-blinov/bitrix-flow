@@ -119,6 +119,11 @@ export default function ProjectPage() {
       setSelectedTask(null);
     };
   }, [projectId, setSelectedTask]);
+  // У проекта свой заголовок вместо PageHeader — вкладку подписываем здесь.
+  useEffect(() => {
+    if (currentProject?.name) document.title = `${currentProject.name} — BitrixFlow`;
+  }, [currentProject?.name]);
+
   const loadGridPage = useCallback(
     async (request: TaskGridPageQuery) => {
       const params = new URLSearchParams({

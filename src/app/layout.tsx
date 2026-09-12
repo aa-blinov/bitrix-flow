@@ -13,7 +13,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   // %s подставляет заголовок страницы: вкладки перестают быть одинаковыми.
-  title: { default: 'BitrixFlow', template: '%s · BitrixFlow' },
+  title: { default: 'BitrixFlow', template: '%s — BitrixFlow' },
   description: 'BitrixFlow — управление задачами, проектами и процессами Bitrix24.',
   applicationName: 'BitrixFlow',
   // Данные портала за логином: поисковикам тут делать нечего.
