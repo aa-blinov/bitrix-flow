@@ -56,7 +56,9 @@ export default function LoginPage() {
               <LockKeyhole size={19} />
             </div>
             <div>
-              <CardTitle>Bitrix24 PM</CardTitle>
+              <CardTitle asChild>
+                <h1>Bitrix24 PM</h1>
+              </CardTitle>
               <p className="text-sm text-muted-foreground">Защищённый доступ</p>
             </div>
           </CardHeader>

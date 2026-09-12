@@ -391,6 +391,7 @@ export default function Sidebar() {
         <SheetContent
           side="left"
           showCloseButton={false}
+          aria-label="Меню навигации"
           className="w-[86vw] max-w-sm p-0 md:hidden"
           onOpenAutoFocus={(event) => event.preventDefault()}
         >

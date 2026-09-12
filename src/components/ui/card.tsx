@@ -36,9 +36,16 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+// asChild — чтобы заголовок карточки мог быть настоящим h1/h2 там, где он
+// является заголовком страницы, а не просто крупным текстом.
+function CardTitle({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<'div'> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : 'div';
   return (
-    <div
+    <Comp
       data-slot="card-title"
       className={cn(
         'font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm',

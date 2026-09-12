@@ -381,6 +381,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     >
       <DialogContent
         showCloseButton={false}
+        // Без заголовка скринридер объявляет диалог безымянным (aria-dialog-name).
+        aria-label={task?.title ? `Задача: ${task.title}` : 'Карточка задачи'}
         onInteractOutside={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onFocusOutside={(event) => event.preventDefault()}
@@ -476,7 +478,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 value={selectedStageId}
                 onValueChange={(stageId) => void moveTaskToStage(task.id, stageId)}
               >
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40" aria-label="Фаза задачи">
                   <Layers size={14} className="mr-1 shrink-0" />
                   <SelectValue placeholder="Фаза" />
                 </SelectTrigger>
@@ -490,7 +492,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               </Select>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Закрыть задачу">
             <X size={20} />
           </Button>
         </div>
@@ -831,7 +833,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         value={task.projectId || 'none'}
                         onValueChange={(value) => value !== 'none' && void handleMoveProject(value)}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-label="Проект">
                           <SelectValue placeholder="Без проекта" />
                         </SelectTrigger>
                         <SelectContent>
@@ -859,7 +861,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             handleUpdateField('assigneeId', value === 'unassigned' ? '' : value)
                           }
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full" aria-label="Исполнитель">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1013,7 +1015,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           value={task.priority}
                           onValueChange={(value) => handleUpdateField('priority', value)}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full" aria-label="Приоритет">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1328,6 +1330,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   onClick={() => void handleAddComment()}
                   disabled={!comment.trim() || isSendingComment}
                   className="h-10 shrink-0 gap-2"
+                  // На узком экране остаётся одна иконка — подпись нужна вслух.
+                  aria-label="Отправить комментарий"
                 >
                   <Send size={16} />
                   <span className="hidden sm:inline">Отправить</span>

@@ -61,7 +61,10 @@ function SearchPageContent() {
       {/* Search Input */}
       <div className="border-b bg-background p-4 lg:p-6">
         <div className="relative max-w-2xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={20}
+          />
           <Input
             type="text"
             value={query}
@@ -148,11 +151,13 @@ function SearchPageContent() {
             ))}
           </div>
         ) : query ? (
-          <div className="text-center py-8 text-gray-400">
+          <div className="text-center py-8 text-muted-foreground">
             Задачи по запросу «{query}» не найдены
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-400">Начните вводить текст для поиска</div>
+          <div className="text-center py-8 text-muted-foreground">
+            Начните вводить текст для поиска
+          </div>
         )}
       </div>
 
