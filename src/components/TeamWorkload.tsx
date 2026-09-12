@@ -437,7 +437,11 @@ export default function TeamWorkload() {
                       <div className="flex min-w-0 items-center gap-2 px-4 py-3">
                         <UserAvatar user={assignee} />
                         <div className="min-w-0">
-                          <span className="block truncate text-sm font-medium">
+                          {/* Имя обрезается колонкой — полное показываем подсказкой. */}
+                          <span
+                            className="block truncate text-sm font-medium"
+                            title={assignee.name}
+                          >
                             {assignee.name}
                           </span>
                           <span className="block text-xs text-muted-foreground">

@@ -1601,7 +1601,10 @@ export default function TaskGrid({
                           {showProject && task.projectId && task.projectId !== '0' && (
                             <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                               <Folder className="size-3 shrink-0" />
-                              <span className="truncate">
+                              <span
+                                className="truncate"
+                                title={projectById[task.projectId]?.name || undefined}
+                              >
                                 {projectById[task.projectId]?.name || `Проект ${task.projectId}`}
                               </span>
                             </span>
@@ -1809,6 +1812,7 @@ export default function TaskGrid({
                                 <TableCell
                                   key={column}
                                   className="max-w-64 truncate text-muted-foreground"
+                                  title={task.description || undefined}
                                 >
                                   {task.description || '—'}
                                 </TableCell>
