@@ -69,6 +69,41 @@ export const normalizedTaskFields = {
       { $ifNull: ['$data.responsibleName', '$data.RESPONSIBLE_NAME'] },
     ],
   },
+  creatorId: {
+    $convert: {
+      input: {
+        $ifNull: ['$data.creator.id', { $ifNull: ['$data.createdBy', '$data.CREATED_BY'] }],
+      },
+      to: 'string',
+      onError: '',
+      onNull: '',
+    },
+  },
+  // Соисполнители и наблюдатели приходят массивом id (или отсутствуют вовсе).
+  accompliceIds: {
+    $map: {
+      input: {
+        $let: {
+          vars: { raw: { $ifNull: ['$data.accomplices', '$data.ACCOMPLICES'] } },
+          in: { $cond: [{ $isArray: '$$raw' }, '$$raw', []] },
+        },
+      },
+      as: 'id',
+      in: { $toString: '$$id' },
+    },
+  },
+  auditorIds: {
+    $map: {
+      input: {
+        $let: {
+          vars: { raw: { $ifNull: ['$data.auditors', '$data.AUDITORS'] } },
+          in: { $cond: [{ $isArray: '$$raw' }, '$$raw', []] },
+        },
+      },
+      as: 'id',
+      in: { $toString: '$$id' },
+    },
+  },
   changedDate: { $ifNull: ['$data.changedDate', '$data.CHANGED_DATE'] },
   createdDate: { $ifNull: ['$data.createdDate', '$data.CREATED_DATE'] },
   deadline: { $ifNull: ['$data.deadline', '$data.DEADLINE'] },

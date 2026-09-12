@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
+import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
@@ -44,15 +45,10 @@ function AllTasksInner() {
   const loadPage = useCallback(
     async (request: TaskGridPageQuery) => {
       const params = new URLSearchParams({
+        ...filterQueryParams(request.filters),
         page: String(request.page),
         limit: String(request.limit),
         query: request.query,
-        status: request.status,
-        hideDone: String(request.hideDone),
-        assigneeId: request.assigneeId,
-        tag: request.tag,
-        priority: request.priority,
-        projectId: request.projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
       });
       if (requestedAssignee === 'unassigned') params.set('unassigned', 'true');

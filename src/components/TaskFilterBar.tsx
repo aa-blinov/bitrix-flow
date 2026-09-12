@@ -21,46 +21,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toolbarControl } from '@/components/ui/toolbar';
+import {
+  splitValues as splitFilterValues,
+  type FilterField,
+  type FilterFieldKey,
+  type FilterPreset,
+  type FilterValues,
+} from '@/lib/task-filters';
 
-export type FilterFieldKey =
-  'status' | 'assignee' | 'project' | 'tag' | 'priority' | 'deadline' | 'hideDone';
-
-export type FilterOption = { value: string; label: string; hint?: string };
-
-export type FilterField = {
-  key: FilterFieldKey;
-  label: string;
-  /** Значение «фильтр не задан»: чип для него не показываем. */
-  empty: string;
-  options: FilterOption[];
-  /** Поле-переключатель: выбирается без списка значений. */
-  toggle?: boolean;
-  /** Как в Asana: одно поле можно фильтровать сразу по нескольким значениям. */
-  multi?: boolean;
-};
-
-/** Значения мультиполя хранятся строкой «a,b,c» — так же уходят на сервер. */
-export function splitValues(value: string, empty: string): string[] {
-  return value === empty ? [] : value.split(',').filter(Boolean);
-}
-
-export type FilterValues = Record<FilterFieldKey, string>;
-
-export type FilterPreset = {
-  id: string;
-  label: string;
-  values: Partial<FilterValues>;
-};
+export type {
+  FilterField,
+  FilterFieldKey,
+  FilterOption,
+  FilterPreset,
+  FilterValues,
+} from '@/lib/task-filters';
+export { splitValues } from '@/lib/task-filters';
 
 function optionLabel(field: FilterField, value: string): string {
   if (!field.multi) return field.options.find((option) => option.value === value)?.label || value;
-  const selected = splitValues(value, field.empty);
+  const selected = splitFilterValues(value, field.empty);
   const first = field.options.find((option) => option.value === selected[0])?.label || selected[0];
   return selected.length > 1 ? `${first} +${selected.length - 1}` : first;
 }
 
 function toggleValue(field: FilterField, current: string, option: string): string {
-  const selected = splitValues(current, field.empty);
+  const selected = splitFilterValues(current, field.empty);
   const next = selected.includes(option)
     ? selected.filter((item) => item !== option)
     : [...selected, option];
@@ -177,7 +163,7 @@ export default function TaskFilterBar({
                   key={option.value}
                   checked={
                     field.multi
-                      ? splitValues(values[field.key], field.empty).includes(option.value)
+                      ? splitFilterValues(values[field.key], field.empty).includes(option.value)
                       : values[field.key] === option.value
                   }
                   onSelect={(event) => {
@@ -238,7 +224,9 @@ export default function TaskFilterBar({
                   key={option.value}
                   checked={
                     drillField.multi
-                      ? splitValues(values[drillField.key], drillField.empty).includes(option.value)
+                      ? splitFilterValues(values[drillField.key], drillField.empty).includes(
+                          option.value,
+                        )
                       : values[drillField.key] === option.value
                   }
                   onSelect={(event) => {
@@ -291,7 +279,7 @@ export default function TaskFilterBar({
                         field.multi ? (
                           <DropdownMenuCheckboxItem
                             key={option.value}
-                            checked={splitValues(values[field.key], field.empty).includes(
+                            checked={splitFilterValues(values[field.key], field.empty).includes(
                               option.value,
                             )}
                             onSelect={(event) => event.preventDefault()}

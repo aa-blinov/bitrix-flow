@@ -6,6 +6,7 @@ import { convertBxTask, useKanbanStore } from '@/store/kanban';
 import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid from '@/components/TaskGrid';
 
 function MyTasksInner() {
@@ -19,15 +20,10 @@ function MyTasksInner() {
   const taskFromUrl = searchParams.get('task');
   const loadPage = useCallback(async (request: TaskGridPageQuery) => {
     const params = new URLSearchParams({
+      ...filterQueryParams(request.filters),
       page: String(request.page),
       limit: String(request.limit),
       query: request.query,
-      status: request.status,
-      hideDone: String(request.hideDone),
-      assigneeId: request.assigneeId,
-      tag: request.tag,
-      priority: request.priority,
-      projectId: request.projectId,
       sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
     });
     const response = await fetch(`/api/tasks/all?${params.toString()}`);

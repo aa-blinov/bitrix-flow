@@ -80,6 +80,12 @@ export async function GET(req: NextRequest) {
   const assigneeId = req.nextUrl.searchParams.get('assigneeId') || 'all';
   const projectId = req.nextUrl.searchParams.get('projectId') || 'all';
   const stageId = req.nextUrl.searchParams.get('stageId') || 'all';
+  const creatorId = req.nextUrl.searchParams.get('creatorId') || 'all';
+  const accompliceId = req.nextUrl.searchParams.get('accompliceId') || 'all';
+  const auditorId = req.nextUrl.searchParams.get('auditorId') || 'all';
+  // Срок отдельным полем: раньше «просрочено» и «без дедлайна» жили внутри
+  // статуса, поэтому «в работе и просрочено» выбрать было нельзя.
+  const deadlineFilter = req.nextUrl.searchParams.get('deadline') || 'all';
   const priority = req.nextUrl.searchParams.get('priority') || 'all';
   const hasDeadline = req.nextUrl.searchParams.get('hasDeadline') === 'true';
   const hideDone = req.nextUrl.searchParams.get('hideDone') === 'true';
@@ -119,19 +125,53 @@ export async function GET(req: NextRequest) {
       .map((item) => item.trim())
       .filter(Boolean);
 
+  const oneOf = (value: string) => {
+    const ids = many(value);
+    return ids.length > 1 ? { $in: ids } : ids[0];
+  };
   if (assigneeId !== 'all') {
+    // «Не назначен» соседствует с обычными исполнителями в одном мультивыборе,
+    // поэтому разбираем его отдельной веткой $or, а не отдельным параметром.
     const ids = many(assigneeId);
-    filter.responsibleId = ids.length > 1 ? { $in: ids } : ids[0];
+    const named = ids.filter((id) => id !== 'none');
+    if (ids.includes('none')) {
+      const clauses: Record<string, unknown>[] = [{ responsibleId: { $in: ['', '0'] } }];
+      if (named.length) clauses.push({ responsibleId: { $in: named } });
+      filter.$and = [...(filter.$and || []), { $or: clauses }];
+    } else if (named.length) {
+      filter.responsibleId = named.length > 1 ? { $in: named } : named[0];
+    }
   }
   if (unassigned) filter.responsibleId = { $in: ['', '0'] };
-  if (projectId !== 'all') {
-    const ids = many(projectId);
-    filter.groupId = ids.length > 1 ? { $in: ids } : ids[0];
-  }
-  if (stageId !== 'all') filter.stageId = stageId;
+  if (projectId !== 'all') filter.groupId = oneOf(projectId);
+  if (stageId !== 'all') filter.stageId = oneOf(stageId);
+  if (creatorId !== 'all') filter.creatorId = oneOf(creatorId);
+  if (accompliceId !== 'all') filter.accompliceIds = { $in: many(accompliceId) };
+  if (auditorId !== 'all') filter.auditorIds = { $in: many(auditorId) };
   if (priority === 'high') filter.priorityValue = { $in: ['2', 2, '3', 3, '4', 4] };
+  else if (priority === 'normal') filter.priorityValue = { $in: ['1', 1] };
+  else if (priority === 'low') filter.priorityValue = { $in: ['0', 0] };
   if (hasDeadline) {
     filter.$and = [...(filter.$and || []), { deadline: { $exists: true, $nin: [null, ''] } }];
+  }
+  // Один разбор срока на два параметра: status (старые ссылки из календаря
+  // нагрузки и уведомлений) и deadline (поле фильтра).
+  const deadlineConditions = (value: string): Record<string, unknown>[] => {
+    if (value === 'none') return [{ deadlineDate: null }, { rawStatus: { $ne: '5' } }];
+    if (value === 'has') return [{ deadlineDate: { $ne: null } }];
+    const expr =
+      value === 'overdue'
+        ? { $lt: ['$deadlineDate', today] }
+        : value === 'attention'
+          ? { $lt: ['$deadlineDate', tomorrow] }
+          : value === 'week'
+            ? { $and: [{ $gte: ['$deadlineDate', today] }, { $lt: ['$deadlineDate', weekEnd] }] }
+            : null;
+    if (!expr) return [];
+    return [{ rawStatus: { $ne: '5' } }, { deadlineDate: { $ne: null } }, { $expr: expr }];
+  };
+  if (deadlineFilter !== 'all') {
+    filter.$and = [...(filter.$and || []), ...deadlineConditions(deadlineFilter)];
   }
   if (hideDone) filter.rawStatus = { $ne: '5' };
   if (status === 'active') filter.rawStatus = { $ne: '5' };
@@ -139,24 +179,9 @@ export async function GET(req: NextRequest) {
   else if (['in_progress', 'testing', 'done', 'deferred'].includes(status)) {
     filter.rawStatus = { in_progress: '3', testing: '4', done: '5', deferred: '6' }[status];
   } else if (status === 'no_deadline') {
-    filter.$and = [
-      ...(filter.$and || []),
-      { $or: [{ deadline: null }, { deadline: '' }] },
-      { rawStatus: { $ne: '5' } },
-    ];
+    filter.$and = [...(filter.$and || []), ...deadlineConditions('none')];
   } else if (['overdue', 'attention', 'week'].includes(status)) {
-    const deadlineMatch =
-      status === 'overdue'
-        ? { $lt: ['$deadlineDate', today] }
-        : status === 'attention'
-          ? { $lt: ['$deadlineDate', tomorrow] }
-          : { $and: [{ $gte: ['$deadlineDate', today] }, { $lt: ['$deadlineDate', weekEnd] }] };
-    filter.$and = [
-      ...(filter.$and || []),
-      { rawStatus: { $ne: '5' } },
-      { deadlineDate: { $ne: null } },
-      { $expr: deadlineMatch },
-    ];
+    filter.$and = [...(filter.$and || []), ...deadlineConditions(status)];
   }
   if (hideDone && status === 'done') {
     filter.$and = [...(filter.$and || []), { rawStatus: { $ne: '5' } }];

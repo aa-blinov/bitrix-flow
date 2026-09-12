@@ -14,6 +14,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
+import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -123,14 +124,10 @@ export default function ProjectPage() {
   const loadGridPage = useCallback(
     async (request: TaskGridPageQuery) => {
       const params = new URLSearchParams({
+        ...filterQueryParams(request.filters),
         page: String(request.page),
         limit: String(request.limit),
         query: request.query,
-        status: request.status,
-        hideDone: String(request.hideDone),
-        assigneeId: request.assigneeId,
-        tag: request.tag,
-        priority: request.priority,
         projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
       });

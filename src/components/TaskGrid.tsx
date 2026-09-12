@@ -58,12 +58,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import TaskFilterBar, {
+import TaskFilterBar from '@/components/TaskFilterBar';
+import {
+  EMPTY_FILTERS,
   type FilterField,
   type FilterFieldKey,
   type FilterPreset,
   type FilterValues,
-} from '@/components/TaskFilterBar';
+} from '@/lib/task-filters';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -153,14 +155,10 @@ type Sort = { key: SortKey; direction: 'asc' | 'desc' };
 export type TaskGridPageQuery = {
   page: number;
   query: string;
-  status: string;
-  hideDone: boolean;
-  assigneeId: string;
-  projectId: string;
-  tag: string;
-  priority: string;
   limit: number;
   sorts: Sort[];
+  /** Все поля фильтра разом: страницы переводят их в параметры одной функцией. */
+  filters: FilterValues;
 };
 type TaskGridPage = { tasks: BxTask[]; total: number };
 type ColumnKey = SortKey;
@@ -171,19 +169,37 @@ const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
   { value: 'assignee', label: 'По исполнителю' },
   { value: 'hierarchy', label: 'Иерархия задач' },
 ];
+// Ссылки из календаря нагрузки и уведомлений приносят срок в параметре
+// статуса (?status=overdue) — с отдельным полем «Срок» раскладываем их сами.
+const DEADLINE_STATUSES = ['overdue', 'attention', 'week', 'no_deadline'];
+function initialFilterValues(status: string, assignee: string, project: string): FilterValues {
+  const deadline = DEADLINE_STATUSES.includes(status)
+    ? status === 'no_deadline'
+      ? 'none'
+      : status
+    : 'all';
+  return {
+    ...EMPTY_FILTERS,
+    status: deadline === 'all' ? status : 'all',
+    deadline,
+    assignee,
+    project,
+  };
+}
 const isGroupBy = (value: string): value is GroupBy =>
   GROUP_BY_OPTIONS.some((option) => option.value === value);
 type SavedView = {
   id: string;
   name: string;
   config: {
+    // Старая раскладка полей: вью, сохранённые до объединения фильтров.
     statusFilter: string;
     assigneeFilter: string;
     projectFilter: string;
-    // Появился позже сохранённых вью, поэтому необязателен.
     tagFilter?: string;
-    groupBy: GroupBy;
     hideDone: boolean;
+    filters?: Partial<FilterValues>;
+    groupBy: GroupBy;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
     columnWidths?: Record<SortKey, number>;
@@ -712,15 +728,24 @@ export default function TaskGrid({
   );
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [hideDone, setHideDone] = useState(false);
-  const [assigneeFilter, setAssigneeFilter] = useState(initialAssigneeId);
-  const [projectFilter, setProjectFilter] = useState(initialProjectId);
-  const [tagFilter, setTagFilter] = useState('all');
+  // Все фильтры живут одним объектом: иначе каждое новое поле пришлось бы
+  // прописывать в состоянии, сбросе, пресетах, сохранённых вью, зависимостях
+  // эффекта и запросе — шесть мест на поле.
+  const [filters, setFilters] = useState<FilterValues>(() =>
+    initialFilterValues(initialStatus, initialAssigneeId, initialProjectId),
+  );
+  const setFilter = useCallback(
+    (key: FilterFieldKey, value: string) => setFilters((current) => ({ ...current, [key]: value })),
+    [],
+  );
+  const statusFilter = filters.status;
+  const hideDone = filters.hideDone === 'on';
+  const assigneeFilter = filters.assignee;
+  const projectFilter = filters.project;
+  const tagFilter = filters.tag;
   const isMobile = useIsMobile();
   const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
-  const [priorityFilter, setPriorityFilter] = useState('all');
   const [activePreset, setActivePreset] = useState('');
   const currentUserId = useKanbanStore((state) => state.currentUser.id);
   const [draftQuery, setDraftQuery] = useState('');
@@ -775,14 +800,10 @@ export default function TaskGrid({
       checked ? [...columns, column] : columns.filter((item) => item !== column),
     );
   };
-  const activeFilterCount = [
-    statusFilter !== 'all',
-    hideDone,
-    assigneeFilter !== 'all',
-    showProject && projectFilter !== 'all',
-    tagFilter !== 'all',
-    priorityFilter !== 'all',
-  ].filter(Boolean).length;
+  const activeFilterCount = Object.entries(filters).filter(
+    ([key, value]) =>
+      value !== EMPTY_FILTERS[key as FilterFieldKey] && (key !== 'project' || showProject),
+  ).length;
   const orderedTasks = useMemo(() => {
     if (loadPage) return tasks;
     const value = (task: BxTask, key: SortKey) => {
@@ -1007,14 +1028,17 @@ export default function TaskGrid({
   };
 
   useEffect(() => {
-    setStatusFilter(initialStatus);
+    setFilters((current) => ({
+      ...current,
+      ...initialFilterValues(initialStatus, current.assignee, current.project),
+    }));
   }, [initialStatus]);
   useEffect(() => {
-    setAssigneeFilter(initialAssigneeId);
-  }, [initialAssigneeId]);
+    setFilter('assignee', initialAssigneeId);
+  }, [initialAssigneeId, setFilter]);
   useEffect(() => {
-    setProjectFilter(initialProjectId);
-  }, [initialProjectId]);
+    setFilter('project', initialProjectId);
+  }, [initialProjectId, setFilter]);
 
   // Теги подтягиваем под текущую область: проект страницы либо выбранный
   // в фильтре проект, иначе все доступные задачи.
@@ -1078,18 +1102,7 @@ export default function TaskGrid({
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [
-    assigneeFilter,
-    groupBy,
-    pageSize,
-    priorityFilter,
-    projectFilter,
-    query,
-    sorts,
-    statusFilter,
-    hideDone,
-    tagFilter,
-  ]);
+  }, [filters, groupBy, pageSize, query, sorts]);
   useEffect(() => {
     setPage((currentPage) => Math.min(currentPage, pageCount));
   }, [pageCount]);
@@ -1106,14 +1119,9 @@ export default function TaskGrid({
       .current({
         page,
         query,
-        status: statusFilter,
-        hideDone,
-        assigneeId: assigneeFilter,
-        projectId: showProject ? projectFilter : 'all',
-        tag: tagFilter,
-        priority: priorityFilter,
         limit: pageSize,
         sorts,
+        filters: { ...filters, project: showProject ? filters.project : 'all' },
       })
       .then((nextPage) => {
         if (cancelled) return;
@@ -1132,41 +1140,19 @@ export default function TaskGrid({
     return () => {
       cancelled = true;
     };
-  }, [
-    pageSize,
-    tagFilter,
-    setPagedTasks,
-    assigneeFilter,
-    hideDone,
-    page,
-    projectFilter,
-    query,
-    serverPageRetry,
-    showProject,
-    sorts,
-    statusFilter,
-  ]);
+  }, [filters, pageSize, page, query, serverPageRetry, setPagedTasks, showProject, sorts]);
 
   const resetFilters = () => {
     if (isMobile) setShowFilters(false);
     setQuery('');
     setDraftQuery('');
-    setStatusFilter('all');
-    setHideDone(false);
-    setAssigneeFilter('all');
-    setProjectFilter('all');
-    setTagFilter('all');
-    setPriorityFilter('all');
+    setFilters(EMPTY_FILTERS);
     setActivePreset('');
   };
   const applyView = (id: string) => {
     if (id === 'default') {
       setActiveViewId('');
-      setStatusFilter(initialStatus);
-      setHideDone(false);
-      setAssigneeFilter('all');
-      setProjectFilter('all');
-      setTagFilter('all');
+      setFilters(initialFilterValues(initialStatus, 'all', 'all'));
       setGroupBy('none');
       setSorts([{ key: 'updated', direction: 'desc' }]);
       setVisibleColumns(DEFAULT_COLUMNS);
@@ -1178,11 +1164,16 @@ export default function TaskGrid({
     const view = views.find((item) => item.id === id);
     if (!view) return;
     const config = view.config;
-    setStatusFilter(config.statusFilter);
-    setHideDone(config.hideDone);
-    setAssigneeFilter(config.assigneeFilter);
-    setProjectFilter(config.projectFilter);
-    setTagFilter(config.tagFilter || 'all');
+    setFilters({
+      ...EMPTY_FILTERS,
+      ...(config.filters || {}),
+      // Вью, сохранённые до объединения фильтров в один объект.
+      status: config.filters?.status ?? config.statusFilter,
+      assignee: config.filters?.assignee ?? config.assigneeFilter,
+      project: config.filters?.project ?? config.projectFilter,
+      tag: config.filters?.tag ?? config.tagFilter ?? 'all',
+      hideDone: config.filters?.hideDone ?? (config.hideDone ? 'on' : 'off'),
+    });
     setGroupBy(config.groupBy);
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
@@ -1193,6 +1184,8 @@ export default function TaskGrid({
     const name = viewName.trim();
     if (!name || !viewScope) return;
     const config = {
+      filters,
+      // Дублируем в старых полях, чтобы вью открывалось и на прежней версии.
       statusFilter,
       assigneeFilter,
       projectFilter,
@@ -1289,6 +1282,7 @@ export default function TaskGrid({
   const isReadOnly = showProject;
   // Поля конструктора описываем ровно теми значениями, которые понимает
   // /api/tasks/all: иначе фильтр обещал бы то, чего сервер не умеет.
+  const userOptions = users.map((user) => ({ value: user.id, label: user.name }));
   const filterFields: FilterField[] = [
     {
       key: 'status',
@@ -1296,11 +1290,20 @@ export default function TaskGrid({
       empty: 'all',
       options: [
         { value: 'active', label: 'Активные' },
-        { value: 'attention', label: 'Требуют внимания' },
-        { value: 'week', label: 'Дедлайн на неделе' },
-        { value: 'no_deadline', label: 'Без дедлайна' },
-        { value: 'overdue', label: 'Просрочено' },
         ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+      ],
+    },
+    {
+      // Срок отдельно от статуса: так можно спросить «в работе и просрочено».
+      key: 'deadline',
+      label: 'Срок',
+      empty: 'all',
+      options: [
+        { value: 'overdue', label: 'Просрочено' },
+        { value: 'attention', label: 'Сегодня и завтра' },
+        { value: 'week', label: 'На неделе' },
+        { value: 'has', label: 'Есть срок' },
+        { value: 'none', label: 'Без срока' },
       ],
     },
     {
@@ -1308,8 +1311,11 @@ export default function TaskGrid({
       label: 'Исполнитель',
       empty: 'all',
       multi: true,
-      options: users.map((user) => ({ value: user.id, label: user.name })),
+      options: [{ value: 'none', label: 'Не назначен' }, ...userOptions],
     },
+    { key: 'creator', label: 'Постановщик', empty: 'all', multi: true, options: userOptions },
+    { key: 'accomplice', label: 'Соисполнитель', empty: 'all', multi: true, options: userOptions },
+    { key: 'auditor', label: 'Наблюдатель', empty: 'all', multi: true, options: userOptions },
     ...(showProject
       ? [
           {
@@ -1335,11 +1341,26 @@ export default function TaskGrid({
         hint: `(${item.count})`,
       })),
     },
+    ...(stages.length
+      ? [
+          {
+            key: 'stage' as const,
+            label: 'Стадия',
+            empty: 'all',
+            multi: true,
+            options: stages.map((stage) => ({ value: stage.id, label: stage.name })),
+          },
+        ]
+      : []),
     {
       key: 'priority',
       label: 'Приоритет',
       empty: 'all',
-      options: [{ value: 'high', label: 'Высокий' }],
+      options: [
+        { value: 'high', label: 'Высокий' },
+        { value: 'normal', label: 'Обычный' },
+        { value: 'low', label: 'Низкий' },
+      ],
     },
     {
       key: 'hideDone',
@@ -1350,42 +1371,30 @@ export default function TaskGrid({
     },
   ];
 
-  const filterValues: FilterValues = {
-    status: statusFilter,
-    assignee: assigneeFilter,
-    project: projectFilter,
-    tag: tagFilter,
-    priority: priorityFilter,
-    deadline: 'all',
-    hideDone: hideDone ? 'on' : 'off',
-  };
+  const filterValues: FilterValues = filters;
 
   const setFilterValue = (key: FilterFieldKey, value: string) => {
     setActivePreset('');
-    if (key === 'status') setStatusFilter(value);
-    else if (key === 'assignee') setAssigneeFilter(value);
-    else if (key === 'project') setProjectFilter(value);
-    else if (key === 'tag') setTagFilter(value);
-    else if (key === 'priority') setPriorityFilter(value);
-    else if (key === 'hideDone') setHideDone(value === 'on');
+    setFilter(key, value);
   };
 
   // Шорткаты: то, что спрашивают каждый день, одним нажатием.
   const filterPresets: FilterPreset[] = [
     { id: 'mine', label: 'Мои', values: { assignee: currentUserId || 'all' } },
-    { id: 'overdue', label: 'Просроченные', values: { status: 'overdue' } },
-    { id: 'week', label: 'На неделе', values: { status: 'week' } },
-    { id: 'no_deadline', label: 'Без срока', values: { status: 'no_deadline' } },
+    {
+      id: 'created_by_me',
+      label: 'Поставленные мной',
+      values: { creator: currentUserId || 'all' },
+    },
+    { id: 'overdue', label: 'Просроченные', values: { deadline: 'overdue' } },
+    { id: 'week', label: 'На неделе', values: { deadline: 'week' } },
+    { id: 'no_deadline', label: 'Без срока', values: { deadline: 'none' } },
   ];
 
   const applyPreset = (preset: FilterPreset) => {
     const next = activePreset === preset.id ? null : preset;
     setActivePreset(next ? next.id : '');
-    setStatusFilter(next?.values.status ?? 'all');
-    setAssigneeFilter(next?.values.assignee ?? 'all');
-    setTagFilter(next?.values.tag ?? 'all');
-    setPriorityFilter(next?.values.priority ?? 'all');
-    if (!next) setHideDone(false);
+    setFilters({ ...EMPTY_FILTERS, ...(next?.values ?? {}) });
   };
 
   const filterControls = (
