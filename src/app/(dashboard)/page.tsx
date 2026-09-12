@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getProjectColor, getProjectInitials } from '@/lib/utils';
-import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
@@ -30,6 +30,30 @@ export default function DashboardPage() {
     setSelectedProject,
   } = useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
+  // Числа на карточках и в сводке считает сервер по всему зеркалу: клиент
+  // держит только первую страницу задач, и раньше главная показывала её срез.
+  const [stats, setStats] = useState<{
+    projects: Record<string, { total: number; done: number; overdue: number }>;
+    totals: { attention: number; inProgress: number; week: number; noDeadline: number };
+  }>({ projects: {}, totals: { attention: 0, inProgress: 0, week: 0, noDeadline: 0 } });
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/tasks/stats?byProject=true')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled || !Array.isArray(data.projects)) return;
+        setStats({
+          projects: Object.fromEntries(
+            data.projects.map((item: { id: string }) => [item.id, item]),
+          ),
+          totals: data.totals || { attention: 0, inProgress: 0, week: 0, noDeadline: 0 },
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const hasBootstrapped = useRef(false);
@@ -85,25 +109,24 @@ export default function DashboardPage() {
     return <LoadingState className="min-h-screen bg-muted/30" />;
   }
 
-  const projectsWithStats = projects.map((p) => {
+  // «Без проекта» — такой же вход, как в левой панели: у портала 69 задач вне
+  // групп, и без этой карточки с главной до них было не добраться.
+  const noProject = {
+    id: NO_PROJECT_ID,
+    name: NO_PROJECT_NAME,
+    description: '',
+    membersCount: 0,
+    isArchived: false,
+  };
+  const projectsWithStats = [noProject, ...projects].map((p) => {
+    const row = stats.projects[p.id];
     const projectTasks = allTasks.filter((t) => t.projectId === p.id);
-    const completed = projectTasks.filter((t) => t.status === 'done').length;
-    const inProgress = projectTasks.filter((t) => t.status === 'in_progress').length;
-    const overdue = projectTasks.filter((t) => {
-      if (!t.dueDate || t.status === 'done') return false;
-      return new Date(t.dueDate) < new Date();
-    }).length;
-    const totalEstimate = projectTasks.reduce((sum, t) => sum + t.estimate, 0);
-    const totalActual = projectTasks.reduce((sum, t) => sum + t.actualTime, 0);
-
     return {
       ...p,
-      taskCount: projectTasks.length,
-      completed,
-      inProgress,
-      overdue,
-      totalEstimate,
-      totalActual,
+      taskCount: row?.total ?? projectTasks.length,
+      completed: row?.done ?? projectTasks.filter((t) => t.status === 'done').length,
+      overdue: row?.overdue ?? 0,
+      inProgress: projectTasks.filter((t) => t.status === 'in_progress').length,
     };
   });
 
@@ -113,10 +136,10 @@ export default function DashboardPage() {
       project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
   );
 
-  const attentionCount = allTasks.filter((task) => needsDeadlineAttention(task)).length;
-  const inProgressCount = allTasks.filter((task) => task.status === 'in_progress').length;
-  const dueThisWeekCount = allTasks.filter((task) => isDueThisWeek(task)).length;
-  const noDeadlineCount = allTasks.filter((task) => task.status !== 'done' && !task.dueDate).length;
+  const attentionCount = stats.totals.attention;
+  const inProgressCount = stats.totals.inProgress;
+  const dueThisWeekCount = stats.totals.week;
+  const noDeadlineCount = stats.totals.noDeadline;
 
   return (
     <div className="min-h-full bg-muted/20">
