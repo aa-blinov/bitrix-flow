@@ -128,12 +128,14 @@ export default function ProjectPage() {
         query: request.query,
         projectId,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
+        hierarchy: String(request.hierarchy),
       });
       const response = await fetch(`/api/tasks/all?${params.toString()}`);
       if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
       const data = await response.json();
       return {
         tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        ancestors: (Array.isArray(data.ancestors) ? data.ancestors : []).map(convertBxTask),
         total: Number(data.total) || 0,
       };
     },

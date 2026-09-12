@@ -48,6 +48,7 @@ import {
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { extractTaskTags } from '@/lib/task-tags';
+import { orderTasksAsTree } from '@/lib/task-tree';
 import { getBitrixTaskUrl } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
@@ -162,8 +163,10 @@ export type TaskGridPageQuery = {
   sorts: Sort[];
   /** Все поля фильтра разом: страницы переводят их в параметры одной функцией. */
   filters: FilterValues;
+  /** Группировка «Иерархия задач»: сервер дотянет родителей найденных подзадач. */
+  hierarchy: boolean;
 };
-type TaskGridPage = { tasks: BxTask[]; total: number };
+type TaskGridPage = { tasks: BxTask[]; total: number; ancestors?: BxTask[] };
 type ColumnKey = SortKey;
 type GroupBy = 'none' | 'stage' | 'assignee' | 'hierarchy';
 const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
@@ -735,7 +738,6 @@ export default function TaskGrid({
   const hideDone = filters.hideDone === 'on';
   const assigneeFilter = filters.assignee;
   const projectFilter = filters.project;
-  const tagFilter = filters.tag;
   const isMobile = useIsMobile();
   const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
@@ -800,7 +802,11 @@ export default function TaskGrid({
       value !== EMPTY_FILTERS[key as FilterFieldKey] && (key !== 'project' || showProject),
   ).length;
   const orderedTasks = useMemo(() => {
-    if (loadPage) return tasks;
+    if (loadPage) {
+      if (groupBy !== 'hierarchy') return tasks;
+      // Родители приходят отдельно: они не совпадения фильтра, а ветка к ним.
+      return orderTasksAsTree(tasks, [...tasks, ...(serverPage.ancestors || [])]);
+    }
     const value = (task: BxTask, key: SortKey) => {
       if (key === 'project') return projectById[task.projectId]?.name || '';
       if (key === 'stage') return task.stageId;
@@ -856,46 +862,9 @@ export default function TaskGrid({
         return 0;
       });
     if (groupBy !== 'hierarchy') return matchingTasks;
-
-    const taskById = new Map(tasks.map((task) => [task.id, task]));
-    const visibleIds = new Set(matchingTasks.map((task) => task.id));
-    const ranks = new Map(matchingTasks.map((task, index) => [task.id, index]));
-    for (const task of matchingTasks) {
-      let parentId = task.parentId;
-      while (parentId && !visibleIds.has(parentId)) {
-        const parent = taskById.get(parentId);
-        if (!parent) break;
-        visibleIds.add(parent.id);
-        ranks.set(parent.id, Math.min(ranks.get(parent.id) ?? Infinity, ranks.get(task.id) ?? 0));
-        parentId = parent.parentId;
-      }
-    }
-    const children = new Map<string, BxTask[]>();
-    const roots: BxTask[] = [];
-    for (const task of tasks) {
-      if (!visibleIds.has(task.id)) continue;
-      if (task.parentId && visibleIds.has(task.parentId)) {
-        const siblings = children.get(task.parentId) || [];
-        siblings.push(task);
-        children.set(task.parentId, siblings);
-      } else {
-        roots.push(task);
-      }
-    }
-    const sortTree = (items: BxTask[]) =>
-      items.sort(
-        (left, right) => (ranks.get(left.id) ?? Infinity) - (ranks.get(right.id) ?? Infinity),
-      );
-    const result: BxTask[] = [];
-    const walk = (task: BxTask, seen = new Set<string>()) => {
-      if (seen.has(task.id)) return;
-      seen.add(task.id);
-      result.push(task);
-      sortTree(children.get(task.id) || []).forEach((child) => walk(child, seen));
-    };
-    sortTree(roots).forEach((task) => walk(task));
-    return result;
+    return orderTasksAsTree(matchingTasks, tasks);
   }, [
+    serverPage.ancestors,
     assigneeFilter,
     projectById,
     projectFilter,
@@ -957,6 +926,13 @@ export default function TaskGrid({
     }
     return { childCount, depthById, isVisible };
   }, [collapsedTaskIds, pageTasks]);
+  // Родители, дотянутые ради ветки: под фильтр они не подошли, поэтому в списке
+  // показываем их приглушённо — как контекст, а не как найденное.
+  const contextTaskIds = useMemo(() => {
+    if (groupBy !== 'hierarchy') return new Set<string>();
+    const matched = new Set(tasks.map((task) => task.id));
+    return new Set(orderedTasks.filter((task) => !matched.has(task.id)).map((task) => task.id));
+  }, [groupBy, orderedTasks, tasks]);
   const displayPageTasks =
     groupBy === 'hierarchy'
       ? pageTasks.filter((task) => hierarchy.isVisible.get(task.id))
@@ -1119,6 +1095,7 @@ export default function TaskGrid({
         limit: pageSize,
         sorts,
         filters: { ...filters, project: showProject ? filters.project : 'all' },
+        hierarchy: groupBy === 'hierarchy',
       })
       .then((nextPage) => {
         if (cancelled) return;
@@ -1137,7 +1114,7 @@ export default function TaskGrid({
     return () => {
       cancelled = true;
     };
-  }, [filters, pageSize, page, query, serverPageRetry, setPagedTasks, showProject, sorts]);
+  }, [filters, groupBy, pageSize, page, query, serverPageRetry, setPagedTasks, showProject, sorts]);
 
   const resetFilters = () => {
     if (isMobile) setShowFilters(false);
@@ -1527,7 +1504,18 @@ export default function TaskGrid({
                 return (
                   <article
                     key={task.id}
+                    // Уровень вложенности на телефоне — отступом: кнопки
+                    // сворачивания в карточке нет, а понять глубину надо.
+                    style={
+                      groupBy === 'hierarchy'
+                        ? {
+                            paddingLeft: `calc(1rem + ${(hierarchy.depthById.get(task.id) || 0) * 14}px)`,
+                          }
+                        : undefined
+                    }
                     className={`max-w-full min-w-0 overflow-hidden p-4 ${
+                      contextTaskIds.has(task.id) ? 'opacity-60' : ''
+                    } ${
                       task.status === 'done'
                         ? 'bg-muted/60 text-muted-foreground'
                         : needsDeadlineAttention(task)
@@ -1740,6 +1728,8 @@ export default function TaskGrid({
                           // строк за экраном: без него наведение на строку
                           // перекрашивало всю таблицу (~200мс на событие).
                           className={`[content-visibility:auto] [contain-intrinsic-size:auto_44px] ${
+                            contextTaskIds.has(task.id) ? 'opacity-60' : ''
+                          } ${
                             task.status === 'done'
                               ? 'bg-muted/60 text-muted-foreground'
                               : needsDeadlineAttention(task)

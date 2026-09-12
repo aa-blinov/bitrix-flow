@@ -50,6 +50,7 @@ function AllTasksInner() {
         limit: String(request.limit),
         query: request.query,
         sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
+        hierarchy: String(request.hierarchy),
       });
       if (requestedAssignee === 'unassigned') params.set('unassigned', 'true');
       if (workload && workload !== 'no_deadline' && workload !== 'overdue') {
@@ -60,6 +61,7 @@ function AllTasksInner() {
       const data = await response.json();
       return {
         tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        ancestors: (Array.isArray(data.ancestors) ? data.ancestors : []).map(convertBxTask),
         total: Number(data.total) || 0,
       };
     },

@@ -327,6 +327,33 @@ export async function GET(req: NextRequest) {
   const mirroredTasks = page?.tasks || [];
   const total = page?.total?.[0]?.value || 0;
 
+  // Для группировки «Иерархия задач»: родитель найденной подзадачи может не
+  // попасть на страницу, и без него ветка выглядела бы плоской. Дотягиваем
+  // предков по цепочке — глубина в Битриксе небольшая, но цикл ограничиваем.
+  const ancestors: any[] = [];
+  if (req.nextUrl.searchParams.get('hierarchy') === 'true' && mirroredTasks.length) {
+    const known = new Set<string>(mirroredTasks.map((task: any) => String(task.id ?? task.ID)));
+    const parentOf = (task: any) => {
+      const parent = String(task.parentId ?? task.PARENT_ID ?? '0');
+      return parent && parent !== '0' ? parent : null;
+    };
+    let wanted: string[] = mirroredTasks
+      .map(parentOf)
+      .filter((id: string | null): id is string => Boolean(id));
+    for (let depth = 0; depth < 5 && wanted.length; depth += 1) {
+      const missing = [...new Set(wanted)].filter((id) => !known.has(id));
+      if (!missing.length) break;
+      const batch = await db
+        .collection('task_mirror')
+        .aggregate([...stages, { $match: { taskId: { $in: missing } } }, { $replaceWith: '$data' }])
+        .toArray();
+      if (!batch.length) break;
+      for (const task of batch) known.add(String(task.id ?? task.ID));
+      ancestors.push(...batch);
+      wanted = batch.map(parentOf).filter((id: string | null): id is string => Boolean(id));
+    }
+  }
+
   if (total === 0 && !hasMirroredTasks) {
     const allTasks: any[] = [];
     let start = 0;
@@ -370,6 +397,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     tasks: mirroredTasks.map(toTaskListItem),
+    ancestors: ancestors.map(toTaskListItem),
     total,
     nextOffset: offset + limit < total ? offset + limit : null,
     page: requestedPage,
