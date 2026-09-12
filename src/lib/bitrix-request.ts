@@ -9,6 +9,8 @@ const ipv4Agent = new Agent({ family: 4, keepAlive: true, maxSockets: 8 });
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_PARALLEL = 3;
+// Сколько групп адресов перебрать, прежде чем сдаться.
+const MAX_GROUPS = 3;
 
 // Some Bitrix24 portals return several A records. We probe a handful in
 // parallel and take the first to answer — a single dead edge (and they
@@ -16,6 +18,36 @@ const MAX_PARALLEL = 3;
 // must not stall the whole call for the full timeout, three times in a row.
 // lastGoodAddress biases the next attempt to the address that just answered.
 let lastGoodAddress: string | null = null;
+// Мёртвые edge-адреса портала (у eora.bitrix24.ru это вся группа 46.235.53.*)
+// висят на TCP-connect до таймаута. Раз наткнувшись, не выбираем их снова
+// ближайшие минуты: иначе каждый третий запрос падал целиком.
+const deadAddresses = new Map<string, number>();
+const DEAD_TTL_MS = 5 * 60 * 1000;
+
+function isAlive(address: string) {
+  const until = deadAddresses.get(address);
+  if (!until) return true;
+  if (until > Date.now()) return false;
+  deadAddresses.delete(address);
+  return true;
+}
+
+function markDead(address: string) {
+  deadAddresses.set(address, Date.now() + DEAD_TTL_MS);
+  if (lastGoodAddress === address) lastGoodAddress = null;
+}
+
+/** Соединение не состоялось — запрос точно не дошёл, повтор безопасен. */
+function isConnectFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = (error as NodeJS.ErrnoException)?.code || '';
+  return (
+    message.includes('TIMEOUT') ||
+    ['ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET', 'EPIPE', 'EAI_AGAIN'].includes(
+      code,
+    )
+  );
+}
 
 interface AddressEntry {
   address: string;
@@ -36,12 +68,14 @@ async function resolveAddresses(hostname: string): Promise<AddressEntry[]> {
 
 function pickProbes(pool: AddressEntry[], n: number): AddressEntry[] {
   // Prefer the address that answered last call; pad with the rest shuffled.
-  const rest = pool.filter((a) => a.address !== lastGoodAddress);
+  const alive = pool.filter((entry) => isAlive(entry.address));
+  const usable = alive.length ? alive : pool;
+  const rest = usable.filter((a) => a.address !== lastGoodAddress);
   for (let i = rest.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [rest[i], rest[j]] = [rest[j], rest[i]];
   }
-  const head = lastGoodAddress ? pool.filter((a) => a.address === lastGoodAddress) : [];
+  const head = lastGoodAddress ? usable.filter((a) => a.address === lastGoodAddress) : [];
   return [...head, ...rest].slice(0, n);
 }
 
@@ -118,6 +152,7 @@ export async function getBitrixFileStream(url: string): Promise<{
       lastGoodAddress = entry.address;
       return { status: response.statusCode || 200, headers: response.headers, stream: response };
     } catch (error) {
+      if (isConnectFailure(error)) markDead(entry.address);
       lastError = error;
     }
   }
@@ -135,45 +170,65 @@ export async function postBitrixJson(
   // POST mutations are not idempotent: racing them across several Bitrix IPs
   // can create duplicate tasks, comments and time entries. Parallel probes are
   // therefore opt-in for known read-only callers only.
-  const probes = pickProbes(pool, parallel ? MAX_PARALLEL : 1);
+  const order = pickProbes(pool, pool.length);
+  const groupSize = parallel ? MAX_PARALLEL : 1;
   const body = sendJson
     ? JSON.stringify(params)
     : new URLSearchParams(params as Record<string, string>).toString();
 
-  // Race a handful of addresses against the same timeout. First success wins;
-  // the rest are torn down by abort. AnyConnect error or 5xx from a probe is
-  // ignored unless EVERY probe fails, in which case we report a timeout.
-  const attempts = probes.map(async (entry) => {
-    try {
-      const { status, raw } = await httpRequest(
-        url,
-        body,
-        sendJson,
-        CONNECT_TIMEOUT_MS,
-        entry.address,
-      );
-      if (status >= 500) throw new Error(`BITRIX24_HTTP_${status}`);
-      return { entry, status, raw };
-    } catch (error) {
-      throw error;
-    }
-  });
+  const attempt = async (entry: AddressEntry) => {
+    const { status, raw } = await httpRequest(
+      url,
+      body,
+      sendJson,
+      CONNECT_TIMEOUT_MS,
+      entry.address,
+    );
+    if (status >= 500) throw new Error(`BITRIX24_HTTP_${status}`);
+    return { entry, status, raw };
+  };
 
-  try {
-    const winner = await Promise.any(attempts);
-    lastGoodAddress = winner.entry.address;
+  // Группу адресов гоняем наперегонки (для чтения) или по одному (для мутаций).
+  // Если вся группа не смогла соединиться, берём следующую: раньше запрос
+  // падал целиком, стоило выбору попасть на мёртвые адреса.
+  let lastError: unknown = new Error('BITRIX24_REQUEST_FAILED');
+  for (let start = 0; start < order.length && start < groupSize * MAX_GROUPS; start += groupSize) {
+    const group = order.slice(start, start + groupSize);
+    if (!group.length) break;
     try {
-      return JSON.parse(winner.raw);
-    } catch {
-      throw new Error(`BITRIX24_INVALID_RESPONSE (${winner.status})`);
+      const winner = await Promise.any(group.map(attempt));
+      lastGoodAddress = winner.entry.address;
+      try {
+        return JSON.parse(winner.raw);
+      } catch {
+        throw new Error(`BITRIX24_INVALID_RESPONSE (${winner.status})`);
+      }
+    } catch (error) {
+      const failures =
+        error instanceof AggregateError ? error.errors : Array.isArray(error) ? error : [error];
+      group.forEach((entry, index) => {
+        if (isConnectFailure(failures[index] ?? failures[0])) markDead(entry.address);
+      });
+      lastError = failures[failures.length - 1] ?? error;
+      // Сервер ответил (5xx, битый JSON) — адрес живой, повтор ничего не даст
+      // и для мутации был бы опасен.
+      if (!failures.every((failure) => isConnectFailure(failure))) break;
     }
-  } catch (errors) {
-    const list = Array.isArray(errors) ? errors : [errors];
-    const last = list[list.length - 1];
-    throw last instanceof Error ? last : new Error('BITRIX24_REQUEST_FAILED');
   }
+  throw lastError instanceof Error ? lastError : new Error('BITRIX24_REQUEST_FAILED');
 }
 
 // Поллер задач стартует в src/instrumentation.ts, при старте сервера.
 // Раньше он же запускался побочным эффектом импорта этого модуля: лишний
 // путь запуска, который срабатывал только после первого запроса.
+
+// Точки для тестов: перебор адресов — самая хрупкая часть общения с порталом.
+export const __testing = {
+  isConnectFailure,
+  markDead,
+  pickProbes,
+  reset: () => {
+    deadAddresses.clear();
+    lastGoodAddress = null;
+  },
+};
