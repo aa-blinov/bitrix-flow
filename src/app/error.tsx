@@ -2,6 +2,7 @@
 
 // Экран падения рендера: без него пользователь видел пустую страницу, а причина
 // оставалась только в консоли.
+import Link from 'next/link';
 import { useEffect } from 'react';
 
 export default function Error({
@@ -32,12 +33,12 @@ export default function Error({
           >
             Повторить
           </button>
-          <a
+          <Link
             href="/"
             className="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-muted"
           >
             На главную
-          </a>
+          </Link>
         </div>
       </div>
     </main>
