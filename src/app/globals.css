@@ -180,3 +180,24 @@ body {
     @apply font-sans;
   }
 }
+
+/* Уважаем системную настройку «меньше движения»: анимации и плавная прокрутка
+   вызывают у части пользователей головокружение, а вестибулярные нарушения —
+   это не про вкус. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Крутилка сообщает о ходе загрузки — её оставляем, иначе экран выглядит
+     зависшим. Просто крутим спокойнее. */
+  .animate-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
