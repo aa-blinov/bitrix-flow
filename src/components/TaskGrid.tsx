@@ -886,6 +886,8 @@ export default function TaskGrid({
     ? Math.max(1, Math.ceil(effectiveTotal / pageSize))
     : pageCount;
   const pageStart = (page - 1) * pageSize;
+  // Подтянутые родители в счёт страницы не идут: это контекст, а не результат.
+  const matchedOnPage = loadPage ? tasks.length : orderedTasks.length;
   const pageTasks = loadPage ? orderedTasks : orderedTasks.slice(pageStart, pageStart + pageSize);
   const loadNextPage = async () => {
     if (loadPage) {
@@ -1905,10 +1907,10 @@ export default function TaskGrid({
         {(pageCount > 1 || hasMore) && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-6">
             <p className="text-sm text-muted-foreground">
-              {orderedTasks.length ? pageStart + 1 : 0}–
-              {loadPage
-                ? pageStart + orderedTasks.length
-                : Math.min(pageStart + pageSize, orderedTasks.length)}{' '}
+              {/* Считаем только совпадения: в иерархии к ним добавляются
+                  родители-контекст, и «1–52 из 2045» вводило в заблуждение. */}
+              {matchedOnPage ? pageStart + 1 : 0}–
+              {loadPage ? pageStart + matchedOnPage : Math.min(pageStart + pageSize, matchedOnPage)}{' '}
               из {effectiveTotal || tasks.length}
               {effectiveTotal ? `, страница ${page} из ${totalPageCount}` : ''}
             </p>
