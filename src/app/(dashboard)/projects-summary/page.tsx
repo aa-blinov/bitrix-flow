@@ -53,7 +53,6 @@ export default function ProjectsSummaryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [calculatedAt, setCalculatedAt] = useState('');
-  const memberId = useKanbanStore((state) => state.memberId);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [dateField, setDateField] = useState<'changed' | 'created'>('changed');
@@ -61,36 +60,45 @@ export default function ProjectsSummaryPage() {
   const filtersRef = useRef({ fromDate, toDate, dateField });
   filtersRef.current = { fromDate, toDate, dateField };
 
-  const load = useCallback(async (force = false, silent = false) => {
-    const memberId = localStorage.getItem('bitrix_member_id') || '';
-    if (!memberId) return;
-    if (!silent) setIsLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      if (force) params.set('refresh', '1');
-      if (filtersRef.current.fromDate) params.set('from', filtersRef.current.fromDate);
-      if (filtersRef.current.toDate) params.set('to', filtersRef.current.toDate);
-      params.set('date_field', filtersRef.current.dateField);
-      const response = await fetch(`/api/projects/summary?${params}`, {
-        headers: { 'X-Member-Id': memberId },
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Не удалось получить сводку');
-      setProjects(data.projects || []);
-      setCalculatedAt(data.calculatedAt || '');
-      if (data.refreshing) {
-        if (refreshTimer.current) clearTimeout(refreshTimer.current);
-        refreshTimer.current = setTimeout(() => {
-          void load(false, true);
-        }, 3000);
+  // member_id берём из стора: в localStorage он появляется только после
+  // OAuth-редиректа, и на свежем устройстве страница зависала в «Загрузка…»,
+  // потому что выход по !memberId не снимал флаг.
+  const memberId = useKanbanStore((state) => state.memberId);
+  const load = useCallback(
+    async (force = false, silent = false) => {
+      if (!memberId) {
+        setIsLoading(false);
+        return;
       }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Не удалось получить сводку');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      if (!silent) setIsLoading(true);
+      setError('');
+      try {
+        const params = new URLSearchParams();
+        if (force) params.set('refresh', '1');
+        if (filtersRef.current.fromDate) params.set('from', filtersRef.current.fromDate);
+        if (filtersRef.current.toDate) params.set('to', filtersRef.current.toDate);
+        params.set('date_field', filtersRef.current.dateField);
+        const response = await fetch(`/api/projects/summary?${params}`, {
+          headers: { 'X-Member-Id': memberId },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Не удалось получить сводку');
+        setProjects(data.projects || []);
+        setCalculatedAt(data.calculatedAt || '');
+        if (data.refreshing) {
+          if (refreshTimer.current) clearTimeout(refreshTimer.current);
+          refreshTimer.current = setTimeout(() => {
+            void load(false, true);
+          }, 3000);
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'Не удалось получить сводку');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [memberId],
+  );
 
   useEffect(() => {
     void load();
