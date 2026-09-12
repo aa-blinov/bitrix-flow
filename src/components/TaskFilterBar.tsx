@@ -219,7 +219,9 @@ export default function TaskFilterBar({
         <DropdownMenuContent
           align="start"
           collisionPadding={8}
-          className={stacked ? 'max-h-80 w-[calc(100vw-2rem)] overflow-y-auto' : undefined}
+          className={
+            stacked ? 'max-h-80 w-[calc(100vw-2rem)] overflow-y-auto' : 'min-w-48'
+          }
         >
           {drillField ? (
             <>
