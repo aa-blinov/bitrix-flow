@@ -34,7 +34,14 @@ export type FilterField = {
   options: FilterOption[];
   /** Поле-переключатель: выбирается без списка значений. */
   toggle?: boolean;
+  /** Как в Asana: одно поле можно фильтровать сразу по нескольким значениям. */
+  multi?: boolean;
 };
+
+/** Значения мультиполя хранятся строкой «a,b,c» — так же уходят на сервер. */
+export function splitValues(value: string, empty: string): string[] {
+  return value === empty ? [] : value.split(',').filter(Boolean);
+}
 
 export type FilterValues = Record<FilterFieldKey, string>;
 
@@ -45,7 +52,18 @@ export type FilterPreset = {
 };
 
 function optionLabel(field: FilterField, value: string): string {
-  return field.options.find((option) => option.value === value)?.label || value;
+  if (!field.multi) return field.options.find((option) => option.value === value)?.label || value;
+  const selected = splitValues(value, field.empty);
+  const first = field.options.find((option) => option.value === selected[0])?.label || selected[0];
+  return selected.length > 1 ? `${first} +${selected.length - 1}` : first;
+}
+
+function toggleValue(field: FilterField, current: string, option: string): string {
+  const selected = splitValues(current, field.empty);
+  const next = selected.includes(option)
+    ? selected.filter((item) => item !== option)
+    : [...selected, option];
+  return next.length ? next.join(',') : field.empty;
 }
 
 export default function TaskFilterBar({
@@ -69,7 +87,10 @@ export default function TaskFilterBar({
   stacked?: boolean;
 }) {
   const active = fields.filter((field) => values[field.key] !== field.empty);
-  const available = fields.filter((field) => values[field.key] === field.empty);
+  // В меню держим все поля, а не только незанятые: иначе после первой галочки
+  // поле уходило из списка, подменю размонтировалось и отметить второе
+  // значение было нельзя.
+  const available = fields;
 
   return (
     <div className={stacked ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'}>
@@ -143,8 +164,24 @@ export default function TaskFilterBar({
               {field.options.map((option) => (
                 <DropdownMenuCheckboxItem
                   key={option.value}
-                  checked={values[field.key] === option.value}
-                  onCheckedChange={() => onChange(field.key, option.value)}
+                  checked={
+                    field.multi
+                      ? splitValues(values[field.key], field.empty).includes(option.value)
+                      : values[field.key] === option.value
+                  }
+                  onSelect={(event) => {
+                    // Мультивыбор: меню остаётся открытым, чтобы отметить
+                    // несколько значений подряд.
+                    if (field.multi) event.preventDefault();
+                  }}
+                  onCheckedChange={() =>
+                    onChange(
+                      field.key,
+                      field.multi
+                        ? toggleValue(field, values[field.key], option.value)
+                        : option.value,
+                    )
+                  }
                 >
                   {option.label}
                   {option.hint ? (
@@ -163,7 +200,6 @@ export default function TaskFilterBar({
             variant="outline"
             size="sm"
             className={`${toolbarControl} ${stacked ? 'w-full justify-center' : ''}`}
-            disabled={available.length === 0}
           >
             <Plus size={14} />
             Фильтр
@@ -185,17 +221,33 @@ export default function TaskFilterBar({
               <DropdownMenuSub key={field.key}>
                 <DropdownMenuSubTrigger>{field.label}</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                  {field.options.map((option) => (
-                    <DropdownMenuItem
-                      key={option.value}
-                      onClick={() => onChange(field.key, option.value)}
-                    >
-                      {option.label}
-                      {option.hint ? (
-                        <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
+                  {field.options.map((option) =>
+                    field.multi ? (
+                      <DropdownMenuCheckboxItem
+                        key={option.value}
+                        checked={splitValues(values[field.key], field.empty).includes(option.value)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={() =>
+                          onChange(field.key, toggleValue(field, values[field.key], option.value))
+                        }
+                      >
+                        {option.label}
+                        {option.hint ? (
+                          <span className="ml-1 text-muted-foreground">{option.hint}</span>
+                        ) : null}
+                      </DropdownMenuCheckboxItem>
+                    ) : (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => onChange(field.key, option.value)}
+                      >
+                        {option.label}
+                        {option.hint ? (
+                          <span className="ml-1 text-muted-foreground">{option.hint}</span>
+                        ) : null}
+                      </DropdownMenuItem>
+                    ),
+                  )}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ),

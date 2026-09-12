@@ -110,9 +110,24 @@ export async function GET(req: NextRequest) {
       { responsibleName: { $regex: escapedQuery, $options: 'i' } },
     ];
   }
-  if (assigneeId !== 'all') filter.responsibleId = assigneeId;
+  // Значения приходят списком через запятую: в Asana одно поле фильтруется
+  // сразу по нескольким значениям, и это самый частый сценарий (двое коллег,
+  // пара проектов, несколько тегов).
+  const many = (value: string) =>
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  if (assigneeId !== 'all') {
+    const ids = many(assigneeId);
+    filter.responsibleId = ids.length > 1 ? { $in: ids } : ids[0];
+  }
   if (unassigned) filter.responsibleId = { $in: ['', '0'] };
-  if (projectId !== 'all') filter.groupId = projectId;
+  if (projectId !== 'all') {
+    const ids = many(projectId);
+    filter.groupId = ids.length > 1 ? { $in: ids } : ids[0];
+  }
   if (stageId !== 'all') filter.stageId = stageId;
   if (priority === 'high') filter.priorityValue = { $in: ['2', 2, '3', 3, '4', 4] };
   if (hasDeadline) {
@@ -149,10 +164,11 @@ export async function GET(req: NextRequest) {
   // Теги живут в тексте задачи, а не отдельным полем, поэтому фильтруем
   // выражением по названию и описанию — тем же разбором, что и в UI.
   if (tag !== 'all') {
+    const tags = many(tag);
     filter.$and = [
       ...(filter.$and || []),
       {
-        $or: [
+        $or: tags.flatMap((one) => [
           // Штатный тег задачи. Сравниваем регэкспом с опцией i, а не через
           // $toLower: он не приводит кириллицу, из-за чего «Спринт 2» никогда
           // не совпадал с выбранным в фильтре значением.
@@ -165,7 +181,7 @@ export async function GET(req: NextRequest) {
                   in: {
                     $regexMatch: {
                       input: { $ifNull: ['$$name', ''] },
-                      regex: `^${escapeRegex(tag)}$`,
+                      regex: `^${escapeRegex(one)}$`,
                       options: 'i',
                     },
                   },
@@ -185,12 +201,12 @@ export async function GET(req: NextRequest) {
                     { $ifNull: ['$description', ''] },
                   ],
                 },
-                regex: mongoHashtagMatch(tag),
+                regex: mongoHashtagMatch(one),
                 options: 'i',
               },
             },
           },
-        ],
+        ]),
       },
     ];
   }

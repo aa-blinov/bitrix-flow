@@ -1307,6 +1307,7 @@ export default function TaskGrid({
       key: 'assignee',
       label: 'Исполнитель',
       empty: 'all',
+      multi: true,
       options: users.map((user) => ({ value: user.id, label: user.name })),
     },
     ...(showProject
@@ -1315,6 +1316,7 @@ export default function TaskGrid({
             key: 'project' as const,
             label: 'Проект',
             empty: 'all',
+            multi: true,
             options: [
               { value: NO_PROJECT_ID, label: NO_PROJECT_NAME },
               ...projects.map((project) => ({ value: project.id, label: project.name })),
@@ -1326,6 +1328,7 @@ export default function TaskGrid({
       key: 'tag',
       label: 'Тег',
       empty: 'all',
+      multi: true,
       options: availableTags.map((item) => ({
         value: item.tag,
         label: item.label,
