@@ -12,9 +12,24 @@ STAMP="$(date +%Y-%m-%d_%H-%M)"
 set -a && source "$DIR/.env.local" && set +a
 
 mkdir -p "$OUT"
-docker compose --env-file "$DIR/.env.local" exec -T mongodb mongodump \
-  --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin \
-  --db "${MONGO_DB:-bitrix_kanban}" --archive --gzip > "$OUT/bitrix_kanban_$STAMP.gz"
+FILE="$OUT/bitrix_kanban_$STAMP.gz"
 
-echo "[backup] готово: $OUT/bitrix_kanban_$STAMP.gz ($(du -h "$OUT/bitrix_kanban_$STAMP.gz" | cut -f1))"
+dump() {
+  docker compose --env-file "$DIR/.env.local" exec -T mongodb mongodump \
+    --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin \
+    --db "${MONGO_DB:-bitrix_kanban}" --archive --gzip
+}
+
+# В дампе лежат OAuth-токены портала и хеши сессий, поэтому архив шифруем:
+# файл может уехать в облако или на чужой диск отдельно от сервера.
+if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
+  FILE="$FILE.enc"
+  dump | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_PASSPHRASE -out "$FILE"
+else
+  echo "[backup] BACKUP_PASSPHRASE не задан — архив будет без шифрования" >&2
+  dump > "$FILE"
+fi
+
+echo "[backup] готово: $FILE ($(du -h "$FILE" | cut -f1))"
 find "$OUT" -name 'bitrix_kanban_*.gz' -mtime "+$KEEP_DAYS" -delete
+find "$OUT" -name 'bitrix_kanban_*.gz.enc' -mtime "+$KEEP_DAYS" -delete

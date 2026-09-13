@@ -53,8 +53,17 @@ records are hashed and stored in MongoDB, so logging out revokes the current dev
 KEEP_DAYS=30 ./scripts/backup-mongo.sh
 ```
 
-Schedule it from the host's cron; the dump is a gzipped archive restorable with
-`mongorestore --archive --gzip`. `backups/` is git-ignored.
+Schedule it from the host's cron. `backups/` is git-ignored. Set
+`BACKUP_PASSPHRASE` in `.env.local` — the dump carries portal OAuth tokens and
+session hashes, so the archive is encrypted with AES-256 whenever the phrase is
+present. Restore:
+
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE \
+  -in backups/bitrix_kanban_<stamp>.gz.enc | \
+  docker compose exec -T mongodb mongorestore --archive --gzip --drop \
+  --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin
+```
 
 ### Health and monitoring
 
