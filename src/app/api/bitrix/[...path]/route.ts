@@ -603,9 +603,29 @@ async function refreshToken(token: any): Promise<string | null> {
   }
 }
 
+// Читающие методы. Всё остальное меняет данные и доступно только POST: при
+// SameSite=Lax кука уходит с чужого сайта при обычном переходе по ссылке, и
+// GET-мутация вроде tasks.task.delete сработала бы как CSRF.
+const READ_ONLY_METHODS = new Set([
+  'tasks.task.list',
+  'tasks.task.get',
+  'task.stages.get',
+  'task.checklistitem.getlist',
+  'task.elapseditem.getlist',
+  'sonet_group.get',
+  'sonet_group.user.get',
+  'user.get',
+  'user.current',
+  'im.dialog.messages.get',
+]);
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
-  return handleRequest(req, path.join('.'));
+  const method = path.join('.');
+  if (!READ_ONLY_METHODS.has(method)) {
+    return NextResponse.json({ error: 'METHOD_REQUIRES_POST', method }, { status: 405 });
+  }
+  return handleRequest(req, method);
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
