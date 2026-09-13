@@ -4,6 +4,7 @@
 // оставалась только в консоли.
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { reportError } from '@/lib/error-reporter';
 
 export default function Error({
   error,
@@ -14,6 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Ошибка страницы', error);
+    reportError(error, { route: window.location.pathname, tags: { source: 'error-boundary' } });
   }, [error]);
 
   return (

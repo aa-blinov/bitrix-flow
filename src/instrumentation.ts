@@ -7,3 +7,10 @@ export async function register() {
   const { startBackgroundSync } = await import('./lib/background-sync');
   startBackgroundSync();
 }
+
+// Next вызывает этот хук на каждую необработанную ошибку серверного рендера и
+// route handler'а — единственная точка, где их видно целиком.
+export async function onRequestError(error: unknown, request: { path?: string; method?: string }) {
+  const { reportError } = await import('./lib/error-reporter');
+  reportError(error, { route: request?.path, method: request?.method });
+}

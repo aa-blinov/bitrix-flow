@@ -65,6 +65,31 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE \
   --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin
 ```
 
+### Errors and alerting
+
+Unhandled errors go to GlitchTip (Sentry-compatible) through a ~80-line reporter
+instead of the full SDK: server-side via the `onRequestError` instrumentation
+hook, browser-side via `window.onerror` / `unhandledrejection` and both error
+boundaries. Set `GLITCHTIP_DSN` in `.env.local`; without it reporting is off, so
+local runs and tests stay silent.
+
+The DSN is also baked into the client bundle at build time
+(`NEXT_PUBLIC_GLITCHTIP_DSN` build arg, wired in `docker-compose.yml`), and
+`APP_RELEASE` tags events with a release — pass the commit:
+
+```bash
+APP_RELEASE=$(git rev-parse --short HEAD) docker compose --env-file .env.local up -d --build
+```
+
+External liveness check, for the host's cron (better from another machine):
+
+```bash
+*/2 * * * * cd /path/to/bitrix-kanban && ./scripts/health-watch.sh >> backups/health.log 2>&1
+```
+
+It calls `/api/health` and, on failure, reports a `HealthCheckFailed` event to
+the same project — alerts then travel the usual route.
+
 ### Health and monitoring
 
 `GET /api/health` answers without a session and pings MongoDB, so `docker compose ps` shows

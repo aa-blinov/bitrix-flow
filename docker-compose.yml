@@ -8,6 +8,9 @@ services:
   app:
     build:
       context: .
+      args:
+        NEXT_PUBLIC_GLITCHTIP_DSN: ${GLITCHTIP_DSN:-}
+        APP_RELEASE: ${APP_RELEASE:-dev}
     restart: unless-stopped
     logging: *logging
     env_file:
@@ -19,6 +22,9 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3000
       MOCK_B24: ${MOCK_B24:-0}
+      # Ошибки сервера уезжают в GlitchTip; без переменной отчёты отключены.
+      GLITCHTIP_DSN: ${GLITCHTIP_DSN:-}
+      APP_RELEASE: ${APP_RELEASE:-dev}
     expose:
       - '3000'
     # Живость приложения, а не только контейнера: /api/health пингует Mongo,

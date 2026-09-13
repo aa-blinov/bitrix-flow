@@ -1,6 +1,9 @@
 'use client';
 
 // Последний рубеж: падение в корневом layout, когда своя разметка уже недоступна.
+import { useEffect } from 'react';
+import { reportError } from '@/lib/error-reporter';
+
 export default function GlobalError({
   error,
   reset,
@@ -8,6 +11,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportError(error, { route: window.location.pathname, tags: { source: 'global-error' } });
+  }, [error]);
+
   return (
     <html lang="ru">
       <body
