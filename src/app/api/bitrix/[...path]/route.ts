@@ -203,7 +203,42 @@ async function refreshMirrorAfterMutation(
   await syncTaskMirror(memberId, taskId, 'ONTASKUPDATE');
 }
 
+// Прокси ходит в портал с токеном приложения, поэтому список методов закрыт:
+// с украденной сессией иначе открывался бы весь REST (пользователи, CRM, диск,
+// бизнес-процессы), а не те действия, которые умеет интерфейс.
+const ALLOWED_METHODS = new Set([
+  'tasks.task.list',
+  'tasks.task.get',
+  'tasks.task.add',
+  'tasks.task.update',
+  'tasks.task.delete',
+  'tasks.task.chat.message.send',
+  'task.stages.get',
+  'task.stages.add',
+  'task.stages.update',
+  'task.checklistitem.getlist',
+  'task.checklistitem.add',
+  'task.checklistitem.update',
+  'task.checklistitem.complete',
+  'task.checklistitem.renew',
+  'task.checklistitem.delete',
+  'task.elapseditem.getlist',
+  'task.elapseditem.add',
+  'sonet_group.get',
+  'sonet_group.create',
+  'sonet_group.update',
+  'sonet_group.user.get',
+  'sonet_group.user.add',
+  'sonet_group.user.delete',
+  'user.get',
+  'user.current',
+  'im.dialog.messages.get',
+]);
+
 async function handleRequest(req: NextRequest, method: string) {
+  if (!ALLOWED_METHODS.has(method)) {
+    return NextResponse.json({ error: 'METHOD_NOT_ALLOWED', method }, { status: 403 });
+  }
   if (isMockEnabled()) {
     const params: Record<string, string> = {};
     req.nextUrl.searchParams.forEach((value, key) => {

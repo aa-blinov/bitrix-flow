@@ -45,11 +45,23 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     return NextResponse.json({ error: 'FILE_UNAVAILABLE' }, { status: 504 });
   }
 
-  const disposition = req.nextUrl.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+  const contentType = String(upstream.headers['content-type'] || 'application/octet-stream');
+  // Файл приходит с портала и отдаётся с НАШЕГО домена: html или svg, открытые
+  // inline, выполнили бы скрипт в контексте приложения. Встраиваем только то,
+  // что браузер не исполняет, остальное — вложением.
+  const inlineSafe =
+    /^(image\/(png|jpe?g|gif|webp|avif|bmp|x-icon)|application\/pdf|text\/plain|audio\/|video\/)/i.test(
+      contentType,
+    );
+  const disposition =
+    req.nextUrl.searchParams.get('download') === '1' || !inlineSafe ? 'attachment' : 'inline';
   const contentLength = upstream.headers['content-length'];
   return new NextResponse(Readable.toWeb(upstream.stream) as ReadableStream, {
     headers: {
-      'Content-Type': String(upstream.headers['content-type'] || 'application/octet-stream'),
+      'Content-Type': contentType,
+      'X-Content-Type-Options': 'nosniff',
+      // Даже если тип соврал: запрещаем странице с вложением что-либо исполнять.
+      'Content-Security-Policy': "default-src 'none'; sandbox",
       ...(contentLength ? { 'Content-Length': String(contentLength) } : {}),
       'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(name)}`,
       // Файл в Битриксе неизменяем: подписанная ссылка живёт недолго, а сам

@@ -137,6 +137,16 @@ async function enrichTaskTitle(memberId: string, details: ReturnType<typeof even
   }
 }
 
+const INSTALL_TRUST_WINDOW_MS = 60 * 60 * 1000;
+
+/** Окно, в котором портал ещё вправе назвать свой application_token. */
+function withinInstallWindow(record: Record<string, unknown> | null) {
+  const stamp = record?.installed_at || record?.updated_at;
+  const installedAt = stamp instanceof Date ? stamp.getTime() : Date.parse(String(stamp || ''));
+  if (!Number.isFinite(installedAt)) return false;
+  return Date.now() - installedAt < INSTALL_TRUST_WINDOW_MS;
+}
+
 // Public Bitrix24 handler: persists a history record then forwards it to SSE.
 export async function POST(req: NextRequest) {
   try {
@@ -150,24 +160,27 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const tokens = await db
       .collection('user_tokens')
-      .findOne({ member_id: String(memberId) }, { projection: { application_token: 1 } });
+      .findOne(
+        { member_id: String(memberId) },
+        { projection: { application_token: 1, installed_at: 1, updated_at: 1 } },
+      );
     const receivedToken = String(body.auth?.application_token || '');
-    let expectedToken =
+    const expectedToken =
       typeof tokens?.application_token === 'string' ? tokens.application_token : '';
-    // Old portal installations created before this check may not have stored
-    // the token. Bootstrap it from the first authenticated payload so that
-    // subsequent events can be verified against it.
     if (expectedToken && receivedToken && expectedToken.length === receivedToken.length) {
       const validToken = timingSafeEqual(Buffer.from(expectedToken), Buffer.from(receivedToken));
       if (!validToken) return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
-    } else if (!expectedToken && receivedToken) {
+    } else if (!expectedToken && receivedToken && withinInstallWindow(tokens)) {
+      // Установки, сделанные до появления этой проверки, токен не сохраняли.
+      // Подхватываем его с первого события, но только в течение часа после
+      // установки: иначе любой, кто знает member_id, записал бы свой токен и
+      // получил право слать события от имени портала.
       await db
         .collection('user_tokens')
         .updateOne(
           { member_id: String(memberId) },
           { $set: { application_token: receivedToken, updated_at: new Date() } },
         );
-      expectedToken = receivedToken;
     } else {
       return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
     }

@@ -1,9 +1,5 @@
 import { getDb } from '@/lib/mongo';
-import {
-  hasActiveStoredSession,
-  hasActiveStoredSessionById,
-  upsertStoredSession,
-} from '@/lib/session-store';
+import { hasActiveStoredSessionById } from '@/lib/session-store';
 import { getSessionId } from '@/lib/session';
 
 /**
@@ -13,13 +9,11 @@ import { getSessionId } from '@/lib/session';
  * present in the database.
  */
 export async function getAuthorizedMemberId(session?: string): Promise<string | null> {
-  // Подпись проверяется всегда. Mongo используем только как best-effort lookup,
-  // потому что proxy пропускает запрос только при валидной подписи. Если запись
-  // в sessions потерялась (например, после `wipe`), но кука ещё живая — мы не
-  // должны выкидывать пользователя на логин. Восстанавливаем запись на лету.
+  // Подпись проверяется всегда, запись в sessions — тоже. Раньше запись
+  // воссоздавалась на лету по живой куке: выход из системы переставал что-либо
+  // отзывать, и украденная кука работала все восемь часов до истечения.
   const sessionId = await getSessionId(session);
   if (!sessionId) return null;
-  await upsertStoredSession(sessionId);
   const active = await hasActiveStoredSessionById(sessionId);
   if (!active) return null;
   const db = await getDb();

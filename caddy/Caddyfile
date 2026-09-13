@@ -34,7 +34,7 @@ bitrix-flow.duckdns.org {
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "frame-ancestors 'self' https://*.bitrix24.ru https://*.bitrix24.com"
+        Content-Security-Policy "frame-ancestors 'self' https://*.bitrix24.ru https://*.bitrix24.com; object-src 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
 }

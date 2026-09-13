@@ -75,7 +75,9 @@ export async function GET(req: NextRequest) {
   const offset = req.nextUrl.searchParams.has('page')
     ? (requestedPage - 1) * limit
     : Math.max(0, Number(req.nextUrl.searchParams.get('offset')) || 0);
-  const query = req.nextUrl.searchParams.get('query')?.trim() || '';
+  // Длинная строка поиска — это полный скан зеркала регэкспом: режем ввод,
+  // иначе один запрос способен занять базу надолго.
+  const query = (req.nextUrl.searchParams.get('query')?.trim() || '').slice(0, 200);
   const status = req.nextUrl.searchParams.get('status') || 'all';
   const assigneeId = req.nextUrl.searchParams.get('assigneeId') || 'all';
   const projectId = req.nextUrl.searchParams.get('projectId') || 'all';
@@ -128,7 +130,10 @@ export async function GET(req: NextRequest) {
     value
       .split(',')
       .map((item) => item.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      // Разумный предел на мультивыбор: столько значений не бывает в UI, а
+      // $in на тысячи элементов — уже отказ в обслуживании.
+      .slice(0, 100);
 
   const oneOf = (value: string) => {
     const ids = many(value);
