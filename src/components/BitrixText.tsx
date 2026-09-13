@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { parseBitrixNodes, type BitrixNode } from '@/lib/bitrix-markup';
+import { safeHref, safeImageSrc } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 
 function render(nodes: BitrixNode[]): ReactNode[] {
@@ -10,7 +11,9 @@ function render(nodes: BitrixNode[]): ReactNode[] {
       return (
         <a
           key={index}
-          href={node.href}
+          // Текст задачи приходит из Битрикса: ссылка вида javascript:… выполнила
+          // бы скрипт в нашем контексте, поэтому схемы фильтруем.
+          href={safeHref(node.href)}
           target="_blank"
           rel="noreferrer"
           className="text-primary underline underline-offset-2"
@@ -22,7 +25,7 @@ function render(nodes: BitrixNode[]): ReactNode[] {
       return (
         <img
           key={index}
-          src={node.src}
+          src={safeImageSrc(node.src)}
           alt=""
           className="my-1 inline-block max-h-80 max-w-full rounded"
         />
