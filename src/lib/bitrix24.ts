@@ -268,7 +268,14 @@ async function bx24(method: string, params: Record<string, string> = {}): Promis
 
   const data = await res.json();
   if (data.error) {
-    throw new Error(data.error_description || data.error);
+    // Битрикс объясняет отказ по-человечески («Не указан исполнитель»), но
+    // текст лежит в message: без него пользователь видел только код ошибки.
+    const reason = data.error_description || data.message || data.error;
+    throw new Error(
+      String(reason)
+        .replace(/<br\s*\/?>/gi, ' ')
+        .trim(),
+    );
   }
   return data.result;
 }

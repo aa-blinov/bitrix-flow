@@ -2,7 +2,7 @@
 
 // Создание задачи с любого экрана. Раньше кнопка жила только внутри проекта,
 // хотя работают люди в «Моих задачах» и «Всех задачах».
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useKanbanStore } from '@/store/kanban';
 import { Button } from '@/components/ui/button';
@@ -41,15 +41,23 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
   const [projectId, setProjectId] = useState(defaultProjectId || '');
   const [assigneeId, setAssigneeId] = useState(currentUser.id || '');
   const [deadline, setDeadline] = useState('');
+  // currentUser приезжает позже первого рендера, поэтому поле исполнителя
+  // оставалось пустым и Битрикс отвечал «Не указан исполнитель».
+  useEffect(() => {
+    if (currentUser.id) setAssigneeId((current) => current || currentUser.id);
+  }, [currentUser.id]);
+  useEffect(() => {
+    if (defaultProjectId) setProjectId((current) => current || defaultProjectId);
+  }, [defaultProjectId]);
 
   const submit = async () => {
-    if (!title.trim() || !projectId) return;
+    if (!title.trim() || !projectId || !assigneeId) return;
     setSaving(true);
     try {
       await createTask({
         title: title.trim(),
         description: description.trim() || undefined,
-        responsibleId: assigneeId || undefined,
+        responsibleId: assigneeId,
         deadline: deadline || undefined,
         projectId,
       });
@@ -86,7 +94,7 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
             placeholder="Что нужно сделать"
             aria-label="Название задачи"
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && title.trim() && projectId) void submit();
+              if (event.key === 'Enter' && title.trim() && projectId && assigneeId) void submit();
             }}
           />
           <Textarea
@@ -133,7 +141,10 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
           <Button variant="outline" onClick={() => setOpen(false)}>
             Отмена
           </Button>
-          <Button onClick={() => void submit()} disabled={!title.trim() || !projectId || saving}>
+          <Button
+            onClick={() => void submit()}
+            disabled={!title.trim() || !projectId || !assigneeId || saving}
+          >
             {saving ? 'Создаём…' : 'Создать'}
           </Button>
         </DialogFooter>
