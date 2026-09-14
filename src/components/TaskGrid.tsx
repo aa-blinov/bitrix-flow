@@ -1749,17 +1749,22 @@ export default function TaskGrid({
                           {task.priority !== 'medium' && (
                             <Badge variant="outline">{priority}</Badge>
                           )}
-                          {showProject && task.projectId && task.projectId !== '0' && (
-                            <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                              <Folder className="size-3 shrink-0" />
-                              <span
-                                className="truncate"
-                                title={projectById[task.projectId]?.name || undefined}
-                              >
-                                {projectById[task.projectId]?.name || `Проект ${task.projectId}`}
+                          {/* Пока список проектов не пришёл, лучше промолчать,
+                              чем показывать «Проект 95» вместо названия. */}
+                          {showProject &&
+                            task.projectId &&
+                            task.projectId !== '0' &&
+                            projectById[task.projectId]?.name && (
+                              <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                                <Folder className="size-3 shrink-0" />
+                                <span
+                                  className="truncate"
+                                  title={projectById[task.projectId]?.name}
+                                >
+                                  {projectById[task.projectId]?.name}
+                                </span>
                               </span>
-                            </span>
-                          )}
+                            )}
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
