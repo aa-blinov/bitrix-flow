@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 import { serverCache } from '@/lib/server-cache';
+import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
@@ -181,7 +182,18 @@ async function callBitrix(token: any, method: string, params: Record<string, unk
   return response.result;
 }
 
-async function fetchAllTasks(token: any) {
+async function fetchAllTasks(token: any, memberId: string) {
+  // В mock-режиме (демо и UI-тесты) живого портала нет: считаем сводку по
+  // зеркалу в Mongo — данные те же, что видит список задач.
+  if (isMockEnabled()) {
+    const db = await getDb();
+    const mirrored = await db
+      .collection('task_mirror')
+      .find({ member_id: memberId }, { projection: { data: 1 } })
+      .toArray();
+    return mirrored.map((row) => row.data as RawTask);
+  }
+
   const tasks: RawTask[] = [];
   let start = 0;
   const visited = new Set<number>();
@@ -213,8 +225,10 @@ export async function GET(req: NextRequest) {
 
     const calculate = async () => {
       const [rawProjects, tasks] = await Promise.all([
-        callBitrix(token, 'sonet_group.get', {}),
-        fetchAllTasks(token),
+        isMockEnabled()
+          ? Promise.resolve(mockHandle('sonet_group.get', {}) as unknown[])
+          : callBitrix(token, 'sonet_group.get', {}),
+        fetchAllTasks(token, memberId),
       ]);
       return { rawProjects: rawProjects || [], tasks };
     };

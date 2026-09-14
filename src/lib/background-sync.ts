@@ -50,6 +50,11 @@ function getState(): SyncState {
 }
 
 export function startBackgroundSync(): void {
+  // В mock-режиме живого портала нет: поллер только сыпал бы 403 в логи.
+  if (process.env.MOCK_B24 === '1') {
+    console.log('[task-sync] mock-режим: фоновая синхронизация выключена');
+    return;
+  }
   const state = getState();
   if (state.intervalId) return; // идемпотентно — singleton уже идёт
 

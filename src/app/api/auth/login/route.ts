@@ -60,14 +60,20 @@ export async function POST(request: NextRequest) {
     value: session,
     httpOnly: true,
     sameSite: 'lax',
-    // Кука без Secure уедет и по http: в проде это недопустимо, а в локальной
-    // разработке по http её иначе не выставить.
-    secure:
-      process.env.NODE_ENV === 'production' ||
-      (process.env.BITRIX24_APP_URL?.startsWith('https://') ?? false),
+    // Кука без Secure уедет и по http, поэтому в проде она всегда Secure.
+    // Исключение — локальный адрес: браузер не примет Secure-куку по http,
+    // и UI-тесты на 127.0.0.1 не смогли бы войти.
+    secure: isSecureOrigin(),
     path: '/',
   });
   return response;
+}
+
+function isSecureOrigin(): boolean {
+  const appUrl = process.env.BITRIX24_APP_URL || '';
+  if (appUrl.startsWith('https://')) return true;
+  if (/^https?:\/\/(127\.0\.0\.1|localhost)/.test(appUrl)) return false;
+  return process.env.NODE_ENV === 'production';
 }
 
 /** Сравнение за постоянное время: длина пароля не должна утекать по таймингу. */

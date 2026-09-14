@@ -102,6 +102,20 @@ Caddy adds HSTS, `nosniff`, `Referrer-Policy` and a `frame-ancestors` policy tha
 embedding only into the app's own origin and Bitrix24 portals. Adjust the list in
 `caddy/Caddyfile` if the app has to run inside another host.
 
+### UI tests
+
+```bash
+npm run test:ui:db        # поднять тестовую Mongo на 27018 (tmpfs, боевая не трогается)
+npm run test:ui           # засеять данные и прогнать Playwright
+npm run test:ui:update    # обновить эталоны скриншотов
+```
+
+Тесты идут против сборки с `MOCK_B24=1` и отдельной базой `bitrix_kanban_test`:
+данные фиксированные, поэтому скриншоты сравниваются попиксельно. Покрыты девять
+экранов в двух вьюпортах (десктоп и телефон) плюс состояния: карточка задачи,
+фильтр с чипом, пустой результат, диалог создания, тёмная тема, доска. Каждый
+экран заодно проверяется на ошибки в консоли.
+
 ### UI checks
 
 The interface is audited with axe-core (WCAG 2.1 A/AA plus best practice) on both a 390px and

@@ -1,0 +1,12 @@
+# Отдельная база для UI-тестов: боевые данные трогать нельзя, а скриншотам
+# нужен предсказуемый набор задач.
+services:
+  mongodb-test:
+    image: mongo:7
+    container_name: bitrix-flow-test-mongo
+    restart: 'no'
+    command: ['--quiet']
+    ports:
+      - '27018:27017'
+    tmpfs:
+      - /data/db
