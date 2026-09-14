@@ -3,6 +3,8 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import ErrorMonitor from '@/components/ErrorMonitor';
+import { ToastProvider } from '@/components/ui/toast';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 
 // Inter: профессиональный современный шрифт с полной поддержкой кириллицы.
 // Используем display=swap, чтобы текст не блокировал первый рендер.
@@ -39,7 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ErrorMonitor />
-        {children}
+        <ToastProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import { convertBxTask, useKanbanStore } from '@/store/kanban';
 import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import QuickCreateTask from '@/components/QuickCreateTask';
 import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid from '@/components/TaskGrid';
 
@@ -52,7 +53,11 @@ function MyTasksInner() {
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <PageHeader title="Мои задачи" description="Задачи, где вы указаны исполнителем" />
+      <PageHeader
+        title="Мои задачи"
+        description="Задачи, где вы указаны исполнителем"
+        actions={<QuickCreateTask />}
+      />
 
       <div className="mt-4">
         {!currentUser.id ? (

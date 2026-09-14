@@ -43,6 +43,7 @@ import {
   User,
   CalendarDays,
   Clock,
+  Download,
   Pencil,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
@@ -58,6 +59,8 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import QuickCreateTask from '@/components/QuickCreateTask';
+import { useTaskToasts } from '@/components/ui/toast';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import TaskFilterBar from '@/components/TaskFilterBar';
 import {
@@ -291,8 +294,10 @@ const EditableTitle = memo(function EditableTitle({
   tree?: { depth: number; hasChildren: boolean; expanded: boolean; onToggle: () => void };
 }) {
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
+  const toasts = useTaskToasts();
   const { openTask } = useTaskUrl();
   const [title, setTitle] = useState(task.title);
+  const [editing, setEditing] = useState(false);
   useEffect(() => setTitle(task.title), [task.title]);
   const commit = () => {
     const next = title.trim();
@@ -301,7 +306,10 @@ const EditableTitle = memo(function EditableTitle({
       return;
     }
     if (next !== task.title)
-      void updateTaskField(task.id, 'title', next).catch(() => setTitle(task.title));
+      void updateTaskField(task.id, 'title', next).catch((error) => {
+        setTitle(task.title);
+        toasts.failed('Название не сохранилось', error);
+      });
   };
   return (
     <div
@@ -326,20 +334,52 @@ const EditableTitle = memo(function EditableTitle({
         <span className="mt-1 block size-6 shrink-0 border-l border-b border-muted-foreground/30" />
       ) : null}
       <div className="min-w-0 flex-1">
-        <Input
-          aria-label={`Название задачи ${task.id}`}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur();
-            if (event.key === 'Escape') {
-              setTitle(task.title);
-              event.currentTarget.blur();
-            }
-          }}
-          className="h-8 max-w-full border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
-        />
+        {/* Клик по названию открывает карточку — так ждут все списки задач.
+            Переименование прячется за двойным кликом и карандашом: раньше
+            название было полем ввода, и открыть задачу можно было только
+            иконкой в конце строки. */}
+        {editing ? (
+          <Input
+            autoFocus
+            aria-label={`Название задачи ${task.id}`}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            onBlur={() => {
+              commit();
+              setEditing(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === 'Escape') {
+                setTitle(task.title);
+                setEditing(false);
+              }
+            }}
+            className="h-8 max-w-full border-transparent bg-transparent px-1 font-medium shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background focus-visible:ring-2"
+          />
+        ) : (
+          <div className="group/title flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => openTask(task.id)}
+              onDoubleClick={() => setEditing(true)}
+              className="min-w-0 flex-1 truncate rounded px-1 py-1 text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              title={task.title}
+            >
+              {title}
+            </button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Переименовать задачу ${task.id}`}
+              title="Переименовать"
+              className="opacity-0 transition-opacity group-hover/title:opacity-100 focus-visible:opacity-100"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="size-3" />
+            </Button>
+          </div>
+        )}
         <div className="mt-1 flex gap-2 px-1 text-xs text-muted-foreground">
           <a
             href={getBitrixTaskUrl(task.id)}
@@ -444,6 +484,21 @@ const FieldControls = memo(function FieldControls({
   visibleColumns?: ColumnKey[];
 }) {
   const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
+  const toasts = useTaskToasts();
+  // Правка уходит без подтверждения: молчим при успехе, но об отказе Битрикса
+  // говорим — раньше значение просто прыгало обратно.
+  const edit = (field: string, value: unknown, what: string) => {
+    const previous = (task as unknown as Record<string, unknown>)[field];
+    void updateTaskField(task.id, field, value)
+      .then(() =>
+        toasts.undoable(`${what}: изменено`, () =>
+          updateTaskField(task.id, field, previous).catch((error) =>
+            toasts.failed('Не удалось отменить', error),
+          ),
+        ),
+      )
+      .catch((error) => toasts.failed(`${what}: не сохранилось`, error));
+  };
   const label = (name: string, child: React.ReactNode) => (
     <label className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2 text-xs text-muted-foreground">
       <span>{name}</span>
@@ -458,7 +513,18 @@ const FieldControls = memo(function FieldControls({
       label={stageOptions.find((stage) => stage.id === task.stageId)?.name || 'Без фазы'}
       value={task.stageId}
       options={stageOptions.map((stage) => ({ value: stage.id, label: stage.name }))}
-      onChange={(value) => void moveTaskToStage(task.id, value)}
+      onChange={(value) => {
+        const previous = task.stageId;
+        void moveTaskToStage(task.id, value)
+          .then(() =>
+            toasts.undoable('Фаза изменена', () =>
+              moveTaskToStage(task.id, previous).catch((error) =>
+                toasts.failed('Не удалось отменить', error),
+              ),
+            ),
+          )
+          .catch((error) => toasts.failed('Фаза не сохранилась', error));
+      }}
       ariaLabel="Фаза"
     />
   );
@@ -471,9 +537,7 @@ const FieldControls = memo(function FieldControls({
       label={task.assigneeName || 'Не назначен'}
       value={task.assigneeId || 'unassigned'}
       options={assigneeOptions}
-      onChange={(value) =>
-        void updateTaskField(task.id, 'assigneeId', value === 'unassigned' ? '' : value)
-      }
+      onChange={(value) => edit('assigneeId', value === 'unassigned' ? '' : value, 'Исполнитель')}
       ariaLabel="Исполнитель"
     />
   );
@@ -485,7 +549,7 @@ const FieldControls = memo(function FieldControls({
       label={PRIORITY_LABELS[task.priority]?.label || task.priority}
       value={task.priority}
       options={priorityOptions}
-      onChange={(value) => void updateTaskField(task.id, 'priority', value)}
+      onChange={(value) => edit('priority', value, 'Приоритет')}
       ariaLabel="Приоритет"
     />
   );
@@ -494,7 +558,7 @@ const FieldControls = memo(function FieldControls({
       aria-label="Дедлайн"
       type="date"
       value={inputDate(task.dueDate)}
-      onChange={(event) => void updateTaskField(task.id, 'deadline', event.target.value || null)}
+      onChange={(event) => edit('deadline', event.target.value || null, 'Дедлайн')}
       className={
         controlClass +
         (needsDeadlineAttention(task)
@@ -512,7 +576,7 @@ const FieldControls = memo(function FieldControls({
       value={task.estimate || ''}
       onChange={(event) => {
         const value = event.currentTarget.valueAsNumber;
-        if (Number.isFinite(value) && value >= 0) void updateTaskField(task.id, 'estimate', value);
+        if (Number.isFinite(value) && value >= 0) edit('estimate', value, 'Оценка');
       }}
       className={controlClass}
     />
@@ -677,6 +741,7 @@ export default function TaskGrid({
   const setPagedTasks = useKanbanStore((state) => state.setPagedTasks);
   const storedTasks = useKanbanStore((state) => state.allTasks);
   const updateTaskField = useKanbanStore((state) => state.updateTaskField);
+  const gridToasts = useTaskToasts();
   const { openTask, closeTask } = useTaskUrl();
   const createTask = useKanbanStore((state) => state.createTask);
   const projects = useKanbanStore((state) => state.projects);
@@ -1185,9 +1250,71 @@ export default function TaskGrid({
         ? new Set([...current].filter((id) => !pageTasks.some((task) => task.id === id)))
         : new Set([...current, ...pageTasks.map((task) => task.id)]),
     );
+  // Выгрузка того, что сейчас на экране: колонки берём видимые, значения —
+  // человекочитаемые, чтобы файл можно было открыть и сразу отправить.
+  const exportCsv = () => {
+    const rows = selectedIds.size
+      ? displayPageTasks.filter((task) => selectedIds.has(task.id))
+      : displayPageTasks;
+    if (!rows.length) {
+      gridToasts.failed('Нечего выгружать', new Error('В списке нет задач'));
+      return;
+    }
+    const columns = orderedVisibleColumns;
+    const value = (task: BxTask, column: ColumnKey) => {
+      if (column === 'title') return task.title;
+      if (column === 'project') return projectById[task.projectId]?.name || '';
+      if (column === 'stage') return stages.find((stage) => stage.id === task.stageId)?.name || '';
+      if (column === 'assignee') return task.assigneeName || '';
+      if (column === 'priority') return PRIORITY_LABELS[task.priority]?.label || '';
+      if (column === 'deadline') return task.dueDate || '';
+      if (column === 'estimate') return String(task.estimate ?? '');
+      if (column === 'actual') return String(task.actualTime ?? '');
+      if (column === 'updated') return task.updatedDate || '';
+      if (column === 'created') return task.createdDate || '';
+      if (column === 'description') return task.description || '';
+      if (column === 'comments') return String(task.commentsCount ?? 0);
+      if (column === 'parent') return task.parentId || '';
+      if (column === 'tags') return (task.tags || []).join(' ');
+      return '';
+    };
+    const escape = (text: string) => `"${text.replaceAll('"', '""').replaceAll('\n', ' ')}"`;
+    const csv = [
+      ['ID', ...columns.map((column) => COLUMN_LABELS[column])].map(escape).join(';'),
+      ...rows.map((task) =>
+        [task.id, ...columns.map((column) => value(task, column))].map(escape).join(';'),
+      ),
+    ].join('\r\n');
+    // BOM: иначе Excel открывает кириллицу кракозябрами.
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    gridToasts.saved(`Выгружено задач: ${rows.length}`);
+  };
+
   const applyBulk = (field: 'assigneeId' | 'status', value: string) => {
-    void Promise.all([...selectedIds].map((id) => updateTaskField(id, field, value)));
+    // Запоминаем прежние значения: применить статус к двадцати задачам легко,
+    // а вот вернуть всё обратно вручную — нет.
+    const affected = [...selectedIds]
+      .map((id) => tasks.find((task) => task.id === id))
+      .filter((task): task is BxTask => Boolean(task))
+      .map((task) => ({
+        id: task.id,
+        previous: field === 'status' ? task.status : task.assigneeId || '',
+      }));
     setSelectedIds(new Set());
+    void Promise.all(affected.map(({ id }) => updateTaskField(id, field, value)))
+      .then(() =>
+        gridToasts.undoable(`Изменено задач: ${affected.length}`, () =>
+          Promise.all(
+            affected.map(({ id, previous }) => updateTaskField(id, field, previous)),
+          ).then(() => undefined),
+        ),
+      )
+      .catch((error) => gridToasts.failed('Массовое изменение не прошло', error));
   };
   const toggleSort = (key: SortKey) => {
     setSorts((current) => {
@@ -1341,6 +1468,16 @@ export default function TaskGrid({
               placeholder="Поиск задач…"
               className="h-10 rounded-md sm:h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
             />
+            <Button
+              variant="outline"
+              size="sm"
+              className={toolbarControl}
+              onClick={exportCsv}
+              title="Выгрузить в CSV то, что сейчас в списке"
+            >
+              <Download size={14} />
+              <span className="hidden sm:inline">CSV</span>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className={toolbarControl}>
@@ -1431,6 +1568,10 @@ export default function TaskGrid({
           {selectedIds.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-sm">
               <span className="font-medium">Выбрано: {selectedIds.size}</span>
+              <Button variant="outline" size="sm" className={toolbarControl} onClick={exportCsv}>
+                <Download size={14} />
+                Выгрузить CSV
+              </Button>
               <Select onValueChange={(value) => applyBulk('assigneeId', value)}>
                 <SelectTrigger className="w-44" aria-label="Назначить исполнителя">
                   <SelectValue placeholder="Назначить…" />
@@ -1471,10 +1612,20 @@ export default function TaskGrid({
               <div>
                 <h2 className="font-semibold">Нет задач</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {showProject
+                  {activeFilterCount > 0 || query
                     ? 'По выбранным фильтрам ничего не найдено.'
-                    : 'Измените фильтры или создайте первую задачу на доске.'}
+                    : 'Здесь пока пусто — создайте первую задачу.'}
                 </p>
+                {/* Пустой экран без действия — тупик: даём выход прямо отсюда. */}
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {(activeFilterCount > 0 || query) && (
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                      <Filter size={14} />
+                      Сбросить фильтры
+                    </Button>
+                  )}
+                  <QuickCreateTask defaultProjectId={tagsProjectId} />
+                </div>
               </div>
             </div>
           )}

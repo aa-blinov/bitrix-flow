@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
@@ -41,6 +42,7 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const confirm = useConfirm();
   const projectId = (params?.id as string) || '0';
   const notificationTaskId = searchParams.get('task');
   const initialStatus = searchParams.get('status') || 'all';
@@ -201,7 +203,14 @@ export default function ProjectPage() {
   }
 
   async function removeMember(userId: string) {
-    if (!currentProject || !window.confirm('Удалить участника из проекта?')) return;
+    if (!currentProject) return;
+    const agreed = await confirm({
+      title: 'Удалить участника из проекта?',
+      description: 'Он потеряет доступ к задачам проекта в Битрикс24.',
+      confirmLabel: 'Удалить',
+      destructive: true,
+    });
+    if (!agreed) return;
     await removeProjectMember(currentProject.id, userId);
     setMemberIds((ids) => ids.filter((id) => id !== userId));
     await useKanbanStore.getState().loadProjects(true);
@@ -214,13 +223,15 @@ export default function ProjectPage() {
   }
 
   async function toggleArchive() {
-    if (
-      !currentProject ||
-      !window.confirm(
-        currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?',
-      )
-    )
-      return;
+    if (!currentProject) return;
+    const agreed = await confirm({
+      title: currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?',
+      description: currentProject.isArchived
+        ? 'Проект снова появится в активных списках.'
+        : 'Проект уедет в архив: он останется доступен, но пропадёт из основных списков.',
+      confirmLabel: currentProject.isArchived ? 'Вернуть' : 'Архивировать',
+    });
+    if (!agreed) return;
     await updateProject(currentProject.id, { archived: !currentProject.isArchived });
     setSettingsOpen(false);
   }

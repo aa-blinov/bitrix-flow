@@ -11,6 +11,7 @@ import { filterQueryParams } from '@/lib/task-filters';
 import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import QuickCreateTask from '@/components/QuickCreateTask';
 import { Button } from '@/components/ui/button';
 
 function AllTasksInner() {
@@ -90,13 +91,16 @@ function AllTasksInner() {
         title="Все задачи"
         description={workloadDescription}
         actions={
-          searchParams.get('from') === 'workload' ? (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/team-workload">
-                <ArrowLeft /> К нагрузке
-              </Link>
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {searchParams.get('from') === 'workload' && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/team-workload">
+                  <ArrowLeft /> К нагрузке
+                </Link>
+              </Button>
+            )}
+            <QuickCreateTask />
+          </div>
         }
       />
 

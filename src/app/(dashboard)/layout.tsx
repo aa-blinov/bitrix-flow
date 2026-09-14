@@ -1,5 +1,7 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
+import KeyboardShortcuts from '@/components/KeyboardShortcuts';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -66,6 +68,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       {/* Кнопка меню висит над контентом: снизу оставляем место, иначе она
           перекрывает последнюю карточку списка. */}
+      <KeyboardShortcuts />
+      <ConnectionStatus />
       <main className="min-h-screen pb-20 lg:pb-0 lg:pl-64">{children}</main>
     </div>
   );

@@ -168,6 +168,7 @@ interface KanbanStore {
     estimate?: number;
     parentId?: string;
     stageId?: string;
+    projectId?: string;
   }) => Promise<string | null>;
 
   // Восстановление из localStorage (вызывать в useEffect чтобы избежать hydration mismatch)
@@ -987,19 +988,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   createTask: async (data) => {
-    const { selectedProjectId } = get();
-    if (!selectedProjectId) return null;
+    // Проект можно указать явно: на «Всех задачах» выбранного проекта нет,
+    // а создавать задачу оттуда нужно.
+    const { projectId, ...fields } = data;
+    const groupId = projectId || get().selectedProjectId;
+    if (!groupId) return null;
 
     try {
-      await bxCreateTask({
-        ...data,
-        groupId: selectedProjectId,
-      });
-      await get().loadTasks(true);
+      await bxCreateTask({ ...fields, groupId });
+      if (groupId === get().selectedProjectId) await get().loadTasks(true);
       return 'ok';
     } catch (err: any) {
       console.error('Failed to create task:', err);
-      return null;
+      throw err;
     }
   },
 }));

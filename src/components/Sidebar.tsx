@@ -2,6 +2,7 @@
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import {
+  Search,
   LayoutDashboard,
   ListChecks,
   Menu,
@@ -104,12 +105,40 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
+  // Недавно открытые — сверху: пятьдесят один проект по алфавиту означает, что
+  // свои три-четыре приходится каждый раз искать заново.
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('bitrix-flow-recent-projects') || '[]');
+      if (Array.isArray(saved)) setRecentIds(saved.filter((id) => typeof id === 'string'));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    const match = /^\/projects\/([^/?#]+)/.exec(pathname || '');
+    if (!match) return;
+    setRecentIds((current) => {
+      const next = [match[1], ...current.filter((id) => id !== match[1])].slice(0, 4);
+      try {
+        localStorage.setItem('bitrix-flow-recent-projects', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [pathname]);
+
   const sortedProjects = [...projects]
     .sort((left, right) => left.name.localeCompare(right.name, 'ru', { sensitivity: 'base' }))
     .filter((project) =>
       project.name.toLocaleLowerCase('ru').includes(projectQuery.toLocaleLowerCase('ru')),
     );
   const activeProjects = sortedProjects.filter((project) => !project.isArchived);
+  // Недавние показываем отдельным блоком и только когда не идёт поиск —
+  // в результатах поиска порядок должен быть предсказуемым.
+  const recentProjects = projectQuery
+    ? []
+    : recentIds
+        .map((id) => activeProjects.find((project) => project.id === id))
+        .filter((project): project is (typeof activeProjects)[number] => Boolean(project));
   const archivedProjects = sortedProjects.filter((project) => project.isArchived);
 
   function getInitials(name: string): string {
@@ -197,6 +226,13 @@ export default function Sidebar() {
             onNavigate={closeMobile}
           />
           <NavItem
+            href="/search"
+            icon={Search}
+            label="Поиск"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavItem
             href="/all-tasks"
             icon={ListChecks}
             label="Все задачи"
@@ -274,6 +310,40 @@ export default function Sidebar() {
                     </span>
                     <span className="min-w-0 flex-1 truncate">{NO_PROJECT_NAME}</span>
                   </Link>
+                )}
+                {recentProjects.length > 1 && (
+                  <>
+                    <p className="px-2.5 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Недавние
+                    </p>
+                    {recentProjects.map((project) => {
+                      const active = pathname === `/projects/${project.id}`;
+                      return (
+                        <Link
+                          key={`recent-${project.id}`}
+                          href={`/projects/${project.id}`}
+                          prefetch={false}
+                          onClick={closeMobile}
+                          className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
+                            active
+                              ? 'bg-muted font-medium text-foreground'
+                              : 'text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <span
+                            className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                            aria-hidden="true"
+                          >
+                            {getInitials(project.name)}
+                          </span>
+                          <span className="truncate" title={project.name}>
+                            {project.name}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                    <div className="my-1 border-t" />
+                  </>
                 )}
                 {activeProjects.map((project) => {
                   const active = pathname === `/projects/${project.id}`;

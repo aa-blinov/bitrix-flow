@@ -7,13 +7,36 @@ type Listener = (event: any) => void;
 
 const channels = new Map<string, { source: EventSource; listeners: Set<Listener> }>();
 
+// Состояние связи держим отдельно от событий: интерфейсу нужно показать, что
+// данные перестали обновляться, иначе вкладка молча живёт со старым списком.
+type ConnectionState = 'connecting' | 'online' | 'offline';
+const connectionListeners = new Set<(state: ConnectionState) => void>();
+let connectionState: ConnectionState = 'connecting';
+
+function setConnectionState(next: ConnectionState) {
+  if (connectionState === next) return;
+  connectionState = next;
+  for (const listener of [...connectionListeners]) listener(next);
+}
+
+export function subscribeToConnection(listener: (state: ConnectionState) => void) {
+  connectionListeners.add(listener);
+  listener(connectionState);
+  return () => {
+    connectionListeners.delete(listener);
+  };
+}
+
 function subscribe(memberId: string, listener: Listener) {
   let channel = channels.get(memberId);
   if (!channel) {
     const source = new EventSource(`/api/events?member_id=${memberId}`);
     channel = { source, listeners: new Set() };
     channels.set(memberId, channel);
+    source.onopen = () => setConnectionState('online');
+    source.onerror = () => setConnectionState('offline');
     source.onmessage = (message) => {
+      setConnectionState('online');
       try {
         const event = JSON.parse(message.data);
         if (event.type === 'connected') return;
@@ -31,6 +54,7 @@ function subscribe(memberId: string, listener: Listener) {
     if (active.listeners.size === 0) {
       active.source.close();
       channels.delete(memberId);
+      setConnectionState('connecting');
     }
   };
 }

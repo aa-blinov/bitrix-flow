@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import PageHeader from '@/components/PageHeader';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Notice = {
   id: string;
@@ -35,6 +36,7 @@ function noticeLabel(type: string) {
 }
 
 export default function NotificationsPage() {
+  const confirm = useConfirm();
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
@@ -50,7 +52,14 @@ export default function NotificationsPage() {
   }, []);
 
   async function clearHistory() {
-    if (!items.length || !window.confirm('Очистить всю историю уведомлений?')) return;
+    if (!items.length) return;
+    const agreed = await confirm({
+      title: 'Очистить историю уведомлений?',
+      description: 'Записи удалятся безвозвратно, сами задачи в Битриксе не изменятся.',
+      confirmLabel: 'Очистить',
+      destructive: true,
+    });
+    if (!agreed) return;
     setClearing(true);
     try {
       const response = await fetch('/api/notifications', { method: 'DELETE' });
