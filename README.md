@@ -105,10 +105,14 @@ embedding only into the app's own origin and Bitrix24 portals. Adjust the list i
 ### UI tests
 
 ```bash
-npm run test:ui:db        # поднять тестовую Mongo на 27018 (tmpfs, боевая не трогается)
-npm run test:ui           # засеять данные и прогнать Playwright
-npm run test:ui:update    # обновить эталоны скриншотов
+./scripts/ui-tests-docker.sh                     # прогон как в CI
+./scripts/ui-tests-docker.sh --update-snapshots  # обновить эталоны
+npm run test:ui                                  # быстрый прогон в системном Chrome
 ```
+
+Эталоны снимаются в образе `mcr.microsoft.com/playwright` — том же, что в CI:
+локальный Chrome рисует шрифты чуть иначе, и попиксельное сравнение падало бы
+без единого изменения в коде.
 
 Тесты идут против сборки с `MOCK_B24=1` и отдельной базой `bitrix_kanban_test`:
 данные фиксированные, поэтому скриншоты сравниваются попиксельно. Покрыты девять

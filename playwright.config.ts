@@ -60,7 +60,7 @@ export default defineConfig({
       PORT: String(PORT),
       HOSTNAME: '127.0.0.1',
       MOCK_B24: '1',
-      MONGO_URL: 'mongodb://127.0.0.1:27018',
+      MONGO_URL: process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018',
       MONGO_DB: 'bitrix_kanban_test',
       AUTH_USERNAME: 'tester',
       AUTH_PASSWORD: 'tester-password',

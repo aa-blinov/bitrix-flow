@@ -38,11 +38,13 @@ jobs:
     # иначе сравнивать картинки не с чем — боевые задачи меняются каждую минуту.
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Тот же образ, в котором снимаются эталоны: иначе рендеринг шрифтов
+    # отличается и попиксельное сравнение падает на ровном месте.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     services:
       mongodb:
         image: mongo:7
-        ports:
-          - 27018:27017
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -50,11 +52,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: node scripts/seed-test-db.mjs
+        env:
+          MONGO_URL: mongodb://mongodb:27017
       - run: npx playwright test
         env:
           CI: 'true'
+          TEST_MONGO_URL: mongodb://mongodb:27017
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
