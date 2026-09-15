@@ -10,7 +10,7 @@ bitrix-flow.duckdns.org {
 
     @events path /api/events
     handle @events {
-        reverse_proxy app:3000 {
+        reverse_proxy 172.32.10.3:3000 {
             flush_interval -1
             header_up Host {host}
             header_up X-Real-IP {remote_host}
@@ -19,7 +19,7 @@ bitrix-flow.duckdns.org {
     }
 
     handle {
-        reverse_proxy app:3000 {
+        reverse_proxy 172.32.10.3:3000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-Proto {scheme}

@@ -22,6 +22,23 @@ fi
 
 echo "[$STAMP] health FAILED (curl=$status): ${body:-нет ответа}" >&2
 
+# Попытка вернуть сайт самим: docker дважды за сутки ронял внутренний DNS, и
+# прокси отдавал 502 при живом приложении. Пересоздание стека это лечит.
+# Повторяем не чаще раза в 15 минут, чтобы не крутить рестарты по кругу.
+RECOVER_STAMP="$DIR/backups/.last-recover"
+NOW=$(date +%s)
+LAST=$(cat "$RECOVER_STAMP" 2>/dev/null || echo 0)
+if [ $((NOW - LAST)) -gt 900 ]; then
+  echo "$NOW" > "$RECOVER_STAMP"
+  echo "[$STAMP] пробую поднять стек заново" >&2
+  (cd "$DIR" && docker compose --env-file .env.local up -d --force-recreate >/dev/null 2>&1) || true
+  sleep 25
+  if curl -fsS --max-time 15 "$URL" 2>/dev/null | grep -q '"status":"ok"'; then
+    echo "[$STAMP] поднялся сам, алерт не шлём"
+    exit 0
+  fi
+fi
+
 if [ -z "${GLITCHTIP_DSN:-}" ]; then
   echo "[$STAMP] GLITCHTIP_DSN не задан — алерт отправить некуда" >&2
   exit 1

@@ -17,7 +17,7 @@ services:
       - .env.local
     environment:
       # Приложению хватает readWrite на своей базе: под root оно ходило зря.
-      MONGO_URL: mongodb://${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME in .env.local}:${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD in .env.local}@mongodb:27017/bitrix_kanban?authSource=bitrix_kanban
+      MONGO_URL: mongodb://${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME in .env.local}:${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD in .env.local}@172.32.10.2:27017/bitrix_kanban?authSource=bitrix_kanban
       MONGO_DB: bitrix_kanban
       HOSTNAME: 0.0.0.0
       PORT: 3000
@@ -27,6 +27,9 @@ services:
       APP_RELEASE: ${APP_RELEASE:-dev}
     expose:
       - '3000'
+    networks:
+      default:
+        ipv4_address: 172.32.10.3
     # Живость приложения, а не только контейнера: /api/health пингует Mongo,
     # поэтому зависший коннект виден снаружи и docker перезапустит сервис.
     healthcheck:
@@ -57,8 +60,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     networks:
-      - default
-      - cast-team_default
+      default:
+        ipv4_address: 172.32.10.4
+      cast-team_default: {}
     depends_on:
       app:
         condition: service_started
@@ -75,6 +79,9 @@ services:
       MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD in .env.local}
     volumes:
       - mongodb_data:/data/db
+    networks:
+      default:
+        ipv4_address: 172.32.10.2
     healthcheck:
       test:
         [
@@ -91,7 +98,12 @@ volumes:
   caddy_config:
 
 networks:
+  # Свои адреса вместо имён: встроенный DNS docker дважды за сутки переставал
+  # резолвить `app` и `mongodb`, и Caddy отдавал 502 при живом приложении.
   default:
+    ipam:
+      config:
+        - subnet: 172.32.10.0/24
   # cast-team's own compose network — lets this Caddy reach cast-team's
   # cast-server container by name for the added cast-team.duckdns.org site,
   # without publishing cast-server's port to the host.
