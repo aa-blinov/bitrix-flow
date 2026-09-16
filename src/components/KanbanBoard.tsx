@@ -1112,10 +1112,10 @@ function TaskCard({
     >
       {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
           фазу можно выбрать и списком. */}
-      <div className="mb-2 flex items-start gap-1.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      <div className="mb-2 flex items-start gap-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
           <span
-            className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
+            className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
           >
             {priority.label}
           </span>
@@ -1144,7 +1144,7 @@ function TaskCard({
             <Button
               variant="ghost"
               size="icon"
-              className="-mt-1 -mr-1 size-9 shrink-0"
+              className="-mt-1 -mr-1 size-7 shrink-0"
               aria-label={`Переместить задачу ${task.title}`}
               onClick={(event) => event.stopPropagation()}
             >
@@ -1180,26 +1180,30 @@ function TaskCard({
         )}
       </div>
 
-      {/* Meta footer */}
-      <div className="mt-2 flex items-center justify-between gap-2 pt-1">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0 flex-1">
+      {/* Meta footer — в узких колонках (224px) «План + Факт» не помещаются
+          в одну строку с дедлайном и аватаром. Перенос строк и truncate у
+          дедлайна/оценки чинят наложение, не ломая внешний вид на широких. */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span
-            className={`flex items-center gap-1 shrink-0 ${isOverdue ? 'text-destructive font-medium' : ''}`}
+            className={`flex min-w-0 items-center gap-1 ${isOverdue ? 'text-destructive font-medium' : ''}`}
           >
-            <Calendar size={12} />
-            {dueDate || 'Без срока'}
+            <Calendar size={12} className="shrink-0" />
+            <span className="truncate">{dueDate || 'Без срока'}</span>
           </span>
           {(task.estimate > 0 || task.actualTime > 0) && (
-            <span className="flex items-center gap-1 shrink-0">
-              <Timer size={12} />
-              {task.estimate > 0 && `План ${task.estimate} ч`}
-              {task.estimate > 0 && task.actualTime > 0 && ', '}
-              {task.actualTime > 0 && `Факт ${task.actualTime} ч`}
+            <span className="flex items-center gap-1">
+              <Timer size={12} className="shrink-0" />
+              <span className="truncate">
+                {task.estimate > 0 && `План ${task.estimate} ч`}
+                {task.estimate > 0 && task.actualTime > 0 && ', '}
+                {task.actualTime > 0 && `Факт ${task.actualTime} ч`}
+              </span>
             </span>
           )}
           {totalSubtasks > 0 && (
-            <span className="flex items-center gap-1 shrink-0">
-              <span>☐</span>
+            <span className="flex items-center gap-1">
+              <span aria-hidden>☐</span>
               {completedSubtasks}/{totalSubtasks}
             </span>
           )}
