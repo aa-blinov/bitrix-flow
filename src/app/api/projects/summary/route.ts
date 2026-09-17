@@ -58,6 +58,18 @@ function value(task: RawTask, ...keys: (keyof RawTask)[]) {
   return '';
 }
 
+// Mirror the shape coming from /api/tasks/all: seed and live Bitrix responses
+// nest the project under `group`, while legacy payloads use the flat `groupId`.
+// The summary used to read only the flat keys, so every task fell through to
+// projectId='0' and the board rendered 0 tasks on every project.
+function projectIdOf(task: RawTask): string {
+  const flat = String(value(task, 'groupId', 'group_id', 'GROUP_ID') || '');
+  if (flat) return flat;
+  // @ts-expect-error — `group` isn't part of RawTask but the real payload carries it.
+  const nested = task.group && (task.group.id || task.group.ID);
+  return nested ? String(nested) : '0';
+}
+
 function toHours(seconds: number) {
   return Math.round((seconds / 3600) * 10) / 10;
 }
@@ -105,7 +117,7 @@ function calculatePlannedHours(tasks: RawTask[]) {
 function summarize(projects: any[], tasks: RawTask[]) {
   const byProject = new Map<string, RawTask[]>();
   for (const task of tasks) {
-    const projectId = String(value(task, 'groupId', 'group_id', 'GROUP_ID') || '0');
+    const projectId = projectIdOf(task);
     if (!byProject.has(projectId)) byProject.set(projectId, []);
     byProject.get(projectId)!.push(task);
   }
