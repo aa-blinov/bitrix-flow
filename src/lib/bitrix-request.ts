@@ -12,8 +12,22 @@ const ipv4Agent = new Agent({ family: 4, keepAlive: true, maxSockets: 8 });
 // карточка задачи открывалась по 30 с. Соединение (TCP + TLS) ждём коротко,
 // ответ — долго: большие списки задач Битрикс собирает секундами.
 const CONNECT_TIMEOUT_MS = 2_000;
-const RESPONSE_TIMEOUT_MS = 15_000;
+// Ответ ждём долго: оборванная медленная мутация показала бы ошибку, хотя в
+// Битриксе она уже сохранилась.
+const RESPONSE_TIMEOUT_MS = 30_000;
 const SLOW_CALL_MS = 2_000;
+// Адрес, ответивший дольше, откладываем как мёртвый: edge 46.235.53.* бывает
+// живым, но отвечает по 20+ с.
+const SLOW_ADDRESS_MS = 3_000;
+// Чтения повторять безопасно, поэтому их всегда гоняем по нескольким адресам,
+// кто бы ни вызывал: /api/dashboard и фоновый sync читали по одному адресу и
+// ждали медленный edge целиком.
+const READ_METHOD = /\.(get|list|getlist|current)$|^server\.time$/i;
+
+function isReadMethod(url: string) {
+  const method = new URL(url).pathname.replace(/^\/rest\//, '').replace(/\.json$/, '');
+  return READ_METHOD.test(method);
+}
 const MAX_PARALLEL = 3;
 // Сколько групп адресов перебрать, прежде чем сдаться.
 const MAX_GROUPS = 3;
@@ -202,13 +216,15 @@ export async function postBitrixJson(
   // can create duplicate tasks, comments and time entries. Parallel probes are
   // therefore opt-in for known read-only callers only.
   const order = pickProbes(pool, pool.length);
-  const groupSize = parallel ? MAX_PARALLEL : 1;
+  const groupSize = parallel || isReadMethod(url) ? MAX_PARALLEL : 1;
   const body = sendJson
     ? JSON.stringify(params)
     : new URLSearchParams(params as Record<string, string>).toString();
 
   const attempt = async (entry: AddressEntry) => {
+    const attemptStart = Date.now();
     const { status, raw } = await httpRequest(url, body, sendJson, entry.address);
+    if (Date.now() - attemptStart > SLOW_ADDRESS_MS) markDead(entry.address);
     if (status >= 500) throw new Error(`BITRIX24_HTTP_${status}`);
     return { entry, status, raw };
   };
@@ -259,6 +275,7 @@ export async function postBitrixJson(
 // Точки для тестов: перебор адресов — самая хрупкая часть общения с порталом.
 export const __testing = {
   isConnectFailure,
+  isReadMethod,
   markDead,
   pickProbes,
   reset: () => {
