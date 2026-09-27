@@ -50,7 +50,7 @@ import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { extractTaskTags } from '@/lib/task-tags';
 import { orderTasksAsTree } from '@/lib/task-tree';
-import { getBitrixTaskUrl } from '@/lib/utils';
+import { getBitrixTaskUrl, toLocalInputValue } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -137,7 +137,7 @@ function useTaskUrl() {
   }, [pathname, router, searchParams]);
   return { openTask, closeTask };
 }
-const inputDate = (value?: string) => (value ? value.slice(0, 10) : '');
+const inputDate = (value?: string) => toLocalInputValue(value, 'date');
 const PAGE_SIZE = 50;
 // На телефоне 50 карточек — семь экранов прокрутки до пагинации.
 const MOBILE_PAGE_SIZE = 20;

@@ -182,6 +182,14 @@ interface KanbanStore {
   // Computed
 }
 
+// Правка одной задачи в обоих списках: карточка держит задачу из tasks
+// (доска) или из allTasks (открыта по ссылке, не на странице доски). Чек-лист и
+// время раньше менялись только в tasks — в Битриксе сохранялось, а открытая
+// карточка не видела изменений до перезагрузки.
+function mapBoth(state: { tasks: BxTask[]; allTasks: BxTask[] }, fn: (task: BxTask) => BxTask) {
+  return { tasks: state.tasks.map(fn), allTasks: state.allTasks.map(fn) };
+}
+
 export function convertBxTask(bxTask: Bx24Task): BxTask {
   return {
     id: bxTask.id,
@@ -744,7 +752,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         else if (value === 'deferred') await bxRunTaskStatusAction(id, 'defer');
         else if (value === 'done') await bxRunTaskStatusAction(id, 'complete');
         else if (value === 'new')
-          await bxRunTaskStatusAction(id, previous.status === 'done' ? 'renew' : 'pause');
+          // Из «Готово» и «Отложена» в «Новая» Битрикс возвращает через renew,
+          // pause — только из «В работе».
+          await bxRunTaskStatusAction(
+            id,
+            previous.status === 'done' || previous.status === 'deferred' ? 'renew' : 'pause',
+          );
         else if (value === 'testing') await bxUpdateStatus(id, '2', '-4');
       }
     } catch (error) {
@@ -870,14 +883,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     await bxAddChecklistItem(taskId, title, parentId);
     const checklist = await fetchChecklist(taskId);
     set((state) => ({
-      tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, checklist } : task)),
+      ...mapBoth(state, (task) => (task.id === taskId ? { ...task, checklist } : task)),
     }));
   },
 
   updateChecklistItem: async (taskId, itemId, title) => {
     await bxUpdateChecklistItem(taskId, itemId, title);
     set((state) => ({
-      tasks: state.tasks.map((task) =>
+      ...mapBoth(state, (task) =>
         task.id === taskId
           ? {
               ...task,
@@ -893,7 +906,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   setChecklistItemCompleted: async (taskId, itemId, completed) => {
     await bxSetChecklistItemCompleted(taskId, itemId, completed);
     set((state) => ({
-      tasks: state.tasks.map((task) =>
+      ...mapBoth(state, (task) =>
         task.id === taskId
           ? {
               ...task,
@@ -909,7 +922,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   deleteChecklistItem: async (taskId, itemId) => {
     await bxDeleteChecklistItem(taskId, itemId);
     set((state) => ({
-      tasks: state.tasks.map((task) =>
+      ...mapBoth(state, (task) =>
         task.id === taskId
           ? { ...task, checklist: task.checklist?.filter((item) => item.id !== itemId) }
           : task,
@@ -922,7 +935,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const tempId = `temp-${Date.now()}`;
 
     set((state) => ({
-      tasks: state.tasks.map((t) =>
+      ...mapBoth(state, (t) =>
         t.id === taskId
           ? {
               ...t,
@@ -948,7 +961,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       await bxAddTime(taskId, hoursToSeconds(hours), description);
     } catch {
       set((state) => ({
-        tasks: state.tasks.map((t) =>
+        ...mapBoth(state, (t) =>
           t.id === taskId
             ? {
                 ...t,

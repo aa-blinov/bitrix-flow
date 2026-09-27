@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getProjectInitials, pluralRu, usableAvatar } from './utils';
+import { getProjectInitials, pluralRu, toLocalInputValue, usableAvatar } from './utils';
 
 describe('getProjectInitials', () => {
   it('uses only words made of letters', () => {
@@ -29,5 +29,16 @@ describe('pluralRu', () => {
       'задачи',
       'задач',
     ]);
+  });
+});
+
+describe('toLocalInputValue', () => {
+  it('переводит время портала в пояс браузера', () => {
+    // Пояс фиксируем: результат зависит от него, а CI и ноутбук живут в разных.
+    process.env.TZ = 'UTC';
+    expect(toLocalInputValue('2026-09-28T18:00:00+05:00', 'datetime')).toBe('2026-09-28T13:00');
+    expect(toLocalInputValue('2026-09-29T02:30:00+05:00', 'date')).toBe('2026-09-28');
+    expect(toLocalInputValue('', 'date')).toBe('');
+    expect(toLocalInputValue('не дата', 'datetime')).toBe('');
   });
 });

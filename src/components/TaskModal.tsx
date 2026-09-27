@@ -1,6 +1,6 @@
 'use client';
 import { Bx24User, BxFile, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
-import { useKanbanStore } from '@/store/kanban';
+import { convertBxTask, useKanbanStore } from '@/store/kanban';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -32,6 +32,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { toLocalInputValue } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,8 +119,6 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     users,
     projects,
     tasks,
-    allTasks,
-    loadAllTasks,
     subtasks,
     loadSubtasks,
     createTask,
@@ -155,6 +154,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [parentSearchResults, setParentSearchResults] = useState<Bx24Task[]>([]);
   const [existingSubtaskResults, setExistingSubtaskResults] = useState<Bx24Task[]>([]);
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
+  const [actionsVersion, setActionsVersion] = useState(0);
   const [allowedActions, setAllowedActions] = useState<Record<string, boolean> | null>(
     task.actions || null,
   );
@@ -250,33 +250,48 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     return () => {
       cancelled = true;
     };
-  }, [task.id]);
+    // Права зависят от статуса: после «Начать» — «Приостановить», после
+    // «Завершить» — «Возобновить». Перечитываем их, когда Битрикс подтвердил
+    // смену статуса (actionsVersion), а не на оптимистичной правке: тогда он
+    // ещё отдавал права старого статуса, и «Отложить» у задачи в работе
+    // падало с «Действие не доступно».
+  }, [task.id, actionsVersion]);
 
   const can = (action: string) => allowedActions?.[action] === true;
 
   const handleUpdateField = async (field: string, value: any) => {
+    // Пока статус меняется, кнопки статуса прячем: права ещё старые.
+    if (field === 'status') setAllowedActions(null);
     try {
       setFieldError(null);
       await updateTaskField(task.id, field, value);
       setEditingField(null);
     } catch (error) {
       setFieldError(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+    } finally {
+      if (field === 'status') setActionsVersion((version) => version + 1);
     }
   };
 
   const handleStartTask = async () => {
-    // The project board may not contain the user's task from another project.
-    // Load the complete task list before applying the single-focus interaction.
-    if (allTasks.length === 0) await loadAllTasks();
-    const knownTasks = new Map(
-      [...tasks, ...useKanbanStore.getState().allTasks].map((item) => [item.id, item]),
-    );
-    const activeTask = [...knownTasks.values()].find(
-      (item) =>
-        item.id !== task.id &&
-        item.status === 'in_progress' &&
-        String(item.assigneeId) === String(currentUser.id),
-    );
+    // «В работе» у человека одна задача. Раньше для проверки грузился общий
+    // список (первые 50 задач портала): «Начать» ждало его секундами, а задача
+    // в работе из-за пределов этих 50 не находилась. Спрашиваем сервер прямо.
+    let activeTask: BxTask | undefined;
+    try {
+      const params = new URLSearchParams({
+        status: 'in_progress',
+        assigneeId: String(currentUser.id),
+        limit: '5',
+      });
+      const response = await fetch(`/api/tasks/all?${params}`);
+      const data = response.ok ? await response.json() : { tasks: [] };
+      activeTask = (Array.isArray(data.tasks) ? data.tasks : [])
+        .map(convertBxTask)
+        .find((item: BxTask) => item.id !== task.id);
+    } catch {
+      // Проверка — подсказка, а не условие: без неё просто запускаем задачу.
+    }
 
     if (activeTask) {
       setFocusConflict(activeTask);
@@ -290,9 +305,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     if (!focusConflict) return;
     try {
       setFieldError(null);
+      setAllowedActions(null);
       await updateTaskField(focusConflict.id, 'status', 'new');
       await updateTaskField(task.id, 'status', 'in_progress');
       setFocusConflict(null);
+      setActionsVersion((version) => version + 1);
     } catch (error) {
       setFieldError(error instanceof Error ? error.message : 'Не удалось изменить статус');
     }
@@ -365,10 +382,19 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
   const handleAddSubtask = async () => {
     if (newSubtaskTitle.trim()) {
-      await createTask({
-        title: newSubtaskTitle,
-        parentId: task.id,
-      });
+      // Битрикс не создаёт задачу без исполнителя, а без проекта подзадача
+      // уехала бы в текущий выбранный проект, а не в проект родителя.
+      try {
+        await createTask({
+          title: newSubtaskTitle,
+          parentId: task.id,
+          projectId: task.projectId && task.projectId !== '0' ? task.projectId : undefined,
+          responsibleId: task.assigneeId || currentUser.id,
+        });
+      } catch (error) {
+        setFieldError(error instanceof Error ? error.message : 'Не удалось создать подзадачу');
+        return;
+      }
       setNewSubtaskTitle('');
       setShowSubtaskAdd(false);
       void loadSubtasks(task.id);
@@ -426,11 +452,31 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               {STATUS_LABELS[task.status] || task.status}
             </Badge>
             <div className="flex shrink-0 items-center gap-1">
-              {(task.status === 'new' || task.status === 'deferred') && (
+              {/* Отложенную Битрикс не «стартует», а возвращает в «Новая» (renew)
+                  или завершает: раньше тут ждали start, и шапка была пустой. */}
+              {task.status === 'deferred' && (
+                <>
+                  {can('renew') && (
+                    <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
+                      <RotateCcw /> Возобновить
+                    </Button>
+                  )}
+                  {can('complete') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleUpdateField('status', 'done')}
+                    >
+                      <CircleCheck /> Завершить
+                    </Button>
+                  )}
+                </>
+              )}
+              {task.status === 'new' && (
                 <>
                   {can('start') && (
                     <Button size="sm" onClick={() => void handleStartTask()}>
-                      <Play /> {task.status === 'deferred' ? 'Продолжить' : 'Начать'}
+                      <Play /> Начать
                     </Button>
                   )}
                   {task.status === 'new' && can('defer') && (
@@ -867,7 +913,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         <SelectContent>
                           <SelectItem value="none">Без проекта</SelectItem>
                           {projects
-                            .filter((project) => !project.isArchived)
+                            // Архивный проект в список переноса не предлагаем, но текущий
+                            // оставляем: иначе у задачи архивного проекта поле пустое.
+                            .filter(
+                              (project) => !project.isArchived || project.id === task.projectId,
+                            )
                             .map((project) => (
                               <SelectItem key={project.id} value={project.id}>
                                 {project.name}
@@ -1073,7 +1123,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         <Input
                           type="datetime-local"
                           className="w-full"
-                          value={task.dueDate ? task.dueDate.slice(0, 16) : ''}
+                          value={toLocalInputValue(task.dueDate, 'datetime')}
                           onChange={(e) =>
                             handleUpdateField(
                               'deadline',
