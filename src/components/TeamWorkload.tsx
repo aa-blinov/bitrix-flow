@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
+  CalendarOff,
   ClipboardList,
   Clock3,
   RefreshCw,
-  UsersRound,
+  TriangleAlert,
 } from 'lucide-react';
+import { cn, pluralRu } from '@/lib/utils';
 import { Bx24Project, Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
@@ -63,18 +65,14 @@ function formatHours(hours: number) {
     : `${hours.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ч`;
 }
 
-function taskLabel(count: number) {
-  const lastTwo = count % 100;
-  const last = count % 10;
-  if (lastTwo >= 11 && lastTwo <= 14) return 'задач';
-  if (last === 1) return 'задача';
-  if (last >= 2 && last <= 4) return 'задачи';
-  return 'задач';
-}
+const taskLabel = (count: number) => pluralRu(count, ['задача', 'задачи', 'задач']);
 
-function loadTone(_count: number, _hours: number) {
-  return 'border-border bg-background/40 hover:bg-muted/70';
-}
+// Пустая ячейка — фон, а не карточка: десятки рамок с «—» забивали сетку, и
+// дни с задачами не выделялись.
+const EMPTY_CELL = 'border-transparent text-muted-foreground/60 hover:bg-muted/50';
+const FILLED_CELL = 'border-border bg-background/40 hover:ring-2 hover:ring-primary/30';
+const OVERDUE_CELL =
+  'border-destructive/30 bg-destructive/10 text-red-800 hover:ring-2 hover:ring-destructive/30 dark:text-red-200';
 
 function UserAvatar({ user }: { user: Bx24User }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -236,6 +234,7 @@ export default function TeamWorkload() {
       )
     : [];
 
+  const todayKey = calendarDayKey(new Date());
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
     [weekStart],
@@ -308,42 +307,64 @@ export default function TeamWorkload() {
       />
 
       <div className="space-y-4 p-4 lg:p-6">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <ClipboardList className="size-5 text-primary" />
+              <ClipboardList className="size-5 shrink-0 text-primary" />
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{weekTotals.count}</p>
-                <p className="text-sm text-muted-foreground">задач со сроком на текущую неделю</p>
+                <p className="text-sm text-muted-foreground">
+                  {taskLabel(weekTotals.count)} со сроком на этой неделе
+                </p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <Clock3 className="size-5 text-primary" />
+              <Clock3 className="size-5 shrink-0 text-primary" />
               <div>
                 <p className="text-2xl font-semibold tabular-nums">
                   {formatHours(weekTotals.hours)}
                 </p>
-                <p className="text-sm text-muted-foreground">плановая нагрузка на текущую неделю</p>
+                <p className="text-sm text-muted-foreground">план на этой неделе</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <UsersRound className="size-5 text-amber-600" />
+              <CalendarOff className="size-5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{noDeadlineCount}</p>
-                <p className="text-sm text-muted-foreground">задач без срока</p>
+                <p className="text-sm text-muted-foreground">
+                  {taskLabel(noDeadlineCount)} без срока
+                </p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <ClipboardList className="size-5 text-red-600" />
+              <TriangleAlert
+                className={cn(
+                  'size-5 shrink-0',
+                  overdueCount ? 'text-destructive' : 'text-muted-foreground',
+                )}
+              />
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{overdueCount}</p>
-                <p className="text-sm text-muted-foreground">просроченных задач</p>
+                <p
+                  className={cn(
+                    'text-2xl font-semibold tabular-nums',
+                    overdueCount > 0 && 'text-destructive',
+                  )}
+                >
+                  {overdueCount}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {pluralRu(overdueCount, [
+                    'просроченная задача',
+                    'просроченные задачи',
+                    'просроченных задач',
+                  ])}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -402,17 +423,32 @@ export default function TeamWorkload() {
             </div>
           </div>
 
+          {/* Ошибка факта раньше записывалась в состояние и терялась: ячейки
+              просто оставались без «Факт», как будто никто ничего не списывал. */}
+          {timeError && (
+            <p role="alert" className="border-b px-4 py-2 text-sm text-destructive">
+              {timeError}. Нажмите «Обновить факт», чтобы повторить.
+            </p>
+          )}
           {summaryError ? (
             <p className="p-6 text-sm text-destructive">{summaryError}</p>
           ) : !summary ? (
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[1050px]">
-                <div className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b bg-muted/40 text-sm">
+              <div className="min-w-[1090px]">
+                <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b bg-muted/40 text-sm">
                   <div className="px-4 py-3 font-medium">Исполнитель</div>
                   {days.map((day, index) => (
-                    <div key={calendarDayKey(day)} className="border-l px-2 py-3 text-center">
+                    <div
+                      key={calendarDayKey(day)}
+                      aria-current={calendarDayKey(day) === todayKey ? 'date' : undefined}
+                      className={cn(
+                        'border-l px-2 py-3 text-center',
+                        calendarDayKey(day) === todayKey &&
+                          'shadow-[inset_0_-2px_0_0_var(--primary)]',
+                      )}
+                    >
                       <p className="font-medium">{DAY_NAMES[index]}</p>
                       <p className="text-xs text-muted-foreground">{DAY_FORMATTER.format(day)}</p>
                     </div>
@@ -432,7 +468,7 @@ export default function TeamWorkload() {
                   return (
                     <div
                       key={assignee.id}
-                      className="grid grid-cols-[minmax(170px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
+                      className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
                     >
                       <div className="flex min-w-0 items-center gap-2 px-4 py-3">
                         <UserAvatar user={assignee} />
@@ -444,8 +480,8 @@ export default function TeamWorkload() {
                           >
                             {assignee.name}
                           </span>
-                          <span className="block text-xs text-muted-foreground">
-                            План {formatHours(memberPlannedHours)}, факт{' '}
+                          <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                            План {formatHours(memberPlannedHours)} · факт{' '}
                             {formatHours(memberActualHours)}
                           </span>
                         </div>
@@ -463,7 +499,7 @@ export default function TeamWorkload() {
                                 setSelectedActual({ userId: assignee.id, day: key });
                               else if (bucket.count) openTaskList(assignee.id, key);
                             }}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? `${loadTone(bucket.count, bucket.hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count || actualHoursFor(assignee.id, key) !== undefined ? FILLED_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue
                               count={bucket.count}
@@ -479,7 +515,7 @@ export default function TeamWorkload() {
                           <button
                             type="button"
                             onClick={() => bucket.count && openTaskList(assignee.id, 'no_deadline')}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? `${loadTone(bucket.count, bucket.hours)} hover:ring-2 hover:ring-primary/30` : 'border-border bg-background/40 hover:bg-muted/70'}`}
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? FILLED_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
@@ -491,7 +527,7 @@ export default function TeamWorkload() {
                           <button
                             type="button"
                             onClick={() => bucket.count && openTaskList(assignee.id, 'overdue')}
-                            className="m-1 min-h-16 rounded-lg border border-border bg-background/40 px-1 py-2 text-center transition-colors hover:bg-muted/70"
+                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? OVERDUE_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
