@@ -498,26 +498,6 @@ function mapTask(t: any): Bx24Task {
 }
 
 // Поиск задач - кеш 30 секунд
-export async function searchTasks(query: string): Promise<Bx24Task[]> {
-  const key = `search:${query}`;
-  const cached = await cacheGet<Bx24Task[]>(key);
-  if (cached) return cached;
-
-  try {
-    const result = await bx24('tasks.task.list', {
-      'order[ID]': 'DESC',
-      start: '0',
-      'filter[%TITLE]': query,
-    });
-
-    const tasks = (result.tasks || []).map((t: any): Bx24Task => mapTask(t));
-    await cacheSet(key, tasks, 30);
-    return tasks;
-  } catch {
-    return [];
-  }
-}
-
 // Поиск задач в проекте не зависит от уже загруженной страницы Kanban.
 export async function searchProjectTasks(projectId: string, query: string): Promise<Bx24Task[]> {
   const normalizedQuery = query.trim();
