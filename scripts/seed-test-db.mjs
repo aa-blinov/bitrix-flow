@@ -117,6 +117,11 @@ await db.collection('task_mirror').insertMany(
   })),
 );
 
+// У коллекции TTL на 30 дней: уведомления с датами от BASE (март 2026) Mongo
+// удалял в первую же минуту после сида, и тест ленты был флаки. Берём ту же
+// раскладку по дням, но от даты в будущем; в снимках даты замаскированы.
+const NOTIFY_BASE = new Date('2099-03-02T09:00:00.000Z');
+const notifyDay = (offset) => new Date(NOTIFY_BASE.getTime() + offset * 86400000).toISOString();
 await db.collection('notifications').insertMany([
   {
     member_id: MEMBER_ID,
@@ -126,7 +131,7 @@ await db.collection('notifications').insertMany([
     message: 'Перевести справочники на GraphQL',
     taskId: '101',
     projectId: '10',
-    created_at: new Date(day(-1)),
+    created_at: new Date(notifyDay(-1)),
   },
   {
     member_id: MEMBER_ID,
@@ -136,7 +141,7 @@ await db.collection('notifications').insertMany([
     message: 'Уточните лимиты, пожалуйста',
     taskId: '103',
     projectId: '10',
-    created_at: new Date(day(-2)),
+    created_at: new Date(notifyDay(-2)),
   },
 ]);
 
