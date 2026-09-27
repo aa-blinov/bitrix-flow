@@ -9,7 +9,7 @@ services:
     build:
       context: .
       args:
-        NEXT_PUBLIC_GLITCHTIP_DSN: ${GLITCHTIP_DSN:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN:-}
         APP_RELEASE: ${APP_RELEASE:-dev}
     restart: unless-stopped
     logging: *logging
@@ -22,8 +22,8 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3000
       MOCK_B24: ${MOCK_B24:-0}
-      # Ошибки сервера уезжают в GlitchTip; без переменной отчёты отключены.
-      GLITCHTIP_DSN: ${GLITCHTIP_DSN:-}
+      # Ошибки сервера уезжают в Sentry; без переменной отчёты отключены.
+      SENTRY_DSN: ${SENTRY_DSN:-}
       APP_RELEASE: ${APP_RELEASE:-dev}
     expose:
       - '3000'
