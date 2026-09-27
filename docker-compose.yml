@@ -11,6 +11,8 @@ services:
       args:
         NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN:-}
         APP_RELEASE: ${APP_RELEASE:-dev}
+      secrets:
+        - sentry_auth_token
     restart: unless-stopped
     logging: *logging
     env_file:
@@ -109,3 +111,8 @@ networks:
   # without publishing cast-server's port to the host.
   cast-team_default:
     external: true
+
+secrets:
+  # Нужен только на сборке, для загрузки source maps в Sentry.
+  sentry_auth_token:
+    environment: SENTRY_AUTH_TOKEN

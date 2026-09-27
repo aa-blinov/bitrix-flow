@@ -13,6 +13,8 @@ export default withSentryConfig(nextConfig, {
   // работают, только стеки в Sentry будут по минифицированному коду.
   authToken: process.env.SENTRY_AUTH_TOKEN,
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Тот же релиз, что у событий: иначе артефакты не свяжутся с ошибками.
+  release: { name: process.env.APP_RELEASE },
   silent: !process.env.CI,
   telemetry: false,
 });

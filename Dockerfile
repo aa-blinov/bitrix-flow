@@ -13,7 +13,9 @@ ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_APP_RELEASE=$APP_RELEASE
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# Токен Sentry приходит build-секретом, а не ARG: ARG остаётся в истории слоёв.
+# Без секрета сборка идёт как обычно, просто без загрузки source maps.
+RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
