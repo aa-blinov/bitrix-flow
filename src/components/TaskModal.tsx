@@ -55,7 +55,7 @@ import {
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
-import { extractTaskTags } from '@/lib/task-tags';
+import { extractTaskTags, tagKey } from '@/lib/task-tags';
 import { fetchProjectMembers, fetchTaskById, searchProjectTasks } from '@/lib/bitrix24';
 import type { Bx24Task } from '@/lib/bitrix24';
 
@@ -219,7 +219,45 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [existingSubtaskQuery, task.projectId]);
 
   const taskSubtasks = subtasks[task.id] || [];
-  const taskTags = task.tags?.length ? task.tags : extractTaskTags(task.title, task.description);
+  // Теги двух видов: штатные поля TAGS (правятся здесь) и #хэштеги из
+  // названия/описания (живут в тексте, убираются правкой текста).
+  const textTagKeys = new Set(extractTaskTags(task.title, task.description).map(tagKey));
+  // Штатные теги (без #) сохраняются целиком; #хэштеги — те, что Битрикс ещё
+  // не превратил в штатные. Тег, который есть в тексте, крестиком не убрать:
+  // Битрикс вернёт его при следующем сохранении описания.
+  const ownTags = (task.tags || []).filter((tag) => !tag.startsWith('#'));
+  const textTags = (task.tags || []).filter((tag) => tag.startsWith('#'));
+  const isFromText = (tag: string) => textTagKeys.has(tagKey(tag));
+  const [tagDraft, setTagDraft] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<string[] | null>(null);
+  const loadTagSuggestions = () => {
+    if (tagSuggestions) return;
+    setTagSuggestions([]);
+    const params = new URLSearchParams(
+      task.projectId && task.projectId !== '0' ? { projectId: task.projectId } : {},
+    );
+    void fetch(`/api/tasks/tags?${params}`)
+      .then((response) => (response.ok ? response.json() : { tags: [] }))
+      .then((data) =>
+        setTagSuggestions(
+          (Array.isArray(data.tags) ? data.tags : [])
+            .map((item: { tag: string }) => String(item.tag))
+            .filter((tag: string) => !tag.startsWith('#')),
+        ),
+      )
+      .catch(() => {});
+  };
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '').replace(/,$/, '').trim();
+    setTagDraft('');
+    if (!tag || (task.tags || []).some((item) => tagKey(item) === tagKey(tag))) return;
+    void handleUpdateField('tags', [...ownTags, tag]);
+  };
+  const removeTag = (tag: string) =>
+    void handleUpdateField(
+      'tags',
+      ownTags.filter((item) => item !== tag),
+    );
   const projectStages = stages.filter(
     (stage) => !stage.entityId || String(stage.entityId) === String(task.projectId),
   );
@@ -633,18 +671,70 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 <FileAttachments files={task.attachments} attached />
               </div>
 
-              {taskTags.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Теги</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {taskTags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
+              <div>
+                <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Теги</h3>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {ownTags.map((tag) =>
+                    isFromText(tag) ? (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        title="Из названия или описания: убирается правкой текста"
+                      >
                         {tag}
                       </Badge>
-                    ))}
-                  </div>
+                    ) : (
+                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+                        {tag}
+                        <button
+                          type="button"
+                          className="rounded-full p-0.5 hover:bg-foreground/10"
+                          aria-label={`Убрать тег ${tag}`}
+                          onClick={() => removeTag(tag)}
+                        >
+                          <X size={11} />
+                        </button>
+                      </Badge>
+                    ),
+                  )}
+                  {textTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      title="Хэштег из названия или описания: убирается правкой текста"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                  <Input
+                    value={tagDraft}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value.endsWith(',')) addTag(value);
+                      else setTagDraft(value);
+                    }}
+                    onFocus={loadTagSuggestions}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        addTag(tagDraft);
+                      }
+                    }}
+                    onBlur={() => tagDraft.trim() && addTag(tagDraft)}
+                    list={`task-tags-${task.id}`}
+                    placeholder="Добавить тег…"
+                    aria-label="Добавить тег"
+                    className="h-7 w-36 text-xs"
+                  />
+                  <datalist id={`task-tags-${task.id}`}>
+                    {(tagSuggestions || [])
+                      .filter((tag) => !ownTags.includes(tag))
+                      .map((tag) => (
+                        <option key={tag} value={tag} />
+                      ))}
+                  </datalist>
                 </div>
-              )}
+              </div>
 
               {/* Subtasks - Collapsible */}
               <Card className="gap-0 py-0">
