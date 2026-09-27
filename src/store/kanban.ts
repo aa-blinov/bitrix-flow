@@ -16,7 +16,6 @@ import {
   updateChecklistItem as bxUpdateChecklistItem,
   setChecklistItemCompleted as bxSetChecklistItemCompleted,
   deleteChecklistItem as bxDeleteChecklistItem,
-  searchTasks,
   fetchUsers,
   fetchProjectStages,
   createProjectStage,
@@ -105,6 +104,8 @@ interface KanbanStore {
   // Поиск
   searchQuery: string;
   searchResults: BxTask[];
+  searchTotal: number;
+  searchError: string | null;
   isSearching: boolean;
   showSearch: boolean;
 
@@ -256,6 +257,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   taskFiltersByScope: {},
   searchQuery: '',
   searchResults: [],
+  searchTotal: 0,
+  searchError: null,
   isSearching: false,
   showSearch: false,
   hasMoreTasks: false,
@@ -673,12 +676,28 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       return;
     }
 
-    set({ isSearching: true });
+    set({ isSearching: true, searchError: null });
+    // Тот же поиск, что в гриде: по зеркалу — название, описание, номер, проект,
+    // исполнитель. Раньше здесь был запрос в Битрикс только по названию, а
+    // ошибка сети выглядела как «ничего не найдено».
     try {
-      const results = await searchTasks(query);
-      set({ searchResults: results.map(convertBxTask), isSearching: false });
+      const params = new URLSearchParams({ query, limit: '50', sorts: 'updated:desc' });
+      const response = await fetch(`/api/tasks/all?${params}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (get().searchQuery !== query) return;
+      set({
+        searchResults: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        searchTotal: Number(data.total) || 0,
+        isSearching: false,
+      });
     } catch {
-      set({ searchResults: [], isSearching: false });
+      if (get().searchQuery !== query) return;
+      set({
+        searchResults: [],
+        isSearching: false,
+        searchError: 'Поиск не удался. Попробуйте ещё раз.',
+      });
     }
   },
 
