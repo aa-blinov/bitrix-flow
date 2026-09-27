@@ -66,3 +66,15 @@ export function pluralRu(count: number, forms: readonly [string, string, string]
   const rule = RU_PLURAL.select(count);
   return rule === 'one' ? forms[0] : rule === 'few' ? forms[1] : forms[2];
 }
+
+// Значение для <input type="datetime-local"> / "date" в поясе браузера.
+// Битрикс отдаёт время в поясе портала (+05:00), и срез строки показывал его
+// как местное: дедлайн 16:00 по Москве в поле выглядел как 18:00.
+export function toLocalInputValue(value: string | undefined, kind: 'datetime' | 'date'): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return kind === 'date' ? day : `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
