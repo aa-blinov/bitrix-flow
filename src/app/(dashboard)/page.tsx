@@ -2,9 +2,17 @@
 import { useKanbanStore } from '@/store/kanban';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRight, CalendarDays, CalendarOff, ListChecks } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarDays,
+  CalendarOff,
+  ListChecks,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn, getProjectColor, getProjectInitials, pluralRu } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import PageHeader from '@/components/PageHeader';
 import {
@@ -14,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getProjectColor, getProjectInitials } from '@/lib/utils';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 
@@ -32,10 +39,11 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   // Числа на карточках и в сводке считает сервер по всему зеркалу: клиент
   // держит только первую страницу задач, и раньше главная показывала её срез.
+  // null — пока сервер не ответил: нули на карточках читались как «всё чисто».
   const [stats, setStats] = useState<{
     projects: Record<string, { total: number; done: number; overdue: number }>;
     totals: { attention: number; inProgress: number; week: number; noDeadline: number };
-  }>({ projects: {}, totals: { attention: 0, inProgress: 0, week: 0, noDeadline: 0 } });
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     void fetch('/api/tasks/stats?byProject=true')
@@ -55,7 +63,6 @@ export default function DashboardPage() {
     };
   }, []);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
   const hasBootstrapped = useRef(false);
   // Проект выбираем, как только список появился — неважно, чей запрос его
   // принёс: сайдбар обращается за проектами в том же тике.
@@ -107,7 +114,7 @@ export default function DashboardPage() {
 
   // Спиннер во весь экран прятал и шапку: страница оставалась без заголовка,
   // пока грузились проекты. Каркас рисуем сразу, спиннер — на месте списка.
-  const isBootstrapping = isLoading || (!selectedProjectId && !showInstallBanner);
+  const isBootstrapping = isLoading || !selectedProjectId;
 
   // «Без проекта» — такой же вход, как в левой панели: у портала 69 задач вне
   // групп, и без этой карточки с главной до них было не добраться.
@@ -119,7 +126,7 @@ export default function DashboardPage() {
     isArchived: false,
   };
   const projectsWithStats = [noProject, ...projects].map((p) => {
-    const row = stats.projects[p.id];
+    const row = stats?.projects[p.id];
     const projectTasks = allTasks.filter((t) => t.projectId === p.id);
     return {
       ...p,
@@ -136,29 +143,10 @@ export default function DashboardPage() {
       project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
   );
 
-  const attentionCount = stats.totals.attention;
-  const inProgressCount = stats.totals.inProgress;
-  const dueThisWeekCount = stats.totals.week;
-  const noDeadlineCount = stats.totals.noDeadline;
+  const totals = stats?.totals;
 
   return (
     <div className="min-h-full bg-muted/20">
-      {showInstallBanner && (
-        <div className="mx-auto mt-4 max-w-6xl px-4 sm:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <span>
-              Вход выполнен, но подключение к Битрикс24 ещё не настроено. Без него список задач
-              останется пустым.
-            </span>
-            <a
-              href="/api/oauth"
-              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
-            >
-              Подключить Битрикс24
-            </a>
-          </div>
-        </div>
-      )}
       <PageHeader title="Главная" description="Обзор проектов, задач и сроков" />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
@@ -168,44 +156,38 @@ export default function DashboardPage() {
             href="/all-tasks?status=attention"
             icon={AlertTriangle}
             label="Требуют внимания"
-            value={attentionCount}
-            color="text-amber-700 dark:text-amber-300"
-            bgColor="bg-amber-500/15"
+            value={totals?.attention}
+            alarm
           />
           <StatCard
             href="/all-tasks?status=in_progress"
             icon={ListChecks}
             label="В работе"
-            value={inProgressCount}
-            color="text-blue-700 dark:text-blue-300"
-            bgColor="bg-blue-500/15"
+            value={totals?.inProgress}
           />
           <StatCard
             href="/all-tasks?status=week"
             icon={CalendarDays}
             label="Дедлайн на неделе"
-            value={dueThisWeekCount}
-            color="text-violet-700 dark:text-violet-300"
-            bgColor="bg-violet-500/15"
+            value={totals?.week}
           />
           <StatCard
             href="/all-tasks?status=no_deadline"
             icon={CalendarOff}
             label="Без дедлайна"
-            value={noDeadlineCount}
-            color="text-muted-foreground"
-            bgColor="bg-muted"
+            value={totals?.noDeadline}
           />
         </div>
 
         {/* Projects list */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between border-b">
+          <CardHeader className="flex flex-wrap items-center justify-between gap-3 border-b">
             <CardTitle>Проекты</CardTitle>
             <div className="flex items-center gap-2">
               <Input
                 type="text"
                 placeholder="Поиск…"
+                aria-label="Найти проект"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-40 sm:w-64"
@@ -226,7 +208,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
 
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {isBootstrapping && <LoadingState className="min-h-60 bg-transparent" />}
             {!isBootstrapping &&
               filteredProjects.map((project) => {
@@ -253,7 +235,11 @@ export default function DashboardPage() {
                         {project.name}
                       </h2>
                       <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>Всего: {project.taskCount} задач</span>
+                        <span>
+                          {project.taskCount > 0
+                            ? `${project.taskCount} ${pluralRu(project.taskCount, ['задача', 'задачи', 'задач'])}`
+                            : 'Нет задач'}
+                        </span>
                         {project.overdue > 0 && (
                           <span className="font-medium text-destructive">
                             Просрочено: {project.overdue}
@@ -262,18 +248,23 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    {/* Пустая полоса у проекта без задач — шум: место держим, рисуем только при задачах. */}
                     <div className="hidden w-48 items-center gap-3 md:flex">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            progressPercent === 100 ? 'bg-emerald-500' : 'bg-primary'
-                          }`}
-                          style={{ width: `${progressPercent}%` }}
-                        />
-                      </div>
-                      <span className="w-8 text-right text-xs font-medium text-muted-foreground">
-                        {progressPercent}%
-                      </span>
+                      {project.taskCount > 0 && (
+                        <>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                progressPercent === 100 ? 'bg-emerald-500' : 'bg-primary'
+                              }`}
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                          <span className="w-9 text-right text-xs font-medium tabular-nums text-muted-foreground">
+                            {progressPercent}%
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <ArrowRight
@@ -296,34 +287,43 @@ export default function DashboardPage() {
   );
 }
 
+// Цвет у счётчика — только сигнал: «Требуют внимания» загорается, когда есть
+// что разбирать. Остальные карточки нейтральные, иначе сигнал тонет.
 function StatCard({
   icon: Icon,
   label,
   value,
-  color,
-  bgColor,
   href,
+  alarm = false,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
-  value: number | string;
-  color: string;
-  bgColor: string;
+  value: number | undefined;
   href: string;
+  alarm?: boolean;
 }) {
+  const lit = alarm && Boolean(value);
   return (
-    <Link href={href} className="block h-full">
+    <Link href={href} className="block h-full rounded-xl">
       <Card className="h-full py-0 transition hover:bg-muted/50" size="sm">
-        <CardContent className="flex h-24 items-center p-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg ${bgColor} flex items-center justify-center`}>
-              <Icon size={16} className={color} />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className={`text-xl font-semibold ${color} mt-0.5`}>{value}</p>
-            </div>
-          </div>
+        <CardContent className="flex h-24 flex-col justify-center gap-1.5 p-4">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Icon
+              size={14}
+              aria-hidden="true"
+              className={cn('shrink-0', lit && 'text-amber-700 dark:text-amber-300')}
+            />
+            {label}
+          </p>
+          <p
+            className={cn(
+              'text-2xl font-semibold tabular-nums',
+              lit ? 'text-amber-700 dark:text-amber-300' : 'text-foreground',
+              value === 0 && 'text-muted-foreground',
+            )}
+          >
+            {value ?? '—'}
+          </p>
         </CardContent>
       </Card>
     </Link>
