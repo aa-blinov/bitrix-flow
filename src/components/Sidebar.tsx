@@ -83,6 +83,7 @@ export default function Sidebar() {
   const [failedPhoto, setFailedPhoto] = useState('');
   const photo = usableAvatar(currentUser.photo);
   const isLoading = useKanbanStore((s) => s.isLoading);
+  const loadError = useKanbanStore((s) => s.error);
   const loadProjects = useKanbanStore((s) => s.loadProjects);
   const createProject = useKanbanStore((s) => s.createProject);
 
@@ -100,9 +101,18 @@ export default function Sidebar() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Раньше эффект перезапускал загрузку сразу после каждой ошибки: пока сервер
+  // перезапускался, это был плотный цикл запросов, а в панели висело «Нет
+  // проектов». Теперь после ошибки — повтор через 3с и честное сообщение.
+  const projectsFailed = Boolean(loadError) && !projects.length;
   useEffect(() => {
-    if (!projects.length && !isLoading) void loadProjects();
-  }, [isLoading, loadProjects, projects.length]);
+    if (!projects.length && !isLoading && !loadError) void loadProjects();
+  }, [isLoading, loadError, loadProjects, projects.length]);
+  useEffect(() => {
+    if (!projectsFailed) return;
+    const timer = window.setTimeout(() => void loadProjects(), 3000);
+    return () => window.clearTimeout(timer);
+  }, [projectsFailed, loadError, loadProjects]);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const closeMobile = () => setMobileOpen(false);
   const pathname = usePathname();
@@ -269,7 +279,7 @@ export default function Sidebar() {
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Проекты ({isLoading && !projects.length ? '…' : projects.length})
+              Проекты ({(isLoading || projectsFailed) && !projects.length ? '…' : projects.length})
             </p>
             <Button
               variant="ghost"
@@ -413,6 +423,16 @@ export default function Sidebar() {
                   </div>
                 )}
               </>
+            ) : projectsFailed ? (
+              <div
+                role="alert"
+                className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs"
+              >
+                <span className="text-destructive">Не удалось загрузить проекты</span>
+                <Button variant="ghost" size="xs" onClick={() => void loadProjects()}>
+                  Повторить
+                </Button>
+              </div>
             ) : (
               <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Нет проектов</div>
             )}
@@ -433,11 +453,14 @@ export default function Sidebar() {
             />
           ) : (
             <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-500 text-xs font-semibold text-white">
-              {getInitials(currentUser.name)}
+              {currentUser.id ? getInitials(currentUser.name) : '…'}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">{currentUser.name}</p>
+            <p className="truncate text-sm font-medium text-foreground">
+              {/* «Не определён» пугал, пока профиль просто грузился. */}
+              {currentUser.id ? currentUser.name : '…'}
+            </p>
           </div>
         </div>
         <div className="flex items-center justify-end gap-1">
