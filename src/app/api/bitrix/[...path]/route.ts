@@ -124,6 +124,13 @@ const TASKS_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 const MUTATION_METHODS = new Set([
   'tasks.task.add',
   'tasks.task.update',
+  // Кнопки статуса в карточке: без них в списке «Начать», «Отложить»,
+  // «Завершить» и т. д. отвечали METHOD_NOT_ALLOWED.
+  'tasks.task.start',
+  'tasks.task.pause',
+  'tasks.task.defer',
+  'tasks.task.complete',
+  'tasks.task.renew',
   'tasks.task.delete',
   'sonet_group.create',
   'sonet_group.update',
@@ -211,6 +218,13 @@ const ALLOWED_METHODS = new Set([
   'tasks.task.get',
   'tasks.task.add',
   'tasks.task.update',
+  // Кнопки статуса в карточке: без них в списке «Начать», «Отложить»,
+  // «Завершить» и т. д. отвечали METHOD_NOT_ALLOWED.
+  'tasks.task.start',
+  'tasks.task.pause',
+  'tasks.task.defer',
+  'tasks.task.complete',
+  'tasks.task.renew',
   'tasks.task.delete',
   'tasks.task.chat.message.send',
   'task.stages.get',

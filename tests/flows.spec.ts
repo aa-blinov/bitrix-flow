@@ -20,6 +20,18 @@ test('карточка задачи открывается по названию
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('кнопки статуса задачи пропускает прокси', async ({ page }) => {
+  // Прокси пускает только методы из белого списка; «Начать», «Отложить» и
+  // остальные кнопки статуса туда не попали и отвечали METHOD_NOT_ALLOWED.
+  await page.goto('/all-tasks');
+  for (const action of ['start', 'pause', 'defer', 'complete', 'renew']) {
+    const response = await page.request.post(`/api/bitrix/tasks.task.${action}`, {
+      form: { taskId: '101' },
+    });
+    expect(response.status(), `tasks.task.${action}`).toBe(200);
+  }
+});
+
 test('перенос в другой проект не закрывает карточку', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
