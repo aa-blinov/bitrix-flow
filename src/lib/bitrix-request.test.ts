@@ -37,3 +37,17 @@ describe('мёртвые адреса', () => {
     __testing.reset();
   });
 });
+
+describe('isReadMethod', () => {
+  it('чтения гоняем параллельно, мутации — нет', () => {
+    const url = (method: string) => `https://portal.bitrix24.ru/rest/${method}?auth=x`;
+    expect(__testing.isReadMethod(url('sonet_group.get'))).toBe(true);
+    expect(__testing.isReadMethod(url('tasks.task.list'))).toBe(true);
+    expect(__testing.isReadMethod(url('task.checklistitem.getlist'))).toBe(true);
+    expect(__testing.isReadMethod(url('user.current.json'))).toBe(true);
+    expect(__testing.isReadMethod(url('tasks.task.add'))).toBe(false);
+    expect(__testing.isReadMethod(url('task.elapseditem.add'))).toBe(false);
+    expect(__testing.isReadMethod(url('batch'))).toBe(false);
+    expect(__testing.isReadMethod(url('event.bind'))).toBe(false);
+  });
+});
