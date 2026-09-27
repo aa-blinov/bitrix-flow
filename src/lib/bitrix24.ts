@@ -1,5 +1,5 @@
 // Используем in-memory fallback для клиента, MongoDB для сервера
-import { bitrixTaskTags, extractTaskTags } from './task-tags';
+import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from './task-tags';
 
 const isClient = typeof window !== 'undefined';
 
@@ -200,6 +200,9 @@ const TASK_LIST_FIELDS = [
   'CREATED_BY',
   'PARENT_ID',
   'STAGE_ID',
+  'TAGS',
+  'ACCOMPLICES',
+  'AUDITORS',
 ];
 
 function addTaskListFields(params: Record<string, string>) {
@@ -486,10 +489,10 @@ function mapTask(t: any): Bx24Task {
     chatId: t.chatId || t.CHAT_ID || undefined,
     accompliceIds: (t.accomplices || t.ACCOMPLICES || []).map(String),
     auditorIds: (t.auditors || t.AUDITORS || []).map(String),
-    tags: [
-      ...bitrixTaskTags(t.tags || t.TAGS),
-      ...extractTaskTags(t.title || t.TITLE, t.description || t.DESCRIPTION),
-    ],
+    tags: mergeTaskTags(
+      bitrixTaskTags(t.tags || t.TAGS),
+      extractTaskTags(t.title || t.TITLE, t.description || t.DESCRIPTION),
+    ),
     actions: t.action,
   };
 }
@@ -692,6 +695,7 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.groupId !== undefined) updateFields.GROUP_ID = fields.groupId || 0;
   if (fields.accompliceIds !== undefined) updateFields.ACCOMPLICES = fields.accompliceIds;
   if (fields.auditorIds !== undefined) updateFields.AUDITORS = fields.auditorIds;
+  if (fields.tags !== undefined) updateFields.TAGS = fields.tags;
 
   await bx24('tasks.task.update', {
     taskId,
@@ -754,8 +758,15 @@ export async function fetchTaskAttachments(taskId: string): Promise<Bx24File[]> 
 }
 
 export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
-  const result = await bx24('tasks.task.get', { taskId });
+  // tasks.task.get без select не отдаёт штатные теги, с select — только их.
+  // Без второго запроса карточка, открытая через loadTaskById, теряла теги.
+  const [result, tagged] = await Promise.all([
+    bx24('tasks.task.get', { taskId }),
+    bx24('tasks.task.get', { taskId, 'select[0]': 'ID', 'select[1]': 'TAGS' }).catch(() => null),
+  ]);
   const task = result?.task || result;
+  const tags = (tagged?.task || tagged)?.tags;
+  if (task && tags !== undefined) task.tags = tags;
   return {
     id: String(task.id),
     title: task.title || '',
@@ -783,10 +794,10 @@ export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
     chatId: task.chatId ? String(task.chatId) : undefined,
     accompliceIds: task.accomplices || [],
     auditorIds: task.auditors || [],
-    tags: [
-      ...bitrixTaskTags(task.tags || task.TAGS),
-      ...extractTaskTags(task.title, task.description),
-    ],
+    tags: mergeTaskTags(
+      bitrixTaskTags(task.tags || task.TAGS),
+      extractTaskTags(task.title, task.description),
+    ),
   };
 }
 
