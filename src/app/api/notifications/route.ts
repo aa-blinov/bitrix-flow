@@ -9,23 +9,32 @@ async function getMemberId(req: NextRequest) {
   return getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
 }
 
+// Лента постранично, как списки задач: page + limit, в ответе total.
 export async function GET(req: NextRequest) {
   const memberId = await getMemberId(req);
   if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 400 });
   const db = await getDb();
-  const requestedLimit = Number(req.nextUrl.searchParams.get('limit')) || 50;
-  const notifications = await db
-    .collection('notifications')
-    .find({ member_id: memberId })
-    .sort({ created_at: -1 })
-    .limit(Math.min(Math.max(requestedLimit, 1), 200))
-    .toArray();
+  const params = req.nextUrl.searchParams;
+  const limit = Math.min(Math.max(Number(params.get('limit')) || 50, 1), 200);
+  const page = Math.max(Math.floor(Number(params.get('page')) || 1), 1);
+  const filter = { member_id: memberId };
+  const collection = db.collection('notifications');
+  const [rows, total] = await Promise.all([
+    collection
+      .find(filter, { projection: { raw_event: 0 } })
+      .sort({ created_at: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .toArray(),
+    collection.countDocuments(filter),
+  ]);
   return NextResponse.json(
     {
-      notifications: notifications.map(({ _id, member_id, ...item }) => ({
+      notifications: rows.map(({ _id, member_id, ...item }) => ({
         id: _id.toString(),
         ...item,
       })),
+      total,
     },
     { headers: { 'Cache-Control': 'private, max-age=10' } },
   );
