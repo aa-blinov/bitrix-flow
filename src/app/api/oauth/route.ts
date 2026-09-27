@@ -104,9 +104,10 @@ async function handleCallback(code: string, req: NextRequest, portalDomain?: str
 
   // Регистрируем обработчик событий
   try {
-    const host = req.headers.get('host') || '57.131.129.41:3000';
-    const protocol = req.headers.get('x-forwarded-proto') || 'http';
-    const handlerUrl = `${protocol}://${host}/api/b24/handler`;
+    // Адрес берём из конфига, а не из Host/X-Forwarded-Proto: заголовки шлёт
+    // клиент, и подменённый Host вешал бы события портала на чужой адрес.
+    // Старый запасной IP так и оставил в Битриксе мёртвые привязки.
+    const handlerUrl = new URL('/api/b24/handler', APP_URL).href;
 
     for (const event of ['OnTaskAdd', 'OnTaskUpdate', 'OnTaskDelete', 'OnTaskCommentAdd']) {
       await postBitrixJson(`https://${restDomain}/rest/event.bind?auth=${tokens.access_token}`, {
