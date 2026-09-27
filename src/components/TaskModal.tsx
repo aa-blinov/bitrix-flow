@@ -397,8 +397,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
           </p>
         )}
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
-          <div className="flex items-center gap-3 min-w-0">
+        {/* На телефоне кнопки статуса и фаза не влезали в строку и растягивали
+            всю карточку вширь: переносим их, а «Закрыть» держим справа. */}
+        <div className="flex items-start justify-between gap-2 px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <span className="text-sm text-muted-foreground font-mono">#{task.id}</span>
             <Badge variant="outline" className="shrink-0">
               {STATUS_LABELS[task.status] || task.status}
@@ -492,7 +494,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               </Select>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Закрыть задачу">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={onClose}
+            aria-label="Закрыть задачу"
+          >
             <X size={20} />
           </Button>
         </div>
@@ -501,7 +509,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Main */}
-            <div className="md:col-span-2 space-y-4">
+            <div className="min-w-0 space-y-4 md:col-span-2">
               {/* Title */}
               <div>
                 {editingField === 'title' ? (
@@ -686,7 +694,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           onClick={() => setShowExistingSubtaskPicker(true)}
                           variant="outline"
@@ -808,7 +816,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {/* Properties - Collapsible */}
               <Card className="gap-0 py-0">
                 <Button
