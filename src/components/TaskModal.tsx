@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -132,6 +133,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   } = useKanbanStore();
 
   const router = useRouter();
+  const toast = useToast();
   const [comment, setComment] = useState('');
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -305,10 +307,28 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     router.push(`/projects/${projectId}?task=${taskId}`);
   };
 
+  // Перенос в другой проект — правка поля, а не переход: раньше карточка
+  // закрывалась и открывалась доска нового проекта, и человек терял место,
+  // где работал. Теперь остаёмся здесь, а в проект ведёт кнопка в тосте.
   const handleMoveProject = async (projectId: string) => {
-    await moveTaskToProject(task.id, projectId);
-    onClose();
-    router.push(`/projects/${projectId}`);
+    const projectName = projects.find((project) => project.id === projectId)?.name || 'проект';
+    try {
+      await moveTaskToProject(task.id, projectId);
+    } catch (error) {
+      setFieldError(error instanceof Error ? error.message : 'Не удалось перенести задачу');
+      return;
+    }
+    toast({
+      title: `Задача перенесена в «${projectName}»`,
+      tone: 'success',
+      action: {
+        label: 'Открыть проект',
+        onClick: () => {
+          onClose();
+          router.push(`/projects/${projectId}?task=${encodeURIComponent(task.id)}`);
+        },
+      },
+    });
   };
 
   const handleAddComment = async () => {

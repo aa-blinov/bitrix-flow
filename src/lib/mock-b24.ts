@@ -628,6 +628,12 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return { task: { id } };
     }
 
+    case 'tasks.task.update': {
+      // Подтверждаем правку, но данные не меняем: мок живёт весь прогон
+      // UI-тестов, и перенос задачи в одном тесте сдвинул бы снимки остальных.
+      return { task: { id: params.taskId } };
+    }
+
     case 'tasks.task.get': {
       const id = params.taskId || params['filter[ID]'];
       const all = Object.values(ALL_TASKS).flat();
