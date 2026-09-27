@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_FILTERS, filterQueryParams, splitValues, viewFilters } from './task-filters';
+import {
+  EMPTY_FILTERS,
+  filterQueryParams,
+  splitValues,
+  viewFilters,
+  encodeFiltersParam,
+  decodeFiltersParam,
+} from './task-filters';
 
 describe('filterQueryParams', () => {
   it('переводит поля в параметры /api/tasks/all', () => {
@@ -82,5 +89,21 @@ describe('viewFilters', () => {
     expect(filters.creator).toBe('9');
     expect(filters.deadline).toBe('week');
     expect(filters.status).toBe('all');
+  });
+});
+
+describe('фильтры в ссылке', () => {
+  it('туда и обратно без потерь, пишутся только отличия', () => {
+    const values = { ...EMPTY_FILTERS, status: 'active', assignee: '9,15', hideDone: 'on' };
+    const encoded = encodeFiltersParam(values);
+    expect(encoded).toBe('status:active;assignee:9,15;hideDone:on');
+    expect({ ...EMPTY_FILTERS, ...decodeFiltersParam(encoded) }).toEqual(values);
+    expect(encodeFiltersParam(EMPTY_FILTERS)).toBe('');
+  });
+  it('мусор и неизвестные поля пропускает', () => {
+    expect(decodeFiltersParam('evil:1;status:;:x;deadline:overdue')).toEqual({
+      deadline: 'overdue',
+    });
+    expect(decodeFiltersParam(null)).toEqual({});
   });
 });
