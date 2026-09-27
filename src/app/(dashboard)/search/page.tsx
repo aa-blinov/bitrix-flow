@@ -14,8 +14,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import PageHeader from '@/components/PageHeader';
 
 function SearchPageContent() {
-  const { search, searchResults, isSearching, searchQuery, setSelectedTask, tasks } =
-    useKanbanStore();
+  const {
+    search,
+    searchResults,
+    searchTotal,
+    searchError,
+    isSearching,
+    searchQuery,
+    setSelectedTask,
+    tasks,
+  } = useKanbanStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -102,7 +110,11 @@ function SearchPageContent() {
           </div>
         ) : searchResults.length > 0 ? (
           <div className="max-w-2xl space-y-3">
-            <p className="text-sm text-muted-foreground">Найдено: {searchResults.length}</p>
+            <p className="text-sm text-muted-foreground">
+              Найдено: {searchTotal}
+              {searchTotal > searchResults.length &&
+                `, показаны первые ${searchResults.length} — уточните запрос`}
+            </p>
             {searchResults.map((task) => (
               <Card
                 key={task.id}
@@ -162,6 +174,10 @@ function SearchPageContent() {
               </Card>
             ))}
           </div>
+        ) : searchError ? (
+          <p role="alert" className="max-w-2xl py-8 text-center text-destructive">
+            {searchError}
+          </p>
         ) : query ? (
           <p className="max-w-2xl py-8 text-center text-muted-foreground">
             Задачи по запросу «{query}» не найдены
