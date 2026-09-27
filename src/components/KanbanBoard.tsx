@@ -644,29 +644,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         </DialogContent>
       </Dialog>
 
-      {/* Columns already scroll horizontally on small screens; a second stage
-          navigation row duplicated them and made labels overlap. */}
-      <div className="hidden">
-        <div className="flex overflow-x-auto scrollbar-hide">
-          {allStages.map((stage) => {
-            const count = filteredTasks.filter((t) => t.stageId === stage.id).length;
-            return (
-              <Button
-                key={stage.id}
-                variant="ghost"
-                className={`h-auto min-w-[120px] flex-1 rounded-none border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap ${'border-transparent text-muted-foreground'}`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
-                  <span>{stage.name}</span>
-                  <span className="text-xs text-muted-foreground">{count}</span>
-                </div>
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Верхний scrollbar — только desktop; синхронизирован с доской ниже. */}
       <div
         ref={topScrollRef}
@@ -1098,6 +1075,10 @@ function TaskCard({
   const dueDate = formatDeadline(task.dueDate);
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
+  // «Обычный» стоит почти на всех задачах: чип на каждой карточке — шум, а не
+  // сигнал. Показываем только отличие от нормы.
+  const showPriority = task.priority !== 'medium';
+  const hasChips = showPriority || taskTags.length > 0 || Boolean(task.parentId);
 
   return (
     <Card
@@ -1106,19 +1087,48 @@ function TaskCard({
       onClick={onClick}
       // Колонка держит до 50 карточек, а видно от силы шесть: content-visibility
       // позволяет браузеру не отрисовывать то, что за пределами экрана.
-      className={`cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-border hover:shadow-sm ${
+      className={`relative cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-border hover:shadow-sm ${
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
       }`}
     >
       {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
           фазу можно выбрать и списком. */}
-      <div className="mb-2 flex items-start gap-1">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-          <span
-            className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            // С мышью кнопка появляется при наведении: в покое карточка плоская.
+            // На тач-экранах drag&drop нет, поэтому там она видна всегда.
+            className="absolute top-2 right-2 size-7 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+            aria-label={`Переместить задачу ${task.title}`}
+            onClick={(event) => event.stopPropagation()}
           >
-            {priority.label}
-          </span>
+            <MoveHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+          <DropdownMenuLabel>Переместить в фазу</DropdownMenuLabel>
+          {stages.map((stage) => (
+            <DropdownMenuItem
+              key={stage.id}
+              disabled={stage.id === task.stageId}
+              onClick={() => onMoveToStage(task.id, stage.id)}
+            >
+              {stage.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {hasChips && (
+        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-1 pr-6">
+          {showPriority && (
+            <span
+              className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
+            >
+              {priority.label}
+            </span>
+          )}
           {taskTags.slice(0, 3).map((tag) => (
             <span
               key={tag}
@@ -1139,35 +1149,10 @@ function TaskCard({
             </span>
           )}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-mt-1 -mr-1 size-7 shrink-0"
-              aria-label={`Переместить задачу ${task.title}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <MoveHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-            <DropdownMenuLabel>Переместить в фазу</DropdownMenuLabel>
-            {stages.map((stage) => (
-              <DropdownMenuItem
-                key={stage.id}
-                disabled={stage.id === task.stageId}
-                onClick={() => onMoveToStage(task.id, stage.id)}
-              >
-                {stage.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      )}
 
       {/* Title and description indicator share one row so the icon never changes card height. */}
-      <div className="mb-2 flex items-start gap-1">
+      <div className={`mb-2 flex items-start gap-1 ${hasChips ? '' : 'pr-6'}`}>
         <h3
           className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
             isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
