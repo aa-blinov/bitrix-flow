@@ -8,6 +8,10 @@ describe('isConnectFailure', () => {
     expect(__testing.isConnectFailure(refused)).toBe(true);
   });
 
+  it('таймаут ответа не повторяем: мутация могла уже выполниться', () => {
+    expect(__testing.isConnectFailure(new Error('BITRIX24_RESPONSE_TIMEOUT'))).toBe(false);
+  });
+
   it('ответ сервера повторять нельзя', () => {
     expect(__testing.isConnectFailure(new Error('BITRIX24_HTTP_502'))).toBe(false);
     expect(__testing.isConnectFailure(new Error('BITRIX24_INVALID_RESPONSE (200)'))).toBe(false);

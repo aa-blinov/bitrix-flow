@@ -7,7 +7,13 @@ import { Agent, request } from 'node:https';
 // request. Forcing IPv4 makes every call deterministic and fast.
 const ipv4Agent = new Agent({ family: 4, keepAlive: true, maxSockets: 8 });
 
-const CONNECT_TIMEOUT_MS = 10_000;
+// Живой edge портала соединяется за ~0.1 с. Раньше на соединение и ответ был
+// один таймаут в 10 с: подвисший адрес стоил 10 с, а при переборе трёх групп
+// карточка задачи открывалась по 30 с. Соединение (TCP + TLS) ждём коротко,
+// ответ — долго: большие списки задач Битрикс собирает секундами.
+const CONNECT_TIMEOUT_MS = 2_000;
+const RESPONSE_TIMEOUT_MS = 15_000;
+const SLOW_CALL_MS = 2_000;
 const MAX_PARALLEL = 3;
 // Сколько групп адресов перебрать, прежде чем сдаться.
 const MAX_GROUPS = 3;
@@ -22,7 +28,9 @@ let lastGoodAddress: string | null = null;
 // висят на TCP-connect до таймаута. Раз наткнувшись, не выбираем их снова
 // ближайшие минуты: иначе каждый третий запрос падал целиком.
 const deadAddresses = new Map<string, number>();
-const DEAD_TTL_MS = 5 * 60 * 1000;
+// 5 минут было мало: адреса отваливаются надолго, и каждые 5 минут первый же
+// запрос снова натыкался на мёртвый.
+const DEAD_TTL_MS = 30 * 60 * 1000;
 
 function isAlive(address: string) {
   const until = deadAddresses.get(address);
@@ -37,16 +45,40 @@ function markDead(address: string) {
   if (lastGoodAddress === address) lastGoodAddress = null;
 }
 
-/** Соединение не состоялось — запрос точно не дошёл, повтор безопасен. */
+/**
+ * Соединение не состоялось — запрос точно не дошёл, повтор безопасен.
+ * Таймаут ответа сюда не входит: запрос мог уже выполниться, и повтор мутации
+ * на другом адресе создал бы дубль.
+ */
 function isConnectFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const code = (error as NodeJS.ErrnoException)?.code || '';
   return (
-    message.includes('TIMEOUT') ||
-    ['ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET', 'EPIPE', 'EAI_AGAIN'].includes(
-      code,
-    )
+    message.includes('BITRIX24_CONNECT_TIMEOUT') ||
+    [
+      'ECONNREFUSED',
+      'EHOSTUNREACH',
+      'ENETUNREACH',
+      'ECONNRESET',
+      'EPIPE',
+      'EAI_AGAIN',
+      'ETIMEDOUT',
+    ].includes(code)
   );
+}
+
+/** Отдельный короткий таймаут на TCP + TLS; сокет из keep-alive пула его не ждёт. */
+function guardConnect(req: import('node:http').ClientRequest) {
+  req.on('socket', (socket) => {
+    if (!socket.connecting) return;
+    const timer = setTimeout(
+      () => req.destroy(new Error('BITRIX24_CONNECT_TIMEOUT')),
+      CONNECT_TIMEOUT_MS,
+    );
+    socket.once('secureConnect', () => clearTimeout(timer));
+    socket.once('close', () => clearTimeout(timer));
+  });
+  req.on('timeout', () => req.destroy(new Error('BITRIX24_RESPONSE_TIMEOUT')));
 }
 
 interface AddressEntry {
@@ -83,7 +115,6 @@ function httpRequest(
   url: string,
   body: string,
   sendJson: boolean,
-  timeoutMs: number,
   lookupHostname: string,
 ): Promise<{ status: number; raw: string }> {
   return new Promise((resolve, reject) => {
@@ -95,13 +126,13 @@ function httpRequest(
       agent: ipv4Agent,
       lookup: (_host, _opts, cb) => cb(null, chosen, 4),
       servername: new URL(url).hostname,
-      timeout: timeoutMs,
+      timeout: RESPONSE_TIMEOUT_MS,
       headers: {
         'Content-Type': sendJson ? 'application/json' : 'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(body),
       },
     });
-    req.on('timeout', () => req.destroy(new Error('BITRIX24_CONNECT_TIMEOUT')));
+    guardConnect(req);
     req.on('error', reject);
     req.on('response', (response) => {
       let raw = '';
@@ -135,9 +166,9 @@ export async function getBitrixFileStream(url: string): Promise<{
           agent: ipv4Agent,
           lookup: (_host, _opts, cb) => cb(null, entry.address, 4),
           servername: hostname,
-          timeout: CONNECT_TIMEOUT_MS,
+          timeout: RESPONSE_TIMEOUT_MS,
         });
-        req.on('timeout', () => req.destroy(new Error('BITRIX24_CONNECT_TIMEOUT')));
+        guardConnect(req);
         req.on('error', reject);
         req.on('response', (res) => {
           if ((res.statusCode || 0) >= 400) {
@@ -177,13 +208,7 @@ export async function postBitrixJson(
     : new URLSearchParams(params as Record<string, string>).toString();
 
   const attempt = async (entry: AddressEntry) => {
-    const { status, raw } = await httpRequest(
-      url,
-      body,
-      sendJson,
-      CONNECT_TIMEOUT_MS,
-      entry.address,
-    );
+    const { status, raw } = await httpRequest(url, body, sendJson, entry.address);
     if (status >= 500) throw new Error(`BITRIX24_HTTP_${status}`);
     return { entry, status, raw };
   };
@@ -191,6 +216,7 @@ export async function postBitrixJson(
   // Группу адресов гоняем наперегонки (для чтения) или по одному (для мутаций).
   // Если вся группа не смогла соединиться, берём следующую: раньше запрос
   // падал целиком, стоило выбору попасть на мёртвые адреса.
+  const startedAt = Date.now();
   let lastError: unknown = new Error('BITRIX24_REQUEST_FAILED');
   for (let start = 0; start < order.length && start < groupSize * MAX_GROUPS; start += groupSize) {
     const group = order.slice(start, start + groupSize);
@@ -198,6 +224,14 @@ export async function postBitrixJson(
     try {
       const winner = await Promise.any(group.map(attempt));
       lastGoodAddress = winner.entry.address;
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > SLOW_CALL_MS) {
+        // Без query: в нём auth-токен портала.
+        const { hostname: host, pathname } = new URL(url);
+        console.warn(
+          `[bitrix] медленный запрос ${host}${pathname}: ${elapsed} мс, ответил ${winner.entry.address}, мёртвых адресов ${deadAddresses.size}`,
+        );
+      }
       try {
         return JSON.parse(winner.raw);
       } catch {
