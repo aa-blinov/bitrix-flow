@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import PageHeader from '@/components/PageHeader';
+import { toolbarSelect } from '@/components/ui/toolbar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useKanbanStore } from '@/store/kanban';
 
@@ -38,11 +46,22 @@ function noticeLabel(type: string) {
 
 const PAGE_SIZE = 50;
 
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'Все события' },
+  { value: 'comment_added', label: 'Комментарии' },
+  { value: 'task_updated', label: 'Изменения задач' },
+  { value: 'task_added', label: 'Новые задачи' },
+  { value: 'task_deleted', label: 'Удаления' },
+];
+
 async function fetchPage(
   page: number,
+  filters: { projectId: string; type: string },
   signal?: AbortSignal,
 ): Promise<{ notifications: Notice[]; total: number }> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(page) });
+  if (filters.projectId !== 'all') params.set('projectId', filters.projectId);
+  if (filters.type !== 'all') params.set('type', filters.type);
   const response = await fetch(`/api/notifications?${params}`, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
@@ -65,11 +84,19 @@ export default function NotificationsPage() {
   // и ~3800 DOM-узлов, хотя смотрят обычно верхние.
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loadedPage, setLoadedPage] = useState(0);
-  const pageLoading = loadedPage !== page;
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const requestKey = `${page}|${projectFilter}|${typeFilter}`;
+  const [loadedKey, setLoadedKey] = useState('');
+  const pageLoading = loadedKey !== requestKey;
   const goToPage = (next: number) => {
     setError('');
     setPage(next);
+  };
+  const changeFilter = (apply: () => void) => {
+    setError('');
+    apply();
+    setPage(1);
   };
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Без этого сбой загрузки выглядел как «Пока нет уведомлений».
@@ -79,7 +106,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchPage(page, controller.signal)
+    void fetchPage(page, { projectId: projectFilter, type: typeFilter }, controller.signal)
       .then((data) => {
         setItems(data.notifications);
         setTotal(data.total);
@@ -92,11 +119,11 @@ export default function NotificationsPage() {
       .finally(() => {
         if (!controller.signal.aborted) {
           setLoading(false);
-          setLoadedPage(page);
+          setLoadedKey(`${page}|${projectFilter}|${typeFilter}`);
         }
       });
     return () => controller.abort();
-  }, [page]);
+  }, [page, projectFilter, typeFilter]);
 
   async function clearHistory() {
     if (!items.length) return;
@@ -137,6 +164,42 @@ export default function NotificationsPage() {
         }
       />
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
+        {/* Лента за все проекты длинная: фильтр по проекту и типу события. */}
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Select
+            value={projectFilter}
+            onValueChange={(value) => changeFilter(() => setProjectFilter(value))}
+          >
+            <SelectTrigger className={`${toolbarSelect} w-56`} aria-label="Проект">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все проекты</SelectItem>
+              {projectNames
+                .filter((project) => !project.isArchived)
+                .map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={typeFilter}
+            onValueChange={(value) => changeFilter(() => setTypeFilter(value))}
+          >
+            <SelectTrigger className={`${toolbarSelect} w-44`} aria-label="Тип события">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {error && (
           <p role="alert" className="mb-3 text-sm text-destructive">
             {error}
