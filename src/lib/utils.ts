@@ -58,3 +58,11 @@ export function usableAvatar(url: unknown): string | undefined {
   if (/default_avatar/i.test(url)) return undefined;
   return url;
 }
+
+const RU_PLURAL = new Intl.PluralRules('ru');
+
+// «1 задача, 3 задачи, 5 задач»: forms — [one, few, many].
+export function pluralRu(count: number, forms: readonly [string, string, string]): string {
+  const rule = RU_PLURAL.select(count);
+  return rule === 'one' ? forms[0] : rule === 'few' ? forms[1] : forms[2];
+}
