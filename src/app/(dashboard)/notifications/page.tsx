@@ -9,6 +9,7 @@ import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import PageHeader from '@/components/PageHeader';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useKanbanStore } from '@/store/kanban';
 
 type Notice = {
   id: string;
@@ -40,13 +41,23 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  // Без этого сбой загрузки выглядел как «Пока нет уведомлений».
+  const [error, setError] = useState('');
+  const projectNames = useKanbanStore((state) => state.projects);
+  const projectName = (id: string) => projectNames.find((project) => project.id === id)?.name;
 
   useEffect(() => {
     const controller = new AbortController();
     void fetch('/api/notifications?limit=200', { signal: controller.signal })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
       .then((data) => setItems(data.notifications || []))
-      .catch(() => {})
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setError('Не удалось загрузить уведомления. Обновите страницу.');
+      })
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
@@ -64,6 +75,7 @@ export default function NotificationsPage() {
     try {
       const response = await fetch('/api/notifications', { method: 'DELETE' });
       if (response.ok) setItems([]);
+      else setError('Не удалось очистить историю. Попробуйте ещё раз.');
     } finally {
       setClearing(false);
     }
@@ -86,6 +98,11 @@ export default function NotificationsPage() {
         }
       />
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
+        {error && (
+          <p role="alert" className="mb-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
         {loading ? (
           <LoadingState className="min-h-72 bg-transparent" />
         ) : items.length ? (
@@ -105,7 +122,7 @@ export default function NotificationsPage() {
                 .toLocaleLowerCase('ru')
                 .startsWith(typeLabel.toLocaleLowerCase('ru'));
               const content = (
-                <Card className={href ? 'transition-colors hover:bg-muted/50' : undefined}>
+                <Card className={`py-0 ${href ? 'transition-colors hover:bg-muted/50' : ''}`}>
                   <CardContent className="flex gap-3 p-4">
                     <span className="mt-0.5">{noticeIcon(item.type)}</span>
                     <div className="min-w-0 flex-1">
@@ -120,7 +137,11 @@ export default function NotificationsPage() {
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         {item.taskId && <span>Задача #{item.taskId}</span>}
-                        {item.projectId && <span>Проект #{item.projectId}</span>}
+                        {/* Номер проекта ничего не говорит: показываем название, а пока
+                            список проектов не пришёл — молчим. */}
+                        {item.projectId && projectName(item.projectId) && (
+                          <span>{projectName(item.projectId)}</span>
+                        )}
                         {createdAt && (
                           <time dateTime={createdAt}>
                             {new Intl.DateTimeFormat('ru-RU', {
@@ -143,7 +164,7 @@ export default function NotificationsPage() {
               );
             })}
           </div>
-        ) : (
+        ) : error ? null : (
           <Card>
             <CardHeader>
               <CardTitle>Пока нет уведомлений</CardTitle>

@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { PRIORITY_LABELS } from '@/types/bitrix';
+import { PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { Search, X, MessageSquare, Timer, Calendar, User } from 'lucide-react';
 import { Suspense, useState, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -11,20 +11,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import PageHeader from '@/components/PageHeader';
 
 function SearchPageContent() {
   const { search, searchResults, isSearching, searchQuery, setSelectedTask, tasks } =
     useKanbanStore();
-  const [query, setQuery] = useState(searchQuery);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Запрос живёт в ?q=: ссылкой на поиск можно поделиться, и «назад» его не теряет.
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? searchQuery);
   const selectedTaskId = searchParams.get('task');
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (query !== searchQuery) {
         search(query);
+      }
+      const params = new URLSearchParams(window.location.search);
+      if ((params.get('q') ?? '') !== query) {
+        if (query) params.set('q', query);
+        else params.delete('q');
+        const next = params.toString();
+        router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
       }
     }, 300);
     return () => clearTimeout(timer);
@@ -52,11 +61,7 @@ function SearchPageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-4 backdrop-blur lg:px-6">
-        <h1 className="pt-2 text-xl font-semibold text-foreground md:pt-0">Поиск</h1>
-        <p className="text-sm text-muted-foreground">Задачи во всех доступных проектах</p>
-      </header>
+      <PageHeader title="Поиск" description="Задачи во всех доступных проектах" />
 
       {/* Search Input */}
       <div className="border-b bg-background p-4 lg:p-6">
@@ -70,6 +75,7 @@ function SearchPageContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск задач по названию…"
+            aria-label="Поиск задач по названию"
             className="h-11 pl-12 pr-12"
             autoFocus
           />
@@ -78,6 +84,7 @@ function SearchPageContent() {
               variant="ghost"
               size="icon"
               onClick={() => setQuery('')}
+              aria-label="Очистить поиск"
               className="absolute right-1 top-1/2 -translate-y-1/2"
             >
               <X size={18} />
@@ -100,31 +107,36 @@ function SearchPageContent() {
               <Card
                 key={task.id}
                 asChild
-                className="cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm"
+                className="w-full cursor-pointer gap-0 p-4 text-left transition hover:ring-primary/20 hover:shadow-sm"
               >
                 <button type="button" onClick={() => openTask(task.id)}>
                   <div className="flex items-start gap-4">
                     <div
-                      className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
+                      aria-hidden="true"
+                      className={`w-2.5 h-2.5 shrink-0 rounded-full mt-1.5 ${
                         task.status === 'done'
                           ? 'bg-green-500'
                           : task.status === 'in_progress'
                             ? 'bg-blue-500'
                             : task.status === 'testing'
                               ? 'bg-yellow-500'
-                              : 'bg-gray-400'
+                              : 'bg-muted-foreground/50'
                       }`}
                     />
                     <div className="flex-1 min-w-0">
-                      <h2 className="font-medium text-gray-900">{task.title}</h2>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        <span className="font-mono">#{task.id}</span>
-                        <Badge
-                          variant="secondary"
-                          className={`${PRIORITY_LABELS[task.priority]?.bgColor} ${PRIORITY_LABELS[task.priority]?.color}`}
-                        >
-                          {PRIORITY_LABELS[task.priority]?.label}
-                        </Badge>
+                      <h2 className="font-medium text-foreground">{task.title}</h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span className="tabular-nums">#{task.id}</span>
+                        {/* Цвет точки — не единственный носитель статуса: подписываем. */}
+                        <span>{STATUS_LABELS[task.status] || task.status}</span>
+                        {task.priority !== 'medium' && (
+                          <Badge
+                            variant="secondary"
+                            className={`${PRIORITY_LABELS[task.priority]?.bgColor} ${PRIORITY_LABELS[task.priority]?.color}`}
+                          >
+                            {PRIORITY_LABELS[task.priority]?.label}
+                          </Badge>
+                        )}
                         {task.assigneeName && (
                           <span className="flex items-center gap-1">
                             <User size={12} />
@@ -151,13 +163,13 @@ function SearchPageContent() {
             ))}
           </div>
         ) : query ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <p className="max-w-2xl py-8 text-center text-muted-foreground">
             Задачи по запросу «{query}» не найдены
-          </div>
+          </p>
         ) : (
-          <div className="text-center py-8 text-muted-foreground">
+          <p className="max-w-2xl py-8 text-center text-muted-foreground">
             Начните вводить текст для поиска
-          </div>
+          </p>
         )}
       </div>
 

@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import Notifications from '@/components/Notifications';
 import ThemeToggle from '@/components/ThemeToggle';
-import { getProjectColor, getProjectInitials } from '@/lib/utils';
+import { getProjectColor, getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 
 function NavItem({
@@ -79,6 +79,9 @@ export default function Sidebar() {
   // (загрузка задач, стадий, SSE) и меню моргает во время первой загрузки.
   const projects = useKanbanStore((s) => s.projects);
   const currentUser = useKanbanStore((s) => s.currentUser);
+  // CDN Битрикса иногда не отдаёт фото — тогда вместо битой картинки инициалы.
+  const [failedPhoto, setFailedPhoto] = useState('');
+  const photo = usableAvatar(currentUser.photo);
   const isLoading = useKanbanStore((s) => s.isLoading);
   const loadProjects = useKanbanStore((s) => s.loadProjects);
   const createProject = useKanbanStore((s) => s.createProject);
@@ -421,8 +424,13 @@ export default function Sidebar() {
       <div className="p-3">
         <Separator className="mb-3" />
         <div className="flex items-center gap-2.5 px-1 mb-2">
-          {currentUser.photo ? (
-            <img src={currentUser.photo} alt="" className="size-8 rounded-full object-cover" />
+          {photo && failedPhoto !== photo ? (
+            <img
+              src={photo}
+              alt=""
+              className="size-8 shrink-0 rounded-full object-cover"
+              onError={() => setFailedPhoto(photo)}
+            />
           ) : (
             <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-500 text-xs font-semibold text-white">
               {getInitials(currentUser.name)}
