@@ -2,7 +2,7 @@
 
 // Последний рубеж: падение в корневом layout, когда своя разметка уже недоступна.
 import { useEffect } from 'react';
-import { reportError } from '@/lib/error-reporter';
+import * as Sentry from '@sentry/nextjs';
 
 export default function GlobalError({
   error,
@@ -12,7 +12,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    reportError(error, { route: window.location.pathname, tags: { source: 'global-error' } });
+    Sentry.captureException(error, { tags: { source: 'global-error' } });
   }, [error]);
 
   return (

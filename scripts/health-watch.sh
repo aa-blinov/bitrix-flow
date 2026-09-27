@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Внешняя проверка живости. Если /api/health не ответил как надо, отправляет
-# событие в GlitchTip — оттуда алерт уходит тем же путём, что и ошибки
+# событие в Sentry — оттуда алерт уходит тем же путём, что и ошибки
 # приложения. Ставить в cron на хосте (или на другой машине, что надёжнее):
 #   */2 * * * * cd /path/to/bitrix-kanban && ./scripts/health-watch.sh >> backups/health.log 2>&1
 set -uo pipefail
@@ -39,12 +39,12 @@ if [ $((NOW - LAST)) -gt 900 ]; then
   fi
 fi
 
-if [ -z "${GLITCHTIP_DSN:-}" ]; then
-  echo "[$STAMP] GLITCHTIP_DSN не задан — алерт отправить некуда" >&2
+if [ -z "${SENTRY_DSN:-}" ]; then
+  echo "[$STAMP] SENTRY_DSN не задан — алерт отправить некуда" >&2
   exit 1
 fi
 
-python3 - "$GLITCHTIP_DSN" "$URL" "${body:-нет ответа}" "$status" <<'PY'
+python3 - "$SENTRY_DSN" "$URL" "${body:-нет ответа}" "$status" <<'PY'
 import json, sys, urllib.request, uuid
 from datetime import datetime, timezone
 from urllib.parse import urlparse

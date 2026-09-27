@@ -67,15 +67,16 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE \
 
 ### Errors and alerting
 
-Unhandled errors go to GlitchTip (Sentry-compatible) through a ~80-line reporter
-instead of the full SDK: server-side via the `onRequestError` instrumentation
-hook, browser-side via `window.onerror` / `unhandledrejection` and both error
-boundaries. Set `GLITCHTIP_DSN` in `.env.local`; without it reporting is off, so
-local runs and tests stay silent.
+Errors and traces go to Sentry through `@sentry/nextjs`: server and edge via
+`src/sentry.*.config.ts` and the `onRequestError` hook, browser via
+`src/instrumentation-client.ts` plus both error boundaries. Set `SENTRY_DSN` in
+`.env.local`; without it reporting is off, so local runs and tests stay silent.
 
 The DSN is also baked into the client bundle at build time
-(`NEXT_PUBLIC_GLITCHTIP_DSN` build arg, wired in `docker-compose.yml`), and
-`APP_RELEASE` tags events with a release — pass the commit:
+(`NEXT_PUBLIC_SENTRY_DSN` build arg, wired in `docker-compose.yml`). Source maps
+are uploaded only when `SENTRY_AUTH_TOKEN` is set at build time; without it the
+build still works, stack traces just point at minified code. `APP_RELEASE`
+tags events with a release — pass the commit:
 
 ```bash
 APP_RELEASE=$(git rev-parse --short HEAD) docker compose --env-file .env.local up -d --build

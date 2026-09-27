@@ -4,7 +4,7 @@
 // оставалась только в консоли.
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { reportError } from '@/lib/error-reporter';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
   error,
@@ -15,7 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Ошибка страницы', error);
-    reportError(error, { route: window.location.pathname, tags: { source: 'error-boundary' } });
+    Sentry.captureException(error, { tags: { source: 'error-boundary' } });
   }, [error]);
 
   return (
