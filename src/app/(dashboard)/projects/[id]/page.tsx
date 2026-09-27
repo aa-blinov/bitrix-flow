@@ -1,5 +1,6 @@
 'use client';
 import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { pluralRu } from '@/lib/utils';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -286,7 +287,7 @@ export default function ProjectPage() {
                   </span>
                 )}
               </h1>
-              <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <Button
                   variant="link"
                   size="xs"
@@ -294,26 +295,24 @@ export default function ProjectPage() {
                   className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"
                 >
                   <Users size={14} />
-                  {currentProject.membersCount || 0} участников
+                  {currentProject.membersCount || 0}{' '}
+                  {pluralRu(currentProject.membersCount || 0, [
+                    'участник',
+                    'участника',
+                    'участников',
+                  ])}
                 </Button>
                 <span>Задач: {stats.total}</span>
                 <span className="text-emerald-700 dark:text-emerald-400">
                   Завершено: {completedTasks}
                 </span>
+                {/* Сигналы — в той же строке, что и счётчики: отдельной строкой
+                    мелким шрифтом просрочка читалась как сноска. */}
+                {overdueTasks > 0 && (
+                  <span className="font-medium text-destructive">Просрочено: {overdueTasks}</span>
+                )}
+                {unassignedTasks > 0 && <span>Без исполнителя: {unassignedTasks}</span>}
               </div>
-              {Boolean(overdueTasks || unassignedTasks) && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {overdueTasks > 0 && (
-                    <span className="font-medium text-destructive">{overdueTasks} просрочено</span>
-                  )}
-                  {unassignedTasks > 0 && (
-                    <span>
-                      {overdueTasks ? ', ' : ''}
-                      {unassignedTasks} без исполнителя
-                    </span>
-                  )}
-                </p>
-              )}
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-4">
