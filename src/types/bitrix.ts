@@ -1,5 +1,7 @@
 export interface BxTask {
   id: string;
+  /** Ключ группы при серверной группировке грида. */
+  groupKey?: string;
   projectId: string;
   title: string;
   description: string;

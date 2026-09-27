@@ -1,13 +1,13 @@
 'use client';
 
 import { Suspense, useCallback, useEffect } from 'react';
-import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { useKanbanStore } from '@/store/kanban';
 import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
-import { filterQueryParams } from '@/lib/task-filters';
+import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
@@ -34,27 +34,13 @@ function AllTasksInner() {
         : 'all';
   const taskFromUrl = searchParams.get('task');
   const loadPage = useCallback(
-    async (request: TaskGridPageQuery) => {
-      const params = new URLSearchParams({
-        ...filterQueryParams(request.filters),
-        page: String(request.page),
-        limit: String(request.limit),
-        query: request.query,
-        sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
-        hierarchy: String(request.hierarchy),
-      });
-      if (requestedAssignee === 'unassigned') params.set('unassigned', 'true');
+    (request: TaskGridPageQuery) => {
+      const extra: Record<string, string> = {};
+      if (requestedAssignee === 'unassigned') extra.unassigned = 'true';
       if (workload && workload !== 'no_deadline' && workload !== 'overdue') {
-        params.set('deadlineDay', workload);
+        extra.deadlineDay = workload;
       }
-      const response = await fetch(`/api/tasks/all?${params.toString()}`);
-      if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
-      const data = await response.json();
-      return {
-        tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
-        ancestors: (Array.isArray(data.ancestors) ? data.ancestors : []).map(convertBxTask),
-        total: Number(data.total) || 0,
-      };
+      return fetchTaskGridPage(request, extra);
     },
     [requestedAssignee, workload],
   );

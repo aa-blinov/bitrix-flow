@@ -1,5 +1,5 @@
 'use client';
-import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { useKanbanStore } from '@/store/kanban';
 import { pluralRu } from '@/lib/utils';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,7 +15,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { filterQueryParams } from '@/lib/task-filters';
+import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -128,25 +128,7 @@ export default function ProjectPage() {
   }, [currentProject?.name]);
 
   const loadGridPage = useCallback(
-    async (request: TaskGridPageQuery) => {
-      const params = new URLSearchParams({
-        ...filterQueryParams(request.filters),
-        page: String(request.page),
-        limit: String(request.limit),
-        query: request.query,
-        projectId,
-        sorts: request.sorts.map((sort) => `${sort.key}:${sort.direction}`).join(','),
-        hierarchy: String(request.hierarchy),
-      });
-      const response = await fetch(`/api/tasks/all?${params.toString()}`);
-      if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
-      const data = await response.json();
-      return {
-        tasks: (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
-        ancestors: (Array.isArray(data.ancestors) ? data.ancestors : []).map(convertBxTask),
-        total: Number(data.total) || 0,
-      };
-    },
+    (request: TaskGridPageQuery) => fetchTaskGridPage(request, { projectId }),
     [projectId],
   );
   // Счётчики считает сервер по всему проекту: доска и список грузят только
