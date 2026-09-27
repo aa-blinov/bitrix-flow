@@ -20,6 +20,20 @@ test('карточка задачи открывается по названию
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('перенос в другой проект не закрывает карточку', async ({ page }) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('combobox', { name: 'Проект', exact: true }).click();
+  await page.getByRole('option', { name: 'Маркетинг Q4' }).click();
+  // Раньше тут карточка закрывалась и открывалась доска нового проекта.
+  await expect(page.getByText('Задача перенесена в «Маркетинг Q4»')).toBeVisible();
+  await expect(dialog).toContainText('Перевести справочники на GraphQL');
+  await expect(page).toHaveURL(/\/all-tasks/);
+});
+
 test('фильтр по исполнителю сужает список и ставит чип', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);

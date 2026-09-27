@@ -786,9 +786,14 @@ export default function TaskGrid({
     ? serverPage.tasks.map((task) => storedById.get(task.id) || task)
     : initialTasks;
   const effectiveTotal = loadPage ? serverPage.total : totalCount;
+  // Как на доске: задача, перенесённая в другой проект, уходит из списка, но
+  // открытая карточка должна остаться — ищем её и в общем кэше.
+  const storedAllTasks = useKanbanStore((state) => state.allTasks);
   const selectedTask = useMemo(
-    () => tasks.find((task) => task.id === selectedTaskId),
-    [tasks, selectedTaskId],
+    () =>
+      tasks.find((task) => task.id === selectedTaskId) ||
+      storedAllTasks.find((task) => task.id === selectedTaskId),
+    [tasks, storedAllTasks, selectedTaskId],
   );
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');

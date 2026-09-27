@@ -777,9 +777,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           : state.tasks.map((task) =>
               task.id === taskId ? { ...task, projectId, stageId } : task,
             ),
-      allTasks: state.allTasks.map((task) =>
-        task.id === taskId ? { ...task, projectId, stageId } : task,
-      ),
+      // Держим задачу в allTasks и тогда, когда её там не было (открыли из
+      // списка «Без проекта»): по нему открытая карточка находит задачу после
+      // того, как она ушла из списка текущего проекта, и не закрывается.
+      allTasks: state.allTasks.some((task) => task.id === taskId)
+        ? state.allTasks.map((task) =>
+            task.id === taskId ? { ...task, projectId, stageId } : task,
+          )
+        : [...state.allTasks, { ...previous, projectId, stageId }],
     }));
     try {
       await bxUpdateTaskFull(taskId, { groupId: projectId, stageId });
