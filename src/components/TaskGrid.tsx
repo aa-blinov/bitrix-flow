@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  isValidElement,
 } from 'react';
 import {
   DndContext,
@@ -45,11 +46,14 @@ import {
   Clock,
   Download,
   Pencil,
+  Bookmark,
+  CheckCheck,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { extractTaskTags } from '@/lib/task-tags';
 import { orderTasksAsTree } from '@/lib/task-tree';
+import { fetchProjectStages } from '@/lib/bitrix24';
 import { getBitrixTaskUrl, toLocalInputValue } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
@@ -65,6 +69,8 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import TaskFilterBar from '@/components/TaskFilterBar';
 import {
   EMPTY_FILTERS,
+  decodeFiltersParam,
+  encodeFiltersParam,
   initialFilterValues,
   taskFilterFields,
   taskFilterPresets,
@@ -138,6 +144,19 @@ function useTaskUrl() {
   return { openTask, closeTask };
 }
 const inputDate = (value?: string) => toLocalInputValue(value, 'date');
+function dateWithKeptTime(day: string, previous?: string): string | null {
+  if (!day) return null;
+  const [year, month, date] = day.split('-').map(Number);
+  const base = previous ? new Date(previous) : null;
+  const result = new Date(
+    year,
+    month - 1,
+    date,
+    base ? base.getHours() : 19,
+    base ? base.getMinutes() : 0,
+  );
+  return Number.isNaN(result.getTime()) ? null : result.toISOString();
+}
 const PAGE_SIZE = 50;
 // На телефоне 50 карточек — семь экранов прокрутки до пагинации.
 const MOBILE_PAGE_SIZE = 20;
@@ -168,14 +187,24 @@ export type TaskGridPageQuery = {
   filters: FilterValues;
   /** Группировка «Иерархия задач»: сервер дотянет родителей найденных подзадач. */
   hierarchy: boolean;
+  /** Серверная группировка: project | stage | assignee | deadline | none. */
+  groupBy: string;
 };
-type TaskGridPage = { tasks: BxTask[]; total: number; ancestors?: BxTask[] };
+export type TaskGridGroup = { key: string; label: string; count: number };
+export type TaskGridPage = {
+  tasks: BxTask[];
+  total: number;
+  ancestors?: BxTask[];
+  groups?: TaskGridGroup[];
+};
 type ColumnKey = SortKey;
-type GroupBy = 'none' | 'stage' | 'assignee' | 'hierarchy';
+type GroupBy = 'none' | 'project' | 'stage' | 'assignee' | 'deadline' | 'hierarchy';
 const GROUP_BY_OPTIONS: ReadonlyArray<{ value: GroupBy; label: string }> = [
   { value: 'none', label: 'Без группировки' },
+  { value: 'project', label: 'По проекту' },
   { value: 'stage', label: 'По фазе' },
   { value: 'assignee', label: 'По исполнителю' },
+  { value: 'deadline', label: 'По сроку' },
   { value: 'hierarchy', label: 'Иерархия задач' },
 ];
 const isGroupBy = (value: string): value is GroupBy =>
@@ -570,7 +599,13 @@ const FieldControls = memo(function FieldControls({
       aria-label="Дедлайн"
       type="date"
       value={inputDate(task.dueDate)}
-      onChange={(event) => edit('deadline', event.target.value || null, 'Дедлайн')}
+      // Дата без времени Битрикс читает как полночь в поясе портала (+05:00) —
+      // по Москве это 22:00 прошлого дня. Сохраняем время прежнего дедлайна
+      // (или 19:00 по местному, если его не было) и шлём полный ISO.
+      onChange={(event) =>
+        edit('deadline', dateWithKeptTime(event.target.value, task.dueDate), 'Дедлайн')
+      }
+      title={task.dueDate ? formatBitrixDateTime(task.dueDate) : undefined}
       className={
         controlClass +
         (needsDeadlineAttention(task)
@@ -796,19 +831,30 @@ export default function TaskGrid({
     [tasks, storedAllTasks, selectedTaskId],
   );
   const [page, setPage] = useState(1);
-  const [query, setQuery] = useState('');
+  // Состояние списка живёт и в ссылке (?filters=…&group=…&q=…): отфильтрованный
+  // список можно переслать, а значения из ссылки важнее сохранённых.
+  const urlParams = useSearchParams();
+  const gridPathname = usePathname();
+  const [linkState] = useState(() => ({
+    filters: decodeFiltersParam(urlParams.get('filters')),
+    group: urlParams.get('group') || '',
+    query: urlParams.get('q') || '',
+  }));
+  const [query, setQuery] = useState(linkState.query);
   // Фильтры живут в сторе одним объектом: их делит доска того же проекта,
   // поэтому переключение канбан ⇄ список ничего не сбрасывает.
   const filters = useKanbanStore((state) => state.taskFilters);
   const setFilters = useKanbanStore((state) => state.setTaskFilters);
   const setFilter = useKanbanStore((state) => state.setTaskFilter);
   const enterFilterScope = useKanbanStore((state) => state.enterFilterScope);
+  const activeFilterScope = useKanbanStore((state) => state.taskFiltersScope);
   useEffect(() => {
-    enterFilterScope(
-      filterScope || layoutScope,
-      initialFilterValues(initialStatus, initialAssigneeId, initialProjectId),
-    );
+    enterFilterScope(filterScope || layoutScope, {
+      ...initialFilterValues(initialStatus, initialAssigneeId, initialProjectId),
+      ...linkState.filters,
+    });
   }, [
+    linkState,
     enterFilterScope,
     filterScope,
     layoutScope,
@@ -822,10 +868,35 @@ export default function TaskGrid({
   const projectFilter = filters.project;
   const isMobile = useIsMobile();
   const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
-  const [groupBy, setGroupBy] = useState<GroupBy>(initialGroupBy);
+  const [groupBy, setGroupBy] = useState<GroupBy>(
+    isGroupBy(linkState.group) ? linkState.group : initialGroupBy,
+  );
   const [activePreset, setActivePreset] = useState('');
   const currentUserId = useKanbanStore((state) => state.currentUser.id);
-  const [draftQuery, setDraftQuery] = useState('');
+  const [draftQuery, setDraftQuery] = useState(linkState.query);
+  useEffect(() => {
+    // Пишем, только когда фильтры экрана уже подняты: иначе первый проход
+    // стирал бы из ссылки то, что ещё не успело примениться.
+    if (activeFilterScope !== (filterScope || layoutScope)) return;
+    const params = new URLSearchParams(window.location.search);
+    const encoded = encodeFiltersParam(filters);
+    if (encoded) params.set('filters', encoded);
+    else params.delete('filters');
+    if (groupBy !== 'none') params.set('group', groupBy);
+    else params.delete('group');
+    if (query) params.set('q', query);
+    else params.delete('q');
+    // Старые одиночные параметры уже вошли в filters: оставь их — и сброшенный
+    // фильтр вернулся бы после перезагрузки.
+    for (const legacy of ['status', 'assignee', 'project']) params.delete(legacy);
+    const next = params.toString();
+    if (next !== window.location.search.replace(/^\?/, ''))
+      window.history.replaceState(
+        window.history.state,
+        '',
+        next ? `${gridPathname}?${next}` : gridPathname,
+      );
+  }, [activeFilterScope, filterScope, filters, gridPathname, groupBy, layoutScope, query]);
   // Искать по Enter неудобно: подхватываем ввод сами, с паузой на дописывание.
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(draftQuery), 350);
@@ -1021,9 +1092,93 @@ export default function TaskGrid({
     groupBy === 'hierarchy'
       ? pageTasks.filter((task) => hierarchy.isVisible.get(task.id))
       : pageTasks;
+  // Серверная группировка: сервер отдаёт задачи уже подряд по группам и итоги
+  // по всему списку, а не по странице. Клиентский вариант остаётся для гридов
+  // без loadPage.
+  const serverGroups = serverPage.groups;
+  const [stageNames, setStageNames] = useState<Record<string, string>>({});
+  // Фазы каждого проекта запрашиваем один раз: иначе фаза, которой нет в
+  // ответе (удалённая, «0»), перезапускала загрузку по кругу.
+  const requestedStageProjectsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (groupBy !== 'stage' || !serverGroups?.length) return;
+    const known = new Set(stages.map((stage) => String(stage.id)));
+    const projectIds = [
+      ...new Set(
+        serverGroups
+          .map((group) => group.key.split('|'))
+          .filter(([, stageId]) => stageId && stageId !== '0' && !known.has(stageId))
+          .map(([projectId]) => projectId)
+          .filter(
+            (projectId) =>
+              projectId && projectId !== '0' && !requestedStageProjectsRef.current.has(projectId),
+          ),
+      ),
+    ].slice(0, 20);
+    if (!projectIds.length) return;
+    projectIds.forEach((id) => requestedStageProjectsRef.current.add(id));
+    void Promise.all(projectIds.map((id) => fetchProjectStages(id).catch(() => []))).then(
+      (lists) => {
+        const next: Record<string, string> = {};
+        for (const list of lists) for (const stage of list) next[String(stage.id)] = stage.name;
+        setStageNames((current) => ({ ...current, ...next }));
+      },
+    );
+  }, [groupBy, serverGroups, stages]);
   const groupedPageTasks = useMemo(() => {
     if (groupBy === 'none' || groupBy === 'hierarchy')
-      return [{ key: '', label: '', tasks: displayPageTasks }];
+      return [
+        {
+          key: '',
+          label: '',
+          tasks: displayPageTasks,
+          count: displayPageTasks.length,
+          continued: false,
+        },
+      ];
+    if (loadPage && serverGroups) {
+      const byKey = new Map(serverGroups.map((group) => [group.key, group]));
+      // Где начинается группа в общем списке — чтобы пометить «продолжение»,
+      // если она началась на прошлой странице.
+      const startOf = new Map<string, number>();
+      let offset = 0;
+      for (const group of serverGroups) {
+        startOf.set(group.key, offset);
+        offset += group.count;
+      }
+      const stageLabel = (key: string, projectLabel: string) => {
+        const stageId = key.split('|')[1] || '';
+        const name =
+          stages.find((stage) => String(stage.id) === stageId)?.name || stageNames[stageId];
+        const stageText = stageId === '0' || !stageId ? 'Без фазы' : name || 'Фаза';
+        return showProject ? `${projectLabel} · ${stageText}` : stageText;
+      };
+      const result: Array<{
+        key: string;
+        label: string;
+        tasks: BxTask[];
+        count: number;
+        continued: boolean;
+      }> = [];
+      for (const task of displayPageTasks) {
+        const key = task.groupKey ?? '';
+        const last = result[result.length - 1];
+        if (last && last.key === key) {
+          last.tasks.push(task);
+          continue;
+        }
+        const group = byKey.get(key);
+        const label = group?.label || '—';
+        result.push({
+          key,
+          label: groupBy === 'stage' ? stageLabel(key, label) : label,
+          tasks: [task],
+          count: group?.count ?? 1,
+          continued: (startOf.get(key) ?? pageStart) < pageStart,
+        });
+      }
+      return result;
+    }
     const labels =
       groupBy === 'stage'
         ? Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))
@@ -1038,8 +1193,53 @@ export default function TaskGrid({
       key,
       label: labels[key] || (groupBy === 'stage' ? 'Без фазы' : 'Не назначен'),
       tasks: groupedTasks,
+      count: groupedTasks.length,
+      continued: false,
     }));
-  }, [displayPageTasks, groupBy, stages, users]);
+  }, [
+    displayPageTasks,
+    groupBy,
+    loadPage,
+    pageStart,
+    serverGroups,
+    showProject,
+    stageNames,
+    stages,
+    users,
+  ]);
+  // Свёрнутые группы: заголовок — кнопка, строки прячутся.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const groupHeader = (group: {
+    key: string;
+    label: string;
+    count: number;
+    continued: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={() => toggleGroup(group.key)}
+      aria-expanded={!collapsedGroups.has(group.key)}
+      className="flex w-full items-center gap-1.5 text-left font-medium text-foreground"
+    >
+      {collapsedGroups.has(group.key) ? (
+        <ChevronRight className="size-4 shrink-0" />
+      ) : (
+        <ChevronDown className="size-4 shrink-0" />
+      )}
+      <span className="truncate">{group.label}</span>
+      <span className="shrink-0 font-normal tabular-nums text-muted-foreground">{group.count}</span>
+      {group.continued && (
+        <span className="shrink-0 font-normal text-muted-foreground">· продолжение</span>
+      )}
+    </button>
+  );
   const tableColumnCount = orderedVisibleColumns.length + 2;
   // Data arrives in PAGE_SIZE-sized chunks, so a short unfiltered list may
   // still be incomplete. Let only a deliberately narrowed, partial result
@@ -1186,6 +1386,7 @@ export default function TaskGrid({
       sorts,
       filters: { ...filters, project: showProject ? filters.project : 'all' },
       hierarchy: groupBy === 'hierarchy',
+      groupBy: groupBy === 'hierarchy' ? 'none' : groupBy,
     };
     const key = JSON.stringify([request, serverPageRetry]);
     if (key === lastPageKeyRef.current) return;
@@ -1352,14 +1553,22 @@ export default function TaskGrid({
       )
       .catch((error) => gridToasts.failed('Массовое изменение не прошло', error));
   };
-  const toggleSort = (key: SortKey) => {
+  // Клик — сортировка только по этой колонке (↑ → ↓ → снять), Shift+клик —
+  // добавить её следующим уровнем. Раньше любой клик молча добавлял колонку
+  // в начало, и прежние сортировки незаметно оставались вторыми.
+  const toggleSort = (key: SortKey, additive = false) => {
     setSorts((current) => {
       const currentSort = current.find((sort) => sort.key === key);
-      if (currentSort?.direction === 'desc') {
-        return current.filter((sort) => sort.key !== key);
-      }
-      const next: Sort = { key, direction: currentSort ? 'desc' : 'asc' };
-      return [next, ...current.filter((sort) => sort.key !== key)];
+      const direction: Sort['direction'] | null = !currentSort
+        ? 'asc'
+        : currentSort.direction === 'asc'
+          ? 'desc'
+          : null;
+      if (!additive) return direction ? [{ key, direction }] : [];
+      if (!direction) return current.filter((sort) => sort.key !== key);
+      return currentSort
+        ? current.map((sort) => (sort.key === key ? { key, direction } : sort))
+        : [...current, { key, direction }];
     });
   };
   const sortLabel = (key: SortKey) => {
@@ -1386,7 +1595,8 @@ export default function TaskGrid({
     <TableHead className="relative p-0" style={{ width: columnWidths[key] }}>
       <button
         type="button"
-        onClick={() => toggleSort(key)}
+        onClick={(event) => toggleSort(key, event.shiftKey)}
+        title="Сортировать. Shift+клик — добавить вторым уровнем"
         className="flex h-10 w-full items-center gap-1 px-2 text-left hover:text-foreground"
       >
         {label}
@@ -1466,7 +1676,10 @@ export default function TaskGrid({
                     size="sm"
                     className={`${toolbarControl} focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground`}
                   >
-                    {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}
+                    {/* Раньше тут было голое «По умолчанию» — не догадаться, что это
+                        меню сохранённых видов. */}
+                    <Bookmark size={14} />
+                    Вид: {views.find((view) => view.id === activeViewId)?.name || 'по умолчанию'}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
@@ -1564,11 +1777,14 @@ export default function TaskGrid({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {GROUP_BY_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                {/* По проекту — только там, где в списке несколько проектов. */}
+                {GROUP_BY_OPTIONS.filter((option) => showProject || option.value !== 'project').map(
+                  (option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
             {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
@@ -1593,6 +1809,18 @@ export default function TaskGrid({
                 ])}
               </SelectContent>
             </Select>
+            {/* Закрытые задачи в ежедневном списке мешают: переключатель всегда на
+                виду, а не последним пунктом в меню «+ Фильтр». */}
+            <Button
+              variant={hideDone ? 'secondary' : 'outline'}
+              size="sm"
+              className={toolbarControl}
+              aria-pressed={hideDone}
+              onClick={() => setFilterValue('hideDone', hideDone ? 'off' : 'on')}
+            >
+              <CheckCheck size={14} />
+              <span className="hidden sm:inline">Только&nbsp;</span>активные
+            </Button>
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
@@ -1690,186 +1918,204 @@ export default function TaskGrid({
               50 карточек — вдвое больше узлов и работы на каждый рендер. */}
           {isMobile && serverPageReady && tasks.length > 0 && (
             <div className="divide-y px-4 sm:px-6">
-              {displayPageTasks.map((task) => {
-                const assignee =
-                  task.assigneeName ||
-                  users.find((user) => user.id === task.assigneeId)?.name ||
-                  'Не назначен';
-                const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
-                return (
-                  <article
-                    key={task.id}
-                    // Уровень вложенности на телефоне — отступом: кнопки
-                    // сворачивания в карточке нет, а понять глубину надо.
-                    style={
-                      groupBy === 'hierarchy'
-                        ? {
-                            paddingLeft: `calc(1rem + ${(hierarchy.depthById.get(task.id) || 0) * 14}px)`,
-                          }
-                        : undefined
-                    }
-                    className={`max-w-full min-w-0 overflow-hidden p-4 ${
-                      contextTaskIds.has(task.id) ? 'opacity-60' : ''
-                    } ${
-                      task.status === 'done'
-                        ? 'bg-muted/60 text-muted-foreground'
-                        : needsDeadlineAttention(task)
-                          ? 'bg-yellow-500/10'
-                          : ''
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {/* Галка обычного размера, но область касания — 40px:
-                        padding даёт обёртка, иначе раздувается сама рамка. */}
-                      <span
-                        className="-m-2.5 shrink-0 p-2.5"
-                        onClick={(event) => {
-                          if (event.target === event.currentTarget) toggleSelected(task.id);
-                        }}
-                      >
-                        <Checkbox
-                          checked={selectedIds.has(task.id)}
-                          onCheckedChange={() => toggleSelected(task.id)}
-                          aria-label={`Выбрать задачу ${task.title}`}
-                          className="mt-0.5"
-                        />
-                      </span>
-                      {groupBy === 'hierarchy' && (hierarchy.childCount.get(task.id) || 0) > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="mt-0.5 size-6 shrink-0"
-                          aria-label={
-                            collapsedTaskIds.has(task.id)
-                              ? `Развернуть подзадачи ${task.title}`
-                              : `Свернуть подзадачи ${task.title}`
-                          }
-                          onClick={() =>
-                            setCollapsedTaskIds((ids) => {
-                              const next = new Set(ids);
-                              if (next.has(task.id)) next.delete(task.id);
-                              else next.add(task.id);
-                              return next;
-                            })
-                          }
+              {groupedPageTasks
+                .flatMap((group) => [
+                  ...(groupBy !== 'none' && groupBy !== 'hierarchy'
+                    ? [
+                        <div
+                          key={`group:${group.key}`}
+                          className="-mx-4 bg-muted/60 px-4 py-2 text-sm sm:-mx-6 sm:px-6"
                         >
-                          {collapsedTaskIds.has(task.id) ? (
-                            <ChevronRight className="size-4" />
-                          ) : (
-                            <ChevronDown className="size-4" />
+                          {groupHeader(group)}
+                        </div>,
+                      ]
+                    : []),
+                  ...(collapsedGroups.has(group.key) ? [] : group.tasks),
+                ])
+                .map((item) => {
+                  // Заголовок группы уже готовый элемент, остальное — задачи.
+                  if (isValidElement(item)) return item;
+                  const task = item as BxTask;
+                  const assignee =
+                    task.assigneeName ||
+                    users.find((user) => user.id === task.assigneeId)?.name ||
+                    'Не назначен';
+                  const priority = PRIORITY_LABELS[task.priority]?.label || 'Обычный';
+                  return (
+                    <article
+                      key={task.id}
+                      // Уровень вложенности на телефоне — отступом: кнопки
+                      // сворачивания в карточке нет, а понять глубину надо.
+                      style={
+                        groupBy === 'hierarchy'
+                          ? {
+                              paddingLeft: `calc(1rem + ${(hierarchy.depthById.get(task.id) || 0) * 14}px)`,
+                            }
+                          : undefined
+                      }
+                      className={`max-w-full min-w-0 overflow-hidden p-4 ${
+                        contextTaskIds.has(task.id) ? 'opacity-60' : ''
+                      } ${
+                        task.status === 'done'
+                          ? 'bg-muted/60 text-muted-foreground'
+                          : needsDeadlineAttention(task)
+                            ? 'bg-yellow-500/10'
+                            : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        {/* Галка обычного размера, но область касания — 40px:
+                        padding даёт обёртка, иначе раздувается сама рамка. */}
+                        <span
+                          className="-m-2.5 shrink-0 p-2.5"
+                          onClick={(event) => {
+                            if (event.target === event.currentTarget) toggleSelected(task.id);
+                          }}
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(task.id)}
+                            onCheckedChange={() => toggleSelected(task.id)}
+                            aria-label={`Выбрать задачу ${task.title}`}
+                            className="mt-0.5"
+                          />
+                        </span>
+                        {groupBy === 'hierarchy' &&
+                          (hierarchy.childCount.get(task.id) || 0) > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="mt-0.5 size-6 shrink-0"
+                              aria-label={
+                                collapsedTaskIds.has(task.id)
+                                  ? `Развернуть подзадачи ${task.title}`
+                                  : `Свернуть подзадачи ${task.title}`
+                              }
+                              onClick={() =>
+                                setCollapsedTaskIds((ids) => {
+                                  const next = new Set(ids);
+                                  if (next.has(task.id)) next.delete(task.id);
+                                  else next.add(task.id);
+                                  return next;
+                                })
+                              }
+                            >
+                              {collapsedTaskIds.has(task.id) ? (
+                                <ChevronRight className="size-4" />
+                              ) : (
+                                <ChevronDown className="size-4" />
+                              )}
+                            </Button>
                           )}
-                        </Button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => openTask(task.id)}
-                        className="min-w-0 flex-1 text-left focus-visible:outline-none"
-                        style={{
-                          paddingLeft:
-                            groupBy === 'hierarchy'
-                              ? `${(hierarchy.depthById.get(task.id) || 0) * 16}px`
-                              : undefined,
-                        }}
-                      >
-                        <div className="flex items-start gap-2">
-                          {task.status === 'done' ? (
-                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                          ) : (
-                            <Circle className="mt-0.5 size-4 shrink-0" />
-                          )}
-                          <p className="line-clamp-2 font-medium">
-                            {groupBy === 'hierarchy' &&
-                              (hierarchy.depthById.get(task.id) || 0) > 0 &&
-                              '↳ '}
-                            {task.title}
-                          </p>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary">
-                            {STATUS_LABELS[task.status] || task.status}
-                          </Badge>
-                          {task.priority !== 'medium' && (
-                            <Badge variant="outline">{priority}</Badge>
-                          )}
-                          {/* Пока список проектов не пришёл, лучше промолчать,
+                        <button
+                          type="button"
+                          onClick={() => openTask(task.id)}
+                          className="min-w-0 flex-1 text-left focus-visible:outline-none"
+                          style={{
+                            paddingLeft:
+                              groupBy === 'hierarchy'
+                                ? `${(hierarchy.depthById.get(task.id) || 0) * 16}px`
+                                : undefined,
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            {task.status === 'done' ? (
+                              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                            ) : (
+                              <Circle className="mt-0.5 size-4 shrink-0" />
+                            )}
+                            <p className="line-clamp-2 font-medium">
+                              {groupBy === 'hierarchy' &&
+                                (hierarchy.depthById.get(task.id) || 0) > 0 &&
+                                '↳ '}
+                              {task.title}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="secondary">
+                              {STATUS_LABELS[task.status] || task.status}
+                            </Badge>
+                            {task.priority !== 'medium' && (
+                              <Badge variant="outline">{priority}</Badge>
+                            )}
+                            {/* Пока список проектов не пришёл, лучше промолчать,
                               чем показывать «Проект 95» вместо названия. */}
-                          {showProject &&
-                            task.projectId &&
-                            task.projectId !== '0' &&
-                            projectById[task.projectId]?.name && (
-                              <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                                <Folder className="size-3 shrink-0" />
-                                <span
-                                  className="truncate"
-                                  title={projectById[task.projectId]?.name}
-                                >
-                                  {projectById[task.projectId]?.name}
+                            {showProject &&
+                              task.projectId &&
+                              task.projectId !== '0' &&
+                              projectById[task.projectId]?.name && (
+                                <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                                  <Folder className="size-3 shrink-0" />
+                                  <span
+                                    className="truncate"
+                                    title={projectById[task.projectId]?.name}
+                                  >
+                                    {projectById[task.projectId]?.name}
+                                  </span>
                                 </span>
+                              )}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <User className="size-3 shrink-0" />
+                              {assignee}
+                            </span>
+                            {!task.dueDate && task.status !== 'done' && (
+                              <span className="inline-flex items-center gap-1 font-medium text-violet-700 dark:text-violet-300">
+                                <CalendarDays className="size-3 shrink-0" />
+                                без срока
                               </span>
                             )}
+                            {task.dueDate && (
+                              <span
+                                className={`inline-flex items-center gap-1 ${
+                                  needsDeadlineAttention(task)
+                                    ? 'font-medium text-yellow-800 dark:text-yellow-200'
+                                    : ''
+                                }`}
+                              >
+                                <CalendarDays className="size-3 shrink-0" />
+                                {formatBitrixDateTime(task.dueDate)}
+                              </span>
+                            )}
+                            {Boolean(task.estimate || task.actualTime) && (
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="size-3 shrink-0" />
+                                {task.actualTime || 0} / {task.estimate || 0} ч
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                        <div className="flex shrink-0 items-center [&_button]:size-11">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={
+                              editingCardIds.has(task.id)
+                                ? `Скрыть поля задачи ${task.title}`
+                                : `Изменить поля задачи ${task.title}`
+                            }
+                            onClick={() =>
+                              setEditingCardIds((ids) => {
+                                const next = new Set(ids);
+                                if (next.has(task.id)) next.delete(task.id);
+                                else next.add(task.id);
+                                return next;
+                              })
+                            }
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <TaskActions task={task} compact />
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1">
-                            <User className="size-3 shrink-0" />
-                            {assignee}
-                          </span>
-                          {!task.dueDate && task.status !== 'done' && (
-                            <span className="inline-flex items-center gap-1 font-medium text-violet-700 dark:text-violet-300">
-                              <CalendarDays className="size-3 shrink-0" />
-                              без срока
-                            </span>
-                          )}
-                          {task.dueDate && (
-                            <span
-                              className={`inline-flex items-center gap-1 ${
-                                needsDeadlineAttention(task)
-                                  ? 'font-medium text-yellow-800 dark:text-yellow-200'
-                                  : ''
-                              }`}
-                            >
-                              <CalendarDays className="size-3 shrink-0" />
-                              {formatBitrixDateTime(task.dueDate)}
-                            </span>
-                          )}
-                          {Boolean(task.estimate || task.actualTime) && (
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="size-3 shrink-0" />
-                              {task.actualTime || 0} / {task.estimate || 0} ч
-                            </span>
-                          )}
+                      </div>
+                      {editingCardIds.has(task.id) && (
+                        <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+                          <FieldControls task={task} compact />
                         </div>
-                      </button>
-                      <div className="flex shrink-0 items-center [&_button]:size-11">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={
-                            editingCardIds.has(task.id)
-                              ? `Скрыть поля задачи ${task.title}`
-                              : `Изменить поля задачи ${task.title}`
-                          }
-                          onClick={() =>
-                            setEditingCardIds((ids) => {
-                              const next = new Set(ids);
-                              if (next.has(task.id)) next.delete(task.id);
-                              else next.add(task.id);
-                              return next;
-                            })
-                          }
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <TaskActions task={task} compact />
-                      </div>
-                    </div>
-                    {editingCardIds.has(task.id) && (
-                      <div className="mt-3 rounded-lg border bg-muted/30 p-3">
-                        <FieldControls task={task} compact />
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
+                      )}
+                    </article>
+                  );
+                })}
             </div>
           )}
           {!isMobile && serverPageReady && tasks.length > 0 && (
@@ -1916,15 +2162,10 @@ export default function TaskGrid({
                     <Fragment key={`${groupBy}:${group.key || 'all'}`}>
                       {groupBy !== 'none' && groupBy !== 'hierarchy' && (
                         <TableRow className="bg-muted/60 hover:bg-muted/60">
-                          <TableCell
-                            colSpan={tableColumnCount}
-                            className="font-medium text-foreground"
-                          >
-                            {group.label} ({group.tasks.length})
-                          </TableCell>
+                          <TableCell colSpan={tableColumnCount}>{groupHeader(group)}</TableCell>
                         </TableRow>
                       )}
-                      {group.tasks.map((task) => (
+                      {(collapsedGroups.has(group.key) ? [] : group.tasks).map((task) => (
                         <TableRow
                           key={task.id}
                           // content-visibility даёт браузеру пропускать отрисовку

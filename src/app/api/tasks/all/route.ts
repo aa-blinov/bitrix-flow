@@ -44,7 +44,83 @@ function toTaskListItem(task: any) {
     // Штатные теги нужны карточкам списка и доски, а не только фильтру.
     tags: task.tags || task.TAGS || undefined,
     auditorIds: (task.auditors || task.AUDITORS || []).map(String),
+    groupKey: task.__group !== undefined ? String(task.__group) : undefined,
   };
+}
+
+// Ключ, подпись и порядок группы для серверной группировки. Порядок — число:
+// «Не назначен» и «Без проекта» уходят в конец, сроки идут от горящих к далёким.
+function groupingStages(groupBy: string, today: Date) {
+  const day = (offset: number) => new Date(today.getTime() + offset * 86400000);
+  const noProject = { $in: [{ $ifNull: ['$groupId', '0'] }, ['0', '', null]] };
+  if (groupBy === 'project') {
+    return {
+      fields: {
+        groupKey: { $ifNull: ['$groupId', '0'] },
+        groupLabel: { $cond: [noProject, 'Без проекта', { $ifNull: ['$groupName', ''] }] },
+        groupOrder: { $cond: [noProject, 1, 0] },
+      },
+    };
+  }
+  if (groupBy === 'assignee') {
+    const none = { $in: [{ $ifNull: ['$responsibleId', ''] }, ['', '0', null]] };
+    return {
+      fields: {
+        groupKey: { $ifNull: ['$responsibleId', ''] },
+        groupLabel: { $cond: [none, 'Не назначен', { $ifNull: ['$responsibleName', ''] }] },
+        groupOrder: { $cond: [none, 1, 0] },
+      },
+    };
+  }
+  if (groupBy === 'stage') {
+    // Фазы у каждого проекта свои: «Новые» одного проекта — не «Новые» другого.
+    return {
+      fields: {
+        groupKey: {
+          $concat: [{ $toString: { $ifNull: ['$groupId', '0'] } }, '|', { $toString: '$stageId' }],
+        },
+        groupLabel: { $cond: [noProject, 'Без проекта', { $ifNull: ['$groupName', ''] }] },
+        groupOrder: { $cond: [noProject, 1, 0] },
+      },
+    };
+  }
+  if (groupBy === 'deadline') {
+    const buckets: Array<[string, string, unknown]> = [
+      ['done', 'Закрытые', { $eq: ['$rawStatus', '5'] }],
+      ['none', 'Без срока', { $eq: ['$deadlineDate', null] }],
+      ['overdue', 'Просрочено', { $lt: ['$deadlineDate', day(0)] }],
+      ['today', 'Сегодня', { $lt: ['$deadlineDate', day(1)] }],
+      ['tomorrow', 'Завтра', { $lt: ['$deadlineDate', day(2)] }],
+      ['week', 'На неделе', { $lt: ['$deadlineDate', day(8)] }],
+    ];
+    const order: Record<string, number> = {
+      overdue: 0,
+      today: 1,
+      tomorrow: 2,
+      week: 3,
+      later: 4,
+      none: 5,
+      done: 6,
+    };
+    const pick = (index: 0 | 1 | 2, fallback: unknown) => ({
+      $switch: {
+        branches: buckets.map((bucket) => ({
+          case: bucket[2],
+          then: index === 2 ? order[bucket[0]] : bucket[index],
+        })),
+        default: fallback,
+      },
+    });
+    return {
+      fields: {
+        groupKey: pick(0, 'later'),
+        // Подпись одинаковая у группы, поэтому для сортировки хватает порядка.
+        groupLabel: pick(1, 'Позже'),
+        groupOrder: pick(2, order.later),
+      },
+    };
+  }
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -315,22 +391,60 @@ export async function GET(req: NextRequest) {
   // Merge the durable mirror with fresher background-sync records inside MongoDB.
   // Pagination happens after de-duplication, so the app never transfers the full task set.
   const { stages } = await taskMirrorStages(memberId);
+  // Группировка на сервере: сортируем сначала по ключу группы, поэтому группы
+  // идут подряд через страницы, а итоги считаются по всему списку. Раньше грид
+  // группировал только загруженные 50 задач, и «Иван (12)» значило «12 на этой
+  // странице».
+  const groupBy = req.nextUrl.searchParams.get('groupBy') || 'none';
+  const grouping = groupingStages(groupBy, today);
   const page = await db
     .collection('task_mirror')
-    .aggregate([
-      ...stages,
-      { $match: filter },
-      { $sort: sort },
-      {
-        $facet: {
-          tasks: [{ $skip: offset }, { $limit: limit }, { $replaceWith: '$data' }],
-          total: [{ $count: 'value' }],
+    .aggregate(
+      [
+        ...stages,
+        { $match: filter },
+        ...(grouping ? [{ $addFields: grouping.fields }] : []),
+        { $sort: grouping ? { groupOrder: 1, groupLabel: 1, groupKey: 1, ...sort } : sort },
+        {
+          $facet: {
+            tasks: [
+              { $skip: offset },
+              { $limit: limit },
+              grouping
+                ? { $replaceWith: { $mergeObjects: ['$data', { __group: '$groupKey' }] } }
+                : { $replaceWith: '$data' },
+            ],
+            total: [{ $count: 'value' }],
+            ...(grouping
+              ? {
+                  groups: [
+                    {
+                      $group: {
+                        _id: '$groupKey',
+                        label: { $first: '$groupLabel' },
+                        order: { $first: '$groupOrder' },
+                        count: { $sum: 1 },
+                      },
+                    },
+                    { $sort: { order: 1, label: 1, _id: 1 } },
+                  ],
+                }
+              : {}),
+          },
         },
-      },
-    ])
+      ],
+      { allowDiskUse: true },
+    )
     .next();
   const mirroredTasks = page?.tasks || [];
   const total = page?.total?.[0]?.value || 0;
+  const groups = grouping
+    ? (page?.groups || []).map((group: { _id: string; label: string; count: number }) => ({
+        key: String(group._id ?? ''),
+        label: String(group.label || ''),
+        count: group.count,
+      }))
+    : undefined;
 
   // Для группировки «Иерархия задач»: родитель найденной подзадачи может не
   // попасть на страницу, и без него ветка выглядела бы плоской. Дотягиваем
@@ -404,6 +518,7 @@ export async function GET(req: NextRequest) {
     tasks: mirroredTasks.map(toTaskListItem),
     ancestors: ancestors.map(toTaskListItem),
     total,
+    groups,
     nextOffset: offset + limit < total ? offset + limit : null,
     page: requestedPage,
   });

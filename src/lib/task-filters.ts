@@ -293,3 +293,26 @@ export function viewFilters(config: Record<string, unknown> | null | undefined):
     hideDone: saved.hideDone ?? (config?.hideDone ? 'on' : EMPTY_FILTERS.hideDone),
   };
 }
+
+// Фильтры в ссылке: «status:active;assignee:9,15;deadline:overdue». Пишем
+// только отличия от пустого набора — ссылка короткая и читаемая.
+export function encodeFiltersParam(values: FilterValues): string {
+  return (Object.keys(EMPTY_FILTERS) as FilterFieldKey[])
+    .filter((key) => values[key] && values[key] !== EMPTY_FILTERS[key])
+    .map((key) => `${key}:${values[key]}`)
+    .join(';');
+}
+
+export function decodeFiltersParam(raw: string | null): Partial<FilterValues> {
+  if (!raw) return {};
+  const result: Partial<FilterValues> = {};
+  for (const part of raw.split(';')) {
+    const index = part.indexOf(':');
+    if (index <= 0) continue;
+    const key = part.slice(0, index) as FilterFieldKey;
+    const value = part.slice(index + 1).trim();
+    // Неизвестные поля из чужой или старой ссылки молча пропускаем.
+    if (key in EMPTY_FILTERS && value) result[key] = value;
+  }
+  return result;
+}
