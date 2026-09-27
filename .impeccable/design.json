@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-27T00:00:00Z",
+  "title": "Design System: BitrixFlow",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Графит",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.205 0 0)",
+          "oklch(0.3 0 0)",
+          "oklch(0.42 0 0)",
+          "oklch(0.55 0 0)",
+          "oklch(0.7 0 0)",
+          "oklch(0.85 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "ink": { "role": "neutral", "displayName": "Чернила", "canonical": "oklch(0.145 0 0)" },
+      "paper": { "role": "neutral", "displayName": "Бумага", "canonical": "oklch(1 0 0)" },
+      "sidebar-paper": {
+        "role": "neutral",
+        "displayName": "Бумага сайдбара",
+        "canonical": "oklch(0.985 0 0)"
+      },
+      "wash": { "role": "neutral", "displayName": "Промывка", "canonical": "oklch(0.97 0 0)" },
+      "quiet-text": {
+        "role": "neutral",
+        "displayName": "Тихий текст",
+        "canonical": "oklch(0.53 0 0)"
+      },
+      "hairline": { "role": "neutral", "displayName": "Волосок", "canonical": "oklch(0.922 0 0)" },
+      "ring": {
+        "role": "neutral",
+        "displayName": "Кольцо фокуса",
+        "canonical": "oklch(0.708 0 0)"
+      },
+      "alarm": {
+        "role": "tertiary",
+        "displayName": "Тревога",
+        "canonical": "oklch(0.577 0.245 27.325)",
+        "tonalRamp": [
+          "oklch(0.25 0.1 27)",
+          "oklch(0.35 0.15 27)",
+          "oklch(0.45 0.2 27)",
+          "oklch(0.577 0.245 27.325)",
+          "oklch(0.68 0.19 27)",
+          "oklch(0.78 0.13 27)",
+          "oklch(0.88 0.07 27)",
+          "oklch(0.95 0.03 27)"
+        ]
+      },
+      "dark-sidebar-accent": {
+        "role": "secondary",
+        "displayName": "Синий сайдбара (тёмная)",
+        "canonical": "oklch(0.488 0.243 264.376)"
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Заголовок страницы в PageHeader." },
+      "title": { "displayName": "Title", "purpose": "Секции и модалка задачи." },
+      "body": { "displayName": "Body", "purpose": "Основной рабочий размер интерфейса." },
+      "label": { "displayName": "Label", "purpose": "Метаданные, бейджи, мелкие кнопки." },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Приоритет и теги внутри карточки канбана, uppercase."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-hover",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "shadow-sm у карточки канбана только на hover."
+      },
+      {
+        "name": "overlay",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Поповеры, меню, диалоги."
+      }
+    ],
+    "motion": [
+      { "name": "fade-in", "value": "fadeIn 0.2s ease-out", "purpose": "Появление панелей." },
+      {
+        "name": "slide-up",
+        "value": "slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Появление карточек и тостов; отключается при prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Основное действие экрана.",
+      "html": "<button class=\"ds-btn-primary\">Создать задачу</button>",
+      "css": ".ds-btn-primary{font:500 14px/1 Inter,system-ui,sans-serif;height:32px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:var(--primary,oklch(0.205 0 0));color:var(--primary-foreground,oklch(0.985 0 0));cursor:pointer;transition:all .15s}.ds-btn-primary:hover{opacity:.8}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(0.708 0 0 / .5)}.ds-btn-primary:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Вторичное действие.",
+      "html": "<button class=\"ds-btn-outline\">Фильтры</button>",
+      "css": ".ds-btn-outline{font:500 14px/1 Inter,system-ui,sans-serif;height:32px;padding:0 10px;border-radius:10px;border:1px solid var(--border,oklch(0.922 0 0));background:var(--background,#fff);color:var(--foreground,oklch(0.145 0 0));cursor:pointer;transition:all .15s}.ds-btn-outline:hover{background:var(--muted,oklch(0.97 0 0))}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(0.708 0 0 / .5)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Тулбары и строки навигации.",
+      "html": "<button class=\"ds-btn-ghost\">Группировка</button>",
+      "css": ".ds-btn-ghost{font:500 14px/1 Inter,system-ui,sans-serif;height:32px;padding:0 10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--foreground,oklch(0.145 0 0));cursor:pointer;transition:all .15s}.ds-btn-ghost:hover{background:var(--muted,oklch(0.97 0 0))}.ds-btn-ghost:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(0.708 0 0 / .5)}"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "description": "Поле поиска и форм.",
+      "html": "<input class=\"ds-input\" placeholder=\"Поиск задач…\">",
+      "css": ".ds-input{font:400 14px/1.4 Inter,system-ui,sans-serif;height:32px;padding:0 10px;border-radius:10px;border:1px solid var(--input,oklch(0.922 0 0));background:transparent;color:var(--foreground,oklch(0.145 0 0));width:240px}.ds-input::placeholder{color:var(--muted-foreground,oklch(0.53 0 0))}.ds-input:focus-visible{outline:none;border-color:var(--ring,oklch(0.708 0 0));box-shadow:0 0 0 3px oklch(0.708 0 0 / .5)}"
+    },
+    {
+      "name": "Signal Chip",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Тег или статус: тинт 500/20, текст 800.",
+      "html": "<span class=\"ds-chip ds-chip-emerald\">В работе</span> <span class=\"ds-chip ds-chip-amber\">Дедлайн на неделе</span> <span class=\"ds-chip ds-chip-rose\">Просрочено</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;height:20px;padding:2px 8px;border-radius:26px;font:500 12px/1 Inter,system-ui,sans-serif}.ds-chip-emerald{background:rgb(16 185 129 / .2);color:#065f46}.ds-chip-amber{background:rgb(245 158 11 / .2);color:#92400e}.ds-chip-rose{background:rgb(244 63 94 / .2);color:#9f1239}"
+    },
+    {
+      "name": "Kanban Card",
+      "kind": "card",
+      "refersTo": "kanban-card",
+      "description": "Карточка задачи на промывке колонки; плоская в покое.",
+      "html": "<div class=\"ds-col\"><div class=\"ds-card\"><div class=\"ds-card-meta\"><span class=\"ds-prio\">Высокий</span><span class=\"ds-tag\">mobile</span></div><div class=\"ds-card-title\">Починить экспорт CSV в гриде задач</div><div class=\"ds-card-foot\"><span>30 сен</span><span class=\"ds-ava\">АБ</span></div></div></div>",
+      "css": ".ds-col{background:oklch(0.97 0 0 / .3);background:color-mix(in oklch,var(--muted,oklch(0.97 0 0)) 30%,transparent);padding:8px;border-radius:10px;width:240px}.ds-card{background:var(--background,#fff);border:1px solid transparent;border-radius:10px;padding:12px;font-family:Inter,system-ui,sans-serif;cursor:pointer;transition:border-color .15s,box-shadow .15s}.ds-card:hover{border-color:var(--border,oklch(0.922 0 0));box-shadow:0 1px 3px rgb(0 0 0 / .1)}.ds-card-meta{display:flex;gap:4px;margin-bottom:8px}.ds-prio{font:500 10px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.025em;padding:3px 6px;border-radius:4px;background:rgb(244 63 94 / .2);color:#9f1239}.ds-tag{font:500 10px/1 Inter,sans-serif;padding:3px 6px;border-radius:4px;background:var(--muted,oklch(0.97 0 0));color:var(--muted-foreground,oklch(0.53 0 0))}.ds-card-title{font:500 14px/1.43 Inter,sans-serif;color:var(--foreground,oklch(0.145 0 0))}.ds-card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font:400 12px/1 Inter,sans-serif;color:var(--muted-foreground,oklch(0.53 0 0))}.ds-ava{width:20px;height:20px;border-radius:50%;background:var(--muted,oklch(0.97 0 0));display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--foreground,oklch(0.145 0 0))}"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "description": "Пункты сайдбара, активный на промывке.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item is-active\">Главная</a><a class=\"ds-nav-item\">Мои задачи</a><a class=\"ds-nav-item\">Проекты</a><a class=\"ds-nav-item\">Нагрузка команды</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:2px;width:220px;padding:8px;background:var(--sidebar,oklch(0.985 0 0));border-radius:10px}.ds-nav-item{font:500 14px/1 Inter,system-ui,sans-serif;padding:8px 10px;border-radius:8px;color:var(--sidebar-foreground,oklch(0.145 0 0));cursor:pointer;text-decoration:none}.ds-nav-item:hover{background:var(--sidebar-accent,oklch(0.97 0 0))}.ds-nav-item.is-active{background:var(--sidebar-accent,oklch(0.97 0 0));font-weight:600}.ds-nav-item:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(0.708 0 0 / .5)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Диспетчерский пульт",
+    "overview": "BitrixFlow смотрит на работу команды так, как диспетчер смотрит на пульт: поверхность спокойная и почти бесцветная, чтобы любой сигнал на ней был виден сразу. Просрочка, перегруз, стадия, приоритет: только они получают цвет. Всё остальное сделано из чернил, бумаги и тонких линий.",
+    "keyCharacteristics": [
+      "Монохромная база, цвет несёт только смысл",
+      "Плоские поверхности, глубина за счёт тона, а не теней",
+      "Плотная, сканируемая типографика на одном Inter",
+      "Мягкие углы 10px на всём, пилюли только у бейджей",
+      "Обе темы первого класса"
+    ],
+    "rules": [
+      {
+        "name": "The Signal Only Rule",
+        "body": "Цвет на экране означает состояние. Если элемент цветной, у пользователя должен быть ответ на вопрос «что это значит»; декоративного цвета нет.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint Not Fill Rule",
+        "body": "Сигналы подаются тинтом 10–20% с насыщенным текстом, а не сплошной заливкой. Сплошная заливка остаётся только у Графита.",
+        "section": "colors"
+      },
+      {
+        "name": "The 14px Floor Rule",
+        "body": "Всё, что читают, а не сканируют, набрано от 14px. 12px и 10px только для меток и метаданных.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat At Rest Rule",
+        "body": "В покое у карточек нет ни тени, ни видимой границы. Граница и shadow-sm появляются только в ответ на hover или перетаскивание.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do держать цвет за состоянием: стадия, приоритет, тег, просрочка, перегруз.",
+      "Do подавать сигналы тинтом 500/20 с текстом 800 (светлая) и 300 (тёмная).",
+      "Do проверять каждый экран в обеих темах.",
+      "Do держать тихий текст не светлее oklch(0.53 0 0) на белом ради AA.",
+      "Do оставлять крупные тач-цели ниже sm (40px)."
+    ],
+    "donts": [
+      "Don't заливать сигналы сплошным насыщенным цветом, кроме Графита.",
+      "Don't вешать тени на карточки и колонки в покое.",
+      "Don't опускать читаемый текст ниже 14px; 10px только для Micro-меток в карточках.",
+      "Don't вводить вторую гарнитуру без явного решения."
+    ]
+  }
+}
