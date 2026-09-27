@@ -63,7 +63,7 @@ function render(nodes: BitrixNode[]): ReactNode[] {
 
 export default function BitrixText({ text, className }: { text: string; className?: string }) {
   return (
-    <span className={cn('whitespace-pre-wrap break-words', className)}>
+    <span className={cn('whitespace-pre-wrap wrap-anywhere', className)}>
       {render(parseBitrixNodes(text))}
     </span>
   );
