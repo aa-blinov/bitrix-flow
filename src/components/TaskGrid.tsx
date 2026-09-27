@@ -189,18 +189,20 @@ type SavedView = {
     groupBy: GroupBy;
     sorts: Sort[];
     visibleColumns: ColumnKey[];
-    columnWidths?: Record<SortKey, number>;
+    columnWidths?: Partial<Record<SortKey, number>>;
   };
 };
+// Дедлайн сразу за исполнителем: последним он уезжал за правый край на
+// обычном ноутбуке, и главный сигнал списка было не видно без прокрутки.
 const DEFAULT_COLUMNS: ColumnKey[] = [
   'title',
   'project',
   'stage',
   'assignee',
+  'deadline',
   'priority',
   'estimate',
   'actual',
-  'deadline',
 ];
 function normalizeVisibleColumns(columns: unknown): ColumnKey[] {
   if (!Array.isArray(columns)) return DEFAULT_COLUMNS;
@@ -230,12 +232,12 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
 };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 280,
-  project: 180,
+  project: 160,
   stage: 140,
-  assignee: 160,
-  priority: 130,
+  assignee: 170,
+  priority: 110,
   deadline: 140,
-  estimate: 150,
+  estimate: 90,
   actual: 80,
   updated: 160,
   description: 260,
@@ -245,6 +247,16 @@ const COLUMN_WIDTHS: Record<SortKey, number> = {
   storyPoints: 120,
   tags: 220,
 };
+
+// Храним только ширины, которые юзер реально менял: раньше в базу уезжал весь
+// словарь, и новые значения по умолчанию до сохранивших раскладку не доходили.
+function customColumnWidths(widths: Record<SortKey, number>): Partial<Record<SortKey, number>> {
+  return Object.fromEntries(
+    (Object.keys(widths) as SortKey[])
+      .filter((key) => widths[key] !== COLUMN_WIDTHS[key])
+      .map((key) => [key, widths[key]]),
+  );
+}
 
 function SortableVisibleColumn({
   column,
@@ -1115,7 +1127,7 @@ export default function TaskGrid({
         if (cancelled || !data.preference) return;
         setVisibleColumns(normalizeVisibleColumns(data.preference.visibleColumns));
         if (data.preference.columnWidths && typeof data.preference.columnWidths === 'object') {
-          setColumnWidths((current) => ({ ...current, ...data.preference.columnWidths }));
+          setColumnWidths({ ...COLUMN_WIDTHS, ...data.preference.columnWidths });
         }
       })
       .catch(() => {})
@@ -1133,7 +1145,10 @@ export default function TaskGrid({
       void fetch('/api/task-grid-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: layoutScope, config: { visibleColumns, columnWidths } }),
+        body: JSON.stringify({
+          scope: layoutScope,
+          config: { visibleColumns, columnWidths: customColumnWidths(columnWidths) },
+        }),
       });
     }, 400);
     return () => window.clearTimeout(timer);
@@ -1211,7 +1226,7 @@ export default function TaskGrid({
     setGroupBy(config.groupBy);
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
-    if (config.columnWidths) setColumnWidths((current) => ({ ...current, ...config.columnWidths }));
+    setColumnWidths({ ...COLUMN_WIDTHS, ...config.columnWidths });
     setLayoutDirty(false);
   };
   const saveView = async () => {
@@ -1222,7 +1237,7 @@ export default function TaskGrid({
       groupBy,
       sorts,
       visibleColumns,
-      columnWidths,
+      columnWidths: customColumnWidths(columnWidths),
     };
     const response = await fetch('/api/task-views', {
       method: 'POST',
@@ -1351,7 +1366,7 @@ export default function TaskGrid({
       <button
         type="button"
         onClick={() => toggleSort(key)}
-        className="flex h-10 w-full items-center gap-1 px-4 text-left hover:text-foreground"
+        className="flex h-10 w-full items-center gap-1 px-2 text-left hover:text-foreground"
       >
         {label}
         <span className="min-w-3 text-xs">{sortLabel(key)}</span>
@@ -1428,7 +1443,7 @@ export default function TaskGrid({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-10 rounded-md sm:h-8 focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground"
+                    className={`${toolbarControl} focus:ring-0 focus-visible:ring-2 aria-expanded:bg-background aria-expanded:text-foreground`}
                   >
                     {views.find((view) => view.id === activeViewId)?.name || 'По умолчанию'}
                   </Button>
@@ -1466,7 +1481,9 @@ export default function TaskGrid({
                 if (event.key === 'Enter') setQuery(draftQuery);
               }}
               placeholder="Поиск задач…"
-              className="h-10 rounded-md sm:h-8 w-full sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]"
+              aria-label="Поиск задач"
+              // На телефоне поиск — первая строка панели, а не третья после вида.
+              className={`${toolbarControl} w-full max-sm:order-first sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem]`}
             />
             <Button
               variant="outline"
@@ -1516,41 +1533,45 @@ export default function TaskGrid({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <select
-              aria-label="Группировка"
+            <Select
               value={groupBy}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (!isGroupBy(value)) return;
-                setGroupBy(value);
+              onValueChange={(value) => {
+                if (isGroupBy(value)) setGroupBy(value);
               }}
-              className="h-10 w-40 rounded-md border border-input sm:h-8 bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 dark:bg-input/30 dark:hover:bg-input/50"
             >
-              {GROUP_BY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className={toolbarSelect} aria-label="Группировка">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUP_BY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
-            <select
+            <Select
               value={`${sorts[0]?.key || 'updated'}:${sorts[0]?.direction || 'desc'}`}
-              onChange={(event) => {
-                const [key, direction] = event.target.value.split(':');
+              onValueChange={(value) => {
+                const [key, direction] = value.split(':');
                 setSorts([{ key: key as SortKey, direction: direction as Sort['direction'] }]);
               }}
-              aria-label="Сортировка"
-              className="h-10 w-40 rounded-md border border-input sm:h-8 bg-transparent px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 md:hidden dark:bg-input/30"
             >
-              {(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
-                <option key={`${column}:desc`} value={`${column}:desc`}>
-                  {COLUMN_LABELS[column]} ↓
-                </option>,
-                <option key={`${column}:asc`} value={`${column}:asc`}>
-                  {COLUMN_LABELS[column]} ↑
-                </option>,
-              ])}
-            </select>
+              <SelectTrigger className={`${toolbarSelect} md:hidden`} aria-label="Сортировка">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
+                  <SelectItem key={`${column}:desc`} value={`${column}:desc`}>
+                    {COLUMN_LABELS[column]} ↓
+                  </SelectItem>,
+                  <SelectItem key={`${column}:asc`} value={`${column}:asc`}>
+                    {COLUMN_LABELS[column]} ↑
+                  </SelectItem>,
+                ])}
+              </SelectContent>
+            </Select>
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}
               size="sm"
@@ -1958,8 +1979,11 @@ export default function TaskGrid({
                             }
                             if (column === 'actual') {
                               return (
-                                <TableCell key={column} className="text-muted-foreground">
-                                  {task.actualTime || 0} ч
+                                <TableCell
+                                  key={column}
+                                  className="tabular-nums text-muted-foreground"
+                                >
+                                  {task.actualTime || 0}
                                 </TableCell>
                               );
                             }
