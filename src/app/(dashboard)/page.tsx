@@ -129,11 +129,16 @@ export default function DashboardPage() {
     };
   });
 
-  const filteredProjects = projectsWithStats.filter(
-    (project) =>
-      (archiveFilter === 'all' || (archiveFilter === 'archived') === Boolean(project.isArchived)) &&
-      project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
-  );
+  const filteredProjects = projectsWithStats
+    .filter(
+      (project) =>
+        (archiveFilter === 'all' ||
+          (archiveFilter === 'archived') === Boolean(project.isArchived)) &&
+        project.name.toLocaleLowerCase('ru').includes(searchQuery.toLocaleLowerCase('ru')),
+    )
+    // Проблемные проекты — наверх: главная для контроля, и проект с 22
+    // просрочками не должен теряться посреди списка. Остальные — как были.
+    .sort((left, right) => right.overdue - left.overdue);
 
   const totals = stats?.totals;
 
