@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const memberId = await member(req);
   if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
-  const body = await req.json();
+  // Битый JSON — ошибка клиента, а не 500 и алерт в Sentry.
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
   const name = String(body.name || '')
     .trim()
     .slice(0, 80);

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { bx24OAuth } from '@/lib/oauth-client';
 
 export async function POST(req: NextRequest) {
-  const { member_id, webhook_url } = await req.json();
+  const { member_id, webhook_url } = (await req.json().catch(() => null)) ?? {};
 
   if (!member_id || !webhook_url) {
     return NextResponse.json({ error: 'member_id and webhook_url required' }, { status: 400 });

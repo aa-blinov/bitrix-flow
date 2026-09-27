@@ -4,7 +4,8 @@ import { getDb } from '@/lib/mongo';
 
 // Bitrix24 шлет события сюда когда что-то меняется
 export async function POST(req: NextRequest) {
-  const data = await req.json();
+  const data = await req.json().catch(() => null);
+  if (!data?.auth?.member_id) return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
   const event = data.event;
   const member_id = data.auth.member_id;
 
