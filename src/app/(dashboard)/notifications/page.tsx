@@ -39,15 +39,21 @@ function noticeLabel(type: string) {
 const PAGE_SIZE = 50;
 
 async function fetchPage(
-  before: string | null,
+  page: number,
   signal?: AbortSignal,
-): Promise<{ notifications: Notice[]; nextCursor: string | null }> {
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-  if (before) params.set('before', before);
+): Promise<{ notifications: Notice[]; total: number }> {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(page) });
   const response = await fetch(`/api/notifications?${params}`, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
-  return { notifications: data.notifications || [], nextCursor: data.nextCursor || null };
+  return { notifications: data.notifications || [], total: Number(data.total) || 0 };
+}
+
+// Те же номера, что в пейджере задач: первая, соседние, последняя.
+function pageNumbers(page: number, pageCount: number) {
+  return [...new Set([1, page - 1, page, page + 1, pageCount])]
+    .filter((value) => value >= 1 && value <= pageCount)
+    .sort((left, right) => left - right);
 }
 
 export default function NotificationsPage() {
@@ -55,10 +61,17 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
-  // Лента кусками по 50, как колонки доски: раньше грузились сразу 200 записей
+  // Постранично по 50, как списки задач: раньше грузились сразу 200 записей
   // и ~3800 DOM-узлов, хотя смотрят обычно верхние.
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadedPage, setLoadedPage] = useState(0);
+  const pageLoading = loadedPage !== page;
+  const goToPage = (next: number) => {
+    setError('');
+    setPage(next);
+  };
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Без этого сбой загрузки выглядел как «Пока нет уведомлений».
   const [error, setError] = useState('');
   const projectNames = useKanbanStore((state) => state.projects);
@@ -66,33 +79,24 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchPage(null, controller.signal)
+    void fetchPage(page, controller.signal)
       .then((data) => {
         setItems(data.notifications);
-        setNextCursor(data.nextCursor);
+        setTotal(data.total);
+        window.scrollTo({ top: 0 });
       })
       .catch(() => {
         if (!controller.signal.aborted)
           setError('Не удалось загрузить уведомления. Обновите страницу.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadedPage(page);
+        }
+      });
     return () => controller.abort();
-  }, []);
-
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError('');
-    try {
-      const data = await fetchPage(nextCursor);
-      setItems((current) => [...current, ...data.notifications]);
-      setNextCursor(data.nextCursor);
-    } catch {
-      setError('Не удалось загрузить ещё. Попробуйте снова.');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  }, [page]);
 
   async function clearHistory() {
     if (!items.length) return;
@@ -108,7 +112,8 @@ export default function NotificationsPage() {
       const response = await fetch('/api/notifications', { method: 'DELETE' });
       if (response.ok) {
         setItems([]);
-        setNextCursor(null);
+        setTotal(0);
+        goToPage(1);
       } else setError('Не удалось очистить историю. Попробуйте ещё раз.');
     } finally {
       setClearing(false);
@@ -197,16 +202,64 @@ export default function NotificationsPage() {
                 <div key={item.id}>{content}</div>
               );
             })}
-            {nextCursor && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                disabled={loadingMore}
-                onClick={() => void loadMore()}
-              >
-                {loadingMore ? 'Загружаем…' : 'Показать ещё'}
-              </Button>
+            {pageCount > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} из {total},
+                  страница {page} из {pageCount}
+                </p>
+                <div
+                  className="flex flex-wrap items-center justify-end gap-1"
+                  aria-label="Пагинация"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden sm:inline-flex"
+                    onClick={() => goToPage(1)}
+                    disabled={pageLoading || page === 1}
+                  >
+                    Первая
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(page - 1)}
+                    disabled={pageLoading || page === 1}
+                  >
+                    Назад
+                  </Button>
+                  {pageNumbers(page, pageCount).map((number) => (
+                    <Button
+                      key={number}
+                      variant={number === page ? 'default' : 'outline'}
+                      size="sm"
+                      className="w-9 px-0"
+                      onClick={() => goToPage(number)}
+                      disabled={pageLoading}
+                    >
+                      {number}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(page + 1)}
+                    disabled={pageLoading || page >= pageCount}
+                  >
+                    Вперёд
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden sm:inline-flex"
+                    onClick={() => goToPage(pageCount)}
+                    disabled={pageLoading || page >= pageCount}
+                  >
+                    Последняя
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         ) : error ? null : (
