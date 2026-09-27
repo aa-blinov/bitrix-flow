@@ -17,7 +17,13 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const limit = Math.min(Math.max(Number(params.get('limit')) || 50, 1), 200);
   const page = Math.max(Math.floor(Number(params.get('page')) || 1), 1);
-  const filter = { member_id: memberId };
+  const filter: Record<string, unknown> = { member_id: memberId };
+  // Фильтры ленты: проект и тип события. Значения — строки из UI, в запрос
+  // идут как есть, без операторов.
+  const projectId = params.get('projectId');
+  if (projectId && /^\d+$/.test(projectId)) filter.projectId = projectId;
+  const type = params.get('type');
+  if (type && /^[a-z_]+$/.test(type)) filter.type = type;
   const collection = db.collection('notifications');
   const [rows, total] = await Promise.all([
     collection
