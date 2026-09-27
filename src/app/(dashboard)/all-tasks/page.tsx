@@ -15,17 +15,7 @@ import QuickCreateTask from '@/components/QuickCreateTask';
 import { Button } from '@/components/ui/button';
 
 function AllTasksInner() {
-  const {
-    projects,
-    allTasks,
-    isLoadingAllTasks,
-    allTasksTotal,
-    loadAllTasks,
-    loadProjects,
-    currentUser,
-    selectedTaskId,
-    setSelectedTask,
-  } = useKanbanStore();
+  const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore();
   const searchParams = useSearchParams();
   const workload = searchParams.get('workload');
   const requestedAssignee = searchParams.get('assignee');
@@ -73,9 +63,10 @@ function AllTasksInner() {
     : 'Задачи по всем доступным проектам';
 
   useEffect(() => {
+    // Список задач грид грузит сам постранично; полный loadAllTasks здесь
+    // качал ту же страницу ещё раз.
     if (projects.length === 0) void loadProjects();
-    if (allTasks.length === 0) void loadAllTasks();
-  }, [allTasks.length, loadAllTasks, loadProjects, projects.length]);
+  }, [loadProjects, projects.length]);
 
   // URL — единый источник правды для открытой задачи: клик/закрытие в TaskGrid
   // пишет ?task=<id>, back/forward браузера приводят нас сюда, мы отражаем
@@ -105,21 +96,18 @@ function AllTasksInner() {
       />
 
       <div className="mt-4">
-        {isLoadingAllTasks && allTasks.length === 0 ? (
-          <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
-        ) : (
-          <TaskGrid
-            showProject
-            initialStatus={initialStatus}
-            initialAssigneeId={initialAssigneeId}
-            initialProjectId={requestedProject}
-            viewScope="all"
-            layoutScope="all"
-            title={null}
-            totalCount={allTasksTotal}
-            loadPage={loadPage}
-          />
-        )}
+        {/* Свой лоадер у грида; второй, страничный, сменялся на него и
+            сдвигал вёрстку (CLS 0.11). */}
+        <TaskGrid
+          showProject
+          initialStatus={initialStatus}
+          initialAssigneeId={initialAssigneeId}
+          initialProjectId={requestedProject}
+          viewScope="all"
+          layoutScope="all"
+          title={null}
+          loadPage={loadPage}
+        />
       </div>
     </div>
   );

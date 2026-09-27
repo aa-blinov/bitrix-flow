@@ -1170,37 +1170,53 @@ export default function TaskGrid({
     setCollapsedTaskIds(new Set());
   }, [groupBy]);
 
+  // Раньше одна и та же страница уходила 2–3 раза: эффект перезапускался на
+  // новой ссылке на filters/sorts с теми же значениями, а на телефоне первый
+  // запрос шёл с размером страницы десктопа, пока useIsMobile не ответил.
+  // Теперь запрос откладывается на тик (схлопывает первые рендеры) и не
+  // повторяется с тем же ключом; ответ применяется по номеру запроса.
+  const lastPageKeyRef = useRef('');
+  const pageRequestIdRef = useRef(0);
   useEffect(() => {
     if (!loadPageRef.current) return;
-    let cancelled = false;
-    setIsServerPageLoading(true);
-    setServerPageError(null);
-    void loadPageRef
-      .current({
-        page,
-        query,
-        limit: pageSize,
-        sorts,
-        filters: { ...filters, project: showProject ? filters.project : 'all' },
-        hierarchy: groupBy === 'hierarchy',
-      })
-      .then((nextPage) => {
-        if (cancelled) return;
-        setServerPage(nextPage);
-        setServerPageReady(true);
-        setPagedTasks(nextPage.tasks, nextPage.total);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setServerPageError('Не удалось загрузить страницу. Повторите попытку.');
-        setServerPageReady(true);
-      })
-      .finally(() => {
-        if (!cancelled) setIsServerPageLoading(false);
-      });
-    return () => {
-      cancelled = true;
+    const request = {
+      page,
+      query,
+      limit: pageSize,
+      sorts,
+      filters: { ...filters, project: showProject ? filters.project : 'all' },
+      hierarchy: groupBy === 'hierarchy',
     };
+    const key = JSON.stringify([request, serverPageRetry]);
+    if (key === lastPageKeyRef.current) return;
+    const timer = window.setTimeout(() => {
+      const load = loadPageRef.current;
+      if (!load) return;
+      lastPageKeyRef.current = key;
+      const requestId = ++pageRequestIdRef.current;
+      const isCurrent = () => requestId === pageRequestIdRef.current;
+      setIsServerPageLoading(true);
+      setServerPageError(null);
+      void load(request)
+        .then((nextPage) => {
+          if (!isCurrent()) return;
+          setServerPage(nextPage);
+          setServerPageReady(true);
+          setPagedTasks(nextPage.tasks, nextPage.total);
+        })
+        .catch(() => {
+          if (!isCurrent()) return;
+          // Ошибка не должна запоминать ключ, иначе «Повторить» с теми же
+          // параметрами не сработает.
+          lastPageKeyRef.current = '';
+          setServerPageError('Не удалось загрузить страницу. Повторите попытку.');
+          setServerPageReady(true);
+        })
+        .finally(() => {
+          if (isCurrent()) setIsServerPageLoading(false);
+        });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [filters, groupBy, pageSize, page, query, serverPageRetry, setPagedTasks, showProject, sorts]);
 
   const resetFilters = () => {

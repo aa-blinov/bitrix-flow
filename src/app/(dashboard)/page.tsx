@@ -27,15 +27,8 @@ import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const {
-    projects,
-    allTasks,
-    loadProjects,
-    loadAllTasks,
-    isLoading,
-    selectedProjectId,
-    setSelectedProject,
-  } = useKanbanStore();
+  const { projects, allTasks, loadProjects, isLoading, selectedProjectId, setSelectedProject } =
+    useKanbanStore();
   const [searchQuery, setSearchQuery] = useState('');
   // Числа на карточках и в сводке считает сервер по всему зеркалу: клиент
   // держит только первую страницу задач, и раньше главная показывала её срез.
@@ -96,12 +89,11 @@ export default function DashboardPage() {
         }
         if (data.connected && data.member_id) {
           localStorage.setItem('bitrix_member_id', data.member_id);
+          // Цифры главной считает сервер (/api/tasks/stats): полный список
+          // задач тут качался зря, ~90 КБ JSON и лишний рендер.
           void loadProjects().then(() => {
             const firstProject = useKanbanStore.getState().projects[0];
             if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
-            // Список уже отдаётся из Mongo/task_mirror, поэтому не создаёт
-            // Bitrix fan-out и заполняет сводные карточки после доски.
-            void loadAllTasks();
           });
           return;
         }
@@ -110,7 +102,7 @@ export default function DashboardPage() {
         router.replace('/connection-help');
       })
       .catch(() => router.replace('/login'));
-  }, [loadAllTasks, loadProjects, router]);
+  }, [loadProjects, router]);
 
   // Спиннер во весь экран прятал и шапку: страница оставалась без заголовка,
   // пока грузились проекты. Каркас рисуем сразу, спиннер — на месте списка.
