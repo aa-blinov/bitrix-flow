@@ -36,11 +36,29 @@ function noticeLabel(type: string) {
   return 'Изменение задачи';
 }
 
+const PAGE_SIZE = 50;
+
+async function fetchPage(
+  before: string | null,
+  signal?: AbortSignal,
+): Promise<{ notifications: Notice[]; nextCursor: string | null }> {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+  if (before) params.set('before', before);
+  const response = await fetch(`/api/notifications?${params}`, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return { notifications: data.notifications || [], nextCursor: data.nextCursor || null };
+}
+
 export default function NotificationsPage() {
   const confirm = useConfirm();
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  // Лента кусками по 50, как колонки доски: раньше грузились сразу 200 записей
+  // и ~3800 DOM-узлов, хотя смотрят обычно верхние.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Без этого сбой загрузки выглядел как «Пока нет уведомлений».
   const [error, setError] = useState('');
   const projectNames = useKanbanStore((state) => state.projects);
@@ -48,12 +66,11 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/api/notifications?limit=200', { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
+    void fetchPage(null, controller.signal)
+      .then((data) => {
+        setItems(data.notifications);
+        setNextCursor(data.nextCursor);
       })
-      .then((data) => setItems(data.notifications || []))
       .catch(() => {
         if (!controller.signal.aborted)
           setError('Не удалось загрузить уведомления. Обновите страницу.');
@@ -61,6 +78,21 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const data = await fetchPage(nextCursor);
+      setItems((current) => [...current, ...data.notifications]);
+      setNextCursor(data.nextCursor);
+    } catch {
+      setError('Не удалось загрузить ещё. Попробуйте снова.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function clearHistory() {
     if (!items.length) return;
@@ -74,8 +106,10 @@ export default function NotificationsPage() {
     setClearing(true);
     try {
       const response = await fetch('/api/notifications', { method: 'DELETE' });
-      if (response.ok) setItems([]);
-      else setError('Не удалось очистить историю. Попробуйте ещё раз.');
+      if (response.ok) {
+        setItems([]);
+        setNextCursor(null);
+      } else setError('Не удалось очистить историю. Попробуйте ещё раз.');
     } finally {
       setClearing(false);
     }
@@ -163,6 +197,17 @@ export default function NotificationsPage() {
                 <div key={item.id}>{content}</div>
               );
             })}
+            {nextCursor && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={loadingMore}
+                onClick={() => void loadMore()}
+              >
+                {loadingMore ? 'Загружаем…' : 'Показать ещё'}
+              </Button>
+            )}
           </div>
         ) : error ? null : (
           <Card>
