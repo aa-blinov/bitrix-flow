@@ -26,6 +26,8 @@ import {
 import { useSSE } from '@/hooks/useSSE';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import { toolbarControl, toolbarSelect } from '@/components/ui/toolbar';
+import { pluralRu } from '@/lib/utils';
 
 type ProjectSummary = {
   id: string;
@@ -44,6 +46,10 @@ type ProjectSummary = {
   progress: number;
   changedAt: string | null;
 };
+
+const TASK_FORMS = ['задачи', 'задач', 'задач'] as const; // «из 1 задачи, из 5 задач»
+const messages = (count: number) =>
+  `${count} ${pluralRu(count, ['сообщение', 'сообщения', 'сообщений'])}`;
 
 const hours = (value: number) => `${value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ч`;
 
@@ -137,8 +143,9 @@ export default function ProjectsSummaryPage() {
           <CardHeader className="gap-3 rounded-none border-0 bg-transparent px-0 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <Input
-                className="h-10 w-full rounded-md sm:h-8 sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1"
+                className={`${toolbarControl} w-full sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1`}
                 placeholder="Найти проект…"
+                aria-label="Найти проект"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -148,10 +155,7 @@ export default function ProjectsSummaryPage() {
                   value={dateField}
                   onValueChange={(value) => setDateField(value as 'changed' | 'created')}
                 >
-                  <SelectTrigger
-                    className="h-10 w-32 rounded-md sm:h-8"
-                    aria-label="Считать по дате"
-                  >
+                  <SelectTrigger className={`${toolbarSelect} w-32`} aria-label="Считать по дате">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -171,7 +175,7 @@ export default function ProjectsSummaryPage() {
                     type="date"
                     value={fromDate}
                     onChange={(event) => setFromDate(event.target.value)}
-                    className="h-10 min-w-0 w-full rounded-md sm:h-8 sm:w-36"
+                    className={`${toolbarControl} w-full min-w-0 sm:w-36`}
                     aria-label="Начальная дата периода"
                   />
                   <label htmlFor="summary-date-to" className="text-muted-foreground">
@@ -182,7 +186,7 @@ export default function ProjectsSummaryPage() {
                     type="date"
                     value={toDate}
                     onChange={(event) => setToDate(event.target.value)}
-                    className="h-10 min-w-0 w-full rounded-md sm:h-8 sm:w-36"
+                    className={`${toolbarControl} w-full min-w-0 sm:w-36`}
                     aria-label="Конечная дата периода"
                   />
                 </div>
@@ -190,16 +194,17 @@ export default function ProjectsSummaryPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-10 rounded-md sm:h-8"
+                className={toolbarControl}
                 onClick={() => void load(false)}
                 disabled={isLoading}
               >
                 Применить
               </Button>
+              {/* Сброс периода ничего не удаляет — красный тут пугал зря. */}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-10 rounded-md sm:h-8 border-destructive/40 text-destructive hover:border-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                className={toolbarControl}
                 disabled={!fromDate && !toDate}
                 onClick={() => {
                   setFromDate('');
@@ -233,7 +238,7 @@ export default function ProjectsSummaryPage() {
                             <Users size={12} />
                             {project.membersCount}
                           </span>
-                          <span>{project.comments} сообщений</span>
+                          {project.comments > 0 && <span>{messages(project.comments)}</span>}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -246,7 +251,8 @@ export default function ProjectsSummaryPage() {
                         <div>
                           <p className="font-medium">{project.progress}% выполнено</p>
                           <p className="text-xs text-muted-foreground">
-                            {project.completed} из {project.leafTaskCount} задач
+                            {project.completed} из {project.leafTaskCount}{' '}
+                            {pluralRu(project.leafTaskCount, TASK_FORMS)}
                           </p>
                         </div>
                       </div>
@@ -254,15 +260,17 @@ export default function ProjectsSummaryPage() {
                         {project.overdue > 0 && (
                           <Badge asChild variant="destructive">
                             <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
-                              {project.overdue} просроч.
+                              Просрочено: {project.overdue}
                             </Link>
                           </Badge>
                         )}
-                        <Badge asChild variant="secondary">
-                          <Link href={`/projects/${project.id}?view=grid&status=active`}>
-                            {project.inProgress} в работе
-                          </Link>
-                        </Badge>
+                        {project.inProgress > 0 && (
+                          <Badge asChild variant="secondary">
+                            <Link href={`/projects/${project.id}?view=grid&status=active`}>
+                              {project.inProgress} в работе
+                            </Link>
+                          </Badge>
+                        )}
                         {project.noDeadline > 0 && (
                           <Badge asChild variant="outline">
                             <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
@@ -300,11 +308,11 @@ export default function ProjectsSummaryPage() {
                               <Users size={12} />
                               {project.membersCount}
                             </span>
-                            <span>{project.comments} сообщений</span>
+                            {project.comments > 0 && <span>{messages(project.comments)}</span>}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">
+                          <div className="text-sm tabular-nums">
                             <span className="font-medium">{hours(project.plannedHours)}</span>
                             <span className="mx-1 text-muted-foreground">/</span>
                             <span className="font-medium">{hours(project.actualHours)}</span>
@@ -319,7 +327,9 @@ export default function ProjectsSummaryPage() {
                                 style={{ width: `${project.progress}%` }}
                               />
                             </div>
-                            <span className="text-xs font-medium">{project.progress}%</span>
+                            <span className="text-xs font-medium tabular-nums">
+                              {project.progress}%
+                            </span>
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {project.completed} из {project.leafTaskCount} выполнено
@@ -327,27 +337,33 @@ export default function ProjectsSummaryPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <span className="font-medium">{project.taskCount}</span>
+                            <span className="font-medium tabular-nums">{project.taskCount}</span>
                             <span className="ml-1 text-muted-foreground">всего</span>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {project.leafTaskCount} исполнителей
-                          </div>
+                          {/* Тут стояло «N исполнителей», хотя выводилось число задач без
+                              подзадач. Показываем то, что есть на самом деле. */}
+                          {project.parentTaskCount > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {project.parentTaskCount} с подзадачами
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {project.overdue > 0 && (
                               <Badge asChild variant="destructive">
                                 <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
-                                  {project.overdue} просроч.
+                                  Просрочено: {project.overdue}
                                 </Link>
                               </Badge>
                             )}
-                            <Badge asChild variant="secondary">
-                              <Link href={`/projects/${project.id}?view=grid&status=active`}>
-                                {project.inProgress} в работе
-                              </Link>
-                            </Badge>
+                            {project.inProgress > 0 && (
+                              <Badge asChild variant="secondary">
+                                <Link href={`/projects/${project.id}?view=grid&status=active`}>
+                                  {project.inProgress} в работе
+                                </Link>
+                              </Badge>
+                            )}
                             {project.noDeadline > 0 && (
                               <Badge asChild variant="outline">
                                 <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
