@@ -3,7 +3,8 @@
 // из-за чего две страницы выглядели собранными из разных наборов.
 // На телефоне контролы выше: 32px — это ниже комфортной зоны пальца (~44px),
 // на мыши лишняя высота ни к чему, поэтому сжимаем их с sm.
-export const toolbarControl = 'h-10 rounded-md sm:h-8';
+// text-sm: кнопки size=sm сами берут 0.8rem, и рядом с полями ввода текст скакал.
+export const toolbarControl = 'h-10 rounded-md text-sm sm:h-8';
 
 export const toolbarSelect = 'h-10 w-40 rounded-md sm:h-8';
 
