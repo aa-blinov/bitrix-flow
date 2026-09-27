@@ -44,3 +44,23 @@ export function extractTaskTags(
   }
   return [...tags.values()];
 }
+
+/** Имя тега для сравнения: без # и без регистра. */
+export function tagKey(tag: string): string {
+  return tag.replace(/^#/, '').toLocaleLowerCase('ru');
+}
+
+/**
+ * Общий список тегов задачи: штатные + #хэштеги из текста, каждый один раз.
+ * Битрикс сам превращает #хэштег из описания в штатный тег, поэтому раньше
+ * «из-текста» и «#из-текста» показывались дважды. Штатное имя важнее.
+ */
+export function mergeTaskTags(bitrixTags: string[], textTags: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const tag of [...bitrixTags, ...textTags]) {
+    const key = tagKey(tag);
+    const current = byKey.get(key);
+    if (!current || (current.startsWith('#') && !tag.startsWith('#'))) byKey.set(key, tag);
+  }
+  return [...byKey.values()];
+}

@@ -20,6 +20,19 @@ test('карточка задачи открывается по названию
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('тег добавляется и убирается в карточке', async ({ page }) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+  const input = dialog.getByLabel('Добавить тег');
+  await input.fill('регрессия');
+  await input.press('Enter');
+  await expect(dialog.getByRole('button', { name: 'Убрать тег регрессия' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Убрать тег регрессия' }).click();
+  await expect(dialog.getByRole('button', { name: 'Убрать тег регрессия' })).toHaveCount(0);
+});
+
 test('кнопки статуса задачи пропускает прокси', async ({ page }) => {
   // Прокси пускает только методы из белого списка; «Начать», «Отложить» и
   // остальные кнопки статуса туда не попали и отвечали METHOD_NOT_ALLOWED.

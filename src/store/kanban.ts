@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { bitrixTaskTags, extractTaskTags } from '@/lib/task-tags';
+import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from '@/lib/task-tags';
 import { BxTask, BxComment, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
 import * as persist from './persist';
 import {
@@ -221,12 +221,10 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
     auditorIds: bxTask.auditorIds,
     // tags приходят и объектом Битрикса, и уже готовым массивом (из fetchTasks),
     // плюс #хэштеги из текста — нормализуем в одном месте и убираем повторы.
-    tags: [
-      ...new Set([
-        ...bitrixTaskTags(bxTask.tags),
-        ...extractTaskTags(bxTask.title, bxTask.description),
-      ]),
-    ],
+    tags: mergeTaskTags(
+      bitrixTaskTags(bxTask.tags),
+      extractTaskTags(bxTask.title, bxTask.description),
+    ),
     actions: bxTask.actions,
   };
 }
@@ -717,7 +715,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'parentId') update.parentId = value;
     else if (field === 'accompliceIds') update.accompliceIds = value;
     else if (field === 'auditorIds') update.auditorIds = value;
-    else if (field === 'projectId') {
+    else if (field === 'tags') {
+      // В задаче теги общим списком: штатные + #хэштеги из текста.
+      update.tags = mergeTaskTags(value, extractTaskTags(previous.title, previous.description));
+    } else if (field === 'projectId') {
       update.projectId = value;
     }
 
@@ -741,6 +742,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     else if (field === 'parentId') bxFields.parentId = value || 0;
     else if (field === 'accompliceIds') bxFields.accompliceIds = value;
     else if (field === 'auditorIds') bxFields.auditorIds = value;
+    else if (field === 'tags') bxFields.tags = value;
     else if (field === 'projectId') bxFields.groupId = value;
 
     try {

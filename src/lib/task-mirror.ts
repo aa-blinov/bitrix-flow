@@ -33,8 +33,20 @@ export async function syncTaskMirror(memberId: string, id: string, event: string
     await removeTask(memberId, id);
     return;
   }
-  const response = await bx24OAuth(memberId, 'tasks.task.get', { taskId: id });
+  // tasks.task.get без select не отдаёт теги, а с select отдаёт только их:
+  // два запроса параллельно. Раньше любая правка задачи из интерфейса
+  // перезаписывала зеркало без тегов, и они пропадали до полного синка.
+  const [response, tagged] = await Promise.all([
+    bx24OAuth(memberId, 'tasks.task.get', { taskId: id }),
+    bx24OAuth(memberId, 'tasks.task.get', {
+      taskId: id,
+      'select[0]': 'ID',
+      'select[1]': 'TAGS',
+    }).catch(() => null),
+  ]);
   const task = response?.task || response;
+  const tags = (tagged?.task || tagged)?.tags;
+  if (task && tags !== undefined) task.tags = tags;
   const resolvedId = taskId(task);
   if (!resolvedId) return;
   await mirror.updateOne(

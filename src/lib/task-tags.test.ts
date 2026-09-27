@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bitrixTaskTags, escapeRegex, extractTaskTags, mongoHashtagMatch } from './task-tags';
+import {
+  bitrixTaskTags,
+  escapeRegex,
+  extractTaskTags,
+  mongoHashtagMatch,
+  mergeTaskTags,
+} from './task-tags';
 
 describe('extractTaskTags', () => {
   it('extracts unique Cyrillic and Latin hashtags from task text', () => {
@@ -35,5 +41,16 @@ describe('escapeRegex', () => {
   it('escapes the characters a tag may legitimately contain', () => {
     expect(escapeRegex('C++ (v2)')).toBe('C\\+\\+ \\(v2\\)');
     expect(escapeRegex('Спринт 2')).toBe('Спринт 2');
+  });
+});
+
+describe('mergeTaskTags', () => {
+  it('хэштег, который Битрикс уже сделал штатным тегом, не дублируется', () => {
+    expect(mergeTaskTags(['P1', 'из-текста'], ['#из-текста', '#новый'])).toEqual([
+      'P1',
+      'из-текста',
+      '#новый',
+    ]);
+    expect(mergeTaskTags(['#Мобайл'], ['#мобайл'])).toEqual(['#Мобайл']);
   });
 });

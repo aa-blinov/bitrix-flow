@@ -466,6 +466,11 @@ async function handleRequest(req: NextRequest, method: string) {
       commentsCount: parseInt(t.commentsCount) || 0,
       parentId: t.parentId || undefined,
       stageId: t.stageId || '0',
+      // Раньше список пересобирался без этих полей: у задач доски не было
+      // штатных тегов, соисполнителей и наблюдателей, и карточка их не видела.
+      tags: t.tags || t.TAGS || undefined,
+      accomplices: t.accomplices || t.ACCOMPLICES || undefined,
+      auditors: t.auditors || t.AUDITORS || undefined,
     }));
     return NextResponse.json({
       result: {
