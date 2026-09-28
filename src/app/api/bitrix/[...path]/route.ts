@@ -151,14 +151,28 @@ const MUTATION_METHODS = new Set([
   'task.checklistitem.delete',
   'task.checklistitem.complete',
   'task.checklistitem.renew',
+  'tasks.task.result.add',
+  'tasks.task.result.update',
+  'tasks.task.result.delete',
 ]);
 const JSON_PAYLOAD_METHODS = new Set([
   'tasks.task.list',
   'tasks.task.add',
   'tasks.task.update',
   'tasks.task.chat.message.send',
+  // Результаты: только запись, tasks.task.result.list использует
+  // недокументированный DSL фильтра, ни один вариант поля/оператора не принят
+  // порталом, поэтому историю результатов читаем только в самом Битриксе.
+  'tasks.task.result.add',
+  'tasks.task.result.update',
+  'tasks.task.result.delete',
 ]);
-const REST_V3_METHODS = new Set(['tasks.task.chat.message.send']);
+const REST_V3_METHODS = new Set([
+  'tasks.task.chat.message.send',
+  'tasks.task.result.add',
+  'tasks.task.result.update',
+  'tasks.task.result.delete',
+]);
 
 function getCacheTtl(method: string): number {
   if (method === 'task.stages.get') return PROJECTS_TTL;
@@ -238,6 +252,9 @@ const ALLOWED_METHODS = new Set([
   'task.checklistitem.delete',
   'task.elapseditem.getlist',
   'task.elapseditem.add',
+  'tasks.task.result.add',
+  'tasks.task.result.update',
+  'tasks.task.result.delete',
   'sonet_group.get',
   'sonet_group.create',
   'sonet_group.update',
@@ -544,6 +561,16 @@ async function callBitrix24(
 function getPayload(method: string, params: Record<string, string>): Record<string, unknown> {
   if (method === 'tasks.task.chat.message.send') {
     return { fields: { taskId: Number(params.taskId), text: params.text } };
+  }
+
+  if (method === 'tasks.task.result.add') {
+    return { fields: { taskId: Number(params.taskId), text: params.text } };
+  }
+  if (method === 'tasks.task.result.update') {
+    return { resultId: Number(params.resultId), fields: { text: params.text } };
+  }
+  if (method === 'tasks.task.result.delete') {
+    return { resultId: Number(params.resultId) };
   }
 
   if (method === 'tasks.task.add' || method === 'tasks.task.update') {
