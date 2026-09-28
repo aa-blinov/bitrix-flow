@@ -59,10 +59,10 @@ function calendarDayKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+const HOURS_FORMAT = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+
 function formatHours(hours: number) {
-  return hours % 1 === 0
-    ? `${hours} ч`
-    : `${hours.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ч`;
+  return hours % 1 === 0 ? `${hours} ч` : `${HOURS_FORMAT.format(hours)} ч`;
 }
 
 const taskLabel = (count: number) => pluralRu(count, ['задача', 'задачи', 'задач']);

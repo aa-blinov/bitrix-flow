@@ -1,6 +1,7 @@
 'use client';
 import { Bx24User, BxFile, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -129,7 +130,28 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     setChecklistItemCompleted,
     deleteChecklistItem,
     isLoadingTask,
-  } = useKanbanStore();
+  } = useKanbanStore(
+    useShallow((s) => ({
+      updateTaskField: s.updateTaskField,
+      currentUser: s.currentUser,
+      moveTaskToProject: s.moveTaskToProject,
+      addComment: s.addComment,
+      addTimeEntry: s.addTimeEntry,
+      users: s.users,
+      projects: s.projects,
+      tasks: s.tasks,
+      subtasks: s.subtasks,
+      loadSubtasks: s.loadSubtasks,
+      createTask: s.createTask,
+      moveTask: s.moveTask,
+      moveTaskToStage: s.moveTaskToStage,
+      stages: s.stages,
+      addChecklistItem: s.addChecklistItem,
+      setChecklistItemCompleted: s.setChecklistItemCompleted,
+      deleteChecklistItem: s.deleteChecklistItem,
+      isLoadingTask: s.isLoadingTask,
+    })),
+  );
 
   const router = useRouter();
   const toast = useToast();

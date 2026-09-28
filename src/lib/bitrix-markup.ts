@@ -124,10 +124,22 @@ export function parseBitrixMarkup(text: string): BitrixMarkupPart[] {
     .filter((part) => part.text);
 }
 
+// Форматтеры создаются один раз: new Intl.DateTimeFormat дорогой, а функция
+// зовётся на каждую ячейку дедлайна. Профиль открытия карточки показывал
+// здесь ~40% CPU — грид перерисовывал строки и строил форматтеры заново.
+const TIME_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+const DATE_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
 export function formatBitrixDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const part = (options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat('ru-RU', options).format(date);
-  return `${part({ hour: '2-digit', minute: '2-digit', hour12: false })} ${part({ day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+  return `${TIME_FORMAT.format(date)} ${DATE_FORMAT.format(date)}`;
 }

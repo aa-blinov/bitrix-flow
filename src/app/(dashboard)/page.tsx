@@ -1,6 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
-import { useRouter } from 'next/navigation';
+import { useShallow } from 'zustand/react/shallow';
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -26,9 +26,15 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { projects, allTasks, loadProjects, isLoading, selectedProjectId, setSelectedProject } =
-    useKanbanStore();
+  const { projects, allTasks, isLoading, selectedProjectId, setSelectedProject } = useKanbanStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      allTasks: s.allTasks,
+      isLoading: s.isLoading,
+      selectedProjectId: s.selectedProjectId,
+      setSelectedProject: s.setSelectedProject,
+    })),
+  );
   const [searchQuery, setSearchQuery] = useState('');
   // Числа на карточках и в сводке считает сервер по всему зеркалу: клиент
   // держит только первую страницу задач, и раньше главная показывала её срез.
@@ -75,34 +81,11 @@ export default function DashboardPage() {
       window.history.replaceState({}, '', '/');
     }
 
-    // A successful OAuth callback includes member_id. Keep it before removing
-    // the callback query string, otherwise the browser cannot find its token.
-    fetch('/api/oauth/check', {
-      credentials: 'include',
-      headers: { 'X-Member-Id': localStorage.getItem('bitrix_member_id') || '' },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.session === false) {
-          router.replace('/login');
-          return;
-        }
-        if (data.connected && data.member_id) {
-          localStorage.setItem('bitrix_member_id', data.member_id);
-          // Цифры главной считает сервер (/api/tasks/stats): полный список
-          // задач тут качался зря, ~90 КБ JSON и лишний рендер.
-          void loadProjects().then(() => {
-            const firstProject = useKanbanStore.getState().projects[0];
-            if (firstProject) useKanbanStore.getState().setSelectedProject(firstProject.id);
-          });
-          return;
-        }
-        // Сессия есть, но Bitrix ещё не установлен: перекидываем на ЛК-раздел
-        // /connection-help, который проверит состояние и перейдёт в ЛК после установки.
-        router.replace('/connection-help');
-      })
-      .catch(() => router.replace('/login'));
-  }, [loadProjects, router]);
+    // Проверку подключения, member_id из сессии и загрузку проектов делают
+    // layout и сайдбар. Раньше главная повторяла это своим /api/oauth/check:
+    // второй запрос, второй выбор первого проекта (и двойная загрузка его
+    // фаз), а при неподключённом Битриксе — спор двух редиректов.
+  }, []);
 
   // Спиннер во весь экран прятал и шапку: страница оставалась без заголовка,
   // пока грузились проекты. Каркас рисуем сразу, спиннер — на месте списка.

@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect } from 'react';
 import { useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import type { TaskGridPageQuery } from '@/components/TaskGrid';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -15,7 +16,15 @@ import QuickCreateTask from '@/components/QuickCreateTask';
 import { Button } from '@/components/ui/button';
 
 function AllTasksInner() {
-  const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore();
+  const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      loadProjects: s.loadProjects,
+      currentUser: s.currentUser,
+      selectedTaskId: s.selectedTaskId,
+      setSelectedTask: s.setSelectedTask,
+    })),
+  );
   const searchParams = useSearchParams();
   const workload = searchParams.get('workload');
   const requestedAssignee = searchParams.get('assignee');

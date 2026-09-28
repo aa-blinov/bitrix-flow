@@ -1,5 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import { PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { Search, X, MessageSquare, Timer, Calendar, User } from 'lucide-react';
 import { Suspense, useState, useEffect } from 'react';
@@ -13,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import PageHeader from '@/components/PageHeader';
 
+const DUE_DATE = new Intl.DateTimeFormat('ru-RU');
+
 function SearchPageContent() {
   const {
     search,
@@ -23,7 +26,18 @@ function SearchPageContent() {
     searchQuery,
     setSelectedTask,
     tasks,
-  } = useKanbanStore();
+  } = useKanbanStore(
+    useShallow((s) => ({
+      search: s.search,
+      searchResults: s.searchResults,
+      searchTotal: s.searchTotal,
+      searchError: s.searchError,
+      isSearching: s.isSearching,
+      searchQuery: s.searchQuery,
+      setSelectedTask: s.setSelectedTask,
+      tasks: s.tasks,
+    })),
+  );
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -158,7 +172,7 @@ function SearchPageContent() {
                         {task.dueDate && (
                           <span className="flex items-center gap-1">
                             <Calendar size={12} />
-                            {new Date(task.dueDate).toLocaleDateString('ru-RU')}
+                            {DUE_DATE.format(new Date(task.dueDate))}
                           </span>
                         )}
                         {task.comments.length > 0 && (

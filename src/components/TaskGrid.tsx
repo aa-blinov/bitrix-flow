@@ -57,6 +57,7 @@ import { fetchProjectStages } from '@/lib/bitrix24';
 import { getBitrixTaskUrl, toLocalInputValue } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Badge } from '@/components/ui/badge';
@@ -524,7 +525,14 @@ const FieldControls = memo(function FieldControls({
   readOnly?: boolean;
   visibleColumns?: ColumnKey[];
 }) {
-  const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore();
+  const { users, stages, updateTaskField, moveTaskToStage } = useKanbanStore(
+    useShallow((s) => ({
+      users: s.users,
+      stages: s.stages,
+      updateTaskField: s.updateTaskField,
+      moveTaskToStage: s.moveTaskToStage,
+    })),
+  );
   const toasts = useTaskToasts();
   // Правка уходит без подтверждения: молчим при успехе, но об отказе Битрикса
   // говорим — раньше значение просто прыгало обратно.
@@ -676,7 +684,9 @@ const ProjectField = memo(function ProjectField({
   task: BxTask;
   readOnly: boolean;
 }) {
-  const { projects, moveTaskToProject } = useKanbanStore();
+  const { projects, moveTaskToProject } = useKanbanStore(
+    useShallow((s) => ({ projects: s.projects, moveTaskToProject: s.moveTaskToProject })),
+  );
   const options = [
     { value: 'none', label: 'Без проекта' },
     ...projects
@@ -705,7 +715,7 @@ const TaskActions = memo(function TaskActions({
   task: BxTask;
   compact?: boolean;
 }) {
-  const { moveTask } = useKanbanStore();
+  const { moveTask } = useKanbanStore(useShallow((s) => ({ moveTask: s.moveTask })));
   const { openTask } = useTaskUrl();
   return (
     <div className="flex items-center">
