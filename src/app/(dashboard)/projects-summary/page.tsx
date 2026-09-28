@@ -51,7 +51,9 @@ const TASK_FORMS = ['задачи', 'задач', 'задач'] as const; // «�
 const messages = (count: number) =>
   `${count} ${pluralRu(count, ['сообщение', 'сообщения', 'сообщений'])}`;
 
-const hours = (value: number) => `${value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} ч`;
+const CHANGED_FORMAT = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+const HOURS_FORMAT = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+const hours = (value: number) => `${HOURS_FORMAT.format(value)} ч`;
 
 export default function ProjectsSummaryPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -375,10 +377,7 @@ export default function ProjectsSummaryPage() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {project.changedAt
-                            ? new Intl.DateTimeFormat('ru-RU', {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              }).format(new Date(project.changedAt))
+                            ? CHANGED_FORMAT.format(new Date(project.changedAt))
                             : 'Нет задач'}
                         </TableCell>
                       </TableRow>

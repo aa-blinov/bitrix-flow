@@ -44,6 +44,7 @@ function noticeLabel(type: string) {
   return 'Изменение задачи';
 }
 
+const NOTICE_DATE = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
 const PAGE_SIZE = 50;
 
 const TYPE_OPTIONS = [
@@ -246,10 +247,7 @@ export default function NotificationsPage() {
                         )}
                         {createdAt && (
                           <time dateTime={createdAt}>
-                            {new Intl.DateTimeFormat('ru-RU', {
-                              dateStyle: 'medium',
-                              timeStyle: 'short',
-                            }).format(new Date(createdAt))}
+                            {NOTICE_DATE.format(new Date(createdAt))}
                           </time>
                         )}
                       </div>

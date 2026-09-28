@@ -1,5 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import { pluralRu } from '@/lib/utils';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -66,7 +67,19 @@ export default function ProjectPage() {
     isRehydrated,
     updateProject,
     users,
-  } = useKanbanStore();
+  } = useKanbanStore(
+    useShallow((s) => ({
+      projects: s.projects,
+      selectedProjectId: s.selectedProjectId,
+      setSelectedProject: s.setSelectedProject,
+      setSelectedTask: s.setSelectedTask,
+      loadTaskById: s.loadTaskById,
+      tasks: s.tasks,
+      isRehydrated: s.isRehydrated,
+      updateProject: s.updateProject,
+      users: s.users,
+    })),
+  );
 
   useEffect(() => {
     const state = useKanbanStore.getState();
