@@ -2328,10 +2328,15 @@ export default function TaskGrid({
                                 }}
                                 onKeyDown={(event) => {
                                   if (event.key === 'Enter' && newTaskTitle.trim()) {
-                                    void createTask({
+                                    // Битрикс отклоняет задачу без исполнителя; диалоговое
+                                    // создание подставляет currentUser сам, а эта строка нет.
+                                    createTask({
                                       title: newTaskTitle.trim(),
+                                      responsibleId: currentUserId,
                                       stageId: group.key,
-                                    });
+                                    }).catch((error) =>
+                                      gridToasts.failed('Задачу не создали', error),
+                                    );
                                     setNewTaskTitle('');
                                     setAddingStageId(null);
                                   }
