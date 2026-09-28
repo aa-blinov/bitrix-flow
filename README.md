@@ -134,11 +134,10 @@ APP_RELEASE=$(git rev-parse --short HEAD) docker compose --env-file .env.local u
 
 ### Если сайт отдаёт 502
 
-Встроенный DNS docker на этом хосте дважды за сутки переставал резолвить имена сервисов:
-приложение живо (`docker compose exec app wget -qO- localhost:3000/api/health` отвечает
-`ok`), а Caddy пишет `dial tcp: lookup app ... server misbehaving`. Поэтому сервисы получили
-фиксированные адреса в подсети `172.32.10.0/24`, и прокси ходит по адресу, а не по имени.
-Если 502 всё же повторится:
+Сервисам заданы фиксированные адреса в подсети `172.32.10.0/24`: docker DNS иногда
+переставал резолвить имена контейнеров, и прокси ходит по адресу, а не по имени. Если
+приложение при этом живо (`docker compose exec app wget -qO- localhost:3000/api/health`
+отвечает `ok`), а сайт всё равно недоступен:
 
 ```bash
 docker compose --env-file .env.local down && docker compose --env-file .env.local up -d
