@@ -1819,7 +1819,10 @@ export default function TaskGrid({
               onClick={() => setFilterValue('hideDone', hideDone ? 'off' : 'on')}
             >
               <CheckCheck size={14} />
-              <span className="hidden sm:inline">Только&nbsp;</span>активные
+              {/* Одним текстом: два соседних flex-элемента получали gap, и между
+                  словами был двойной пробел. */}
+              <span className="sm:hidden">Активные</span>
+              <span className="hidden sm:inline">Только активные</span>
             </Button>
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'secondary' : 'outline'}

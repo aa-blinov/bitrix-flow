@@ -57,7 +57,7 @@ export default function LoginPage() {
             </div>
             <div>
               <CardTitle asChild>
-                <h1>Bitrix24 PM</h1>
+                <h1>BitrixFlow</h1>
               </CardTitle>
               <p className="text-sm text-muted-foreground">Защищённый доступ</p>
             </div>
