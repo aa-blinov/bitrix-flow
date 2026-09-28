@@ -375,6 +375,12 @@ export async function GET(req: NextRequest) {
     comments: 'comments',
     parent: 'parent',
   };
+  // Задачи без срока — в конце при любом направлении: Mongo ставит null
+  // первым при сортировке по возрастанию, и «ближайшие дедлайны» начинались
+  // с пустых строк.
+  const sortsByDeadline = (
+    requestedSorts.length ? requestedSorts.map(([key]) => key) : [sortKey]
+  ).includes('deadline');
   const sort = Object.fromEntries(
     (requestedSorts.length
       ? requestedSorts.map(([key, direction]) => [
@@ -382,7 +388,9 @@ export async function GET(req: NextRequest) {
           direction === 'asc' ? 1 : -1,
         ])
       : [[sortField[sortKey] || 'changedDate', sortDirection]]
-    ).concat([['taskId', -1]]),
+    )
+      .flatMap((entry) => (entry[0] === 'deadlineDate' ? [['noDeadline', 1], entry] : [entry]))
+      .concat([['taskId', -1]]),
   );
 
   // task_mirror — полный серверный снимок задач, обновляемый событиями Bitrix24.
@@ -403,6 +411,9 @@ export async function GET(req: NextRequest) {
       [
         ...stages,
         { $match: filter },
+        ...(sortsByDeadline
+          ? [{ $addFields: { noDeadline: { $cond: [{ $eq: ['$deadlineDate', null] }, 1, 0] } } }]
+          : []),
         ...(grouping ? [{ $addFields: grouping.fields }] : []),
         { $sort: grouping ? { groupOrder: 1, groupLabel: 1, groupKey: 1, ...sort } : sort },
         {
