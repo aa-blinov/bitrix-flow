@@ -1,45 +1,48 @@
 # Bitrix24 Kanban
 
-Asana-like project and task workspace for Bitrix24. The application uses Bitrix24 OAuth,
-keeps a task mirror in MongoDB, and receives verified task events for background updates.
+Рабочее пространство для проектов и задач Bitrix24 в духе Asana. Приложение входит через
+Bitrix24 OAuth, держит зеркало задач в MongoDB и принимает проверенные события задач для
+фонового обновления.
 
-Screenshots below are taken against the fixed mock dataset used by the UI tests
-(`MOCK_B24=1`, see [UI tests](#ui-tests)), not against a real portal — none of the names,
-projects, or tasks are real.
+Скрины ниже сняты на фиксированном наборе данных из UI-тестов (`MOCK_B24=1`, раздел
+«UI-тесты» ниже), не на реальном портале: имена, проекты и задачи вымышленные.
 
-## Screens
+## Экраны
 
-**Home** — overdue and no-deadline counters, projects sorted with the most overdue first.
+**Главная**: счётчики просроченных задач и задач без дедлайна, проекты отсортированы:
+самые просроченные наверху.
 
-![Home](docs/screenshots/home.png)
+![Главная](docs/screenshots/home.png)
 
-**Project board** — Kanban and list view, stage progress, planned vs. logged hours.
+**Доска проекта**: канбан и список, прогресс по стадиям, план и факт часов.
 
-![Kanban board](docs/screenshots/kanban.png)
+![Доска проекта](docs/screenshots/kanban.png)
 
-**Task card** — description, tags, subtasks, checklist, time log and comments, opened over the
-board so the URL stays the single source of truth for back/forward navigation.
+**Карточка задачи**: описание, теги, подзадачи, чек-лист, учёт времени и комментарии.
+Открывается поверх доски, а URL остаётся единственным источником правды для навигации
+назад и вперёд.
 
-![Task card](docs/screenshots/task-modal.png)
+![Карточка задачи](docs/screenshots/task-modal.png)
 
-**Team workload** — a weekly calendar per assignee with overdue and no-deadline buckets.
+**Нагрузка команды**: недельный календарь по исполнителям с отдельными блоками для
+просроченных задач и задач без дедлайна.
 
-![Team workload](docs/screenshots/workload.png)
+![Нагрузка команды](docs/screenshots/workload.png)
 
-**Projects summary** — plan/fact hours and status per project, filterable by date range.
+**Сводка проектов**: план и факт часов, статус по каждому проекту, фильтр по периоду.
 
-![Projects summary](docs/screenshots/projects-summary.png)
+![Сводка проектов](docs/screenshots/projects-summary.png)
 
-**Notifications** — a feed of task events (new task, comment, status change) filterable by
-project and event type, paginated the same way the task grid is.
+**Уведомления**: лента событий по задачам (новая задача, комментарий, смена статуса) с
+фильтром по проекту и типу события, постраничная так же, как таблица задач.
 
-![Notifications](docs/screenshots/notifications.png)
+![Уведомления](docs/screenshots/notifications.png)
 
-**Search** — the same search used by the task grid, available across every project.
+**Поиск**: тот же поиск, что в таблице задач, только по всем проектам сразу.
 
-![Search](docs/screenshots/search.png)
+![Поиск](docs/screenshots/search.png)
 
-## Local setup
+## Локальный запуск
 
 ```bash
 cp .env.example .env.local
@@ -47,52 +50,55 @@ npm ci
 npm run dev
 ```
 
-Fill every required value in `.env.local`. This file is deliberately ignored by Git; never
-paste tokens, passwords, Mongo connection strings, or production URLs into issues or commits.
+Заполни все обязательные значения в `.env.local`. Файл специально в `.gitignore`: не вставляй
+токены, пароли, строки подключения к Mongo и боевые URL в issues или коммиты.
 
-For production, configure a public **HTTPS** address in `BITRIX24_APP_URL` and
-`BITRIX24_REDIRECT_URI`. Bitrix24 must be able to reach `/api/b24/handler` to deliver events.
+Для продакшена укажи публичный **HTTPS**-адрес в `BITRIX24_APP_URL` и
+`BITRIX24_REDIRECT_URI`. Bitrix24 должен достучаться до `/api/b24/handler`, чтобы доставлять
+события.
 
-## Commands
+## Команды
 
 ```bash
-npm run lint          # ESLint and Next.js rules
-npm run format:check  # Prettier validation
-npm run format        # Apply Prettier
-npm test              # Unit tests
-npm run build         # Production build and TypeScript validation
+npm run lint          # ESLint и правила Next.js
+npm run format:check  # проверка Prettier
+npm run format        # применить Prettier
+npm test              # юнит-тесты
+npm run build         # продакшен-сборка и проверка TypeScript
 ```
 
-GitHub Actions runs all four checks on pull requests and on pushes to `main`.
+GitHub Actions гоняет все четыре проверки на пул-реквестах и на пуше в `main`.
 
-## Production
+## Продакшен
 
 ```bash
 docker compose --env-file .env.local up -d --build
 ```
 
-MongoDB has no host port mapping and is only available within the Compose network. Keep
-`.env.local` mode `0600` on the host. The app session cookie is `HttpOnly`; server-side session
-records are hashed and stored in MongoDB, so logging out revokes the current device session.
+У MongoDB нет проброса порта на хост, она доступна только внутри сети Compose. Держи
+`.env.local` в режиме `0600` на хосте. Сессионная кука приложения `HttpOnly`; записи сессий
+на сервере хранятся в MongoDB в виде хэша, поэтому выход из аккаунта отзывает сессию именно
+этого устройства.
 
-## Before publishing to GitHub
+## Перед публикацией на GitHub
 
-1. Run `git status --ignored` and verify that `.env.local`, `.next`, and `node_modules` are ignored.
-2. Run the commands in **Commands**.
-3. Add a remote and push only after reviewing `git diff --cached`.
-4. Put deployment values in GitHub/hosting secrets, never in repository variables or workflow files.
+1. Прогони `git status --ignored` и проверь, что `.env.local`, `.next` и `node_modules`
+   игнорируются.
+2. Прогони команды из раздела **Команды**.
+3. Добавляй remote и делай push только после `git diff --cached`.
+4. Значения для деплоя держи в секретах GitHub или хостинга, никогда в переменных
+   репозитория или файлах воркфлоу.
 
-### Backups
+### Бэкапы
 
 ```bash
-./scripts/backup-mongo.sh          # dump into ./backups, keeps 14 days
+./scripts/backup-mongo.sh          # дамп в ./backups, хранит 14 дней
 KEEP_DAYS=30 ./scripts/backup-mongo.sh
 ```
 
-Schedule it from the host's cron. `backups/` is git-ignored. Set
-`BACKUP_PASSPHRASE` in `.env.local` — the dump carries portal OAuth tokens and
-session hashes, so the archive is encrypted with AES-256 whenever the phrase is
-present. Restore:
+Запускай по cron на хосте. `backups/` в `.gitignore`. Задай `BACKUP_PASSPHRASE` в
+`.env.local`: дамп несёт OAuth-токены портала и хэши сессий, поэтому архив шифруется
+AES-256, если фраза задана. Восстановление:
 
 ```bash
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE \
@@ -101,60 +107,59 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE \
   --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin
 ```
 
-### Errors and alerting
+### Ошибки и алерты
 
-Errors and traces go to Sentry through `@sentry/nextjs`: server and edge via
-`src/sentry.*.config.ts` and the `onRequestError` hook, browser via
-`src/instrumentation-client.ts` plus both error boundaries. Set `SENTRY_DSN` in
-`.env.local`; without it reporting is off, so local runs and tests stay silent.
+Ошибки и трейсы уходят в Sentry через `@sentry/nextjs`: сервер и edge через
+`src/sentry.*.config.ts` и хук `onRequestError`, браузер через `src/instrumentation-client.ts`
+и оба error boundary. Задай `SENTRY_DSN` в `.env.local`; без него отправка выключена, и
+локальные запуски с тестами остаются тихими.
 
-The DSN is also baked into the client bundle at build time
-(`NEXT_PUBLIC_SENTRY_DSN` build arg, wired in `docker-compose.yml`). Source maps
-are uploaded only when `SENTRY_AUTH_TOKEN` is set at build time; without it the
-build still works, stack traces just point at minified code. `APP_RELEASE`
-tags events with a release — pass the commit:
+DSN также зашит в клиентский бандл на этапе сборки (build-arg `NEXT_PUBLIC_SENTRY_DSN`,
+прописан в `docker-compose.yml`). Сорс-мапы загружаются, только если на сборке задан
+`SENTRY_AUTH_TOKEN`; без него сборка всё равно проходит, просто стектрейсы будут указывать
+на минифицированный код. `APP_RELEASE` помечает события релизом, передавай коммит:
 
 ```bash
 APP_RELEASE=$(git rev-parse --short HEAD) docker compose --env-file .env.local up -d --build
 ```
 
-External liveness check, for the host's cron (better from another machine):
+Внешняя проверка доступности для cron на хосте (лучше с другой машины):
 
 ```bash
 */2 * * * * cd /path/to/bitrix-kanban && ./scripts/health-watch.sh >> backups/health.log 2>&1
 ```
 
-It calls `/api/health` and, on failure, reports a `HealthCheckFailed` event to
-the same project — alerts then travel the usual route.
+Она дёргает `/api/health` и при падении шлёт событие `HealthCheckFailed` в тот же проект,
+дальше алерт идёт обычным маршрутом.
 
 ### Если сайт отдаёт 502
 
-Встроенный DNS docker на этом хосте дважды за сутки переставал резолвить имена
-сервисов: приложение живо (`docker compose exec app wget -qO- localhost:3000/api/health`
-отвечает `ok`), а Caddy пишет `dial tcp: lookup app ... server misbehaving`.
-Поэтому сервисы получили фиксированные адреса в подсети `172.32.10.0/24`, и
-прокси ходит по адресу, а не по имени. Если 502 всё же повторится:
+Встроенный DNS docker на этом хосте дважды за сутки переставал резолвить имена сервисов:
+приложение живо (`docker compose exec app wget -qO- localhost:3000/api/health` отвечает
+`ok`), а Caddy пишет `dial tcp: lookup app ... server misbehaving`. Поэтому сервисы получили
+фиксированные адреса в подсети `172.32.10.0/24`, и прокси ходит по адресу, а не по имени.
+Если 502 всё же повторится:
 
 ```bash
 docker compose --env-file .env.local down && docker compose --env-file .env.local up -d
 ```
 
-`scripts/health-watch.sh` делает это сам (не чаще раза в 15 минут) и шлёт алерт,
-только если после пересоздания сайт так и не ответил.
+`scripts/health-watch.sh` делает это сам (не чаще раза в 15 минут) и шлёт алерт, только если
+после пересоздания сайт так и не ответил.
 
-### Health and monitoring
+### Здоровье и мониторинг
 
-`GET /api/health` answers without a session and pings MongoDB, so `docker compose ps` shows
-`healthy` only while the app can actually reach the database. Compose restarts the service when
-three checks in a row fail.
+`GET /api/health` отвечает без сессии и пингует MongoDB, поэтому `docker compose ps` пишет
+`healthy`, только пока приложение реально достаёт до базы. Compose перезапускает сервис
+после трёх подряд неудачных проверок.
 
-### Proxy hardening
+### Защита прокси
 
-Caddy adds HSTS, `nosniff`, `Referrer-Policy` and a `frame-ancestors` policy that allows
-embedding only into the app's own origin and Bitrix24 portals. Adjust the list in
-`caddy/Caddyfile` if the app has to run inside another host.
+Caddy добавляет HSTS, `nosniff`, `Referrer-Policy` и политику `frame-ancestors`, которая
+разрешает встраивание только в собственный origin приложения и порталы Bitrix24. Список
+правится в `caddy/Caddyfile`, если приложению нужно работать внутри другого хоста.
 
-### UI tests
+### UI-тесты
 
 ```bash
 ./scripts/ui-tests-docker.sh                     # прогон как в CI
@@ -162,18 +167,18 @@ embedding only into the app's own origin and Bitrix24 portals. Adjust the list i
 npm run test:ui                                  # быстрый прогон в системном Chrome
 ```
 
-Эталоны снимаются в образе `mcr.microsoft.com/playwright` — том же, что в CI:
-локальный Chrome рисует шрифты чуть иначе, и попиксельное сравнение падало бы
-без единого изменения в коде.
+Эталоны снимаются в образе `mcr.microsoft.com/playwright`, том же, что в CI: локальный
+Chrome рисует шрифты чуть иначе, и попиксельное сравнение падало бы без единого изменения
+в коде.
 
-Тесты идут против сборки с `MOCK_B24=1` и отдельной базой `bitrix_kanban_test`:
-данные фиксированные, поэтому скриншоты сравниваются попиксельно. Покрыты девять
-экранов в двух вьюпортах (десктоп и телефон) плюс состояния: карточка задачи,
-фильтр с чипом, пустой результат, диалог создания, тёмная тема, доска. Каждый
-экран заодно проверяется на ошибки в консоли.
+Тесты идут против сборки с `MOCK_B24=1` и отдельной базой `bitrix_kanban_test`: данные
+фиксированные, поэтому скриншоты сравниваются попиксельно. Покрыты девять экранов в двух
+вьюпортах (десктоп и телефон) плюс состояния: карточка задачи, фильтр с чипом, пустой
+результат, диалог создания, тёмная тема, доска. Каждый экран заодно проверяется на ошибки
+в консоли.
 
-### UI checks
+### Проверки интерфейса
 
-The interface is audited with axe-core (WCAG 2.1 A/AA plus best practice) on both a 390px and
-a 1440px viewport, in light and dark themes. Keep it at zero violations: controls need an
-accessible name, dialogs need a title, and body text must stay at 4.5:1 contrast.
+Интерфейс проверяется axe-core (WCAG 2.1 A/AA плюс best practice) на вьюпортах 390px и
+1440px, в светлой и тёмной теме. Порог: ноль нарушений. Элементам управления нужно
+доступное имя, диалогам заголовок, а основной текст должен держать контраст 4.5:1.
