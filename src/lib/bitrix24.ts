@@ -825,6 +825,41 @@ export async function deleteChecklistItem(taskId: string, itemId: string) {
   return bx24('task.checklistitem.delete', { TASKID: taskId, ITEMID: itemId });
 }
 
+// «Результаты» — отдельная от чата/комментариев сущность в Битриксе (кнопка
+// «Добавить результат» в карточке), только v3-эндпоинты, ключи в camelCase.
+// tasks.task.result.list использует непубличный DSL фильтра — ни field/operator/value,
+// ни один из вариантов, которые распознаёт эта версия портала, не найден, поэтому
+// историю результатов читаем только в самом Битриксе, приложение только пишет.
+export interface Bx24TaskResult {
+  id: string;
+  authorId: string;
+  authorName?: string;
+  text: string;
+  createdAt: string;
+}
+
+function normalizeTaskResult(item: any): Bx24TaskResult {
+  return {
+    id: String(item.id ?? item.ID ?? ''),
+    authorId: String(item.authorId ?? item.AUTHOR_ID ?? item.createdBy ?? ''),
+    text: item.text ?? item.TEXT ?? '',
+    createdAt: item.createdAt ?? item.CREATED_AT ?? item.createdDate ?? '',
+  };
+}
+
+export async function addTaskResult(taskId: string, text: string): Promise<Bx24TaskResult> {
+  const result = await bx24('tasks.task.result.add', { taskId, text });
+  return normalizeTaskResult(result?.item ?? { text });
+}
+
+export async function updateTaskResult(resultId: string, text: string): Promise<void> {
+  await bx24('tasks.task.result.update', { resultId, text });
+}
+
+export async function deleteTaskResult(resultId: string): Promise<void> {
+  await bx24('tasks.task.result.delete', { resultId });
+}
+
 export async function addTaskComment(taskId: string, text: string): Promise<void> {
   const result = await bx24('tasks.task.chat.message.send', {
     taskId,

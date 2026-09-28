@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from '@/lib/task-tags';
-import { BxTask, BxComment, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
+import { BxTask, BxComment, BxTaskResult, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
 import * as persist from './persist';
 import {
   fetchTasksByProject,
@@ -26,6 +26,9 @@ import {
   runTaskStatusAction as bxRunTaskStatusAction,
   updateTaskFull as bxUpdateTaskFull,
   addTaskComment as bxAddComment,
+  addTaskResult as bxAddTaskResult,
+  updateTaskResult as bxUpdateTaskResult,
+  deleteTaskResult as bxDeleteTaskResult,
   addTimeEntry as bxAddTime,
   createTask as bxCreateTask,
   Bx24Task,
@@ -155,6 +158,9 @@ interface KanbanStore {
   moveTaskToStage: (taskId: string, stageId: string) => Promise<void>;
   moveTaskToProject: (taskId: string, projectId: string) => Promise<void>;
   addComment: (taskId: string, text: string) => Promise<void>;
+  addTaskResult: (taskId: string, text: string) => Promise<void>;
+  updateTaskResult: (taskId: string, resultId: string, text: string) => Promise<void>;
+  deleteTaskResult: (taskId: string, resultId: string) => Promise<void>;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
   addChecklistItem: (taskId: string, title: string, parentId?: string) => Promise<void>;
   updateChecklistItem: (taskId: string, itemId: string, title: string) => Promise<void>;
@@ -208,6 +214,7 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
     estimate: secondsToHours(bxTask.timeEstimate),
     actualTime: secondsToHours(bxTask.timeSpentInLogs),
     comments: [],
+    results: [],
     commentsCount: bxTask.commentsCount,
     storyPoints: bxTask.storyPoints,
     checklist: [],
@@ -896,6 +903,105 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         tasks: state.tasks.map(removeComment),
         allTasks: state.allTasks.map(removeComment),
       }));
+      throw error;
+    }
+  },
+
+  addTaskResult: async (taskId, text) => {
+    const { currentUser } = get();
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: BxTaskResult = {
+      id: tempId,
+      taskId,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    const append = (task: BxTask) =>
+      task.id === taskId ? { ...task, results: [...(task.results || []), optimistic] } : task;
+    set((state) => mapBoth(state, append));
+
+    try {
+      // tasks.task.result.list не читается (см. комментарий в bitrix24.ts), поэтому
+      // подменяем временную запись реальной прямо из ответа add, без рефетча списка.
+      const saved = await bxAddTaskResult(taskId, text);
+      set((state) =>
+        mapBoth(state, (task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                results: (task.results || []).map((r) =>
+                  r.id === tempId ? { ...saved, taskId, authorName: currentUser.name } : r,
+                ),
+              }
+            : task,
+        ),
+      );
+    } catch (error) {
+      const remove = (task: BxTask) =>
+        task.id === taskId
+          ? { ...task, results: (task.results || []).filter((r) => r.id !== tempId) }
+          : task;
+      set((state) => mapBoth(state, remove));
+      throw error;
+    }
+  },
+
+  updateTaskResult: async (taskId, resultId, text) => {
+    const previousText = get()
+      .tasks.find((task) => task.id === taskId)
+      ?.results?.find((r) => r.id === resultId)?.text;
+    const replace = (task: BxTask) =>
+      task.id === taskId
+        ? {
+            ...task,
+            results: (task.results || []).map((r) => (r.id === resultId ? { ...r, text } : r)),
+          }
+        : task;
+    set((state) => mapBoth(state, replace));
+
+    try {
+      await bxUpdateTaskResult(resultId, text);
+    } catch (error) {
+      // Список не читается, поэтому откатываемся к тексту, который был до
+      // правки, а не к серверу.
+      if (previousText !== undefined) {
+        const revert = (task: BxTask) =>
+          task.id === taskId
+            ? {
+                ...task,
+                results: (task.results || []).map((r) =>
+                  r.id === resultId ? { ...r, text: previousText } : r,
+                ),
+              }
+            : task;
+        set((state) => mapBoth(state, revert));
+      }
+      throw error;
+    }
+  },
+
+  deleteTaskResult: async (taskId, resultId) => {
+    const removed = get()
+      .tasks.find((task) => task.id === taskId)
+      ?.results?.find((r) => r.id === resultId);
+    const remove = (task: BxTask) =>
+      task.id === taskId
+        ? { ...task, results: (task.results || []).filter((r) => r.id !== resultId) }
+        : task;
+    set((state) => mapBoth(state, remove));
+
+    try {
+      await bxDeleteTaskResult(resultId);
+    } catch (error) {
+      // Список не читается, поэтому возвращаем ту же запись, которую убрали
+      // оптимистично, а не тянем сервер за подтверждением.
+      if (removed) {
+        const restore = (task: BxTask) =>
+          task.id === taskId ? { ...task, results: [...(task.results || []), removed] } : task;
+        set((state) => mapBoth(state, restore));
+      }
       throw error;
     }
   },

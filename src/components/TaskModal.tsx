@@ -31,6 +31,8 @@ import {
   Clock3,
   RotateCcw,
   Paperclip,
+  ClipboardCheck,
+  Pencil,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toLocalInputValue } from '@/lib/utils';
@@ -116,6 +118,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     currentUser,
     moveTaskToProject,
     addComment,
+    addTaskResult,
+    updateTaskResult,
+    deleteTaskResult,
     addTimeEntry,
     users,
     projects,
@@ -136,6 +141,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       currentUser: s.currentUser,
       moveTaskToProject: s.moveTaskToProject,
       addComment: s.addComment,
+      addTaskResult: s.addTaskResult,
+      updateTaskResult: s.updateTaskResult,
+      deleteTaskResult: s.deleteTaskResult,
       addTimeEntry: s.addTimeEntry,
       users: s.users,
       projects: s.projects,
@@ -158,6 +166,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [comment, setComment] = useState('');
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [taskResultText, setTaskResultText] = useState('');
+  const [isSendingResult, setIsSendingResult] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [editingResultId, setEditingResultId] = useState<string | null>(null);
+  const [editingResultText, setEditingResultText] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [showTimeEntry, setShowTimeEntry] = useState(false);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
@@ -422,6 +435,42 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       setCommentError('Не удалось отправить комментарий. Попробуйте ещё раз.');
     } finally {
       setIsSendingComment(false);
+    }
+  };
+
+  const handleAddResult = async () => {
+    const text = taskResultText.trim();
+    if (!text || isSendingResult) return;
+
+    setTaskResultText('');
+    setResultError(null);
+    setIsSendingResult(true);
+    try {
+      await addTaskResult(task.id, text);
+    } catch {
+      setTaskResultText((current) => current || text);
+      setResultError('Не удалось сохранить результат. Попробуйте ещё раз.');
+    } finally {
+      setIsSendingResult(false);
+    }
+  };
+
+  const handleUpdateResult = async (resultId: string) => {
+    const text = editingResultText.trim();
+    if (!text) return;
+    setEditingResultId(null);
+    try {
+      await updateTaskResult(task.id, resultId, text);
+    } catch {
+      toast({ title: 'Не удалось изменить результат', tone: 'error' });
+    }
+  };
+
+  const handleDeleteResult = async (resultId: string) => {
+    try {
+      await deleteTaskResult(task.id, resultId);
+    } catch {
+      toast({ title: 'Не удалось удалить результат', tone: 'error' });
     }
   };
 
@@ -1414,6 +1463,128 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               </Card>
             </div>
           </div>
+
+          <Card className="mt-6 gap-0 overflow-hidden py-0">
+            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <ClipboardCheck size={16} className="text-primary" /> Результаты
+              </h3>
+              <Badge variant="secondary" className="font-normal tabular-nums">
+                {(task.results || []).length}
+              </Badge>
+            </div>
+            <div className="max-h-80 space-y-3 overflow-y-auto bg-muted/20 p-3 sm:p-4">
+              {(task.results || []).length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Результатов пока нет в этой вкладке.
+                  <br />
+                  Полную историю смотрите в Битриксе — список из приложения не читается.
+                </p>
+              ) : (
+                (task.results || []).map((resultItem) => (
+                  <article
+                    key={resultItem.id}
+                    className="flex gap-3 rounded-xl border bg-background p-3 shadow-sm"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      {(resultItem.authorName || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="text-sm font-semibold">{resultItem.authorName}</span>
+                        {resultItem.createdAt && (
+                          <time className="text-xs text-muted-foreground">
+                            {formatDate(resultItem.createdAt)}
+                          </time>
+                        )}
+                      </div>
+                      {editingResultId === resultItem.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            autoFocus
+                            value={editingResultText}
+                            onChange={(event) => setEditingResultText(event.target.value)}
+                            rows={3}
+                            className="resize-y bg-muted/30 text-sm"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => void handleUpdateResult(resultItem.id)}
+                            >
+                              Сохранить
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingResultId(null)}
+                            >
+                              Отмена
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="break-words text-sm leading-relaxed text-foreground/85">
+                          <BitrixText text={resultItem.text} />
+                        </div>
+                      )}
+                    </div>
+                    {resultItem.authorId === currentUser.id &&
+                      editingResultId !== resultItem.id && (
+                        <div className="flex shrink-0 gap-1">
+                          <button
+                            type="button"
+                            aria-label="Изменить результат"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              setEditingResultId(resultItem.id);
+                              setEditingResultText(resultItem.text);
+                            }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Удалить результат"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => void handleDeleteResult(resultItem.id)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                  </article>
+                ))
+              )}
+            </div>
+            <div className="border-t bg-background p-3 sm:p-4">
+              <div className="flex items-end gap-2">
+                <Textarea
+                  value={taskResultText}
+                  onChange={(event) => setTaskResultText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      void handleAddResult();
+                    }
+                  }}
+                  placeholder="Что сделано… Shift+Enter — сохранить"
+                  rows={3}
+                  className="min-h-24 flex-1 resize-y bg-muted/30"
+                />
+                <Button
+                  onClick={() => void handleAddResult()}
+                  disabled={!taskResultText.trim() || isSendingResult}
+                  className="h-10 shrink-0 gap-2"
+                  aria-label="Сохранить результат"
+                >
+                  <ClipboardCheck size={16} />
+                  <span className="hidden sm:inline">Сохранить</span>
+                </Button>
+              </div>
+              {resultError && <p className="mt-2 text-sm text-destructive">{resultError}</p>}
+            </div>
+          </Card>
 
           <Card className="mt-6 gap-0 overflow-hidden py-0">
             <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">

@@ -18,6 +18,7 @@ export interface BxTask {
   storyPoints?: number;
   comments: BxComment[];
   commentsCount?: number;
+  results?: BxTaskResult[];
   checklist?: BxChecklistItem[];
   timeEntries: TimeEntry[];
   parentId?: string;
@@ -52,6 +53,15 @@ export interface BxFile {
   extension: string;
   width?: number;
   height?: number;
+}
+
+export interface BxTaskResult {
+  id: string;
+  taskId: string;
+  authorId: string;
+  authorName?: string;
+  text: string;
+  createdAt: string;
 }
 
 export interface BxComment {
