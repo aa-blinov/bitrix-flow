@@ -1,5 +1,6 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
+import { useShallow } from 'zustand/react/shallow';
 import { PRIORITY_LABELS, STATUS_LABELS, BxTask, Bx24User } from '@/types/bitrix';
 import TaskFilterBar from '@/components/TaskFilterBar';
 import {
@@ -105,20 +106,26 @@ function getAvatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+// Форматтеры один раз на модуль: toLocale*String строит новый на каждый
+// вызов, а formatDeadline зовётся на каждую карточку доски.
+const DAY_MONTH = new Intl.DateTimeFormat('ru-RU', { month: 'short', day: 'numeric' });
+const WEEKDAY = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' });
+const HOUR_MINUTE = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
 function formatDeadline(dateStr: string | undefined): string {
   if (!dateStr) return '';
   try {
     const date = new Date(dateStr);
     const now = new Date();
     const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    let day = date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' });
+    let day = DAY_MONTH.format(date);
     if (diff === 0) day = 'Сегодня';
     else if (diff === 1) day = 'Завтра';
     else if (diff === -1) day = 'Вчера';
-    else if (diff > 1 && diff < 7) day = date.toLocaleDateString('ru-RU', { weekday: 'short' });
-    else if (diff < 0 && diff > -7) day = date.toLocaleDateString('ru-RU', { weekday: 'short' });
+    else if (diff > 1 && diff < 7) day = WEEKDAY.format(date);
+    else if (diff < 0 && diff > -7) day = WEEKDAY.format(date);
 
-    return `${day}, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+    return `${day}, ${HOUR_MINUTE.format(date)}`;
   } catch {
     return '';
   }
@@ -149,7 +156,30 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     projects,
     currentUser,
     loadTaskById,
-  } = useKanbanStore();
+  } = useKanbanStore(
+    useShallow((s) => ({
+      tasks: s.tasks,
+      stages: s.stages,
+      selectedProjectId: s.selectedProjectId,
+      moveTaskToStage: s.moveTaskToStage,
+      setSelectedTask: s.setSelectedTask,
+      createTask: s.createTask,
+      createStage: s.createStage,
+      renameStage: s.renameStage,
+      isLoading: s.isLoading,
+      stagesLoadedFor: s.stagesLoadedFor,
+      taskFilters: s.taskFilters,
+      taskSearch: s.taskSearch,
+      setTaskFilter: s.setTaskFilter,
+      setTaskFilters: s.setTaskFilters,
+      setTaskSearch: s.setTaskSearch,
+      enterFilterScope: s.enterFilterScope,
+      users: s.users,
+      projects: s.projects,
+      currentUser: s.currentUser,
+      loadTaskById: s.loadTaskById,
+    })),
+  );
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
