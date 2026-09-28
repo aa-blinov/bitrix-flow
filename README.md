@@ -3,6 +3,42 @@
 Asana-like project and task workspace for Bitrix24. The application uses Bitrix24 OAuth,
 keeps a task mirror in MongoDB, and receives verified task events for background updates.
 
+Screenshots below are taken against the fixed mock dataset used by the UI tests
+(`MOCK_B24=1`, see [UI tests](#ui-tests)), not against a real portal — none of the names,
+projects, or tasks are real.
+
+## Screens
+
+**Home** — overdue and no-deadline counters, projects sorted with the most overdue first.
+
+![Home](docs/screenshots/home.png)
+
+**Project board** — Kanban and list view, stage progress, planned vs. logged hours.
+
+![Kanban board](docs/screenshots/kanban.png)
+
+**Task card** — description, tags, subtasks, checklist, time log and comments, opened over the
+board so the URL stays the single source of truth for back/forward navigation.
+
+![Task card](docs/screenshots/task-modal.png)
+
+**Team workload** — a weekly calendar per assignee with overdue and no-deadline buckets.
+
+![Team workload](docs/screenshots/workload.png)
+
+**Projects summary** — plan/fact hours and status per project, filterable by date range.
+
+![Projects summary](docs/screenshots/projects-summary.png)
+
+**Notifications** — a feed of task events (new task, comment, status change) filterable by
+project and event type, paginated the same way the task grid is.
+
+![Notifications](docs/screenshots/notifications.png)
+
+**Search** — the same search used by the task grid, available across every project.
+
+![Search](docs/screenshots/search.png)
+
 ## Local setup
 
 ```bash
