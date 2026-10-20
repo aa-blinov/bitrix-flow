@@ -1,9 +1,9 @@
-FROM node:20-alpine AS dependencies
+FROM node:26-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 # NEXT_PUBLIC_* инлайнится в клиентский бандл на сборке, поэтому приходит
 # аргументом, а не переменной окружения контейнера.
@@ -17,7 +17,7 @@ COPY . .
 # Без секрета сборка идёт как обычно, просто без загрузки source maps.
 RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/public ./public
