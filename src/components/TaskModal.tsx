@@ -11,7 +11,6 @@ import {
   Eye,
   Flag,
   Calendar,
-  Timer,
   CheckSquare,
   Square,
   Plus,
@@ -34,27 +33,21 @@ import {
   ClipboardCheck,
   Pencil,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Avatar } from '@/components/monos/Avatar';
+import { Badge } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { Card } from '@/components/monos/Card';
+import { Checkbox } from '@/components/monos/Checkbox';
+import { Chip } from '@/components/monos/Chip';
+import { IconButton } from '@/components/monos/IconButton';
+import { Modal } from '@/components/monos/Modal';
+import { Notice } from '@/components/monos/Notice';
+import { Popover } from '@/components/monos/Popover';
+import { SelectField } from '@/components/monos/SelectField';
+import { TextArea } from '@/components/monos/TextArea';
+import { TextField } from '@/components/monos/TextField';
+import { useToast } from '@/components/monos/toast';
 import { toLocalInputValue } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
@@ -76,7 +69,7 @@ function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boo
               target="_blank"
               rel="noreferrer"
               title={file.name}
-              className="block overflow-hidden rounded-lg border"
+              className="block overflow-hidden rounded-ui border border-line"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -92,11 +85,11 @@ function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boo
           <a
             key={file.id}
             href={`${href}${attached ? '&' : '?'}download=1`}
-            className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors hover:bg-muted"
+            className="flex items-center gap-2 rounded-ui border border-line px-2.5 py-1.5 text-xs transition-colors hover:bg-surface-2"
           >
-            <Paperclip size={13} className="shrink-0 text-muted-foreground" />
+            <Paperclip size={13} strokeWidth={1.7} className="shrink-0 text-ink-faint" />
             <span className="max-w-56 truncate">{file.name}</span>
-            <span className="shrink-0 text-muted-foreground">{formatFileSize(file.size)}</span>
+            <span className="shrink-0 text-ink-faint">{formatFileSize(file.size)}</span>
           </a>
         );
       })}
@@ -110,6 +103,14 @@ function formatFileSize(bytes: number) {
   const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   const value = bytes / 1024 ** index;
   return `${value.toLocaleString('ru-RU', { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 })} ${units[index]}`;
+}
+
+// Слово-статус задачи: цвет здесь — состояние, а не украшение.
+function statusTone(status: string): 'neutral' | 'accent' | 'danger' | 'warning' | 'success' {
+  if (status === 'done') return 'success';
+  if (status === 'in_progress') return 'accent';
+  if (status === 'deferred') return 'warning';
+  return 'neutral';
 }
 
 export default function TaskModal({ task, onClose }: { task: BxTask; onClose: () => void }) {
@@ -462,7 +463,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     try {
       await updateTaskResult(task.id, resultId, text);
     } catch {
-      toast({ title: 'Не удалось изменить результат', tone: 'error' });
+      toast({ title: 'Не удалось изменить результат', tone: 'danger' });
     }
   };
 
@@ -470,7 +471,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     try {
       await deleteTaskResult(task.id, resultId);
     } catch {
-      toast({ title: 'Не удалось удалить результат', tone: 'error' });
+      toast({ title: 'Не удалось удалить результат', tone: 'danger' });
     }
   };
 
@@ -527,1208 +528,1187 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
 
+  const projectOptions = [
+    { value: 'none', label: 'Без проекта' },
+    ...projects
+      // Архивный проект в список переноса не предлагаем, но текущий
+      // оставляем: иначе у задачи архивного проекта поле пустое.
+      .filter((project) => !project.isArchived || project.id === task.projectId)
+      .map((project) => ({ value: project.id, label: project.name })),
+  ];
+
+  const assigneeOptions = [
+    { value: 'unassigned', label: 'Не назначен' },
+    ...users.map((user) => ({ value: user.id, label: userLabel(user) })),
+  ];
+
+  const memberUsers = users.filter((user) => projectMemberIds.includes(user.id));
+
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent
-        showCloseButton={false}
-        // Без заголовка скринридер объявляет диалог безымянным (aria-dialog-name).
-        aria-label={task?.title ? `Задача: ${task.title}` : 'Карточка задачи'}
-        onInteractOutside={(event) => event.preventDefault()}
-        onPointerDownOutside={(event) => event.preventDefault()}
-        onFocusOutside={(event) => event.preventDefault()}
-        className="top-0 left-0 h-dvh w-dvw max-h-none max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none p-0 lg:left-auto lg:right-0 lg:flex lg:w-[60rem] lg:max-w-[calc(100vw-4rem)] lg:flex-col lg:gap-0 lg:overflow-hidden lg:rounded-l-xl"
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        title={task.title}
+        size="xl"
+        showClose={false}
+        closeOnBackdrop={false}
+        // Пока открыт диалог о чужой задаче в работе, Escape закрывает его,
+        // а не всю карточку.
+        closeOnEscape={!focusConflict}
+        className="max-w-none lg:max-w-[60rem]"
       >
         {fieldError && (
-          <p
-            className="mx-4 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-            role="alert"
-          >
-            {fieldError}
-          </p>
+          <div className="mb-3">
+            <Notice tone="danger">{fieldError}</Notice>
+          </div>
         )}
-        {/* Header */}
         {/* На телефоне кнопки статуса и фаза не влезали в строку и растягивали
             всю карточку вширь: переносим их, а «Закрыть» держим справа. */}
-        <div className="flex items-start justify-between gap-2 px-4 py-3 border-b bg-muted flex-shrink-0 sticky top-0 z-10">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            <span className="text-sm text-muted-foreground font-mono">#{task.id}</span>
-            <Badge variant="outline" className="shrink-0">
-              {STATUS_LABELS[task.status] || task.status}
-            </Badge>
-            <div className="flex shrink-0 items-center gap-1">
-              {/* Отложенную Битрикс не «стартует», а возвращает в «Новая» (renew)
-                  или завершает: раньше тут ждали start, и шапка была пустой. */}
-              {task.status === 'deferred' && (
-                <>
-                  {can('renew') && (
-                    <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
-                      <RotateCcw /> Возобновить
-                    </Button>
-                  )}
-                  {can('complete') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleUpdateField('status', 'done')}
-                    >
-                      <CircleCheck /> Завершить
-                    </Button>
-                  )}
-                </>
-              )}
-              {task.status === 'new' && (
-                <>
-                  {can('start') && (
-                    <Button size="sm" onClick={() => void handleStartTask()}>
-                      <Play /> Начать
-                    </Button>
-                  )}
-                  {task.status === 'new' && can('defer') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleUpdateField('status', 'deferred')}
-                    >
-                      <Clock3 /> Отложить
-                    </Button>
-                  )}
-                </>
-              )}
-              {task.status === 'in_progress' && (
-                <>
-                  {can('pause') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleUpdateField('status', 'new')}
-                    >
-                      <Pause /> Приостановить
-                    </Button>
-                  )}
-                  {can('defer') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleUpdateField('status', 'deferred')}
-                    >
-                      <Clock3 /> Отложить
-                    </Button>
-                  )}
-                  {can('complete') && (
-                    <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                      <CircleCheck /> Завершить
-                    </Button>
-                  )}
-                </>
-              )}
-              {task.status === 'testing' && (
-                <>
-                  {can('defer') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleUpdateField('status', 'deferred')}
-                    >
-                      <Clock3 /> Отложить
-                    </Button>
-                  )}
-                  {can('complete') && (
-                    <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                      <CircleCheck /> Завершить
-                    </Button>
-                  )}
-                </>
-              )}
-              {task.status === 'done' && can('renew') && (
-                <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
-                  <RotateCcw /> Возобновить
-                </Button>
-              )}
-            </div>
-            {projectStages.length > 0 && (
-              <Select
-                value={selectedStageId}
-                onValueChange={(stageId) => void moveTaskToStage(task.id, stageId)}
-              >
-                <SelectTrigger className="w-40" aria-label="Фаза задачи">
-                  <Layers size={14} className="mr-1 shrink-0" />
-                  <SelectValue placeholder="Фаза" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectStages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="sticky top-0 z-10 -mx-6 mb-4 flex flex-wrap items-center gap-2 border-b border-line bg-canvas px-6 py-2 sm:-mx-8 sm:px-8">
+          <span className="text-whisper text-ink-faint">#{task.id}</span>
+          <Badge tone={statusTone(task.status)}>{STATUS_LABELS[task.status] || task.status}</Badge>
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {/* Отложенную Битрикс не «стартует», а возвращает в «Новая» (renew)
+                или завершает: раньше тут ждали start, и шапка была пустой. */}
+            {task.status === 'deferred' && (
+              <>
+                {can('renew') && (
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
+                    Возобновить
+                  </Button>
+                )}
+                {can('complete') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'done')}
+                  >
+                    Завершить
+                  </Button>
+                )}
+              </>
+            )}
+            {task.status === 'new' && (
+              <>
+                {can('start') && (
+                  <Button size="sm" onClick={() => void handleStartTask()}>
+                    Начать
+                  </Button>
+                )}
+                {task.status === 'new' && can('defer') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'deferred')}
+                  >
+                    Отложить
+                  </Button>
+                )}
+              </>
+            )}
+            {task.status === 'in_progress' && (
+              <>
+                {can('pause') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'new')}
+                  >
+                    Приостановить
+                  </Button>
+                )}
+                {can('defer') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'deferred')}
+                  >
+                    Отложить
+                  </Button>
+                )}
+                {can('complete') && (
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                    Завершить
+                  </Button>
+                )}
+              </>
+            )}
+            {task.status === 'testing' && (
+              <>
+                {can('defer') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'deferred')}
+                  >
+                    Отложить
+                  </Button>
+                )}
+                {can('complete') && (
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                    Завершить
+                  </Button>
+                )}
+              </>
+            )}
+            {task.status === 'done' && can('renew') && (
+              <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
+                Возобновить
+              </Button>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={onClose}
-            aria-label="Закрыть задачу"
-          >
-            <X size={20} />
-          </Button>
+          {projectStages.length > 0 && (
+            <SelectField
+              aria-label="Фаза задачи"
+              variant="boxed"
+              size="sm"
+              className="w-40"
+              value={selectedStageId ?? ''}
+              onChange={(event) => {
+                if (event.target.value) void moveTaskToStage(task.id, event.target.value);
+              }}
+              options={projectStages.map((stage) => ({ value: stage.id, label: stage.name }))}
+            />
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            {/* Заголовок окна — имя задачи: править его можно только здесь,
+                поэтому кнопка-карандаш стоит рядом с ним. */}
+            <IconButton
+              label="Изменить название"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditingField('title');
+                setEditValue(task.title);
+              }}
+            >
+              <Pencil size={14} strokeWidth={1.7} />
+            </IconButton>
+            <IconButton label="Закрыть задачу" variant="ghost" size="sm" onClick={onClose}>
+              <X size={16} strokeWidth={1.7} />
+            </IconButton>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Main */}
-            <div className="min-w-0 space-y-4 md:col-span-2">
-              {/* Title */}
-              <div>
-                {editingField === 'title' ? (
-                  <Input
-                    className="h-10 text-lg font-semibold"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleUpdateField('title', editValue)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateField('title', editValue)}
-                    autoFocus
-                  />
-                ) : (
-                  <h2
-                    className="text-lg font-semibold text-foreground cursor-pointer hover:bg-muted rounded-lg px-4 py-2 -mx-4"
-                    onClick={() => {
-                      setEditingField('title');
-                      setEditValue(task.title);
-                    }}
-                  >
-                    {task.title}
-                  </h2>
-                )}
-              </div>
+        {editingField === 'title' && (
+          <div className="mb-3">
+            <TextField
+              variant="boxed"
+              size="lg"
+              autoFocus
+              value={editValue}
+              onChange={(event) => setEditValue(event.target.value)}
+              onBlur={() => void handleUpdateField('title', editValue)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void handleUpdateField('title', editValue);
+              }}
+              aria-label="Название задачи"
+            />
+          </div>
+        )}
 
-              {/* Description */}
-              <div>
-                <h3 className="text-xs uppercase text-muted-foreground font-medium mb-2">
-                  Описание
-                </h3>
-                {editingField === 'description' ? (
-                  <Textarea
-                    className="min-h-24 resize-none"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleUpdateField('description', editValue)}
-                    rows={3}
-                    autoFocus
-                  />
-                ) : (
-                  <div
-                    className="text-foreground/80 cursor-pointer hover:bg-muted rounded-lg p-3 min-h-[50px]"
-                    onClick={() => {
-                      setEditingField('description');
-                      setEditValue(task.description);
-                    }}
-                  >
-                    {task.description ? (
-                      <BitrixText text={task.description} />
-                    ) : (
-                      <span className="text-muted-foreground">Добавить описание…</span>
-                    )}
-                  </div>
-                )}
-                {/* Вложения описания кликабельны и вне режима редактирования */}
-                <FileAttachments files={task.attachments} attached />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-xs font-medium uppercase text-muted-foreground">Теги</h3>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {ownTags.map((tag) =>
-                    isFromText(tag) ? (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        title="Из названия или описания: убирается правкой текста"
-                      >
-                        {tag}
-                      </Badge>
-                    ) : (
-                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                        {tag}
-                        <button
-                          type="button"
-                          className="rounded-full p-0.5 hover:bg-foreground/10"
-                          aria-label={`Убрать тег ${tag}`}
-                          onClick={() => removeTag(tag)}
-                        >
-                          <X size={11} />
-                        </button>
-                      </Badge>
-                    ),
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Main */}
+          <div className="min-w-0 space-y-4 md:col-span-2">
+            {/* Description */}
+            <div>
+              <h3 className="mb-2 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                Описание
+              </h3>
+              {editingField === 'description' ? (
+                <TextArea
+                  variant="boxed"
+                  rows={3}
+                  autoFocus
+                  value={editValue}
+                  onChange={(event) => setEditValue(event.target.value)}
+                  onBlur={() => void handleUpdateField('description', editValue)}
+                />
+              ) : (
+                <div
+                  className="min-h-[50px] cursor-pointer rounded-ui bg-surface-2 p-3 text-sm text-ink"
+                  onClick={() => {
+                    setEditingField('description');
+                    setEditValue(task.description);
+                  }}
+                >
+                  {task.description ? (
+                    <BitrixText text={task.description} />
+                  ) : (
+                    <span className="text-ink-faint">Добавить описание…</span>
                   )}
-                  {textTags.map((tag) => (
-                    <Badge
+                </div>
+              )}
+              {/* Вложения описания кликабельны и вне режима редактирования */}
+              <FileAttachments files={task.attachments} attached />
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                Теги
+              </h3>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {ownTags.map((tag) =>
+                  isFromText(tag) ? (
+                    <Chip
                       key={tag}
-                      variant="outline"
-                      title="Хэштег из названия или описания: убирается правкой текста"
+                      size="md"
+                      title="Из названия или описания: убирается правкой текста"
                     >
                       {tag}
-                    </Badge>
+                    </Chip>
+                  ) : (
+                    <Chip
+                      key={tag}
+                      size="md"
+                      removable
+                      removeLabel={`Убрать тег ${tag}`}
+                      onRemove={() => void removeTag(tag)}
+                    >
+                      {tag}
+                    </Chip>
+                  ),
+                )}
+                {textTags.map((tag) => (
+                  <Chip
+                    key={tag}
+                    size="md"
+                    title="Хэштег из названия или описания: убирается правкой текста"
+                  >
+                    {tag}
+                  </Chip>
+                ))}
+                <TextField
+                  size="sm"
+                  className="w-36"
+                  value={tagDraft}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value.endsWith(',')) addTag(value);
+                    else setTagDraft(value);
+                  }}
+                  onFocus={loadTagSuggestions}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addTag(tagDraft);
+                    }
+                  }}
+                  onBlur={() => tagDraft.trim() && addTag(tagDraft)}
+                  list={`task-tags-${task.id}`}
+                  placeholder="Добавить тег…"
+                  aria-label="Добавить тег"
+                />
+                <datalist id={`task-tags-${task.id}`}>
+                  {(tagSuggestions || [])
+                    .filter((tag) => !ownTags.includes(tag))
+                    .map((tag) => (
+                      <option key={tag} value={tag} />
+                    ))}
+                </datalist>
+              </div>
+            </div>
+
+            {/* Subtasks - Collapsible */}
+            <Card padding="none" className="overflow-hidden">
+              <Button
+                onClick={() => setShowSubtasks(!showSubtasks)}
+                variant="quiet"
+                size="sm"
+                className="h-auto w-full justify-start gap-2 px-4 py-3"
+                icon={<CheckSquare size={14} strokeWidth={1.7} className="text-ink-faint" />}
+                trailing={
+                  showSubtasks ? (
+                    <ChevronUp size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  ) : (
+                    <ChevronDown size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  )
+                }
+              >
+                Подзадачи ({taskSubtasks.length})
+              </Button>
+
+              {showSubtasks && (
+                <div className="space-y-2 p-3">
+                  {taskSubtasks.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="flex items-center gap-3 rounded-ui bg-surface-2 p-2"
+                    >
+                      <GripVertical size={14} strokeWidth={1.7} className="text-ink-faint" />
+                      <Checkbox
+                        checked={sub.status === 'done'}
+                        onChange={() =>
+                          void moveTask(sub.id, sub.status === 'done' ? 'new' : 'done')
+                        }
+                        ariaLabel={
+                          sub.status === 'done'
+                            ? 'Вернуть подзадачу в работу'
+                            : 'Завершить подзадачу'
+                        }
+                      />
+                      <span
+                        className={`flex-1 text-sm ${
+                          sub.status === 'done' ? 'text-ink-faint line-through' : 'text-ink'
+                        }`}
+                      >
+                        {sub.title}
+                      </span>
+                      <span className="text-whisper text-ink-faint">#{sub.id}</span>
+                    </div>
                   ))}
-                  <Input
-                    value={tagDraft}
+
+                  {showSubtaskAdd ? (
+                    <div className="flex items-center gap-2 rounded-ui bg-surface-2 p-2">
+                      <Square size={16} strokeWidth={1.7} className="text-ink-faint" />
+                      <TextField
+                        variant="underline"
+                        size="sm"
+                        className="flex-1"
+                        value={newSubtaskTitle}
+                        onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                        placeholder="Название подзадачи…"
+                        aria-label="Название подзадачи"
+                        autoFocus
+                        onKeyDown={(event) => event.key === 'Enter' && void handleAddSubtask()}
+                      />
+                      <IconButton
+                        label="Добавить подзадачу"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleAddSubtask()}
+                      >
+                        <Plus size={14} strokeWidth={1.7} />
+                      </IconButton>
+                      <IconButton
+                        label="Отменить"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSubtaskAdd(false)}
+                      >
+                        <X size={14} strokeWidth={1.7} />
+                      </IconButton>
+                    </div>
+                  ) : showExistingSubtaskPicker ? (
+                    <div className="relative rounded-ui bg-surface-2 p-2">
+                      <TextField
+                        variant="underline"
+                        size="sm"
+                        value={existingSubtaskQuery}
+                        onChange={(event) => setExistingSubtaskQuery(event.target.value)}
+                        placeholder="Найти существующую задачу…"
+                        aria-label="Найти существующую задачу"
+                        autoFocus
+                      />
+                      {existingSubtaskQuery && (
+                        <div className="mt-2 max-h-40 overflow-y-auto rounded-ui border border-line bg-canvas p-1">
+                          {existingSubtaskResults
+                            .filter(
+                              (candidate) =>
+                                candidate.id !== task.id &&
+                                candidate.id !== task.parentId &&
+                                candidate.parentId !== task.id,
+                            )
+                            .slice(0, 10)
+                            .map((candidate) => (
+                              <Button
+                                key={candidate.id}
+                                variant="quiet"
+                                size="sm"
+                                className="h-auto w-full justify-start px-2 py-1.5 text-left"
+                                onClick={() => void handleAttachExistingSubtask(candidate.id)}
+                              >
+                                #{candidate.id}, {candidate.title}
+                              </Button>
+                            ))}
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => {
+                          setExistingSubtaskQuery('');
+                          setShowExistingSubtaskPicker(false);
+                        }}
+                        variant="quiet"
+                        size="sm"
+                        className="mt-1 h-auto w-full justify-start text-xs"
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => setShowExistingSubtaskPicker(true)}
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        icon={<Plus size={14} strokeWidth={1.7} />}
+                      >
+                        Выбрать существующую
+                      </Button>
+                      <Button
+                        onClick={() => setShowSubtaskAdd(true)}
+                        variant="quiet"
+                        size="sm"
+                        className="flex-1"
+                        icon={<Plus size={14} strokeWidth={1.7} />}
+                      >
+                        Создать новую
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <Card padding="none" className="overflow-hidden">
+              <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+                  <CheckSquare size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  Чек-лист ({task.checklist?.filter((item) => item.completed).length || 0}/
+                  {task.checklist?.length || 0})
+                </h3>
+              </div>
+              <div className="space-y-3 p-3">
+                {task.checklist
+                  ?.filter((item) => item.parentId === '0')
+                  .map((list) => (
+                    <div key={list.id} className="rounded-ui border border-line bg-surface-2 p-2">
+                      <div className="px-1 text-sm font-bold text-ink">{list.title}</div>
+                      {task.checklist
+                        ?.filter((item) => item.parentId === list.id)
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-2 rounded-ui px-1 py-1 hover:bg-surface"
+                          >
+                            <Checkbox
+                              checked={item.completed}
+                              ariaLabel={
+                                item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'
+                              }
+                              onChange={() =>
+                                void setChecklistItemCompleted(task.id, item.id, !item.completed)
+                              }
+                            />
+                            <span
+                              className={`min-w-0 flex-1 text-sm ${
+                                item.completed ? 'text-ink-faint line-through' : 'text-ink'
+                              }`}
+                            >
+                              {item.title}
+                            </span>
+                            <IconButton
+                              label="Удалить пункт"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void deleteChecklistItem(task.id, item.id)}
+                            >
+                              <Trash2 size={14} strokeWidth={1.7} />
+                            </IconButton>
+                          </div>
+                        ))}
+                      <div className="mt-2 flex gap-2">
+                        <TextField
+                          variant="underline"
+                          size="sm"
+                          value={activeChecklistId === list.id ? newChecklistItem : ''}
+                          onFocus={() => setActiveChecklistId(list.id)}
+                          onChange={(event) => {
+                            setActiveChecklistId(list.id);
+                            setNewChecklistItem(event.target.value);
+                          }}
+                          placeholder="Добавить пункт…"
+                          aria-label="Добавить пункт чек-листа"
+                          onKeyDown={(event) =>
+                            event.key === 'Enter' && void handleAddChecklistItem()
+                          }
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => void handleAddChecklistItem(list.id)}
+                          disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                <div className="flex gap-2 border-t border-line pt-3">
+                  <TextField
+                    variant="underline"
+                    size="sm"
+                    value={activeChecklistId === null ? newChecklistItem : ''}
+                    onFocus={() => setActiveChecklistId(null)}
                     onChange={(event) => {
-                      const value = event.target.value;
-                      if (value.endsWith(',')) addTag(value);
-                      else setTagDraft(value);
+                      setActiveChecklistId(null);
+                      setNewChecklistItem(event.target.value);
                     }}
-                    onFocus={loadTagSuggestions}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        addTag(tagDraft);
-                      }
-                    }}
-                    onBlur={() => tagDraft.trim() && addTag(tagDraft)}
-                    list={`task-tags-${task.id}`}
-                    placeholder="Добавить тег…"
-                    aria-label="Добавить тег"
-                    className="h-7 w-36 text-xs"
+                    placeholder="Название нового чек-листа…"
+                    aria-label="Название нового чек-листа"
+                    onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()}
                   />
-                  <datalist id={`task-tags-${task.id}`}>
-                    {(tagSuggestions || [])
-                      .filter((tag) => !ownTags.includes(tag))
-                      .map((tag) => (
-                        <option key={tag} value={tag} />
-                      ))}
-                  </datalist>
+                  <Button
+                    size="sm"
+                    onClick={() => void handleAddChecklistItem(null)}
+                    disabled={activeChecklistId !== null || !newChecklistItem.trim()}
+                  >
+                    Создать
+                  </Button>
                 </div>
               </div>
+            </Card>
+          </div>
 
-              {/* Subtasks - Collapsible */}
-              <Card className="gap-0 py-0">
-                <Button
-                  onClick={() => setShowSubtasks(!showSubtasks)}
-                  variant="ghost"
-                  className="h-auto w-full justify-between rounded-none px-4 py-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckSquare size={16} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">
-                      Подзадачи ({taskSubtasks.length})
+          {/* Sidebar */}
+          <div className="min-w-0 space-y-4">
+            {/* Properties - Collapsible */}
+            <Card padding="none" className="overflow-hidden">
+              <Button
+                onClick={() => setShowDetails(!showDetails)}
+                variant="quiet"
+                size="sm"
+                className="h-auto w-full justify-start gap-2 px-4 py-3"
+                icon={<Layers size={14} strokeWidth={1.7} className="text-ink-faint" />}
+                trailing={
+                  showDetails ? (
+                    <ChevronUp size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  ) : (
+                    <ChevronDown size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  )
+                }
+              >
+                Детали
+              </Button>
+
+              {showDetails && (
+                <div className="space-y-4 p-4">
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Layers size={12} strokeWidth={1.7} /> Проект
+                    </p>
+                    <SelectField
+                      variant="boxed"
+                      aria-label="Проект"
+                      value={task.projectId || 'none'}
+                      onChange={(event) => {
+                        if (event.target.value !== 'none')
+                          void handleMoveProject(event.target.value);
+                      }}
+                      options={projectOptions}
+                    />
+                  </div>
+
+                  {/* Assignee */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <User size={12} strokeWidth={1.7} /> Исполнитель
+                    </p>
+                    {editingField === 'assigneeId' ? (
+                      <SelectField
+                        variant="boxed"
+                        aria-label="Исполнитель"
+                        value={task.assigneeId || 'unassigned'}
+                        onChange={(event) =>
+                          void handleUpdateField(
+                            'assigneeId',
+                            event.target.value === 'unassigned' ? '' : event.target.value,
+                          )
+                        }
+                        options={assigneeOptions}
+                      />
+                    ) : (
+                      <p
+                        className="-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium text-ink hover:bg-surface-2"
+                        onClick={() => setEditingField('assigneeId')}
+                      >
+                        {task.assigneeName || 'Не назначен'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Users size={12} strokeWidth={1.7} /> Соисполнители
+                    </p>
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {(task.accompliceIds || []).map((id) => (
+                        <Chip
+                          key={id}
+                          size="md"
+                          removable
+                          removeLabel="Удалить соисполнителя"
+                          onRemove={() =>
+                            void handleUpdateField(
+                              'accompliceIds',
+                              (task.accompliceIds || []).filter((item) => item !== id),
+                            )
+                          }
+                        >
+                          {users.find((user) => user.id === id)?.name || `#${id}`}
+                        </Chip>
+                      ))}
+                    </div>
+                    <Popover
+                      placement="bottom"
+                      className="w-full"
+                      trigger={
+                        <Button variant="secondary" size="sm" className="w-full justify-start">
+                          Выбрать соисполнителей…
+                        </Button>
+                      }
+                    >
+                      <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+                        {memberUsers.map((user) => (
+                          <Checkbox
+                            key={user.id}
+                            checked={(task.accompliceIds || []).includes(user.id)}
+                            onChange={(event) =>
+                              void handleUpdateField(
+                                'accompliceIds',
+                                event.target.checked
+                                  ? [...new Set([...(task.accompliceIds || []), user.id])]
+                                  : (task.accompliceIds || []).filter((id) => id !== user.id),
+                              )
+                            }
+                          >
+                            {userLabel(user)}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Eye size={12} strokeWidth={1.7} /> Наблюдатели
+                    </p>
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {(task.auditorIds || []).map((id) => (
+                        <Chip
+                          key={id}
+                          size="md"
+                          removable
+                          removeLabel="Удалить наблюдателя"
+                          onRemove={() =>
+                            void handleUpdateField(
+                              'auditorIds',
+                              (task.auditorIds || []).filter((item) => item !== id),
+                            )
+                          }
+                        >
+                          {users.find((user) => user.id === id)?.name || `#${id}`}
+                        </Chip>
+                      ))}
+                    </div>
+                    <Popover
+                      placement="bottom"
+                      className="w-full"
+                      trigger={
+                        <Button variant="secondary" size="sm" className="w-full justify-start">
+                          Выбрать наблюдателей…
+                        </Button>
+                      }
+                    >
+                      <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+                        {memberUsers.map((user) => (
+                          <Checkbox
+                            key={user.id}
+                            checked={(task.auditorIds || []).includes(user.id)}
+                            onChange={(event) =>
+                              void handleUpdateField(
+                                'auditorIds',
+                                event.target.checked
+                                  ? [...new Set([...(task.auditorIds || []), user.id])]
+                                  : (task.auditorIds || []).filter((id) => id !== user.id),
+                              )
+                            }
+                          >
+                            {userLabel(user)}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Popover>
+                  </div>
+
+                  {/* Priority */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Flag size={12} strokeWidth={1.7} /> Приоритет
+                    </p>
+                    {editingField === 'priority' ? (
+                      <SelectField
+                        variant="boxed"
+                        aria-label="Приоритет"
+                        value={task.priority}
+                        onChange={(event) => void handleUpdateField('priority', event.target.value)}
+                        options={priorityOptions}
+                      />
+                    ) : (
+                      <p
+                        className={`-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium hover:bg-surface-2 ${PRIORITY_LABELS[task.priority]?.color}`}
+                        onClick={() => setEditingField('priority')}
+                      >
+                        {PRIORITY_LABELS[task.priority]?.label}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Deadline */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Calendar size={12} strokeWidth={1.7} /> Дедлайн
+                    </p>
+                    {editingField === 'deadline' ? (
+                      <TextField
+                        variant="boxed"
+                        type="datetime-local"
+                        value={toLocalInputValue(task.dueDate, 'datetime')}
+                        onChange={(event) =>
+                          void handleUpdateField(
+                            'deadline',
+                            event.target.value ? new Date(event.target.value).toISOString() : '',
+                          )
+                        }
+                        onBlur={() => setEditingField(null)}
+                        aria-label="Дедлайн"
+                        autoFocus
+                      />
+                    ) : (
+                      <p
+                        className={`-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium hover:bg-surface-2 ${isOverdue ? 'text-danger-text' : 'text-ink'}`}
+                        onClick={() => setEditingField('deadline')}
+                      >
+                        {task.dueDate ? formatDate(task.dueDate) : 'Без дедлайна'}
+                        {isOverdue && (
+                          <AlertTriangle size={12} strokeWidth={1.7} className="ml-1 inline" />
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Parent task */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <Layers size={12} strokeWidth={1.7} /> Родительская задача
+                    </p>
+                    {task.parentId && (
+                      <div className="mb-2 flex items-center justify-between rounded-ui border border-line bg-surface-2 px-2 py-1 text-sm">
+                        <span className="truncate">
+                          {tasks.find((candidate) => candidate.id === task.parentId)?.title ||
+                            `#${task.parentId}`}
+                        </span>
+                        <IconButton
+                          label="Убрать родительскую задачу"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleUpdateField('parentId', '')}
+                        >
+                          <X size={14} strokeWidth={1.7} />
+                        </IconButton>
+                      </div>
+                    )}
+                    <div className="relative">
+                      <TextField
+                        variant="underline"
+                        value={parentQuery}
+                        onChange={(event) => setParentQuery(event.target.value)}
+                        placeholder="Найти задачу по названию или ID…"
+                        aria-label="Найти задачу по названию или ID"
+                      />
+                      {parentQuery && (
+                        <div className="absolute z-menu mt-1 max-h-48 w-full overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay">
+                          {parentSearchResults
+                            .filter(
+                              (candidate) =>
+                                candidate.id !== task.id &&
+                                !taskSubtasks.some((subtask) => subtask.id === candidate.id),
+                            )
+                            .slice(0, 10)
+                            .map((candidate) => (
+                              <Button
+                                key={candidate.id}
+                                variant="quiet"
+                                size="sm"
+                                className="h-auto w-full justify-start px-2 py-1.5 text-left"
+                                onClick={() => {
+                                  void handleUpdateField('parentId', candidate.id);
+                                  setParentQuery('');
+                                }}
+                              >
+                                #{candidate.id}, {candidate.title}
+                              </Button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Time Tracking */}
+            <Card padding="none" className="overflow-hidden">
+              <Button
+                onClick={() => setShowTimeEntry(!showTimeEntry)}
+                variant="quiet"
+                size="sm"
+                className="h-auto w-full justify-start gap-2 px-4 py-3"
+                icon={<Clock size={14} strokeWidth={1.7} className="text-ink-faint" />}
+                trailing={
+                  showTimeEntry ? (
+                    <ChevronUp size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  ) : (
+                    <ChevronDown size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  )
+                }
+              >
+                Время
+              </Button>
+
+              {showTimeEntry && (
+                <div className="space-y-3 p-4">
+                  <TextField
+                    variant="underline"
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    placeholder="Часы (ч)"
+                    aria-label="Часы (ч)"
+                    value={timeHours}
+                    onChange={(event) => setTimeHours(Number(event.target.value))}
+                  />
+                  <TextField
+                    variant="underline"
+                    type="text"
+                    placeholder="Что вы сделали?"
+                    aria-label="Что вы сделали?"
+                    value={timeDesc}
+                    onChange={(event) => setTimeDesc(event.target.value)}
+                  />
+                  <Button full onClick={() => void handleAddTime()}>
+                    Записать время
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2 p-4">
+                {task.timeEntries.slice(0, 3).map((entry) => (
+                  <div key={entry.id} className="rounded-ui bg-surface-2 p-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-info-text">{entry.hours} ч</span>
+                      <span className="text-whisper text-ink-faint">{entry.date}</span>
+                    </div>
+                    {entry.description && (
+                      <p className="mt-1 text-whisper text-ink-faint">{entry.description}</p>
+                    )}
+                  </div>
+                ))}
+
+                <div className="space-y-1 border-t border-line pt-2">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-ink-soft">План, ч:</span>
+                    {editingField === 'estimate' ? (
+                      <TextField
+                        variant="underline"
+                        size="sm"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        className="w-24 [&_input]:text-right"
+                        aria-label="План, ч"
+                        value={editValue}
+                        onChange={(event) => setEditValue(event.target.value)}
+                        onBlur={() =>
+                          void handleUpdateField('estimate', parseFloat(editValue) || 0)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter')
+                            void handleUpdateField('estimate', parseFloat(editValue) || 0);
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="font-medium text-ink hover:underline"
+                        onClick={() => {
+                          setEditValue(String(task.estimate));
+                          setEditingField('estimate');
+                        }}
+                      >
+                        {task.estimate} ч
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ink-soft">Факт, ч:</span>
+                    <span
+                      className={`font-medium ${
+                        task.actualTime > task.estimate ? 'text-danger-text' : 'text-success-text'
+                      }`}
+                    >
+                      {task.actualTime} ч
                     </span>
                   </div>
-                  {showSubtasks ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
 
-                {showSubtasks && (
-                  <div className="p-3 space-y-2">
-                    {taskSubtasks.map((sub) => (
-                      <div key={sub.id} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
-                        <GripVertical size={14} className="text-muted-foreground/70" />
-                        <Button
-                          onClick={() => moveTask(sub.id, sub.status === 'done' ? 'new' : 'done')}
-                          variant="ghost"
-                          size="icon-xs"
-                          className="text-muted-foreground hover:text-emerald-600"
-                        >
-                          {sub.status === 'done' ? (
-                            <CheckSquare size={16} className="text-green-500" />
-                          ) : (
-                            <Square size={16} />
-                          )}
-                        </Button>
-                        <span
-                          className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-                        >
-                          {sub.title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">#{sub.id}</span>
-                      </div>
-                    ))}
-
-                    {showSubtaskAdd ? (
-                      <div className="flex items-center gap-2 rounded-lg bg-muted p-2">
-                        <Square size={16} className="text-muted-foreground/70" />
-                        <Input
-                          type="text"
-                          value={newSubtaskTitle}
-                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                          placeholder="Название подзадачи…"
-                          className="h-8 flex-1 text-sm"
+        <Card padding="none" className="mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <ClipboardCheck size={14} strokeWidth={1.7} className="text-ink-faint" /> Результаты
+            </h3>
+            <Badge tone="neutral" className="tabular-nums">
+              {(task.results || []).length}
+            </Badge>
+          </div>
+          <div className="max-h-80 space-y-3 overflow-y-auto bg-surface-2/40 p-3 sm:p-4">
+            {(task.results || []).length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-soft">
+                Результатов пока нет в этой вкладке.
+                <br />
+                Полную историю смотрите в Битриксе — список из приложения не читается.
+              </p>
+            ) : (
+              (task.results || []).map((resultItem) => (
+                <article
+                  key={resultItem.id}
+                  className="flex gap-3 rounded-ui border border-line bg-canvas p-3 shadow-rest"
+                >
+                  <Avatar name={resultItem.authorName} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="text-sm font-bold text-ink">{resultItem.authorName}</span>
+                      {resultItem.createdAt && (
+                        <time className="text-whisper text-ink-faint">
+                          {formatDate(resultItem.createdAt)}
+                        </time>
+                      )}
+                    </div>
+                    {editingResultId === resultItem.id ? (
+                      <div className="space-y-2">
+                        <TextArea
+                          variant="boxed"
                           autoFocus
-                          onKeyDown={(e) => e.key === 'Enter' && void handleAddSubtask()}
+                          value={editingResultText}
+                          onChange={(event) => setEditingResultText(event.target.value)}
+                          rows={3}
                         />
-                        <Button
-                          onClick={() => void handleAddSubtask()}
-                          variant="ghost"
-                          size="icon-xs"
-                        >
-                          <Plus size={16} />
-                        </Button>
-                        <Button
-                          onClick={() => setShowSubtaskAdd(false)}
-                          variant="ghost"
-                          size="icon-xs"
-                        >
-                          <X size={16} />
-                        </Button>
-                      </div>
-                    ) : showExistingSubtaskPicker ? (
-                      <div className="relative rounded-lg bg-muted p-2">
-                        <Input
-                          value={existingSubtaskQuery}
-                          onChange={(event) => setExistingSubtaskQuery(event.target.value)}
-                          placeholder="Найти существующую задачу…"
-                          className="h-8"
-                          autoFocus
-                        />
-                        {existingSubtaskQuery && (
-                          <div className="mt-2 max-h-40 overflow-y-auto rounded border bg-background p-1">
-                            {existingSubtaskResults
-                              .filter(
-                                (candidate) =>
-                                  candidate.id !== task.id &&
-                                  candidate.id !== task.parentId &&
-                                  candidate.parentId !== task.id,
-                              )
-                              .slice(0, 10)
-                              .map((candidate) => (
-                                <Button
-                                  key={candidate.id}
-                                  variant="ghost"
-                                  className="h-auto w-full justify-start px-2 py-1.5 text-left"
-                                  onClick={() => void handleAttachExistingSubtask(candidate.id)}
-                                >
-                                  <span className="truncate">
-                                    #{candidate.id}, {candidate.title}
-                                  </span>
-                                </Button>
-                              ))}
-                          </div>
-                        )}
-                        <Button
-                          onClick={() => {
-                            setExistingSubtaskQuery('');
-                            setShowExistingSubtaskPicker(false);
-                          }}
-                          variant="ghost"
-                          className="mt-1 h-7 w-full text-xs"
-                        >
-                          Отмена
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => void handleUpdateResult(resultItem.id)}>
+                            Сохранить
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="quiet"
+                            onClick={() => setEditingResultId(null)}
+                          >
+                            Отмена
+                          </Button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          onClick={() => setShowExistingSubtaskPicker(true)}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          <Plus size={14} />
-                          Выбрать существующую
-                        </Button>
-                        <Button
-                          onClick={() => setShowSubtaskAdd(true)}
-                          variant="ghost"
-                          className="flex-1 text-muted-foreground"
-                        >
-                          <Plus size={14} />
-                          Создать новую
-                        </Button>
+                      <div className="break-words text-sm leading-relaxed text-ink">
+                        <BitrixText text={resultItem.text} />
                       </div>
                     )}
                   </div>
-                )}
-              </Card>
-
-              <Card className="gap-0 py-0">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <CheckSquare size={16} /> Чек-лист (
-                    {task.checklist?.filter((item) => item.completed).length || 0}/
-                    {task.checklist?.length || 0})
-                  </div>
-                </div>
-                <div className="space-y-3 px-4 pb-3">
-                  {task.checklist
-                    ?.filter((item) => item.parentId === '0')
-                    .map((list) => (
-                      <div key={list.id} className="rounded-lg border bg-muted/30 p-2">
-                        <div className="px-1 text-sm font-medium">{list.title}</div>
-                        {task.checklist
-                          ?.filter((item) => item.parentId === list.id)
-                          .map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted"
-                            >
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                aria-label={
-                                  item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'
-                                }
-                                onClick={() =>
-                                  void setChecklistItemCompleted(task.id, item.id, !item.completed)
-                                }
-                              >
-                                {item.completed ? (
-                                  <CheckSquare className="text-primary" />
-                                ) : (
-                                  <Square />
-                                )}
-                              </Button>
-                              <span
-                                className={`min-w-0 flex-1 text-sm ${item.completed ? 'text-muted-foreground line-through' : ''}`}
-                              >
-                                {item.title}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                aria-label="Удалить пункт"
-                                onClick={() => void deleteChecklistItem(task.id, item.id)}
-                              >
-                                <Trash2 />
-                              </Button>
-                            </div>
-                          ))}
-                        <div className="mt-2 flex gap-2">
-                          <Input
-                            value={activeChecklistId === list.id ? newChecklistItem : ''}
-                            onFocus={() => setActiveChecklistId(list.id)}
-                            onChange={(event) => {
-                              setActiveChecklistId(list.id);
-                              setNewChecklistItem(event.target.value);
-                            }}
-                            placeholder="Добавить пункт…"
-                            onKeyDown={(event) =>
-                              event.key === 'Enter' && void handleAddChecklistItem()
-                            }
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => void handleAddChecklistItem(list.id)}
-                            disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}
-                          >
-                            Добавить
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  <div className="flex gap-2 border-t pt-3">
-                    <Input
-                      value={activeChecklistId === null ? newChecklistItem : ''}
-                      onFocus={() => setActiveChecklistId(null)}
-                      onChange={(event) => {
-                        setActiveChecklistId(null);
-                        setNewChecklistItem(event.target.value);
-                      }}
-                      placeholder="Название нового чек-листа…"
-                      onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => void handleAddChecklistItem(null)}
-                      disabled={activeChecklistId !== null || !newChecklistItem.trim()}
-                    >
-                      Создать
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Sidebar */}
-            <div className="min-w-0 space-y-4">
-              {/* Properties - Collapsible */}
-              <Card className="gap-0 py-0">
-                <Button
-                  onClick={() => setShowDetails(!showDetails)}
-                  variant="ghost"
-                  className="h-auto w-full justify-between rounded-none px-4 py-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <Layers size={16} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Детали</span>
-                  </div>
-                  {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </Button>
-
-                {showDetails && (
-                  <div className="p-4 space-y-4">
-                    <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Layers size={12} /> Проект
-                      </label>
-                      <Select
-                        value={task.projectId || 'none'}
-                        onValueChange={(value) => value !== 'none' && void handleMoveProject(value)}
+                  {resultItem.authorId === currentUser.id && editingResultId !== resultItem.id && (
+                    <div className="flex shrink-0 gap-1">
+                      <IconButton
+                        label="Изменить результат"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingResultId(resultItem.id);
+                          setEditingResultText(resultItem.text);
+                        }}
                       >
-                        <SelectTrigger className="w-full" aria-label="Проект">
-                          <SelectValue placeholder="Без проекта" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Без проекта</SelectItem>
-                          {projects
-                            // Архивный проект в список переноса не предлагаем, но текущий
-                            // оставляем: иначе у задачи архивного проекта поле пустое.
-                            .filter(
-                              (project) => !project.isArchived || project.id === task.projectId,
-                            )
-                            .map((project) => (
-                              <SelectItem key={project.id} value={project.id}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Assignee */}
-                    <div>
-                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                        <User size={12} /> Исполнитель
-                      </label>
-                      {editingField === 'assigneeId' ? (
-                        <Select
-                          value={task.assigneeId || 'unassigned'}
-                          onValueChange={(value) =>
-                            handleUpdateField('assigneeId', value === 'unassigned' ? '' : value)
-                          }
-                        >
-                          <SelectTrigger className="w-full" aria-label="Исполнитель">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Не назначен</SelectItem>
-                            {users.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {userLabel(u)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <p
-                          className="font-medium text-foreground cursor-pointer hover:bg-muted rounded px-1 -mx-1"
-                          onClick={() => setEditingField('assigneeId')}
-                        >
-                          {task.assigneeName || 'Не назначен'}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users size={12} /> Соисполнители
-                      </label>
-                      <div className="mb-1 flex flex-wrap gap-1">
-                        {(task.accompliceIds || []).map((id) => (
-                          <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                            {users.find((user) => user.id === id)?.name || `#${id}`}
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              className="size-4"
-                              aria-label="Удалить соисполнителя"
-                              onClick={() =>
-                                void handleUpdateField(
-                                  'accompliceIds',
-                                  (task.accompliceIds || []).filter((item) => item !== id),
-                                )
-                              }
-                            >
-                              <X size={11} />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="h-8 w-full justify-start font-normal"
-                          >
-                            Выбрать соисполнителей…
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="start"
-                          className="max-h-64 w-64 overflow-y-auto"
-                        >
-                          {users
-                            .filter((user) => projectMemberIds.includes(user.id))
-                            .map((user) => (
-                              <DropdownMenuCheckboxItem
-                                key={user.id}
-                                checked={(task.accompliceIds || []).includes(user.id)}
-                                onSelect={(event) => event.preventDefault()}
-                                onCheckedChange={(checked) =>
-                                  void handleUpdateField(
-                                    'accompliceIds',
-                                    checked
-                                      ? [...new Set([...(task.accompliceIds || []), user.id])]
-                                      : (task.accompliceIds || []).filter((id) => id !== user.id),
-                                  )
-                                }
-                              >
-                                {userLabel(user)}
-                              </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Eye size={12} /> Наблюдатели
-                      </label>
-                      <div className="mb-1 flex flex-wrap gap-1">
-                        {(task.auditorIds || []).map((id) => (
-                          <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                            {users.find((user) => user.id === id)?.name || `#${id}`}
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              className="size-4"
-                              aria-label="Удалить наблюдателя"
-                              onClick={() =>
-                                void handleUpdateField(
-                                  'auditorIds',
-                                  (task.auditorIds || []).filter((item) => item !== id),
-                                )
-                              }
-                            >
-                              <X size={11} />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="h-8 w-full justify-start font-normal"
-                          >
-                            Выбрать наблюдателей…
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="start"
-                          className="max-h-64 w-64 overflow-y-auto"
-                        >
-                          {users
-                            .filter((user) => projectMemberIds.includes(user.id))
-                            .map((user) => (
-                              <DropdownMenuCheckboxItem
-                                key={user.id}
-                                checked={(task.auditorIds || []).includes(user.id)}
-                                onSelect={(event) => event.preventDefault()}
-                                onCheckedChange={(checked) =>
-                                  void handleUpdateField(
-                                    'auditorIds',
-                                    checked
-                                      ? [...new Set([...(task.auditorIds || []), user.id])]
-                                      : (task.auditorIds || []).filter((id) => id !== user.id),
-                                  )
-                                }
-                              >
-                                {userLabel(user)}
-                              </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    {/* Priority */}
-                    <div>
-                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                        <Flag size={12} /> Приоритет
-                      </label>
-                      {editingField === 'priority' ? (
-                        <Select
-                          value={task.priority}
-                          onValueChange={(value) => handleUpdateField('priority', value)}
-                        >
-                          <SelectTrigger className="w-full" aria-label="Приоритет">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {priorityOptions.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>
-                                {p.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <p
-                          className={`font-medium cursor-pointer hover:bg-muted rounded px-1 -mx-1 ${PRIORITY_LABELS[task.priority]?.color}`}
-                          onClick={() => setEditingField('priority')}
-                        >
-                          {PRIORITY_LABELS[task.priority]?.label}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Deadline */}
-                    <div>
-                      <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                        <Calendar size={12} /> Дедлайн
-                      </label>
-                      {editingField === 'deadline' ? (
-                        <Input
-                          type="datetime-local"
-                          className="w-full"
-                          value={toLocalInputValue(task.dueDate, 'datetime')}
-                          onChange={(e) =>
-                            handleUpdateField(
-                              'deadline',
-                              e.target.value ? new Date(e.target.value).toISOString() : '',
-                            )
-                          }
-                          onBlur={() => setEditingField(null)}
-                          autoFocus
-                        />
-                      ) : (
-                        <p
-                          className={`font-medium cursor-pointer hover:bg-muted rounded px-1 -mx-1 ${isOverdue ? 'text-red-500' : 'text-foreground'}`}
-                          onClick={() => setEditingField('deadline')}
-                        >
-                          {task.dueDate ? formatDate(task.dueDate) : 'Без дедлайна'}
-                          {isOverdue && <AlertTriangle size={12} className="inline ml-1" />}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Parent task */}
-                    <div>
-                      <label className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Layers size={12} /> Родительская задача
-                      </label>
-                      {task.parentId && (
-                        <div className="mb-1 flex items-center justify-between rounded border bg-muted px-2 py-1 text-sm">
-                          <span className="truncate">
-                            {tasks.find((candidate) => candidate.id === task.parentId)?.title ||
-                              `#${task.parentId}`}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label="Убрать родительскую задачу"
-                            onClick={() => void handleUpdateField('parentId', '')}
-                          >
-                            <X />
-                          </Button>
-                        </div>
-                      )}
-                      <div className="relative">
-                        <Input
-                          value={parentQuery}
-                          onChange={(event) => setParentQuery(event.target.value)}
-                          placeholder="Найти задачу по названию или ID…"
-                        />
-                        {parentQuery && (
-                          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
-                            {parentSearchResults
-                              .filter(
-                                (candidate) =>
-                                  candidate.id !== task.id &&
-                                  !taskSubtasks.some((subtask) => subtask.id === candidate.id),
-                              )
-                              .slice(0, 10)
-                              .map((candidate) => (
-                                <Button
-                                  key={candidate.id}
-                                  variant="ghost"
-                                  className="h-auto w-full justify-start px-2 py-1.5 text-left"
-                                  onClick={() => {
-                                    void handleUpdateField('parentId', candidate.id);
-                                    setParentQuery('');
-                                  }}
-                                >
-                                  <span className="truncate">
-                                    #{candidate.id}, {candidate.title}
-                                  </span>
-                                </Button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </Card>
-
-              {/* Time Tracking */}
-              <Card className="gap-0 py-0">
-                <Button
-                  onClick={() => setShowTimeEntry(!showTimeEntry)}
-                  variant="ghost"
-                  className="h-auto w-full justify-between rounded-none px-4 py-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <Clock size={16} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Время</span>
-                  </div>
-                  {showTimeEntry ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </Button>
-
-                {showTimeEntry && (
-                  <div className="p-4 space-y-3">
-                    <Input
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      placeholder="Часы (ч)"
-                      value={timeHours}
-                      onChange={(e) => setTimeHours(Number(e.target.value))}
-                      className="w-full"
-                    />
-                    <Input
-                      type="text"
-                      placeholder="Что вы сделали?"
-                      value={timeDesc}
-                      onChange={(e) => setTimeDesc(e.target.value)}
-                      className="w-full"
-                    />
-                    <Button onClick={handleAddTime} className="w-full">
-                      Записать время
-                    </Button>
-                  </div>
-                )}
-
-                <div className="px-4 pb-4 space-y-2">
-                  {task.timeEntries.slice(0, 3).map((entry) => (
-                    <div key={entry.id} className="text-sm bg-muted rounded-lg p-2">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-blue-600 dark:text-blue-400">
-                          {entry.hours} ч
-                        </span>
-                        <span className="text-muted-foreground text-xs">{entry.date}</span>
-                      </div>
-                      {entry.description && (
-                        <p className="text-muted-foreground text-xs mt-1">{entry.description}</p>
-                      )}
-                    </div>
-                  ))}
-
-                  <div className="pt-2 border-t space-y-1">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">План, ч:</span>
-                      {editingField === 'estimate' ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          className="h-7 w-24 text-right"
-                          value={editValue}
-                          onChange={(event) => setEditValue(event.target.value)}
-                          onBlur={() =>
-                            void handleUpdateField('estimate', parseFloat(editValue) || 0)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter')
-                              void handleUpdateField('estimate', parseFloat(editValue) || 0);
-                          }}
-                          autoFocus
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className="font-medium hover:underline"
-                          onClick={() => {
-                            setEditValue(String(task.estimate));
-                            setEditingField('estimate');
-                          }}
-                        >
-                          {task.estimate} ч
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Факт, ч:</span>
-                      <span
-                        className={`font-medium ${task.actualTime > task.estimate ? 'text-red-500' : 'text-green-600'}`}
+                        <Pencil size={14} strokeWidth={1.7} />
+                      </IconButton>
+                      <IconButton
+                        label="Удалить результат"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleDeleteResult(resultItem.id)}
                       >
-                        {task.actualTime} ч
-                      </span>
+                        <Trash2 size={14} strokeWidth={1.7} />
+                      </IconButton>
                     </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
+                  )}
+                </article>
+              ))
+            )}
           </div>
-
-          <Card className="mt-6 gap-0 overflow-hidden py-0">
-            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
-              <h3 className="flex items-center gap-2 text-sm font-semibold">
-                <ClipboardCheck size={16} className="text-primary" /> Результаты
-              </h3>
-              <Badge variant="secondary" className="font-normal tabular-nums">
-                {(task.results || []).length}
-              </Badge>
+          <div className="border-t border-line p-3 sm:p-4">
+            <div className="flex items-end gap-2">
+              <TextArea
+                variant="boxed"
+                value={taskResultText}
+                onChange={(event) => setTaskResultText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void handleAddResult();
+                  }
+                }}
+                placeholder="Что сделано… Shift+Enter — сохранить"
+                aria-label="Новый результат"
+                rows={3}
+                className="min-h-24 flex-1"
+              />
+              <Button
+                onClick={() => void handleAddResult()}
+                disabled={!taskResultText.trim() || isSendingResult}
+                className="h-9 shrink-0 gap-2"
+                icon={<ClipboardCheck size={16} strokeWidth={1.7} />}
+                aria-label="Сохранить результат"
+              >
+                <span className="hidden sm:inline">Сохранить</span>
+              </Button>
             </div>
-            <div className="max-h-80 space-y-3 overflow-y-auto bg-muted/20 p-3 sm:p-4">
-              {(task.results || []).length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Результатов пока нет в этой вкладке.
-                  <br />
-                  Полную историю смотрите в Битриксе — список из приложения не читается.
-                </p>
-              ) : (
-                (task.results || []).map((resultItem) => (
-                  <article
-                    key={resultItem.id}
-                    className="flex gap-3 rounded-xl border bg-background p-3 shadow-sm"
+            {resultError && <p className="mt-2 text-sm text-danger-text">{resultError}</p>}
+          </div>
+        </Card>
+
+        <Card padding="none" className="mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <MessageSquare size={14} strokeWidth={1.7} className="text-ink-faint" /> Комментарии
+            </h3>
+            <Badge tone="neutral" className="tabular-nums">
+              {task.comments.length}
+            </Badge>
+          </div>
+          <div
+            ref={commentsRef}
+            className="max-h-80 space-y-3 overflow-y-auto bg-surface-2/40 p-3 sm:p-4"
+          >
+            {isLoadingTask && task.comments.length === 0 ? (
+              <LoadingState className="min-h-24 bg-transparent" />
+            ) : task.comments.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-soft">Комментариев пока нет</p>
+            ) : (
+              task.comments.map((commentItem) =>
+                commentItem.isSystem ? (
+                  <div
+                    key={commentItem.id}
+                    className="rounded-ui border border-dashed border-line bg-canvas px-3 py-2 text-sm text-ink-soft"
                   >
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                      {(resultItem.authorName || '?').charAt(0).toUpperCase()}
+                    <div className="mb-1 flex items-center gap-1.5 text-whisper font-bold text-ink-faint">
+                      <Settings2 size={13} strokeWidth={1.7} /> Система
+                      <span className="font-normal">от {formatDate(commentItem.createdDate)}</span>
                     </div>
+                    <div className="leading-relaxed text-ink-soft">
+                      <BitrixText text={commentItem.text} />
+                      <FileAttachments files={commentItem.files} />
+                    </div>
+                  </div>
+                ) : (
+                  <article
+                    key={commentItem.id}
+                    className="flex gap-3 rounded-ui border border-line bg-canvas p-3 shadow-rest"
+                  >
+                    <Avatar name={commentItem.authorName} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-sm font-semibold">{resultItem.authorName}</span>
-                        {resultItem.createdAt && (
-                          <time className="text-xs text-muted-foreground">
-                            {formatDate(resultItem.createdAt)}
-                          </time>
-                        )}
+                        <span className="text-sm font-bold text-ink">{commentItem.authorName}</span>
+                        <time className="text-whisper text-ink-faint">
+                          {formatDate(commentItem.createdDate)}
+                        </time>
                       </div>
-                      {editingResultId === resultItem.id ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            autoFocus
-                            value={editingResultText}
-                            onChange={(event) => setEditingResultText(event.target.value)}
-                            rows={3}
-                            className="resize-y bg-muted/30 text-sm"
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => void handleUpdateResult(resultItem.id)}
-                            >
-                              Сохранить
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingResultId(null)}
-                            >
-                              Отмена
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="break-words text-sm leading-relaxed text-foreground/85">
-                          <BitrixText text={resultItem.text} />
-                        </div>
-                      )}
-                    </div>
-                    {resultItem.authorId === currentUser.id &&
-                      editingResultId !== resultItem.id && (
-                        <div className="flex shrink-0 gap-1">
-                          <button
-                            type="button"
-                            aria-label="Изменить результат"
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={() => {
-                              setEditingResultId(resultItem.id);
-                              setEditingResultText(resultItem.text);
-                            }}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Удалить результат"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => void handleDeleteResult(resultItem.id)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
-                  </article>
-                ))
-              )}
-            </div>
-            <div className="border-t bg-background p-3 sm:p-4">
-              <div className="flex items-end gap-2">
-                <Textarea
-                  value={taskResultText}
-                  onChange={(event) => setTaskResultText(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
-                      event.preventDefault();
-                      void handleAddResult();
-                    }
-                  }}
-                  placeholder="Что сделано… Shift+Enter — сохранить"
-                  rows={3}
-                  className="min-h-24 flex-1 resize-y bg-muted/30"
-                />
-                <Button
-                  onClick={() => void handleAddResult()}
-                  disabled={!taskResultText.trim() || isSendingResult}
-                  className="h-10 shrink-0 gap-2"
-                  aria-label="Сохранить результат"
-                >
-                  <ClipboardCheck size={16} />
-                  <span className="hidden sm:inline">Сохранить</span>
-                </Button>
-              </div>
-              {resultError && <p className="mt-2 text-sm text-destructive">{resultError}</p>}
-            </div>
-          </Card>
-
-          <Card className="mt-6 gap-0 overflow-hidden py-0">
-            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
-              <h3 className="flex items-center gap-2 text-sm font-semibold">
-                <MessageSquare size={16} className="text-primary" /> Комментарии
-              </h3>
-              <Badge variant="secondary" className="font-normal tabular-nums">
-                {task.comments.length}
-              </Badge>
-            </div>
-            <div
-              ref={commentsRef}
-              className="max-h-80 space-y-3 overflow-y-auto bg-muted/20 p-3 sm:p-4"
-            >
-              {isLoadingTask && task.comments.length === 0 ? (
-                <LoadingState className="min-h-24 bg-transparent" />
-              ) : task.comments.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Комментариев пока нет
-                </p>
-              ) : (
-                task.comments.map((commentItem) =>
-                  commentItem.isSystem ? (
-                    <div
-                      key={commentItem.id}
-                      className="rounded-lg border border-dashed bg-background/70 px-3 py-2 text-sm text-muted-foreground"
-                    >
-                      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium">
-                        <Settings2 size={13} /> Система
-                        <span className="font-normal">
-                          от {formatDate(commentItem.createdDate)}
-                        </span>
-                      </div>
-                      <div className="leading-relaxed text-foreground/75">
+                      <div className="break-words text-sm leading-relaxed text-ink">
                         <BitrixText text={commentItem.text} />
                         <FileAttachments files={commentItem.files} />
                       </div>
                     </div>
-                  ) : (
-                    <article
-                      key={commentItem.id}
-                      className="flex gap-3 rounded-xl border bg-background p-3 shadow-sm"
-                    >
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {commentItem.authorName.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="text-sm font-semibold">{commentItem.authorName}</span>
-                          <time className="text-xs text-muted-foreground">
-                            {formatDate(commentItem.createdDate)}
-                          </time>
-                        </div>
-                        <div className="break-words text-sm leading-relaxed text-foreground/85">
-                          <BitrixText text={commentItem.text} />
-                          <FileAttachments files={commentItem.files} />
-                        </div>
-                      </div>
-                    </article>
-                  ),
-                )
-              )}
-            </div>
-            <div className="border-t bg-background p-3 sm:p-4">
-              <div className="flex items-end gap-2">
-                <div className="relative flex-1">
-                  <Textarea
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === 'Enter' &&
-                        event.shiftKey &&
-                        !event.nativeEvent.isComposing
-                      ) {
-                        event.preventDefault();
-                        void handleAddComment();
-                      }
-                    }}
-                    placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
-                    rows={3}
-                    className="min-h-24 resize-y bg-muted/30"
-                  />
-                  {mentionUsers.length > 0 && (
-                    <div className="absolute bottom-full left-0 z-20 mb-1 w-full rounded-lg border bg-popover p-1 shadow-md">
-                      {mentionUsers.map((user) => (
-                        <Button
-                          key={user.id}
-                          variant="ghost"
-                          className="h-auto w-full justify-start px-2 py-1.5"
-                          onClick={() =>
-                            setComment((text) =>
-                              text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `),
-                            )
-                          }
-                        >
-                          {user.name}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  onClick={() => void handleAddComment()}
-                  disabled={!comment.trim() || isSendingComment}
-                  className="h-10 shrink-0 gap-2"
-                  // На узком экране остаётся одна иконка — подпись нужна вслух.
-                  aria-label="Отправить комментарий"
-                >
-                  <Send size={16} />
-                  <span className="hidden sm:inline">Отправить</span>
-                </Button>
+                  </article>
+                ),
+              )
+            )}
+          </div>
+          <div className="border-t border-line p-3 sm:p-4">
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <TextArea
+                  variant="boxed"
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      void handleAddComment();
+                    }
+                  }}
+                  placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
+                  aria-label="Комментарий"
+                  rows={3}
+                  className="min-h-24"
+                />
+                {mentionUsers.length > 0 && (
+                  <div className="absolute bottom-full left-0 z-menu mb-1 w-full rounded-ui border border-line bg-canvas p-1 shadow-overlay">
+                    {mentionUsers.map((user) => (
+                      <Button
+                        key={user.id}
+                        variant="quiet"
+                        size="sm"
+                        className="h-auto w-full justify-start px-2 py-1.5"
+                        onClick={() =>
+                          setComment((text) =>
+                            text.replace(/@[^\s]*$/, `[USER=${user.id}]${user.name}[/USER] `),
+                          )
+                        }
+                      >
+                        {user.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
-              {commentError && <p className="mt-2 text-sm text-destructive">{commentError}</p>}
+              <Button
+                onClick={() => void handleAddComment()}
+                disabled={!comment.trim() || isSendingComment}
+                className="h-9 shrink-0 gap-2"
+                icon={<Send size={16} strokeWidth={1.7} />}
+                // На узком экране остаётся одна иконка — подпись нужна вслух.
+                aria-label="Отправить комментарий"
+              >
+                <span className="hidden sm:inline">Отправить</span>
+              </Button>
             </div>
-          </Card>
-        </div>
-        <Dialog
+            {commentError && <p className="mt-2 text-sm text-danger-text">{commentError}</p>}
+          </div>
+        </Card>
+
+        <Modal
           open={Boolean(focusConflict)}
-          onOpenChange={(open) => !open && setFocusConflict(null)}
-        >
-          <DialogContent className="max-w-md">
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Уже есть задача в работе</h2>
-              <p className="text-sm text-muted-foreground">
-                {focusConflict ? `«${focusConflict.title}»` : ''}
-              </p>
-              {focusConflict && (
-                <p className="text-sm text-muted-foreground">
-                  Проект:{' '}
-                  {projects.find((project) => project.id === focusConflict.projectId)?.name ||
-                    'Без проекта'}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="outline" onClick={openFocusConflict}>
+          onClose={() => setFocusConflict(null)}
+          title="Уже есть задача в работе"
+          description={focusConflict ? `«${focusConflict.title}»` : ''}
+          size="md"
+          footer={
+            <>
+              <Button variant="secondary" onClick={openFocusConflict}>
                 Открыть задачу
               </Button>
               <Button onClick={() => void confirmFocusChange()}>Приостановить и начать</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </DialogContent>
-    </Dialog>
+            </>
+          }
+        >
+          {focusConflict && (
+            <p className="text-sm text-ink-soft">
+              Проект:{' '}
+              {projects.find((project) => project.id === focusConflict.projectId)?.name ||
+                'Без проекта'}
+            </p>
+          )}
+        </Modal>
+      </Modal>
+    </>
   );
 }

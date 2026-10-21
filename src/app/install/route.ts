@@ -61,16 +61,29 @@ function getInstallHtml(domain: string) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bitrix24 Kanban - Установка</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 20px; }
-    .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 480px; width: 100%; text-align: center; }
-    .icon { width: 64px; height: 64px; margin: 0 auto 20px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-    .icon svg { width: 32px; height: 32px; fill: white; }
-    h1 { margin: 0 0 8px; font-size: 24px; color: #111; }
-    .domain { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
-    p { color: #4b5563; line-height: 1.6; margin-bottom: 24px; }
-    .features { text-align: left; background: #f9fafb; padding: 16px; border-radius: 12px; }
-    .features li { padding: 6px 0; color: #4b5563; font-size: 14px; list-style: none; }
-    .features li::before { content: "✓ "; color: #10b981; font-weight: bold; margin-right: 6px; }
+    /* Палитра и радиусы — из набора @monos/ui (грувбокс, светлая): бумага,
+       одна чернильная гарнитура, один радиус. */
+    :root {
+      --bg: #fbf1c7;
+      --surface: #ebdbb2;
+      --surface-2: #d5c4a1;
+      --ink: #3c3836;
+      --ink-soft: #5b5149;
+      --line: #d5c4a1;
+      --accent: #2f595b;
+      --success: #55550e;
+      --radius: 6px;
+    }
+    body { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); color: var(--ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 40px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); max-width: 480px; width: 100%; text-align: center; }
+    .icon { width: 64px; height: 64px; margin: 0 auto 20px; background: var(--surface-2); color: var(--ink); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; }
+    .icon svg { width: 32px; height: 32px; fill: currentColor; }
+    h1 { margin: 0 0 8px; font-size: 24px; color: var(--ink); }
+    .domain { color: var(--ink-soft); font-size: 14px; margin-bottom: 24px; }
+    p { color: var(--ink-soft); line-height: 1.6; margin-bottom: 24px; }
+    .features { text-align: left; background: var(--surface-2); padding: 16px; border-radius: var(--radius); }
+    .features li { padding: 6px 0; color: var(--ink-soft); font-size: 14px; list-style: none; }
+    .features li::before { content: "✓ "; color: var(--success); font-weight: bold; margin-right: 6px; }
   </style>
 </head>
 <body>

@@ -16,7 +16,7 @@ function render(nodes: BitrixNode[]): ReactNode[] {
           href={safeHref(node.href)}
           target="_blank"
           rel="noreferrer"
-          className="text-primary underline underline-offset-2"
+          className="text-ink underline underline-offset-2 hover:opacity-70"
         >
           {children}
         </a>
@@ -27,28 +27,25 @@ function render(nodes: BitrixNode[]): ReactNode[] {
           key={index}
           src={safeImageSrc(node.src)}
           alt=""
-          className="my-1 inline-block max-h-80 max-w-full rounded"
+          className="my-1 inline-block max-h-80 max-w-full rounded-ui"
         />
       );
     if (node.type === 'code')
       return (
-        <code key={index} className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+        <code key={index} className="rounded-ui bg-surface-2 px-1 py-0.5 font-ui text-xs">
           {node.text}
         </code>
       );
     if (node.type === 'quote')
       return (
-        <blockquote
-          key={index}
-          className="my-2 border-l-2 border-muted-foreground/40 pl-3 text-muted-foreground"
-        >
+        <blockquote key={index} className="my-2 border-l-2 border-line pl-3 text-ink-soft">
           {children}
         </blockquote>
       );
     if (node.type === 'list') {
       const List = node.ordered ? 'ol' : 'ul';
       return (
-        <List key={index} className="my-2 list-inside list-disc pl-2 marker:text-muted-foreground">
+        <List key={index} className="my-2 list-inside list-disc pl-2 marker:text-ink-faint">
           {node.items.map((item, itemIndex) => (
             <li key={itemIndex}>{render(item)}</li>
           ))}

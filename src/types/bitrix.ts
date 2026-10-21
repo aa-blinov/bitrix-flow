@@ -100,29 +100,32 @@ export interface BxStage {
   systemType: string;
 }
 
+// Приоритет — состояние, а не украшение: в наборе @monos/ui цвет означает
+// сигнал, поэтому высокий и критический тянут на тёплые роли, а обычный
+// остаётся тихим.
 export const PRIORITY_LABELS: Record<
   TaskPriority,
   { label: string; color: string; bgColor: string }
 > = {
   low: {
     label: 'Низкий',
-    color: 'text-muted-foreground',
-    bgColor: 'bg-muted',
+    color: 'text-ink-faint',
+    bgColor: 'bg-surface-2',
   },
   medium: {
     label: 'Обычный',
-    color: 'text-blue-800 dark:text-blue-300',
-    bgColor: 'bg-blue-500/15',
+    color: 'text-ink-soft',
+    bgColor: 'bg-surface-2',
   },
   high: {
     label: 'Высокий',
-    color: 'text-orange-800 dark:text-orange-300',
-    bgColor: 'bg-orange-500/15',
+    color: 'text-warning-text',
+    bgColor: 'bg-warning/10',
   },
   critical: {
     label: 'Критический',
-    color: 'text-red-800 dark:text-red-300',
-    bgColor: 'bg-red-500/15',
+    color: 'text-danger-text',
+    bgColor: 'bg-danger/10',
   },
 };
 

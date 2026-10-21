@@ -3,20 +3,14 @@
 import Link from 'next/link';
 import { CheckCircle2, MessageSquareText, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/monos/Card';
+import { Button } from '@/components/monos/Button';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
 import PageHeader from '@/components/PageHeader';
-import { toolbarSelect } from '@/components/ui/toolbar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useConfirm } from '@/components/ui/confirm-dialog';
+import { toolbarSelect } from '@/components/monos/toolbar';
+import { SelectField } from '@/components/monos/SelectField';
+import { useConfirm } from '@/components/monos/confirm-dialog';
 import { useKanbanStore } from '@/store/kanban';
 
 type Notice = {
@@ -31,10 +25,13 @@ type Notice = {
 };
 
 function noticeIcon(type: string) {
-  if (type === 'comment_added') return <MessageSquareText className="size-4 text-sky-600" />;
-  if (type === 'task_added') return <CheckCircle2 className="size-4 text-emerald-600" />;
-  if (type === 'task_deleted') return <Trash2 className="size-4 text-destructive" />;
-  return <Pencil className="size-4 text-amber-600" />;
+  if (type === 'comment_added')
+    return <MessageSquareText className="size-4 text-info-text" strokeWidth={1.7} />;
+  if (type === 'task_added')
+    return <CheckCircle2 className="size-4 text-success-text" strokeWidth={1.7} />;
+  if (type === 'task_deleted')
+    return <Trash2 className="size-4 text-danger-text" strokeWidth={1.7} />;
+  return <Pencil className="size-4 text-warning-text" strokeWidth={1.7} />;
 }
 
 function noticeLabel(type: string) {
@@ -149,13 +146,13 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-canvas">
       <PageHeader
         title="Уведомления"
         description="Последние изменения в задачах Битрикс24"
         actions={
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => void clearHistory()}
             disabled={!items.length || clearing}
@@ -167,42 +164,32 @@ export default function NotificationsPage() {
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
         {/* Лента за все проекты длинная: фильтр по проекту и типу события. */}
         <div className="mb-3 flex flex-wrap gap-2">
-          <Select
+          <SelectField
+            size="sm"
+            variant="boxed"
+            className={`${toolbarSelect} w-56`}
+            aria-label="Проект"
             value={projectFilter}
-            onValueChange={(value) => changeFilter(() => setProjectFilter(value))}
-          >
-            <SelectTrigger className={`${toolbarSelect} w-56`} aria-label="Проект">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все проекты</SelectItem>
-              {projectNames
+            onChange={(event) => changeFilter(() => setProjectFilter(event.target.value))}
+            options={[
+              { value: 'all', label: 'Все проекты' },
+              ...projectNames
                 .filter((project) => !project.isArchived)
-                .map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          <Select
+                .map((project) => ({ value: project.id, label: project.name })),
+            ]}
+          />
+          <SelectField
+            size="sm"
+            variant="boxed"
+            className={`${toolbarSelect} w-44`}
+            aria-label="Тип события"
             value={typeFilter}
-            onValueChange={(value) => changeFilter(() => setTypeFilter(value))}
-          >
-            <SelectTrigger className={`${toolbarSelect} w-44`} aria-label="Тип события">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TYPE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(event) => changeFilter(() => setTypeFilter(event.target.value))}
+            options={TYPE_OPTIONS}
+          />
         </div>
         {error && (
-          <p role="alert" className="mb-3 text-sm text-destructive">
+          <p role="alert" className="mb-3 text-sm text-danger-text">
             {error}
           </p>
         )}
@@ -225,20 +212,23 @@ export default function NotificationsPage() {
                 .toLocaleLowerCase('ru')
                 .startsWith(typeLabel.toLocaleLowerCase('ru'));
               const content = (
-                <Card className={`py-0 ${href ? 'transition-colors hover:bg-muted/50' : ''}`}>
-                  <CardContent className="flex gap-3 p-4">
+                <Card
+                  padding="none"
+                  className={href ? 'transition-colors duration-fast hover:bg-surface-2' : ''}
+                >
+                  <div className="flex gap-3 p-4">
                     <span className="mt-0.5">{noticeIcon(item.type)}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="font-medium">{item.title}</p>
                         {!titleIncludesType && (
-                          <span className="text-xs text-muted-foreground">{typeLabel}</span>
+                          <span className="text-xs text-ink-soft">{typeLabel}</span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 text-sm text-ink-soft">
                         <BitrixText text={item.message} />
                       </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
                         {item.taskId && <span>Задача #{item.taskId}</span>}
                         {/* Номер проекта ничего не говорит: показываем название, а пока
                             список проектов не пришёл — молчим. */}
@@ -252,7 +242,7 @@ export default function NotificationsPage() {
                         )}
                       </div>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               );
               return href ? (
@@ -265,7 +255,7 @@ export default function NotificationsPage() {
             })}
             {pageCount > 1 && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-ink-soft">
                   {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} из {total},
                   страница {page} из {pageCount}
                 </p>
@@ -274,7 +264,7 @@ export default function NotificationsPage() {
                   aria-label="Пагинация"
                 >
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="hidden sm:inline-flex"
                     onClick={() => goToPage(1)}
@@ -283,7 +273,7 @@ export default function NotificationsPage() {
                     Первая
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => goToPage(page - 1)}
                     disabled={pageLoading || page === 1}
@@ -293,7 +283,7 @@ export default function NotificationsPage() {
                   {pageNumbers(page, pageCount).map((number) => (
                     <Button
                       key={number}
-                      variant={number === page ? 'default' : 'outline'}
+                      variant={number === page ? 'secondary' : 'quiet'}
                       size="sm"
                       className="w-9 px-0"
                       onClick={() => goToPage(number)}
@@ -303,7 +293,7 @@ export default function NotificationsPage() {
                     </Button>
                   ))}
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => goToPage(page + 1)}
                     disabled={pageLoading || page >= pageCount}
@@ -311,7 +301,7 @@ export default function NotificationsPage() {
                     Вперёд
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="hidden sm:inline-flex"
                     onClick={() => goToPage(pageCount)}
@@ -324,13 +314,11 @@ export default function NotificationsPage() {
             )}
           </div>
         ) : error ? null : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Пока нет уведомлений</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+          <Card padding="md">
+            <p className="text-sm font-bold text-ink">Пока нет уведомлений</p>
+            <p className="mt-1 text-sm text-ink-soft">
               Изменения задач и комментарии из Битрикс24 появятся здесь.
-            </CardContent>
+            </p>
           </Card>
         )}
       </div>

@@ -1,29 +1,214 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
 
-@custom-variant dark (&:is(.dark *));
+/* Дизайн-система — @monos/ui. Токены геометрии, палитры и база приходят из
+   пакета: цвета и размеры здесь не выдуманы, а взяты у набора. */
+@import '@monos/ui/styles.css';
 
-html,
+/* Мост в Tailwind 4.
+   Набор приходит с пресетом для Tailwind 3 (`@monos/ui/tailwind-preset`),
+   а приложение живёт на Tailwind 4, где тема описывается в CSS. Поэтому те
+   же имена перечислены здесь ещё раз, но уже в формате `@theme inline`:
+   `inline` означает, что утилита подставляет `var(--ui-…)` прямо в правило,
+   и тема переключается на лету, без пересборки. */
+@theme inline {
+  /* Цвет — это роль, а не значение. */
+  --color-canvas: var(--ui-bg);
+  --color-surface: var(--ui-surface);
+  --color-surface-2: var(--ui-surface-2);
+  --color-ink: var(--ui-ink);
+  --color-ink-soft: var(--ui-ink-soft);
+  --color-ink-faint: var(--ui-ink-faint);
+  --color-ink-muted: var(--ui-ink-muted);
+  --color-line: var(--ui-line);
+  --color-line-strong: var(--ui-line-strong);
+  --color-accent: var(--ui-accent);
+  --color-danger: var(--ui-danger);
+  --color-warning: var(--ui-warning);
+  --color-success: var(--ui-success);
+  --color-info: var(--ui-info);
+  --color-accent-text: var(--ui-accent-text);
+  --color-danger-text: var(--ui-danger-text);
+  --color-warning-text: var(--ui-warning-text);
+  --color-success-text: var(--ui-success-text);
+  --color-info-text: var(--ui-info-text);
+
+  /* Один радиус на всё. */
+  --radius-ui: var(--ui-radius);
+
+  /* Одна гарнитура: JetBrains Mono с системным моноширинным запасным. */
+  --font-ui: var(--ui-font);
+
+  /* Шёпот: 11px и 12px, верхний регистр и разрядка. */
+  --text-whisper: var(--ui-text-whisper);
+  --text-whisper--line-height: 1.45;
+  --text-whisper-lg: var(--ui-text-whisper-lg);
+  --text-whisper-lg--line-height: 1.45;
+
+  /* Шкала отступов. */
+  --spacing-hair: var(--ui-space-hair);
+  --spacing-tight: var(--ui-space-tight);
+  --spacing-field: var(--ui-space-field);
+  --spacing-snug: var(--ui-space-snug);
+  --spacing-input: var(--ui-space-input);
+  --spacing-base: var(--ui-space-base);
+  --spacing-comfortable: var(--ui-space-comfortable);
+  --spacing-roomy: var(--ui-space-roomy);
+  --spacing-section: var(--ui-space-section);
+
+  /* Плоско в покое, приподнято от касания. */
+  --shadow-rest: var(--ui-shadow-rest);
+  --shadow-lift: var(--ui-shadow-lift);
+  --shadow-overlay: var(--ui-shadow-overlay);
+
+  /* В Tailwind 4 длительность перехода живёт в пространстве
+     `--transition-duration-*`. */
+  --transition-duration-fast: var(--ui-duration-fast);
+  --transition-duration-base: var(--ui-duration-base);
+
+  /* В Tailwind 4 шкала z-index живёт в пространстве `--z-index-*`. */
+  --z-index-menu: var(--ui-z-menu);
+  --z-index-modal: var(--ui-z-modal);
+  --z-index-tooltip: var(--ui-z-tooltip);
+}
+
+/* Доступность палитр.
+   В наборе приглушённые роли и сигнальные тексты подобраны на глаз: в
+   грувбоксе, например, `ink-soft` на приподнятой поверхности даёт 3.65:1, а
+   требование WCAG AA — 4.5:1. Приложение держит эту планку (её проверяет
+   axe-core в UI-тестах), поэтому ниже те же роли подкручены по каждой палитре
+   и режиму: значение сдвинуто к чёрному в светлой теме и к белому в тёмной,
+   пока контраст не проходит. Характер палитр при этом сохраняется — меняется
+   только читаемость. */
+[data-theme='catppuccin'][data-mode='dark'] {
+  --ui-ink-muted: #787d95;
+}
+[data-theme='catppuccin'][data-mode='light'] {
+  --ui-ink-soft: #535660;
+  --ui-ink-faint: #535660;
+  --ui-accent-text: #1851c2;
+  --ui-danger-text: #b10d30;
+  --ui-warning-text: #983c07;
+  --ui-success-text: #29651b;
+  --ui-info-text: #1851c2;
+  --ui-ink-muted: #707280;
+}
+[data-theme='dracula'][data-mode='dark'] {
+  --ui-danger-text: #ff9b9b;
+  --ui-ink-muted: #8095d6;
+}
+[data-theme='dracula'][data-mode='light'] {
+  --ui-accent-text: #035f87;
+  --ui-danger-text: #a32e22;
+  --ui-warning-text: #7c4f13;
+  --ui-success-text: #3a6230;
+  --ui-info-text: #035f87;
+}
+[data-theme='github'][data-mode='light'] {
+  --ui-accent-text: #0965d2;
+  --ui-danger-text: #c9212d;
+  --ui-warning-text: #b14800;
+  --ui-success-text: #197934;
+  --ui-info-text: #0965d2;
+  --ui-ink-muted: #818992;
+}
+[data-theme='gruvbox'][data-mode='dark'] {
+  --ui-ink-soft: #c9baa5;
+  --ui-ink-faint: #c9baa5;
+  --ui-accent-text: #9fc5b6;
+  --ui-danger-text: #ffa490;
+  --ui-warning-text: #ffaa21;
+  --ui-success-text: #c2c528;
+  --ui-info-text: #9fc5b6;
+  --ui-ink-muted: #a69584;
+}
+[data-theme='gruvbox'][data-mode='light'] {
+  --ui-ink-soft: #5b5149;
+  --ui-ink-faint: #5b5149;
+  --ui-accent-text: #2f595b;
+  --ui-danger-text: #a01c17;
+  --ui-warning-text: #883b09;
+  --ui-success-text: #55550e;
+  --ui-info-text: #2f595b;
+  --ui-ink-muted: #766a5e;
+}
+[data-theme='nord'][data-mode='dark'] {
+  --ui-ink-soft: #babfcd;
+  --ui-ink-faint: #babfcd;
+  --ui-accent-text: #a2bfdc;
+  --ui-danger-text: #e9acb1;
+  --ui-warning-text: #ebad99;
+  --ui-success-text: #abc893;
+  --ui-info-text: #a2bfdc;
+  --ui-ink-muted: #8c9bb7;
+}
+[data-theme='nord'][data-mode='light'] {
+  --ui-accent-text: #496485;
+  --ui-danger-text: #954b53;
+  --ui-warning-text: #855748;
+  --ui-success-text: #58664c;
+  --ui-info-text: #496485;
+  --ui-ink-muted: #727e95;
+}
+[data-theme='solarized'][data-mode='dark'] {
+  --ui-ink: #a1b5b7;
+  --ui-ink-soft: #a3b4b8;
+  --ui-ink-faint: #a3b4b8;
+  --ui-accent-text: #58bafe;
+  --ui-danger-text: #ff9592;
+  --ui-warning-text: #ff976b;
+  --ui-success-text: #a7bc17;
+  --ui-info-text: #58bafe;
+  --ui-ink-muted: #76949d;
+}
+[data-theme='solarized'][data-mode='light'] {
+  --ui-ink: #4c6067;
+  --ui-ink-soft: #4f6066;
+  --ui-ink-faint: #4f6066;
+  --ui-accent-text: #1b6193;
+  --ui-danger-text: #b02826;
+  --ui-warning-text: #a23c12;
+  --ui-success-text: #566300;
+  --ui-info-text: #1b6193;
+  --ui-ink-muted: #6e7878;
+}
+
+/* Шрифт приходит из next/font: подставляем его в токен набора, чтобы
+   моноширинная гарнитура была одна и та же во всех шести темах. */
+:root {
+  --ui-font: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Палитры набора приходят с `[data-theme][data-mode]`. Без атрибутов
+   страница остаётся в грувбоксе в светлом режиме — так же, как в галерее. */
+html {
+  color-scheme: light;
+}
+
+html[data-mode='dark'] {
+  color-scheme: dark;
+}
+
 body {
-  height: auto;
+  background: var(--ui-bg);
+  color: var(--ui-ink);
+  font-family: var(--ui-font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Фокус — тонкая линия цвета чернил, и только с клавиатуры. */
+:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+:focus:not(:focus-visible) {
+  outline: none;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+
+::selection {
+  background: var(--ui-selection);
+  color: var(--ui-ink);
 }
 
 @keyframes fadeIn {
@@ -56,129 +241,6 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-@theme inline {
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  /* 0.556 давало #737373 → контраст 4.46 на карточках, чуть ниже нормы AA. */
-  --muted-foreground: oklch(0.53 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
 }
 
 /* Уважаем системную настройку «меньше движения»: анимации и плавная прокрутка

@@ -11,11 +11,11 @@ export default function LoadingState({
   return (
     <div
       role="status"
-      className={cn('flex min-h-[60vh] items-center justify-center bg-background', className)}
+      className={cn('flex min-h-[60vh] items-center justify-center bg-canvas', className)}
     >
       <div className="text-center">
-        <Loader2 className="mx-auto mb-3 size-10 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <Loader2 className="mx-auto mb-3 size-8 animate-spin text-ink-soft" strokeWidth={1.7} />
+        <p className="text-xs uppercase tracking-widest text-ink-faint">{label}</p>
       </div>
     </div>
   );

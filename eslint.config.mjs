@@ -27,6 +27,10 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Отчёты Playwright: это собранные чанки интерфейса отчёта, а не код
+    // проекта. Без игнора `npm run lint` падал после прогона UI-тестов.
+    'playwright-report/**',
+    'test-results/**',
   ]),
 ]);
 

@@ -6,39 +6,27 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
-import {
-  FolderKanban,
-  Users,
-  ChevronRight,
-  Columns3,
-  TableProperties,
-  Settings,
-  UserPlus,
-  X,
-} from 'lucide-react';
+import { ChevronRight, FolderKanban, Settings, Users, X } from 'lucide-react';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
-import { useConfirm } from '@/components/ui/confirm-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/monos/confirm-dialog';
+import { Tabs } from '@/components/monos/Tabs';
+import { Badge } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { IconButton } from '@/components/monos/IconButton';
+import { Modal } from '@/components/monos/Modal';
+import { SelectField } from '@/components/monos/SelectField';
+import { TextArea } from '@/components/monos/TextArea';
+import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
+
+// Переключатель вида живёт в панели над доской и над списком, поэтому список
+// вкладок набора рисуется без панели: содержимое панели — это сам вид.
+const VIEW_TABS = [
+  { id: 'kanban', label: 'Канбан' },
+  { id: 'grid', label: 'Список' },
+];
 
 export default function ProjectPage() {
   const params = useParams();
@@ -191,6 +179,14 @@ export default function ProjectPage() {
       .catch(() => setMemberIds([]));
   }, [currentProject, membersOpen]);
 
+  const memberOptions = useMemo(
+    () =>
+      users
+        .filter((user) => !memberIds.includes(user.id))
+        .map((user) => ({ value: user.id, label: user.name })),
+    [users, memberIds],
+  );
+
   async function addMember(userId: string) {
     if (!currentProject) return;
     await addProjectMember(currentProject.id, userId);
@@ -238,58 +234,62 @@ export default function ProjectPage() {
 
   if (!currentProject) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Проект не найден</p>
-          <Button onClick={() => router.push('/')} className="px-4">
-            На главную
-          </Button>
+          <p className="mb-4 text-ink-soft">Проект не найден</p>
+          <Button onClick={() => router.push('/')}>На главную</Button>
         </div>
       </div>
     );
   }
 
+  const viewTabs = (
+    <Tabs
+      items={VIEW_TABS}
+      value={effectiveView}
+      onChange={setView}
+      label="Вид проекта"
+      variant="pill"
+    />
+  );
+
   return (
-    <div className="min-h-screen overflow-x-clip bg-background" suppressHydrationWarning>
+    <div className="min-h-screen overflow-x-clip bg-canvas" suppressHydrationWarning>
       {/* Project Header */}
-      <div className="border-b bg-background">
-        <div className="px-4 lg:px-6 pt-3 pb-2">
-          <div className="flex items-center gap-1 text-xs text-gray-500 overflow-x-auto scrollbar-hide">
+      <div className="border-b border-line bg-canvas">
+        <div className="px-4 pt-3 pb-2 lg:px-6">
+          <div className="flex items-center gap-1 overflow-x-auto text-xs text-ink-faint scrollbar-hide">
             <Button
-              variant="link"
-              size="xs"
+              variant="quiet"
+              size="sm"
               onClick={() => router.push('/')}
-              className="h-auto p-0 text-muted-foreground no-underline hover:text-foreground hover:no-underline"
+              className="h-auto min-h-0 max-sm:min-h-0 px-0 py-0 text-xs"
             >
               Главная
             </Button>
-            <ChevronRight size={12} />
-            <span className="text-foreground font-medium">{currentProject.name}</span>
+            <ChevronRight size={12} strokeWidth={1.7} />
+            <span className="font-medium text-ink">{currentProject.name}</span>
           </div>
         </div>
 
-        <div className="px-4 lg:px-6 pb-4">
+        <div className="px-4 pb-4 lg:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <span className="rounded-lg bg-primary/10 p-2 text-primary">
-                  <FolderKanban size={20} />
+              <h1 className="flex items-center gap-2 text-xl font-bold text-ink">
+                <span className="rounded-ui bg-accent/10 p-2 text-accent">
+                  <FolderKanban size={20} strokeWidth={1.7} />
                 </span>
                 {currentProject.name}
-                {currentProject.isArchived && (
-                  <span className="rounded border px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    Архив
-                  </span>
-                )}
+                {currentProject.isArchived && <Badge tone="neutral">Архив</Badge>}
               </h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
                 <Button
-                  variant="link"
-                  size="xs"
+                  variant="quiet"
+                  size="sm"
                   onClick={() => setMembersOpen(true)}
-                  className="h-auto gap-1 p-0 text-muted-foreground no-underline hover:text-foreground"
+                  className="h-auto min-h-0 max-sm:min-h-0 gap-1 px-0 py-0 text-sm"
+                  icon={<Users size={14} strokeWidth={1.7} />}
                 >
-                  <Users size={14} />
                   {currentProject.membersCount || 0}{' '}
                   {pluralRu(currentProject.membersCount || 0, [
                     'участник',
@@ -298,13 +298,11 @@ export default function ProjectPage() {
                   ])}
                 </Button>
                 <span>Задач: {stats.total}</span>
-                <span className="text-emerald-700 dark:text-emerald-400">
-                  Завершено: {completedTasks}
-                </span>
+                <span className="text-success-text">Завершено: {completedTasks}</span>
                 {/* Сигналы — в той же строке, что и счётчики: отдельной строкой
                     мелким шрифтом просрочка читалась как сноска. */}
                 {overdueTasks > 0 && (
-                  <span className="font-medium text-destructive">Просрочено: {overdueTasks}</span>
+                  <span className="font-medium text-danger-text">Просрочено: {overdueTasks}</span>
                 )}
                 {unassignedTasks > 0 && <span>Без исполнителя: {unassignedTasks}</span>}
               </div>
@@ -313,20 +311,19 @@ export default function ProjectPage() {
             <div className="ml-auto flex shrink-0 items-center gap-4">
               <div className="hidden gap-4 text-sm md:flex">
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">План</p>
-                  <p className="font-semibold">{totalEstimate.toFixed(1)} ч</p>
+                  <p className="text-xs text-ink-faint">План</p>
+                  <p className="font-bold">{totalEstimate.toFixed(1)} ч</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Факт</p>
-                  <p className="font-semibold">{totalActual.toFixed(1)} ч</p>
+                  <p className="text-xs text-ink-faint">Факт</p>
+                  <p className="font-bold">{totalActual.toFixed(1)} ч</p>
                 </div>
               </div>
               {/* У псевдо-проекта нечего настраивать: это не сущность Bitrix */}
-              <Button
+              <IconButton
+                label="Настройки проекта"
                 variant="ghost"
-                size="icon-sm"
-                title="Настройки проекта"
-                aria-label="Настройки проекта"
+                size="md"
                 className={isNoProject ? 'hidden' : undefined}
                 onClick={() => {
                   setName(currentProject.name);
@@ -334,101 +331,91 @@ export default function ProjectPage() {
                   setSettingsOpen(true);
                 }}
               >
-                <Settings className="size-4" />
-              </Button>
+                <Settings className="size-4" strokeWidth={1.7} />
+              </IconButton>
             </div>
           </div>
         </div>
       </div>
 
-      <Dialog open={membersOpen} onOpenChange={setMembersOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Участники проекта</DialogTitle>
-          </DialogHeader>
-          <Select onValueChange={(value) => void addMember(value)}>
-            <SelectTrigger>
-              <UserPlus className="size-4" />
-              <SelectValue placeholder="Добавить участника" />
-            </SelectTrigger>
-            <SelectContent>
-              {users
-                .filter((user) => !memberIds.includes(user.id))
-                .map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          <div className="max-h-64 space-y-1 overflow-y-auto">
-            {memberIds.map((id) => {
-              const user = users.find((item) => item.id === id);
-              return (
-                <div
-                  key={id}
-                  className="flex items-center justify-between rounded-md px-2 py-2 text-sm"
+      <Modal
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        title="Участники проекта"
+        size="md"
+      >
+        <SelectField
+          value=""
+          onChange={(event) => {
+            const value = event.target.value;
+            if (!value) return;
+            void addMember(value);
+          }}
+          options={memberOptions}
+          placeholder="Добавить участника"
+          variant="boxed"
+          size="md"
+          aria-label="Добавить участника"
+        />
+        <div className="mt-4 max-h-64 space-y-1 overflow-y-auto">
+          {memberIds.map((id) => {
+            const user = users.find((item) => item.id === id);
+            return (
+              <div
+                key={id}
+                className="flex items-center justify-between rounded-ui px-2 py-2 text-sm"
+              >
+                <span>{user?.name || `Пользователь #${id}`}</span>
+                <IconButton
+                  label="Удалить участника"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void removeMember(id)}
                 >
-                  <span>{user?.name || `Пользователь #${id}`}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Удалить участника"
-                    onClick={() => void removeMember(id)}
-                  >
-                    <X />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
+                  <X className="size-4" strokeWidth={1.7} />
+                </IconButton>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
 
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Настройки проекта</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Название"
-          />
-          <Textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Описание"
-          />
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="outline" onClick={() => void toggleArchive()}>
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Настройки проекта"
+        size="md"
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <Button variant="secondary" onClick={() => void toggleArchive()}>
               {currentProject.isArchived ? 'Разархивировать' : 'Архивировать'}
             </Button>
             <Button onClick={() => void saveProject()} disabled={!name.trim()}>
               Сохранить
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Tabs value={effectiveView} onValueChange={setView} className="w-full min-w-0 pb-6">
-        <TabsContent value="kanban" className="mt-0 w-full min-w-0">
-          <KanbanBoard
-            toolbar={
-              <TabsList className="h-10 p-0 sm:h-8">
-                <TabsTrigger value="kanban" className="h-full">
-                  <Columns3 className="size-4" />
-                  Канбан
-                </TabsTrigger>
-                <TabsTrigger value="grid" className="h-full">
-                  <TableProperties className="size-4" />
-                  Список
-                </TabsTrigger>
-              </TabsList>
-            }
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <TextField
+            label="Название"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Название проекта"
           />
-        </TabsContent>
-        <TabsContent value="grid" className="mt-0 w-full min-w-0">
+          <TextArea
+            label="Описание"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Описание"
+          />
+        </div>
+      </Modal>
+
+      <div className="w-full min-w-0 pb-6">
+        {effectiveView === 'kanban' ? (
+          <KanbanBoard toolbar={viewTabs} />
+        ) : (
           <TaskGrid
             initialGroupBy="stage"
             initialStatus={initialStatus}
@@ -437,23 +424,10 @@ export default function ProjectPage() {
             loadPage={loadGridPage}
             tagsProjectId={projectId}
             filterScope={`project:${projectId}`}
-            toolbarLeading={
-              isNoProject ? null : (
-                <TabsList className="h-10 p-0 sm:h-8">
-                  <TabsTrigger value="kanban" className="h-full">
-                    <Columns3 className="size-4" />
-                    Канбан
-                  </TabsTrigger>
-                  <TabsTrigger value="grid" className="h-full">
-                    <TableProperties className="size-4" />
-                    Список
-                  </TabsTrigger>
-                </TabsList>
-              )
-            }
+            toolbarLeading={isNoProject ? null : viewTabs}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@
 // «/» и «n» экономят десятки кликов; всё остальное остаётся мышью.
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/monos/toast';
 
 /** Пока пользователь печатает, клавиши приложению не принадлежат. */
 function isTyping(target: EventTarget | null) {

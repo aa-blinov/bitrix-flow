@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import path from 'node:path';
 
 // Обход всех экранов: смоук (заголовок, ключевые элементы, отсутствие ошибок
 // в консоли) плюс снимок для сравнения с эталоном.
@@ -62,3 +63,65 @@ test('задачи из зеркала действительно отрисов
   await expect(page.getByText('Перевести справочники на GraphQL')).toBeVisible();
   await expect(page.getByText('Свести бюджет кампании')).toBeVisible();
 });
+
+// Доступность проверяется на каждом экране в обеих темах: палитра меняет
+// контраст, а тёмный режим — главный источник «серых на сером».
+const AXE_PATH = path.resolve(process.cwd(), 'node_modules/axe-core/axe.min.js');
+
+type AxeViolation = { id: string; impact: string | null; nodes: string[] };
+
+async function audit(page: Page): Promise<AxeViolation[]> {
+  await page.addScriptTag({ path: AXE_PATH });
+  return page.evaluate(async () => {
+    const axe = (
+      window as unknown as {
+        axe: { run: (context: Document, options: unknown) => Promise<{ violations: unknown[] }> };
+      }
+    ).axe;
+    const result = await axe.run(document, {
+      runOnly: {
+        type: 'tag',
+        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'],
+      },
+    });
+    return result.violations as AxeViolation[];
+  });
+}
+
+const PALETTES = ['gruvbox', 'github', 'dracula', 'nord', 'solarized', 'catppuccin'] as const;
+
+const MODES = ['light', 'dark'] as const;
+
+// Полный набор экранов — для палитры по умолчанию; остальные проверяются на
+// трёх самых разных: список, таблица и доска.
+const FULL_SCREENS = SCREENS;
+const QUICK_SCREENS = SCREENS.filter((screen) =>
+  ['home', 'all-tasks', 'project-board'].includes(screen.name),
+);
+
+for (const palette of PALETTES) {
+  for (const mode of MODES) {
+    test(`${palette}/${mode}: экраны доступны`, async ({ page }) => {
+      await page.addInitScript(
+        ([theme, value]) => {
+          localStorage.setItem('bitrix-flow-theme', `${theme}:${value}`);
+        },
+        [palette, mode] as const,
+      );
+
+      const screens = palette === 'gruvbox' ? FULL_SCREENS : QUICK_SCREENS;
+      const violations: unknown[] = [];
+      for (const screen of screens) {
+        await page.goto(screen.path);
+        await settle(page);
+        const found = await audit(page);
+        violations.push(...found.map((violation) => ({ screen: screen.name, ...violation })));
+      }
+
+      expect(
+        violations,
+        violations.map((violation) => JSON.stringify(violation)).join('\n'),
+      ).toHaveLength(0);
+    });
+  }
+}

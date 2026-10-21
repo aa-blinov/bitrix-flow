@@ -1,26 +1,48 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Plug, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { Card } from '@/components/monos/Card';
 
 export default function ConnectPage() {
   const [status, setStatus] = useState<'loading' | 'connected' | 'error'>('loading');
   const [domain, setDomain] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
 
+  async function checkStatus() {
+    try {
+      const res = await fetch('/api/oauth/check', {
+        headers: { 'X-Member-Id': localStorage.getItem('bitrix_member_id') || '' },
+      });
+      const data = (await res.json()) as {
+        connected?: boolean;
+        member_id?: string;
+        domain?: string;
+      };
+
+      if (data.connected && data.member_id) {
+        localStorage.setItem('bitrix_member_id', data.member_id);
+        setMemberId(data.member_id);
+        setStatus('connected');
+        if (data.domain) setDomain(data.domain);
+        return data;
+      }
+      setStatus('error');
+      return null;
+    } catch {
+      setStatus('error');
+      return null;
+    }
+  }
+
   useEffect(() => {
     // Проверяем OAuth success в URL
     const params = new URLSearchParams(window.location.search);
     if (params.get('install') === 'success' || params.get('oauth') === 'success') {
       // Получаем member_id с сервера
-      checkStatus().then((data: any) => {
-        if (data.member_id) {
-          localStorage.setItem('bitrix_member_id', data.member_id);
-          setMemberId(data.member_id);
-          setStatus('connected');
-          if (data.domain) setDomain(data.domain);
+      void checkStatus().then((data) => {
+        if (data?.member_id) {
           const next = sessionStorage.getItem('bitrix-connect-next') || '/';
           sessionStorage.removeItem('bitrix-connect-next');
           window.location.replace(next.startsWith('/') ? next : '/');
@@ -29,28 +51,8 @@ export default function ConnectPage() {
       return;
     }
 
-    checkStatus();
+    void checkStatus();
   }, []);
-
-  async function checkStatus() {
-    try {
-      const res = await fetch('/api/oauth/check', {
-        headers: { 'X-Member-Id': localStorage.getItem('bitrix_member_id') || '' },
-      });
-      const data = await res.json();
-
-      if (data.connected) {
-        localStorage.setItem('bitrix_member_id', data.member_id);
-        setMemberId(data.member_id);
-        setStatus('connected');
-        if (data.domain) setDomain(data.domain);
-      } else {
-        setStatus('error');
-      }
-    } catch {
-      setStatus('error');
-    }
-  }
 
   const handleConnect = () => {
     const next = new URLSearchParams(window.location.search).get('next');
@@ -59,67 +61,63 @@ export default function ConnectPage() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30 p-4 lg:p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="mb-2 text-2xl font-semibold">Подключение к Битрикс24</h1>
-        <p className="mb-8 text-muted-foreground">
+    <div className="min-h-screen bg-canvas p-4 lg:p-8">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="mb-2 text-xl font-bold tracking-tight text-ink">Подключение к Битрикс24</h1>
+        <p className="mb-8 text-sm text-ink-soft">
           Подключите свой аккаунт Битрикс24 для управления задачами
         </p>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  status === 'connected' ? 'bg-green-100' : 'bg-gray-100'
-                }`}
-              >
-                {status === 'connected' ? (
-                  <CheckCircle2 className="text-green-600" size={24} />
-                ) : status === 'loading' ? (
-                  <RefreshCw className="text-gray-400 animate-spin" size={24} />
-                ) : (
-                  <Plug className="text-gray-400" size={24} />
-                )}
-              </div>
-              <div>
-                <CardTitle>
-                  {status === 'connected'
-                    ? 'Подключено'
-                    : status === 'loading'
-                      ? 'Загрузка...'
-                      : 'Не подключено'}
-                </CardTitle>
-                {domain && <CardDescription>{domain}</CardDescription>}
-                {memberId && (
-                  <Badge variant="outline" className="mt-2">
-                    OAuth ID {memberId}
-                  </Badge>
-                )}
-              </div>
+        <Card padding="none">
+          <div className="flex items-center gap-4 border-b border-line p-4">
+            <div className="flex size-12 items-center justify-center rounded-ui bg-surface-2">
+              {status === 'connected' ? (
+                <CheckCircle2 className="text-success-text" size={22} strokeWidth={1.7} />
+              ) : status === 'loading' ? (
+                <RefreshCw className="animate-spin text-ink-muted" size={22} strokeWidth={1.7} />
+              ) : (
+                <Plug className="text-ink-muted" size={22} strokeWidth={1.7} />
+              )}
             </div>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleConnect} className="w-full" size="lg">
+            <div>
+              <p className="text-sm font-bold text-ink">
+                {status === 'connected'
+                  ? 'Подключено'
+                  : status === 'loading'
+                    ? 'Загрузка…'
+                    : 'Не подключено'}
+              </p>
+              {domain ? <p className="mt-0.5 text-xs text-ink-soft">{domain}</p> : null}
+              {memberId ? (
+                <Badge tone="neutral" className="mt-2">
+                  OAuth ID {memberId}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+          <div className="p-4">
+            <Button
+              full
+              size="lg"
+              onClick={handleConnect}
+              trailing={<ArrowRight size={16} strokeWidth={1.7} />}
+            >
               {status === 'connected' ? 'Переподключить' : 'Подключить Битрикс24'}
-              <ArrowRight size={16} />
             </Button>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card className="mt-6 border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle>Как это работает</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>Запросы от вашего имени (нет лимитов)</li>
-              <li>Real-time обновления через webhook</li>
-              <li>Автоматический refresh токена</li>
-              <li>Безопасное хранение в MongoDB</li>
-              <li>Webhook больше НЕ используется</li>
-            </ul>
-          </CardContent>
+        <Card padding="none" className="mt-6">
+          <div className="border-b border-line p-4">
+            <p className="text-sm font-bold text-ink">Как это работает</p>
+          </div>
+          <ul className="flex flex-col gap-1 p-4 text-sm text-ink-soft">
+            <li>Запросы от вашего имени (нет лимитов)</li>
+            <li>Real-time обновления через webhook</li>
+            <li>Автоматический refresh токена</li>
+            <li>Безопасное хранение в MongoDB</li>
+            <li>Webhook больше НЕ используется</li>
+          </ul>
         </Card>
       </div>
     </div>

@@ -35,7 +35,9 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm test
+      - run: npm run check:contrast
       - run: npm run build
+      - run: npm run check:utilities
 
   ui:
     # Скриншот-тесты: отдельная база с фиксированными данными и мок Битрикса,

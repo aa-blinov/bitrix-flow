@@ -3,16 +3,10 @@
 import { Bell, CheckCircle2, MessageSquareText, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import BitrixText from '@/components/BitrixText';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { IconButton } from '@/components/monos/IconButton';
+import { Popover } from '@/components/monos/Popover';
+import { Separator } from '@/components/monos/Separator';
 import Link from 'next/link';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useSSE } from '@/hooks/useSSE';
 import { useKanbanStore } from '@/store/kanban';
 
@@ -28,10 +22,13 @@ type Notice = {
 };
 
 function icon(type: string) {
-  if (type === 'comment_added') return <MessageSquareText className="size-4 text-sky-600" />;
-  if (type === 'task_added') return <CheckCircle2 className="size-4 text-emerald-600" />;
-  if (type === 'task_deleted') return <Trash2 className="size-4 text-destructive" />;
-  return <Pencil className="size-4 text-amber-600" />;
+  if (type === 'comment_added')
+    return <MessageSquareText className="size-4 text-info-text" strokeWidth={1.7} />;
+  if (type === 'task_added')
+    return <CheckCircle2 className="size-4 text-success-text" strokeWidth={1.7} />;
+  if (type === 'task_deleted')
+    return <Trash2 className="size-4 text-danger-text" strokeWidth={1.7} />;
+  return <Pencil className="size-4 text-warning-text" strokeWidth={1.7} />;
 }
 
 export default function Notifications() {
@@ -95,26 +92,29 @@ export default function Notifications() {
   useSSE(memberId, onEvent);
 
   return (
-    <DropdownMenu
+    <Popover
       open={open}
       onOpenChange={(value) => {
         setOpen(value);
         if (value) markAsSeen();
       }}
-    >
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Уведомления" className="relative">
-          <Bell className="size-4" />
-          {unreadCount > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px]">
+      placement="bottom"
+      trigger={
+        <IconButton label="Уведомления" variant="ghost" size="sm" className="relative">
+          <Bell size={16} strokeWidth={1.7} />
+          {unreadCount > 0 ? (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-canvas">
               {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
-        <DropdownMenuLabel className="px-3 py-2.5">История изменений</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+            </span>
+          ) : null}
+        </IconButton>
+      }
+    >
+      <div className="w-80">
+        <p className="px-3 py-2.5 text-xs uppercase tracking-widest text-ink-faint">
+          История изменений
+        </p>
+        <Separator />
         <div className="max-h-96 overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => {
@@ -130,8 +130,8 @@ export default function Notifications() {
                 <>
                   <span className="mt-0.5">{icon(item.type)}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{item.title}</p>
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                    <p className="font-bold text-ink">{item.title}</p>
+                    <p className="line-clamp-2 text-xs text-ink-soft">
                       <BitrixText text={item.message} />
                     </p>
                   </div>
@@ -142,31 +142,29 @@ export default function Notifications() {
                   key={item.id}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className="flex gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                  className="flex gap-2 rounded-ui px-2 py-2.5 text-sm transition-colors duration-fast hover:bg-surface"
                 >
                   {row}
                 </Link>
               ) : (
-                <div key={item.id} className="flex gap-2 rounded-md px-2 py-2.5 text-sm">
+                <div key={item.id} className="flex gap-2 rounded-ui px-2 py-2.5 text-sm">
                   {row}
                 </div>
               );
             })
           ) : (
-            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-              Изменений пока нет
-            </p>
+            <p className="px-3 py-8 text-center text-xs text-ink-faint">Изменений пока нет</p>
           )}
         </div>
-        <DropdownMenuSeparator />
+        <Separator />
         <Link
           href="/notifications"
           onClick={() => setOpen(false)}
-          className="block px-3 py-2.5 text-center text-xs font-medium text-primary hover:bg-muted"
+          className="block px-3 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-ink transition-opacity duration-fast hover:opacity-60"
         >
           Открыть все уведомления
         </Link>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </div>
+    </Popover>
   );
 }

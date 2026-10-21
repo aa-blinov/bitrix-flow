@@ -5,26 +5,13 @@
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useKanbanStore } from '@/store/kanban';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toolbarControl } from '@/components/ui/toolbar';
-import { useTaskToasts } from '@/components/ui/toast';
+import { Button } from '@/components/monos/Button';
+import { Modal } from '@/components/monos/Modal';
+import { SelectField } from '@/components/monos/SelectField';
+import { TextArea } from '@/components/monos/TextArea';
+import { TextField } from '@/components/monos/TextField';
+import { toolbarControl } from '@/components/monos/toolbar';
+import { useTaskToasts } from '@/components/monos/toast';
 
 export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId?: string }) {
   const projects = useKanbanStore((state) => state.projects);
@@ -75,19 +62,39 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className={toolbarControl}>
-          <Plus size={14} />
-          Новая задача
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Новая задача</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Input
+    <>
+      <Button
+        size="sm"
+        className={toolbarControl}
+        icon={<Plus size={14} strokeWidth={1.7} />}
+        onClick={() => setOpen(true)}
+      >
+        Новая задача
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Новая задача"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={() => void submit()}
+              disabled={!title.trim() || !projectId || !assigneeId || saving}
+              loading={saving}
+            >
+              Создать
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <TextField
+            variant="boxed"
             autoFocus
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -97,7 +104,8 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
               if (event.key === 'Enter' && title.trim() && projectId && assigneeId) void submit();
             }}
           />
-          <Textarea
+          <TextArea
+            variant="boxed"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Описание (необязательно)"
@@ -105,50 +113,30 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
             rows={3}
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger aria-label="Проект" className="w-full">
-                <SelectValue placeholder="Проект" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={assigneeId} onValueChange={setAssigneeId}>
-              <SelectTrigger aria-label="Исполнитель" className="w-full">
-                <SelectValue placeholder="Исполнитель" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SelectField
+              variant="boxed"
+              aria-label="Проект"
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              options={projects.map((project) => ({ value: project.id, label: project.name }))}
+            />
+            <SelectField
+              variant="boxed"
+              aria-label="Исполнитель"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+              options={users.map((user) => ({ value: user.id, label: user.name }))}
+            />
           </div>
-          <Input
+          <TextField
+            variant="boxed"
             type="date"
             value={deadline}
             onChange={(event) => setDeadline(event.target.value)}
             aria-label="Дедлайн"
           />
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Отмена
-          </Button>
-          <Button
-            onClick={() => void submit()}
-            disabled={!title.trim() || !projectId || !assigneeId || saving}
-          >
-            {saving ? 'Создаём…' : 'Создать'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </Modal>
+    </>
   );
 }

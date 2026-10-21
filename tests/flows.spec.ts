@@ -51,8 +51,13 @@ test('перенос в другой проект не закрывает кар
   await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Проект', exact: true }).click();
-  await page.getByRole('option', { name: 'Маркетинг Q4' }).click();
+  // Список вариантов искать внутри карточки: в строках таблицы тоже есть
+  // свои выпадающие списки проекта, и без области поиска Playwright
+  // находит девять одинаковых «Маркетинг Q4». Список нативный, поэтому
+  // вариант выбирается через selectOption, а не кликом по option.
+  await dialog
+    .getByRole('combobox', { name: 'Проект', exact: true })
+    .selectOption({ label: 'Маркетинг Q4' });
   // Раньше тут карточка закрывалась и открывалась доска нового проекта.
   await expect(page.getByText('Задача перенесена в «Маркетинг Q4»')).toBeVisible();
   await expect(dialog).toContainText('Перевести справочники на GraphQL');
@@ -62,16 +67,24 @@ test('перенос в другой проект не закрывает кар
 test('фильтр по исполнителю сужает список и ставит чип', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
+  // Панель фильтров: кнопка «Фильтры» открывает её, дальше — «Фильтр» со
+  // списком полей и значения с галочками. В наборе @monos/ui меню состоит
+  // из данных, поэтому полей и значений два шага, а не вложенное подменю.
   await page
     .getByRole('button', { name: /Фильтры/ })
     .first()
     .click();
   await page.getByRole('button', { name: 'Фильтр', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Исполнитель', exact: true }).click();
-  await page.getByRole('menuitemcheckbox', { name: 'Мария Орлова' }).click();
+  // Поля фильтра живут в поповере: без области поиска под кнопку «Исполнитель»
+  // попадает ещё и заголовок таблицы с сортировкой.
+  const filterPanel = page.getByRole('dialog');
+  await filterPanel.getByRole('button', { name: 'Исполнитель', exact: true }).click();
+  await filterPanel.getByRole('checkbox', { name: 'Мария Орлова' }).check();
   await page.keyboard.press('Escape');
   await settle(page);
-  await expect(page.getByRole('button', { name: /Исполнитель/ }).first()).toContainText('Мария');
+  // Чип рисуется и в панели над списком, и в ящике фильтров на телефоне, поэтому
+  // берём видимый, а не первый подходящий.
+  await expect(page.getByText('Исполнитель: Мария Орлова').filter({ visible: true })).toBeVisible();
   await expect(page.getByText('Согласовать лимиты запросов')).toBeVisible();
   await expect(page.getByText('Перевести справочники на GraphQL')).toHaveCount(0);
   await expect(page).toHaveScreenshot('filtered-list.png', { mask: [page.locator('time')] });
@@ -101,9 +114,12 @@ test('диалог создания задачи заполнен и готов 
 test('тёмная тема рисует список целиком', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
+  // Палитра и режим в наборе @monos/ui живут атрибутами на <html>:
+  // data-theme — палитра, data-mode — светлое или тёмное.
   await page.evaluate(() => {
-    localStorage.setItem('bitrix-flow-theme', 'dark');
-    document.documentElement.classList.add('dark');
+    localStorage.setItem('bitrix-flow-theme', 'gruvbox:dark');
+    document.documentElement.setAttribute('data-theme', 'gruvbox');
+    document.documentElement.setAttribute('data-mode', 'dark');
   });
   await page.waitForTimeout(400);
   await expect(page).toHaveScreenshot('all-tasks-dark.png', { mask: [page.locator('time')] });

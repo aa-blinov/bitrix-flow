@@ -23,88 +23,53 @@ import {
 } from 'react';
 import { convertBxTask } from '@/store/kanban';
 import TaskModal from './TaskModal';
-import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/ui/toolbar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Avatar } from '@/components/monos/Avatar';
+import { Badge, type Tone } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { Card } from '@/components/monos/Card';
+import { Chip } from '@/components/monos/Chip';
+import { Drawer } from '@/components/monos/Drawer';
+import { EmptyState } from '@/components/monos/EmptyState';
+import { IconButton } from '@/components/monos/IconButton';
+import { Menu } from '@/components/monos/Menu';
+import { Modal } from '@/components/monos/Modal';
+import { SearchField } from '@/components/monos/SearchField';
+import { SelectField } from '@/components/monos/SelectField';
+import { TextArea } from '@/components/monos/TextArea';
+import { TextField } from '@/components/monos/TextField';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Card } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import LoadingState from '@/components/LoadingState';
 import { type KanbanSort } from '@/lib/kanban-sort';
 import { extractTaskTags } from '@/lib/task-tags';
 
+// Панель над доской: контролы набора — 44px на телефоне и 36px на мыши.
+// Ниже 36px мышь промахивается, а палец по 32px не попадает.
+const toolbarControl = 'h-11 sm:h-9 rounded-ui';
+const toolbarSelect = 'h-11 sm:h-9';
+const toolbarPanel =
+  'flex w-full flex-wrap items-center gap-2 rounded-ui border border-line bg-surface-2 p-2.5';
+
+// Точка стадии: цвет берём из ролей набора, а не из палитры Tailwind.
 function getStageDotColor(hex: string): string {
   const colors: Record<string, string> = {
-    '47d1e2': 'bg-cyan-500',
-    '75d900': 'bg-green-500',
-    ffab00: 'bg-amber-500',
-    ff5752: 'bg-red-500',
-    '1eae43': 'bg-emerald-500',
+    '47d1e2': 'bg-info',
+    '75d900': 'bg-success',
+    ffab00: 'bg-warning',
+    ff5752: 'bg-danger',
+    '1eae43': 'bg-success',
   };
-  return colors[hex?.toLowerCase()] || 'bg-gray-400';
+  return colors[hex?.toLowerCase()] || 'bg-ink-muted';
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
-// Белые инициалы на заливке -500 давали контраст 2.5–4.1 (sky, emerald, lime и
-// прочие светлые цвета), поэтому берём ту же схему, что у иконок проектов:
-// мягкая подложка и тёмный текст.
-function getAvatarColor(name: string): string {
-  const colors = [
-    'bg-rose-500/20 text-rose-800 dark:text-rose-200',
-    'bg-pink-500/20 text-pink-800 dark:text-pink-200',
-    'bg-fuchsia-500/20 text-fuchsia-800 dark:text-fuchsia-200',
-    'bg-purple-500/20 text-purple-800 dark:text-purple-200',
-    'bg-violet-500/20 text-violet-800 dark:text-violet-200',
-    'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200',
-    'bg-blue-500/20 text-blue-800 dark:text-blue-200',
-    'bg-sky-500/20 text-sky-800 dark:text-sky-200',
-    'bg-cyan-500/20 text-cyan-800 dark:text-cyan-200',
-    'bg-teal-500/20 text-teal-800 dark:text-teal-200',
-    'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200',
-    'bg-green-500/20 text-green-800 dark:text-green-200',
-    'bg-lime-500/20 text-lime-800 dark:text-lime-200',
-    'bg-yellow-500/20 text-yellow-800 dark:text-yellow-200',
-    'bg-amber-500/20 text-amber-800 dark:text-amber-200',
-    'bg-orange-500/20 text-orange-800 dark:text-orange-200',
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-}
+// Приоритет — это состояние, а не украшение: цвет приходит из ролей набора.
+const PRIORITY_TONES: Record<string, { tone: Tone; className: string }> = {
+  low: { tone: 'neutral', className: 'bg-surface-2' },
+  medium: { tone: 'neutral', className: 'bg-surface-2' },
+  high: { tone: 'warning', className: 'bg-warning/10' },
+  critical: { tone: 'danger', className: 'bg-danger/10' },
+};
 
 // Форматтеры один раз на модуль: toLocale*String строит новый на каждый
 // вызов, а formatDeadline зовётся на каждую карточку доски.
@@ -389,6 +354,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const [isCreatingStage, setIsCreatingStage] = useState(false);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
+  // Первый поле каждого окна получает фокус: без ссылки модалка забирала бы
+  // его на себя.
+  const stageNameRef = useRef<HTMLInputElement>(null);
+  const newTaskTitleRef = useRef<HTMLInputElement>(null);
 
   const selectedTask = useKanbanStore((s) =>
     s.selectedTaskId
@@ -402,16 +371,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
   if (!selectedProjectId) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-background">
-        <div className="max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <Search className="text-muted-foreground" size={28} />
-          </div>
-          <h2 className="mb-2 text-xl font-medium text-foreground">Проект не выбран</h2>
-          <p className="text-sm text-muted-foreground">
-            Выберите проект в боковой панели, чтобы увидеть задачи
-          </p>
-        </div>
+      <div className="flex min-h-[60vh] items-center justify-center bg-canvas">
+        <EmptyState
+          icon={<Search size={28} strokeWidth={1.7} />}
+          title="Проект не выбран"
+          description="Выберите проект в боковой панели, чтобы увидеть задачи"
+        />
       </div>
     );
   }
@@ -572,96 +537,94 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   );
 
   return (
-    <div className="flex min-w-0 flex-col bg-background">
+    <div className="flex min-w-0 flex-col bg-canvas">
       {/* Header */}
-      <header className="sticky top-0 z-10 overflow-hidden border-b bg-background px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-10 overflow-hidden border-b border-line bg-canvas px-4 py-4 sm:px-6">
         {/* На узком экране скрытый горизонтальный скролл прятал «Фильтр» и
             «Добавить задачу» без всякого намёка — переносим строки. */}
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3 lg:overflow-x-auto lg:overflow-y-hidden lg:scrollbar-hide">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3 lg:overflow-x-auto lg:overflow-y-hidden">
           {toolbar}
-          <Select value={kanbanSort} onValueChange={(value) => setKanbanSort(value as KanbanSort)}>
-            <SelectTrigger
-              className={`${toolbarSelect} shrink-0 bg-background`}
-              aria-label="Сортировка задач"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="urgency">По срочности</SelectItem>
-              <SelectItem value="updated">По обновлению</SelectItem>
-              <SelectItem value="deadline">По дедлайну</SelectItem>
-              <SelectItem value="title">По названию</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
+          <SelectField
+            value={kanbanSort}
+            onChange={(event) => setKanbanSort(event.target.value as KanbanSort)}
+            options={[
+              { value: 'urgency', label: 'По срочности' },
+              { value: 'updated', label: 'По обновлению' },
+              { value: 'deadline', label: 'По дедлайну' },
+              { value: 'title', label: 'По названию' },
+            ]}
+            variant="boxed"
+            className={`${toolbarSelect} w-40 shrink-0`}
+            aria-label="Сортировка задач"
+          />
+          <SearchField
             value={taskSearch}
-            onChange={(event) => setTaskSearch(event.target.value)}
+            onChange={(value) => setTaskSearch(value)}
             placeholder="Поиск задач…"
-            className={`${toolbarControl} w-48 shrink-0 bg-background`}
-            aria-label="Поиск задач на доске"
+            label="Поиск задач на доске"
+            className="w-48 shrink-0"
           />
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
             <Button
-              variant={showFilters || activeFiltersCount > 0 ? 'secondary' : 'outline'}
-              size="sm"
+              variant={showFilters || activeFiltersCount > 0 ? 'primary' : 'quiet'}
+              size="md"
               className={toolbarControl}
               onClick={() => setShowFilters(!showFilters)}
+              icon={<Filter size={14} strokeWidth={1.7} />}
             >
-              <Filter size={14} />
-              <span>Фильтры</span>
-              {activeFiltersCount > 0 && <Badge variant="secondary">{activeFiltersCount}</Badge>}
+              Фильтры
+              {activeFiltersCount > 0 && <Badge tone="accent">{activeFiltersCount}</Badge>}
             </Button>
 
             <Button
-              variant="outline"
-              size="sm"
+              variant="secondary"
+              size="md"
               className={toolbarControl}
               onClick={() => setShowStageDialog(true)}
+              icon={<Plus size={14} strokeWidth={1.7} />}
             >
-              <Plus size={14} />
-              <span>Фаза</span>
+              Фаза
             </Button>
 
-            <Button size="sm" className={toolbarControl} onClick={openAddDialog}>
-              <Plus size={14} />
-              <span>Добавить задачу</span>
+            <Button
+              size="md"
+              className={toolbarControl}
+              onClick={openAddDialog}
+              icon={<Plus size={14} strokeWidth={1.7} />}
+            >
+              Добавить задачу
             </Button>
           </div>
         </div>
 
-        {/* Filters panel — на телефоне уезжает в нижнюю шторку */}
+        {/* Filters panel — на телефоне уезжает в боковой ящик */}
         {showFilters && !isMobile && (
-          <div className={`mt-3 animate-slideUp ${toolbarPanel}`}>{filterControls}</div>
+          <div className={`mt-3 animate-slide-up ${toolbarPanel}`}>{filterControls}</div>
         )}
       </header>
 
       {isMobile && (
-        <Sheet open={showFilters} onOpenChange={setShowFilters}>
-          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Фильтры</SheetTitle>
-            </SheetHeader>
-            <div className="flex flex-col gap-3 px-4 pb-6 [&_[data-slot=select-trigger]]:h-11 [&_[data-slot=select-trigger]]:w-full [&_button:not([role=checkbox])]:h-11">
-              {filterControls}
-            </div>
-          </SheetContent>
-        </Sheet>
+        <Drawer
+          open={showFilters}
+          onClose={() => setShowFilters(false)}
+          side="right"
+          title="Фильтры"
+        >
+          <div className="flex flex-col gap-3 [&_[data-slot=select-trigger]]:h-11 [&_button:not([role=checkbox])]:h-11">
+            {filterControls}
+          </div>
+        </Drawer>
       )}
 
-      <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Новая фаза</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={stageName}
-            onChange={(event) => setStageName(event.target.value)}
-            onKeyDown={(event) => event.key === 'Enter' && void handleCreateStage()}
-            placeholder="Например, На согласовании"
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStageDialog(false)}>
+      <Modal
+        open={showStageDialog}
+        onClose={() => setShowStageDialog(false)}
+        title="Новая фаза"
+        size="md"
+        initialFocus={stageNameRef}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setShowStageDialog(false)}>
               Отмена
             </Button>
             <Button
@@ -670,9 +633,19 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             >
               {isCreatingStage ? 'Создаём…' : 'Создать'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <TextField
+          ref={stageNameRef}
+          value={stageName}
+          onChange={(event) => setStageName(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && void handleCreateStage()}
+          placeholder="Например, На согласовании"
+          aria-label="Название фазы"
+          autoFocus
+        />
+      </Modal>
 
       {/* Верхний scrollbar — только desktop; синхронизирован с доской ниже. */}
       <div
@@ -681,7 +654,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           if (boardScrollRef.current)
             boardScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="hidden overflow-x-auto border-b bg-background lg:block"
+        className="hidden overflow-x-auto border-b border-line bg-canvas lg:block"
       >
         <div className="flex min-w-max gap-4 px-4 py-2 xl:gap-5">
           {allStages.map((stage) => (
@@ -702,7 +675,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           if (topScrollRef.current)
             topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-background scrollbar-hide lg:snap-none"
+        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
       >
         <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
           {allStages.map((stage) => {
@@ -712,18 +685,19 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             return (
               <Card
                 key={stage.id}
-                className={`w-[20rem] shrink-0 snap-start gap-0 rounded-lg bg-muted/30 py-0 shadow-none ring-0 transition-colors lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
-                  isDragOver ? 'ring-2 ring-blue-400 bg-blue-500/10' : ''
+                padding="none"
+                className={`w-[20rem] shrink-0 snap-start bg-surface-2 lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
+                  isDragOver ? 'border-accent bg-accent/10' : ''
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => void handleDrop(e, stage.id)}
               >
                 {/* Column header */}
-                <div className="flex items-center gap-2 border-b px-3 py-2.5">
+                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
                   {editingStageId === stage.id ? (
-                    <Input
+                    <TextField
                       autoFocus
                       value={editingStageTitle}
                       onChange={(event) => setEditingStageTitle(event.target.value)}
@@ -735,12 +709,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                         if (event.key === 'Enter') event.currentTarget.blur();
                         if (event.key === 'Escape') setEditingStageId(null);
                       }}
-                      className="h-7 flex-1 px-1 text-sm font-semibold"
+                      size="sm"
+                      className="min-w-0 flex-1"
                       aria-label="Название фазы"
                     />
                   ) : (
                     <h2
-                      className="flex-1 cursor-text text-sm font-semibold text-foreground"
+                      className="flex-1 cursor-text text-sm font-bold text-ink"
                       onDoubleClick={() => {
                         setEditingStageId(stage.id);
                         setEditingStageTitle(stage.name);
@@ -749,19 +724,18 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       {stage.name}
                     </h2>
                   )}
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="text-xs text-ink-faint">
                     {colTasks.length}
                     {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
                   </span>
-                  <Button
+                  <IconButton
+                    label={`Добавить задачу в фазу ${stage.name}`}
                     variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground"
+                    size="sm"
                     onClick={() => setInlineAddStage(stage.id)}
-                    aria-label={`Добавить задачу в фазу ${stage.name}`}
                   >
-                    <Plus size={15} />
-                  </Button>
+                    <Plus size={15} strokeWidth={1.7} />
+                  </IconButton>
                 </div>
 
                 {/* Tasks list */}
@@ -793,9 +767,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   {(stagePages[stage.id]?.tasks.length || 0) <
                     (stagePages[stage.id]?.total || 0) && (
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full"
+                      variant="quiet"
+                      size="md"
+                      full
                       disabled={stagePages[stage.id]?.loading}
                       onClick={() =>
                         void loadStagePage(
@@ -815,7 +789,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
           {orphanTasks.length > 0 && (
             <Card
-              className="w-[20rem] flex-shrink-0 gap-0 py-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
+              padding="none"
+              className="w-[20rem] flex-shrink-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
               onDragOver={(e) => handleDragOver(e, 'orphan')}
               onDragLeave={handleDragLeave}
               onDrop={(e) => {
@@ -826,12 +801,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 setDragOverColumn(null);
               }}
             >
-              <div className="flex items-center gap-2 border-b px-3 py-2.5">
-                <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                <h2 className="flex-1 text-sm font-semibold text-foreground">Без фазы</h2>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {orphanTasks.length}
-                </span>
+              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <div className="w-2 h-2 rounded-full bg-ink-muted" />
+                <h2 className="flex-1 text-sm font-bold text-ink">Без фазы</h2>
+                <span className="text-xs text-ink-faint">{orphanTasks.length}</span>
               </div>
               <div className="flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[200px]">
                 {orphanTasks.map((task) => (
@@ -853,127 +826,15 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       </div>
 
       {/* Add Task Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Новая задача</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-              Проект: <span className="font-medium text-foreground">{currentProject?.name}</span>
-            </div>
-            <label className="block space-y-1.5 text-sm font-medium">
-              Название задачи *
-              <Input
-                value={newTask.title}
-                onChange={(event) =>
-                  setNewTask((value) => ({ ...value, title: event.target.value }))
-                }
-                placeholder="Что нужно сделать"
-                autoFocus
-              />
-            </label>
-            <label className="block space-y-1.5 text-sm font-medium">
-              Описание
-              <Textarea
-                value={newTask.description}
-                onChange={(event) =>
-                  setNewTask((value) => ({ ...value, description: event.target.value }))
-                }
-                placeholder="Контекст и ожидаемый результат"
-              />
-            </label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="space-y-1.5 text-sm font-medium">
-                Исполнитель
-                <Select
-                  value={newTask.responsibleId || 'unassigned'}
-                  onValueChange={(value) =>
-                    setNewTask((item) => ({
-                      ...item,
-                      responsibleId: value === 'unassigned' ? '' : value,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned" disabled>
-                      Выберите исполнителя
-                    </SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">
-                Приоритет
-                <Select
-                  value={newTask.priority}
-                  onValueChange={(value) => setNewTask((item) => ({ ...item, priority: value }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Низкий</SelectItem>
-                    <SelectItem value="medium">Обычный</SelectItem>
-                    <SelectItem value="high">Высокий</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">
-                Дедлайн
-                <Input
-                  type="datetime-local"
-                  value={newTask.deadline}
-                  onChange={(event) =>
-                    setNewTask((item) => ({ ...item, deadline: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">
-                Оценка, часы
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={newTask.estimate}
-                  onChange={(event) =>
-                    setNewTask((item) => ({ ...item, estimate: event.target.value }))
-                  }
-                  placeholder="Например, 2.5"
-                />
-              </label>
-            </div>
-            <label className="block space-y-1.5 text-sm font-medium">
-              Фаза
-              <Select
-                value={newTask.stageId || 'none'}
-                onValueChange={(value) =>
-                  setNewTask((item) => ({ ...item, stageId: value === 'none' ? '' : value }))
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Не выбрана</SelectItem>
-                  {allStages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+      <Modal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Новая задача"
+        size="lg"
+        initialFocus={newTaskTitleRef}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setShowAddModal(false)}>
               Отмена
             </Button>
             <Button
@@ -982,9 +843,92 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             >
               Создать задачу
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-ui bg-surface-2 px-3 py-2 text-sm text-ink-soft">
+            Проект: <span className="font-medium text-ink">{currentProject?.name}</span>
+          </div>
+          <TextField
+            ref={newTaskTitleRef}
+            label="Название задачи *"
+            value={newTask.title}
+            onChange={(event) => setNewTask((value) => ({ ...value, title: event.target.value }))}
+            placeholder="Что нужно сделать"
+            autoFocus
+          />
+          <TextArea
+            label="Описание"
+            value={newTask.description}
+            onChange={(event) =>
+              setNewTask((value) => ({ ...value, description: event.target.value }))
+            }
+            placeholder="Контекст и ожидаемый результат"
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SelectField
+              label="Исполнитель"
+              value={newTask.responsibleId || 'unassigned'}
+              onChange={(event) =>
+                setNewTask((item) => ({
+                  ...item,
+                  responsibleId: event.target.value === 'unassigned' ? '' : event.target.value,
+                }))
+              }
+              options={[
+                { value: 'unassigned', label: 'Выберите исполнителя', disabled: true },
+                ...users.map((user) => ({ value: user.id, label: user.name })),
+              ]}
+            />
+            <SelectField
+              label="Приоритет"
+              value={newTask.priority}
+              onChange={(event) =>
+                setNewTask((item) => ({ ...item, priority: event.target.value }))
+              }
+              options={[
+                { value: 'low', label: 'Низкий' },
+                { value: 'medium', label: 'Обычный' },
+                { value: 'high', label: 'Высокий' },
+              ]}
+            />
+            <TextField
+              label="Дедлайн"
+              type="datetime-local"
+              value={newTask.deadline}
+              onChange={(event) =>
+                setNewTask((item) => ({ ...item, deadline: event.target.value }))
+              }
+            />
+            <TextField
+              label="Оценка, часы"
+              type="number"
+              min="0"
+              step="0.5"
+              value={newTask.estimate}
+              onChange={(event) =>
+                setNewTask((item) => ({ ...item, estimate: event.target.value }))
+              }
+              placeholder="Например, 2.5"
+            />
+          </div>
+          <SelectField
+            label="Фаза"
+            value={newTask.stageId || 'none'}
+            onChange={(event) =>
+              setNewTask((item) => ({
+                ...item,
+                stageId: event.target.value === 'none' ? '' : event.target.value,
+              }))
+            }
+            options={[
+              { value: 'none', label: 'Не выбрана' },
+              ...allStages.map((stage) => ({ value: stage.id, label: stage.name })),
+            ]}
+          />
+        </div>
+      </Modal>
 
       {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
     </div>
@@ -1024,9 +968,11 @@ function InlineAddForm({
   };
 
   return (
-    <div className="rounded-md border bg-background p-2 shadow-sm">
-      <Input
+    <div className="rounded-ui border border-line bg-canvas p-2 shadow-rest">
+      <TextField
         ref={inputRef}
+        variant="boxed"
+        size="sm"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
@@ -1037,43 +983,42 @@ function InlineAddForm({
           if (e.key === 'Escape') onCancel();
         }}
         placeholder="Название задачи…"
-        className="h-10 text-sm sm:h-8"
+        aria-label="Название задачи"
         disabled={submitting}
       />
       <div className="mt-2 flex items-center gap-1">
-        <Select
+        <SelectField
           value={assigneeId || 'unassigned'}
-          onValueChange={(value) => setAssigneeId(value === 'unassigned' ? '' : value)}
+          onChange={(event) =>
+            setAssigneeId(event.target.value === 'unassigned' ? '' : event.target.value)
+          }
+          options={[
+            { value: 'unassigned', label: 'Без исполнителя' },
+            ...users.map((u) => ({ value: u.id, label: u.name })),
+          ]}
+          size="sm"
           disabled={submitting}
-        >
-          <SelectTrigger className="h-7 min-w-0 flex-1 text-xs" aria-label="Исполнитель">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unassigned">Без исполнителя</SelectItem>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger className="h-7 w-24 text-xs" aria-label="Приоритет">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Низкий</SelectItem>
-            <SelectItem value="medium">Обычный</SelectItem>
-            <SelectItem value="high">Высокий</SelectItem>
-          </SelectContent>
-        </Select>
+          className="min-w-0 flex-1"
+          aria-label="Исполнитель"
+        />
+        <SelectField
+          value={priority}
+          onChange={(event) => setPriority(event.target.value)}
+          options={[
+            { value: 'low', label: 'Низкий' },
+            { value: 'medium', label: 'Обычный' },
+            { value: 'high', label: 'Высокий' },
+          ]}
+          size="sm"
+          className="w-24"
+          aria-label="Приоритет"
+        />
       </div>
       <div className="mt-2 flex items-center justify-end gap-1">
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={submitting}>
+        <Button size="md" variant="quiet" onClick={onCancel} disabled={submitting}>
           Отмена
         </Button>
-        <Button size="sm" onClick={() => void submit()} disabled={!title.trim() || submitting}>
+        <Button size="md" onClick={() => void submit()} disabled={!title.trim() || submitting}>
           {submitting ? '…' : 'Создать'}
         </Button>
       </div>
@@ -1099,6 +1044,7 @@ function TaskCard({
   onMoveToStage: (taskId: string, stageId: string) => void;
 }) {
   const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
+  const priorityTone = PRIORITY_TONES[task.priority] || PRIORITY_TONES.medium;
   const taskTags = task.tags?.length ? task.tags : extractTaskTags(task.title, task.description);
   const isCompleted = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
@@ -1117,67 +1063,56 @@ function TaskCard({
       onClick={onClick}
       // Колонка держит до 50 карточек, а видно от силы шесть: content-visibility
       // позволяет браузеру не отрисовывать то, что за пределами экрана.
-      className={`relative cursor-pointer gap-0 rounded-lg border border-transparent bg-background p-3 shadow-none ring-0 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-border hover:shadow-sm ${
-        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-muted/60 text-muted-foreground' : ''
+      className={`group/card cursor-pointer border-transparent p-3 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-line-strong hover:shadow-lift ${
+        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-surface-2 text-ink-soft' : ''
       }`}
     >
       {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
           фазу можно выбрать и списком. */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            // С мышью кнопка появляется при наведении: в покое карточка плоская.
-            // На тач-экранах drag&drop нет, поэтому там она видна всегда.
-            className="absolute top-2 right-2 size-7 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
-            aria-label={`Переместить задачу ${task.title}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <MoveHorizontal className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-          <DropdownMenuLabel>Переместить в фазу</DropdownMenuLabel>
-          {stages.map((stage) => (
-            <DropdownMenuItem
-              key={stage.id}
-              disabled={stage.id === task.stageId}
-              onClick={() => onMoveToStage(task.id, stage.id)}
+      <div
+        className="absolute right-2 top-2 z-10 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-within:opacity-100"
+        // Клик по меню не должен открывать карточку.
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Menu
+          label="Переместить в фазу"
+          align="end"
+          width="auto"
+          items={stages.map((stage) => ({
+            value: stage.id,
+            label: stage.name,
+            disabled: stage.id === task.stageId,
+            onSelect: () => onMoveToStage(task.id, stage.id),
+          }))}
+          trigger={
+            <IconButton
+              label={`Переместить задачу ${task.title}`}
+              variant="ghost"
+              size="sm"
+              onClick={(event) => event.stopPropagation()}
             >
-              {stage.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              <MoveHorizontal className="size-4" strokeWidth={1.7} />
+            </IconButton>
+          }
+        />
+      </div>
       {hasChips && (
         <div className="mb-2 flex min-w-0 flex-wrap items-center gap-1 pr-6">
           {showPriority && (
-            <span
-              className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${priority.bgColor} ${priority.color}`}
+            <Badge
+              tone={priorityTone.tone}
+              className={`shrink-0 whitespace-nowrap rounded-ui px-1.5 py-0.5 ${priorityTone.className}`}
             >
               {priority.label}
-            </span>
+            </Badge>
           )}
           {taskTags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              title={tag}
-              className="max-w-28 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-            >
+            <Chip key={tag} title={tag} className="max-w-28">
               {tag}
-            </span>
+            </Chip>
           ))}
-          {taskTags.length > 3 && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              +{taskTags.length - 3}
-            </span>
-          )}
-          {task.parentId && (
-            <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-              Подзадача
-            </span>
-          )}
+          {taskTags.length > 3 && <Chip>+{taskTags.length - 3}</Chip>}
+          {task.parentId && <Chip tone="accent">Подзадача</Chip>}
         </div>
       )}
 
@@ -1185,13 +1120,13 @@ function TaskCard({
       <div className={`mb-2 flex items-start gap-1 ${hasChips ? '' : 'pr-6'}`}>
         <h3
           className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
-            isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'
+            isCompleted ? 'text-ink-soft line-through' : 'text-ink'
           }`}
         >
           {task.title}
         </h3>
         {task.description && (
-          <AlignLeft className="mt-0.5 shrink-0 text-muted-foreground" size={14} />
+          <AlignLeft className="mt-0.5 shrink-0 text-ink-faint" size={14} strokeWidth={1.7} />
         )}
       </div>
 
@@ -1199,16 +1134,16 @@ function TaskCard({
           в одну строку с дедлайном и аватаром. Перенос строк и truncate у
           дедлайна/оценки чинят наложение, не ломая внешний вид на широких. */}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
           <span
-            className={`flex min-w-0 items-center gap-1 ${isOverdue ? 'text-destructive font-medium' : ''}`}
+            className={`flex min-w-0 items-center gap-1 ${isOverdue ? 'text-danger-text font-medium' : ''}`}
           >
-            <Calendar size={12} className="shrink-0" />
+            <Calendar size={12} strokeWidth={1.7} className="shrink-0" />
             <span className="truncate">{dueDate || 'Без срока'}</span>
           </span>
           {(task.estimate > 0 || task.actualTime > 0) && (
             <span className="flex items-center gap-1">
-              <Timer size={12} className="shrink-0" />
+              <Timer size={12} strokeWidth={1.7} className="shrink-0" />
               <span className="truncate">
                 {task.estimate > 0 && `План ${task.estimate} ч`}
                 {task.estimate > 0 && task.actualTime > 0 && ', '}
@@ -1237,29 +1172,9 @@ function TaskCard({
 }
 
 function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
-  const [imageFailed, setImageFailed] = useState(!avatarUrl);
-
-  if (!avatarUrl || imageFailed) {
-    return (
-      <div
-        className={`flex size-6 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${getAvatarColor(name)} text-[10px] font-semibold`}
-        title={name}
-      >
-        {getInitials(name)}
-      </div>
-    );
-  }
-
   return (
-    <Image
-      src={avatarUrl}
-      alt={name}
-      title={name}
-      width={24}
-      height={24}
-      unoptimized
-      onError={() => setImageFailed(true)}
-      className="size-6 shrink-0 rounded-full object-cover ring-2 ring-card"
-    />
+    <span title={name} className="inline-flex shrink-0">
+      <Avatar name={name} src={avatarUrl} size="xs" />
+    </span>
   );
 }

@@ -13,21 +13,15 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { cn, pluralRu } from '@/lib/utils';
-import { Bx24Project, Bx24User } from '@/types/bitrix';
+import { Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
 import PageHeader from '@/components/PageHeader';
 import LoadingState from '@/components/LoadingState';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/monos/Button';
+import { Card } from '@/components/monos/Card';
+import { IconButton } from '@/components/monos/IconButton';
+import { Modal } from '@/components/monos/Modal';
+import { SelectField } from '@/components/monos/SelectField';
 
 type WorkloadBucket = { userId: string; count: number; hours: number };
 type WorkloadSummary = {
@@ -69,10 +63,9 @@ const taskLabel = (count: number) => pluralRu(count, ['задача', 'зада�
 
 // Пустая ячейка — фон, а не карточка: десятки рамок с «—» забивали сетку, и
 // дни с задачами не выделялись.
-const EMPTY_CELL = 'border-transparent text-muted-foreground/60 hover:bg-muted/50';
-const FILLED_CELL = 'border-border bg-background/40 hover:ring-2 hover:ring-primary/30';
-const OVERDUE_CELL =
-  'border-destructive/30 bg-destructive/10 text-red-800 hover:ring-2 hover:ring-destructive/30 dark:text-red-200';
+const EMPTY_CELL = 'border-transparent text-ink-faint hover:bg-surface-2';
+const FILLED_CELL = 'border-line bg-surface-2/50 hover:border-line-strong';
+const OVERDUE_CELL = 'border-danger/30 bg-danger/10 text-danger-text hover:border-danger/60';
 
 function UserAvatar({ user }: { user: Bx24User }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -95,7 +88,7 @@ function UserAvatar({ user }: { user: Bx24User }) {
     );
   }
   return (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent-text">
       {initials || '—'}
     </span>
   );
@@ -114,8 +107,7 @@ function WorkloadValue({
   // estimate per task branch: use the recursive sum of estimated descendants;
   // if every descendant estimate is zero, fall back to the parent's estimate.
   // Sum only root branches so parent and subtasks are never counted twice.
-  if (count === 0 && actualHours === undefined)
-    return <span className="text-muted-foreground">—</span>;
+  if (count === 0 && actualHours === undefined) return <span className="text-ink-faint">—</span>;
   return (
     <span className="flex flex-col items-center gap-0.5 leading-tight">
       {count > 0 && (
@@ -123,11 +115,13 @@ function WorkloadValue({
           <span>
             {count} {taskLabel(count)}
           </span>
-          <span className="text-xs opacity-80">План {formatHours(hours)}</span>
+          {/* Явный цвет вместо opacity: в ячейке с просрочкой текст наследует
+              сигнальный, и приглушение опускало контраст ниже 4.5:1. */}
+          <span className="text-xs text-ink-soft">План {formatHours(hours)}</span>
         </>
       )}
       {actualHours !== undefined && (
-        <span className="text-xs opacity-80">Факт {formatHours(actualHours)}</span>
+        <span className="text-xs text-ink-soft">Факт {formatHours(actualHours)}</span>
       )}
     </span>
   );
@@ -299,8 +293,20 @@ export default function TeamWorkload() {
   const noDeadlineCount = sumOf(summary?.noDeadline || []).count;
   const overdueCount = sumOf(summary?.overdue || []).count;
 
+  const projectOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Все проекты' },
+      { value: NO_PROJECT_ID, label: NO_PROJECT_NAME },
+      ...projects
+        .filter((project) => !project.isArchived)
+        .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
+        .map((project) => ({ value: project.id, label: project.name })),
+    ],
+    [projects],
+  );
+
   return (
-    <div className="min-h-screen bg-background pb-12">
+    <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title="Нагрузка команды"
         description="План по срокам: количество задач и часы на каждого исполнителя"
@@ -308,153 +314,149 @@ export default function TeamWorkload() {
 
       <div className="space-y-4 p-4 lg:p-6">
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <ClipboardList className="size-5 shrink-0 text-primary" />
-              <div>
-                <p className="text-2xl font-semibold tabular-nums">{weekTotals.count}</p>
-                <p className="text-sm text-muted-foreground">
-                  {taskLabel(weekTotals.count)} со сроком на этой неделе
-                </p>
-              </div>
-            </CardContent>
+          <Card className="flex items-center gap-3">
+            <ClipboardList className="size-5 shrink-0 text-accent" strokeWidth={1.7} />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{weekTotals.count}</p>
+              <p className="text-sm text-ink-soft">
+                {taskLabel(weekTotals.count)} со сроком на этой неделе
+              </p>
+            </div>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Clock3 className="size-5 shrink-0 text-primary" />
-              <div>
-                <p className="text-2xl font-semibold tabular-nums">
-                  {formatHours(weekTotals.hours)}
-                </p>
-                <p className="text-sm text-muted-foreground">план на этой неделе</p>
-              </div>
-            </CardContent>
+          <Card className="flex items-center gap-3">
+            <Clock3 className="size-5 shrink-0 text-accent" strokeWidth={1.7} />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{formatHours(weekTotals.hours)}</p>
+              <p className="text-sm text-ink-soft">план на этой неделе</p>
+            </div>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <CalendarOff className="size-5 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-semibold tabular-nums">{noDeadlineCount}</p>
-                <p className="text-sm text-muted-foreground">
-                  {taskLabel(noDeadlineCount)} без срока
-                </p>
-              </div>
-            </CardContent>
+          <Card className="flex items-center gap-3">
+            <CalendarOff className="size-5 shrink-0 text-ink-faint" strokeWidth={1.7} />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{noDeadlineCount}</p>
+              <p className="text-sm text-ink-soft">{taskLabel(noDeadlineCount)} без срока</p>
+            </div>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <TriangleAlert
+          <Card className="flex items-center gap-3">
+            <TriangleAlert
+              className={cn(
+                'size-5 shrink-0',
+                overdueCount ? 'text-danger-text' : 'text-ink-faint',
+              )}
+              strokeWidth={1.7}
+            />
+            <div>
+              <p
                 className={cn(
-                  'size-5 shrink-0',
-                  overdueCount ? 'text-destructive' : 'text-muted-foreground',
+                  'text-2xl font-bold tabular-nums',
+                  overdueCount > 0 && 'text-danger-text',
                 )}
-              />
-              <div>
-                <p
-                  className={cn(
-                    'text-2xl font-semibold tabular-nums',
-                    overdueCount > 0 && 'text-destructive',
-                  )}
-                >
-                  {overdueCount}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {pluralRu(overdueCount, [
-                    'просроченная задача',
-                    'просроченные задачи',
-                    'просроченных задач',
-                  ])}
-                </p>
-              </div>
-            </CardContent>
+              >
+                {overdueCount}
+              </p>
+              <p className="text-sm text-ink-soft">
+                {pluralRu(overdueCount, [
+                  'просроченная задача',
+                  'просроченные задачи',
+                  'просроченных задач',
+                ])}
+              </p>
+            </div>
           </Card>
         </div>
 
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+        <Card padding="none" className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <div>
-              <h2 className="font-semibold">Календарь нагрузки</h2>
-              <p className="text-sm text-muted-foreground">План по срокам и списания времени</p>
+              <h2 className="font-bold">Календарь нагрузки</h2>
+              <p className="text-sm text-ink-soft">План по срокам и списания времени</p>
             </div>
-            <div className="flex items-center gap-1">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger aria-label="Проект" className="max-w-52">
-                  <SelectValue placeholder="Все проекты" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="all">Все проекты</SelectItem>
-                  <SelectItem value={NO_PROJECT_ID}>{NO_PROJECT_NAME}</SelectItem>
-                  {projects
-                    .filter((project) => !project.isArchived)
-                    .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
-                    .map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <SelectField
+                value={selectedProjectId}
+                onChange={(event) => setSelectedProjectId(event.target.value)}
+                options={projectOptions}
+                variant="boxed"
+                size="md"
+                className="w-52 shrink-0"
+                aria-label="Проект"
+              />
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => void refreshActualTime()}
                 disabled={timeRefreshing}
+                icon={
+                  <RefreshCw
+                    className={timeRefreshing ? 'animate-spin' : ''}
+                    size={14}
+                    strokeWidth={1.7}
+                  />
+                }
               >
-                <RefreshCw className={timeRefreshing ? 'animate-spin' : ''} /> Обновить факт
+                Обновить факт
               </Button>
-              <Button
+              <IconButton
+                label="Предыдущая неделя"
                 variant="outline"
-                size="icon"
-                aria-label="Предыдущая неделя"
+                size="md"
                 onClick={() => setWeekStart((current) => addDays(current, -7))}
               >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <Button variant="outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+                <ChevronLeft className="size-4" strokeWidth={1.7} />
+              </IconButton>
+              <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>
                 Сегодня
               </Button>
-              <Button
+              <IconButton
+                label="Следующая неделя"
                 variant="outline"
-                size="icon"
-                aria-label="Следующая неделя"
+                size="md"
                 onClick={() => setWeekStart((current) => addDays(current, 7))}
               >
-                <ChevronRight className="size-4" />
-              </Button>
+                <ChevronRight className="size-4" strokeWidth={1.7} />
+              </IconButton>
             </div>
           </div>
 
           {/* Ошибка факта раньше записывалась в состояние и терялась: ячейки
               просто оставались без «Факт», как будто никто ничего не списывал. */}
           {timeError && (
-            <p role="alert" className="border-b px-4 py-2 text-sm text-destructive">
+            <p role="alert" className="border-b border-line px-4 py-2 text-sm text-danger-text">
               {timeError}. Нажмите «Обновить факт», чтобы повторить.
             </p>
           )}
           {summaryError ? (
-            <p className="p-6 text-sm text-destructive">{summaryError}</p>
+            <p className="p-6 text-sm text-danger-text">{summaryError}</p>
           ) : !summary ? (
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div className="overflow-x-auto">
               <div className="min-w-[1090px]">
-                <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b bg-muted/40 text-sm">
+                <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line bg-surface-2 text-sm">
                   <div className="px-4 py-3 font-medium">Исполнитель</div>
                   {days.map((day, index) => (
                     <div
                       key={calendarDayKey(day)}
                       aria-current={calendarDayKey(day) === todayKey ? 'date' : undefined}
-                      className={cn(
-                        'border-l px-2 py-3 text-center',
-                        calendarDayKey(day) === todayKey &&
-                          'shadow-[inset_0_-2px_0_0_var(--primary)]',
-                      )}
+                      className="relative border-l border-line px-2 py-3 text-center"
                     >
                       <p className="font-medium">{DAY_NAMES[index]}</p>
-                      <p className="text-xs text-muted-foreground">{DAY_FORMATTER.format(day)}</p>
+                      <p className="text-xs text-ink-faint">{DAY_FORMATTER.format(day)}</p>
+                      {/* Сегодняшний день отмечен чертой чернил — так же, как
+                          набор отмечает выбранную вкладку. */}
+                      {calendarDayKey(day) === todayKey ? (
+                        <span
+                          className="absolute inset-x-0 bottom-0 h-0.5 bg-ink"
+                          aria-hidden="true"
+                        />
+                      ) : null}
                     </div>
                   ))}
-                  <div className="border-l px-2 py-3 text-center font-medium">Без срока</div>
-                  <div className="border-l px-2 py-3 text-center font-medium">Просрочено</div>
+                  <div className="border-l border-line px-2 py-3 text-center font-medium">
+                    Без срока
+                  </div>
+                  <div className="border-l border-line px-2 py-3 text-center font-medium">
+                    Просрочено
+                  </div>
                 </div>
                 {assignees.map((assignee) => {
                   const memberPlannedHours = (summary?.days || [])
@@ -468,7 +470,7 @@ export default function TeamWorkload() {
                   return (
                     <div
                       key={assignee.id}
-                      className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b last:border-b-0"
+                      className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line last:border-b-0"
                     >
                       <div className="flex min-w-0 items-center gap-2 px-4 py-3">
                         <UserAvatar user={assignee} />
@@ -480,7 +482,7 @@ export default function TeamWorkload() {
                           >
                             {assignee.name}
                           </span>
-                          <span className="block text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                          <span className="block text-xs whitespace-nowrap text-ink-faint tabular-nums">
                             План {formatHours(memberPlannedHours)} · факт{' '}
                             {formatHours(memberActualHours)}
                           </span>
@@ -499,7 +501,7 @@ export default function TeamWorkload() {
                                 setSelectedActual({ userId: assignee.id, day: key });
                               else if (bucket.count) openTaskList(assignee.id, key);
                             }}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count || actualHoursFor(assignee.id, key) !== undefined ? FILLED_CELL : EMPTY_CELL}`}
+                            className={`m-1 min-h-16 rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count || actualHoursFor(assignee.id, key) !== undefined ? FILLED_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue
                               count={bucket.count}
@@ -515,7 +517,7 @@ export default function TeamWorkload() {
                           <button
                             type="button"
                             onClick={() => bucket.count && openTaskList(assignee.id, 'no_deadline')}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? FILLED_CELL : EMPTY_CELL}`}
+                            className={`m-1 min-h-16 rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? FILLED_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
@@ -527,7 +529,7 @@ export default function TeamWorkload() {
                           <button
                             type="button"
                             onClick={() => bucket.count && openTaskList(assignee.id, 'overdue')}
-                            className={`m-1 min-h-16 rounded-lg border px-1 py-2 text-center transition-colors ${bucket.count ? OVERDUE_CELL : EMPTY_CELL}`}
+                            className={`m-1 min-h-16 rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? OVERDUE_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
@@ -542,43 +544,42 @@ export default function TeamWorkload() {
         </Card>
       </div>
 
-      <Dialog
+      <Modal
         open={Boolean(selectedActual)}
-        onOpenChange={(open) => !open && setSelectedActual(null)}
+        onClose={() => setSelectedActual(null)}
+        title="Списания времени"
+        description={
+          selectedActual
+            ? `${assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник'}, ${selectedActual.day}`
+            : ''
+        }
+        size="md"
       >
-        <DialogContent>
-          <DialogTitle>Списания времени</DialogTitle>
-          <DialogDescription>
-            {selectedActual
-              ? `${assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник'}, ${selectedActual.day}`
-              : ''}
-          </DialogDescription>
-          <div className="max-h-72 space-y-2 overflow-y-auto">
-            {selectedEntries.map((entry, index) => {
-              const task = allTasks.find((item) => item.id === entry.taskId);
-              return (
-                <button
-                  key={`${entry.taskId}-${index}`}
-                  type="button"
-                  className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/70"
-                  onClick={() => {
-                    setSelectedActual(null);
-                    router.push(`/team-workload?task=${entry.taskId}`);
-                  }}
-                >
-                  <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatHours(entry.seconds / 3600)}, задача #{entry.taskId}
-                  </p>
-                </button>
-              );
-            })}
-            {selectedEntries.length === 0 && (
-              <p className="text-sm text-muted-foreground">Списаний за этот день нет.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {selectedEntries.map((entry, index) => {
+            const task = allTasks.find((item) => item.id === entry.taskId);
+            return (
+              <button
+                key={`${entry.taskId}-${index}`}
+                type="button"
+                className="w-full rounded-ui border border-line p-3 text-left transition-colors duration-fast hover:bg-surface-2"
+                onClick={() => {
+                  setSelectedActual(null);
+                  router.push(`/team-workload?task=${entry.taskId}`);
+                }}
+              >
+                <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {formatHours(entry.seconds / 3600)}, задача #{entry.taskId}
+                </p>
+              </button>
+            );
+          })}
+          {selectedEntries.length === 0 && (
+            <p className="text-sm text-ink-soft">Списаний за этот день нет.</p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
