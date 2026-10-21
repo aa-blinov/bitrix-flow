@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Inter } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import { ToastProvider } from '@/components/ui/toast';
-import { ConfirmProvider } from '@/components/ui/confirm-dialog';
+import { ToastProvider } from '@/components/monos/toast';
+import { ConfirmProvider } from '@/components/monos/confirm-dialog';
+import { ThemeProvider } from '@/components/monos/theme';
 
-// Inter: профессиональный современный шрифт с полной поддержкой кириллицы.
-// Используем display=swap, чтобы текст не блокировал первый рендер.
-const inter = Inter({
-  subsets: ['latin', 'cyrillic', 'cyrillic-ext'],
-  variable: '--font-sans',
+// JetBrains Mono — единственная гарнитура в наборе @monos/ui. Подгружается
+// с кириллицей, потому что весь интерфейс приложения русский.
+const jetbrains = JetBrains_Mono({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-jetbrains',
   display: 'swap',
 });
 
@@ -32,16 +33,35 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={cn('font-sans', inter.variable)} suppressHydrationWarning>
+    <html lang="ru" className={cn('font-ui', jetbrains.variable)} suppressHydrationWarning>
       <body className="h-full antialiased">
+        {/* Тема ставится до первой отрисовки, иначе страница моргает белым.
+            Набор из @monos/ui различает палитру и режим атрибутами
+            `[data-theme]` и `[data-mode]`. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(() => { try { const saved = localStorage.getItem('bitrix-flow-theme'); const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.classList.toggle('dark', dark); } catch {} })()`,
+            __html: `(() => { try {
+              const saved = localStorage.getItem('bitrix-flow-theme');
+              const prefersDark = matchMedia('(prefers-color-scheme: dark)').matches;
+              let theme = 'gruvbox';
+              let mode = prefersDark ? 'dark' : 'light';
+              if (saved) {
+                const parts = saved.split(':');
+                if (parts[0] && parts[0] !== 'mode') theme = parts[0];
+                if (parts[1] === 'dark' || parts[1] === 'light') mode = parts[1];
+                else if (saved === 'dark' || saved === 'light') mode = saved;
+              }
+              const el = document.documentElement;
+              el.setAttribute('data-theme', theme);
+              el.setAttribute('data-mode', mode);
+            } catch {} })()`,
           }}
         />
-        <ToastProvider>
-          <ConfirmProvider>{children}</ConfirmProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

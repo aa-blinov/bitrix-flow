@@ -3,9 +3,10 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LockKeyhole } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/monos/Button';
+import { Card } from '@/components/monos/Card';
+import { Notice } from '@/components/monos/Notice';
+import { TextField } from '@/components/monos/TextField';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,51 +49,42 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-12 sm:flex sm:items-center sm:justify-center">
-      <Card className="mx-auto w-full max-w-sm bg-card shadow-2xl">
-        <form onSubmit={onSubmit}>
-          <CardHeader className="flex-row items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <LockKeyhole size={19} />
+    <main className="min-h-screen bg-canvas px-4 py-12 sm:flex sm:items-center sm:justify-center">
+      <Card padding="lg" className="mx-auto w-full max-w-sm">
+        <form onSubmit={onSubmit} className="flex flex-col gap-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-ui bg-ink text-canvas">
+              <LockKeyhole size={18} strokeWidth={1.7} />
             </div>
             <div>
-              <CardTitle asChild>
-                <h1>BitrixFlow</h1>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">Защищённый доступ</p>
+              <h1 className="text-lg font-bold text-ink">BitrixFlow</h1>
+              <p className="text-xs uppercase tracking-widest text-ink-soft">Защищённый доступ</p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="block text-sm font-medium">
-              Логин
-              <Input
-                autoComplete="username"
-                required
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                className="mt-1.5"
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              Пароль
-              <Input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="mt-1.5"
-              />
-            </label>
-            {error && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            <Button disabled={isSubmitting} className="w-full" size="lg">
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <TextField
+              label="Логин"
+              variant="boxed"
+              autoComplete="username"
+              required
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+            <TextField
+              label="Пароль"
+              type="password"
+              variant="boxed"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            {error ? <Notice tone="danger">{error}</Notice> : null}
+            <Button full size="lg" loading={isSubmitting} type="submit">
               {isSubmitting ? 'Входим…' : 'Войти'}
             </Button>
-          </CardContent>
+          </div>
         </form>
       </Card>
     </main>

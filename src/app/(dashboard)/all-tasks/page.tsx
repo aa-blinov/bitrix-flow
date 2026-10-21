@@ -13,7 +13,6 @@ import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import QuickCreateTask from '@/components/QuickCreateTask';
-import { Button } from '@/components/ui/button';
 
 function AllTasksInner() {
   const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore(
@@ -72,18 +71,19 @@ function AllTasksInner() {
   }, [taskFromUrl, selectedTaskId, setSelectedTask]);
 
   return (
-    <div className="min-h-screen bg-background pb-12">
+    <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title="Все задачи"
         description={workloadDescription}
         actions={
           <div className="flex items-center gap-2">
             {searchParams.get('from') === 'workload' && (
-              <Button asChild variant="outline" size="sm">
-                <Link href="/team-workload">
-                  <ArrowLeft /> К нагрузке
-                </Link>
-              </Button>
+              <Link
+                href="/team-workload"
+                className="inline-flex h-11 items-center gap-2 rounded-ui px-3 text-xs font-normal uppercase tracking-widest text-ink-soft transition-colors duration-fast hover:text-ink sm:h-9"
+              >
+                <ArrowLeft size={14} strokeWidth={1.7} />К нагрузке
+              </Link>
             )}
             <QuickCreateTask />
           </div>

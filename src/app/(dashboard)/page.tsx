@@ -11,17 +11,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn, getProjectColor, getProjectInitials, pluralRu } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
+import { Card } from '@/components/monos/Card';
+import { Progress } from '@/components/monos/Progress';
+import { SelectField } from '@/components/monos/SelectField';
+import { TextField } from '@/components/monos/TextField';
+import { cn, getProjectInitials, pluralRu } from '@/lib/utils';
 import PageHeader from '@/components/PageHeader';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 
@@ -100,15 +95,15 @@ export default function DashboardPage() {
     membersCount: 0,
     isArchived: false,
   };
-  const projectsWithStats = [noProject, ...projects].map((p) => {
-    const row = stats?.projects[p.id];
-    const projectTasks = allTasks.filter((t) => t.projectId === p.id);
+  const projectsWithStats = [noProject, ...projects].map((project) => {
+    const row = stats?.projects[project.id];
+    const projectTasks = allTasks.filter((task) => task.projectId === project.id);
     return {
-      ...p,
+      ...project,
       taskCount: row?.total ?? projectTasks.length,
-      completed: row?.done ?? projectTasks.filter((t) => t.status === 'done').length,
+      completed: row?.done ?? projectTasks.filter((task) => task.status === 'done').length,
       overdue: row?.overdue ?? 0,
-      inProgress: projectTasks.filter((t) => t.status === 'in_progress').length,
+      inProgress: projectTasks.filter((task) => task.status === 'in_progress').length,
     };
   });
 
@@ -126,7 +121,7 @@ export default function DashboardPage() {
   const totals = stats?.totals;
 
   return (
-    <div className="min-h-full bg-muted/20">
+    <div className="min-h-full bg-canvas">
       <PageHeader title="Главная" description="Обзор проектов, задач и сроков" />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
@@ -160,35 +155,36 @@ export default function DashboardPage() {
         </div>
 
         {/* Projects list */}
-        <Card>
-          <CardHeader className="flex flex-wrap items-center justify-between gap-3 border-b">
-            <CardTitle>Проекты</CardTitle>
+        <Card padding="none">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+            <p className="text-sm font-bold text-ink">Проекты</p>
             <div className="flex items-center gap-2">
-              <Input
-                type="text"
+              <TextField
+                variant="boxed"
+                size="sm"
                 placeholder="Поиск…"
                 aria-label="Найти проект"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 className="w-40 sm:w-64"
               />
-              <Select
+              <SelectField
+                size="sm"
+                variant="boxed"
                 value={archiveFilter}
-                onValueChange={(value) => setArchiveFilter(value as typeof archiveFilter)}
-              >
-                <SelectTrigger className="w-28" aria-label="Проекты">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Активные</SelectItem>
-                  <SelectItem value="archived">Архив</SelectItem>
-                  <SelectItem value="all">Все</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(event) => setArchiveFilter(event.target.value as typeof archiveFilter)}
+                options={[
+                  { value: 'active', label: 'Активные' },
+                  { value: 'archived', label: 'Архив' },
+                  { value: 'all', label: 'Все' },
+                ]}
+                aria-label="Проекты"
+                className="w-28"
+              />
             </div>
-          </CardHeader>
+          </div>
 
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-line">
             {isBootstrapping && <LoadingState className="min-h-60 bg-transparent" />}
             {!isBootstrapping &&
               filteredProjects.map((project) => {
@@ -201,27 +197,27 @@ export default function DashboardPage() {
                   <Link
                     key={project.id}
                     href={`/projects/${project.id}`}
-                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted transition-colors group"
+                    className="group flex items-center gap-4 px-5 py-3.5 transition-colors duration-fast hover:bg-surface"
                   >
+                    {/* Метка проекта: в наборе цвет означает состояние, поэтому
+                        проект помечается инициалами, а не радугой цветов. */}
                     <div
-                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${getProjectColor(project.name)}`}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-xs font-bold text-ink-soft"
                       aria-hidden="true"
                     >
                       {getProjectInitials(project.name)}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h2 className="truncate text-sm font-medium text-foreground">
-                        {project.name}
-                      </h2>
-                      <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-sm font-medium text-ink">{project.name}</h2>
+                      <div className="mt-0.5 flex items-center gap-3 text-xs text-ink-soft">
                         <span>
                           {project.taskCount > 0
                             ? `${project.taskCount} ${pluralRu(project.taskCount, ['задача', 'задачи', 'задач'])}`
                             : 'Нет задач'}
                         </span>
                         {project.overdue > 0 && (
-                          <span className="font-medium text-destructive">
+                          <span className="font-medium text-danger-text">
                             Просрочено: {project.overdue}
                           </span>
                         )}
@@ -232,15 +228,13 @@ export default function DashboardPage() {
                     <div className="hidden w-48 items-center gap-3 md:flex">
                       {project.taskCount > 0 && (
                         <>
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                progressPercent === 100 ? 'bg-emerald-500' : 'bg-primary'
-                              }`}
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
-                          <span className="w-9 text-right text-xs font-medium tabular-nums text-muted-foreground">
+                          <Progress
+                            value={progressPercent}
+                            label={`Готовность проекта «${project.name}»`}
+                            tone={progressPercent === 100 ? 'success' : 'accent'}
+                            className="flex-1"
+                          />
+                          <span className="w-9 text-right text-xs font-medium tabular-nums text-ink-soft">
                             {progressPercent}%
                           </span>
                         </>
@@ -249,14 +243,14 @@ export default function DashboardPage() {
 
                     <ArrowRight
                       size={16}
-                      className="text-muted-foreground transition-colors group-hover:text-foreground"
+                      className="text-ink-faint transition-colors duration-fast group-hover:text-ink"
                     />
                   </Link>
                 );
               })}
 
             {filteredProjects.length === 0 && !isLoading && (
-              <div className="py-12 text-center text-sm text-muted-foreground">
+              <div className="py-12 text-center text-sm text-ink-soft">
                 {searchQuery ? 'Проекты не найдены' : 'Проектов пока нет'}
               </div>
             )}
@@ -284,27 +278,27 @@ function StatCard({
 }) {
   const lit = alarm && Boolean(value);
   return (
-    <Link href={href} className="block h-full rounded-xl">
-      <Card className="h-full py-0 transition hover:bg-muted/50" size="sm">
-        <CardContent className="flex h-24 flex-col justify-center gap-1.5 p-4">
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <Link href={href} className="block h-full rounded-ui">
+      <Card padding="none" className="h-full transition duration-fast hover:bg-surface">
+        <div className="flex h-24 flex-col justify-center gap-1.5 p-4">
+          <p className="flex items-center gap-1.5 text-xs text-ink-soft">
             <Icon
               size={14}
               aria-hidden="true"
-              className={cn('shrink-0', lit && 'text-amber-700 dark:text-amber-300')}
+              className={cn('shrink-0', lit && 'text-warning-text')}
             />
             {label}
           </p>
           <p
             className={cn(
               'text-2xl font-semibold tabular-nums',
-              lit ? 'text-amber-700 dark:text-amber-300' : 'text-foreground',
-              value === 0 && 'text-muted-foreground',
+              lit ? 'text-warning-text' : 'text-ink',
+              value === 0 && 'text-ink-faint',
             )}
           >
             {value ?? '—'}
           </p>
-        </CardContent>
+        </div>
       </Card>
     </Link>
   );

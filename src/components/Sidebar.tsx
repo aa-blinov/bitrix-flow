@@ -17,33 +17,25 @@ import {
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Badge } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { Checkbox } from '@/components/monos/Checkbox';
+import { Drawer } from '@/components/monos/Drawer';
+import { IconButton } from '@/components/monos/IconButton';
+import { Modal } from '@/components/monos/Modal';
+import { Notice } from '@/components/monos/Notice';
+import { SelectField } from '@/components/monos/SelectField';
+import { Separator } from '@/components/monos/Separator';
+import { TextArea } from '@/components/monos/TextArea';
+import { TextField } from '@/components/monos/TextField';
 import Notifications from '@/components/Notifications';
-import ThemeToggle from '@/components/ThemeToggle';
-import { getProjectColor, getProjectInitials, usableAvatar } from '@/lib/utils';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
+import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 
-function NavItem({
+// Строка навигации остаётся кодом приложения: это продуктовый паттерн, а не
+// примитив набора. Вид — как у NavItem из @monos/ui.
+function NavLink({
   href,
   icon: Icon,
   label,
@@ -52,7 +44,7 @@ function NavItem({
   onNavigate,
 }: {
   href: string;
-  icon: any;
+  icon: typeof LayoutDashboard;
   label: string;
   badge?: number;
   pathname: string;
@@ -63,13 +55,14 @@ function NavItem({
     <Link
       href={href}
       onClick={onNavigate}
-      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-        active ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted'
+      aria-current={active ? 'page' : undefined}
+      className={`flex min-h-9 items-center gap-2.5 rounded-ui px-2.5 text-sm transition-colors duration-fast max-sm:min-h-11 ${
+        active ? 'bg-surface font-bold text-ink' : 'text-ink-soft hover:bg-surface hover:text-ink'
       }`}
     >
-      <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
-      <span className="flex-1 truncate">{label}</span>
-      {badge !== undefined && badge > 0 && <Badge variant="secondary">{badge}</Badge>}
+      <Icon size={16} strokeWidth={1.7} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 ? <Badge tone="neutral">{badge}</Badge> : null}
     </Link>
   );
 }
@@ -210,63 +203,66 @@ export default function Sidebar() {
     window.location.assign('/login');
   }
 
+  const projectLinkClass = (active: boolean) =>
+    `flex min-h-9 items-center gap-2.5 rounded-ui px-2.5 text-sm transition-colors duration-fast max-sm:min-h-11 ${
+      active ? 'bg-surface font-bold text-ink' : 'text-ink-soft hover:bg-surface hover:text-ink'
+    }`;
+
   const SidebarContent = () => (
     // ponytail: w-full + min-w-0 — без этого flex-child растягивается по
     // самому широкому контенту (поиск проектов) и вылезает за w-64 родителя.
-    <div className="flex h-full w-full min-w-0 flex-col">
+    <div className="flex h-full w-full min-w-0 flex-col bg-canvas">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-4">
-        <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
-          BitrixFlow
-        </span>
+      <div className="flex h-16 items-center border-b border-line px-4">
+        <span className="text-lg font-bold tracking-tight text-ink">BitrixFlow</span>
       </div>
 
       {/* Navigation */}
       <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 py-4">
         <div className="space-y-0.5">
-          <NavItem
+          <NavLink
             href="/"
             icon={LayoutDashboard}
             label="Главная"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/projects-summary"
             icon={TableProperties}
             label="Сводка проектов"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/search"
             icon={Search}
             label="Поиск"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/all-tasks"
             icon={ListChecks}
             label="Все задачи"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/my-tasks"
             icon={UserCheck}
             label="Мои задачи"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/team-workload"
             icon={CalendarDays}
             label="Нагрузка команды"
             pathname={pathname}
             onNavigate={closeMobile}
           />
-          <NavItem
+          <NavLink
             href="/notifications"
             icon={Bell}
             label="Уведомления"
@@ -278,55 +274,55 @@ export default function Sidebar() {
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-whisper font-bold uppercase tracking-widest text-ink-faint">
               Проекты ({(isLoading || projectsFailed) && !projects.length ? '…' : projects.length})
             </p>
-            <Button
+            <IconButton
+              label="Создать проект"
               variant="ghost"
-              size="icon-xs"
+              size="sm"
+              tooltipText=""
               onClick={() => setCreateOpen(true)}
-              aria-label="Создать проект"
-              title="Создать проект"
             >
-              <Plus />
-            </Button>
+              <Plus size={16} strokeWidth={1.7} />
+            </IconButton>
           </div>
-          <Input
+          <TextField
+            variant="boxed"
+            size="sm"
             value={projectQuery}
             onChange={(event) => setProjectQuery(event.target.value)}
             placeholder="Найти проект…"
-            className="mb-2 h-8"
+            aria-label="Поиск по проектам"
+            className="mb-2"
           />
-          <div className="flex-1 min-h-0 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
+          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
             {isLoading ? (
               <LoadingState className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (
               <>
                 {/* Задачи вне проектов иначе не увидеть: в Bitrix у них нет
                     ни группы, ни страницы. */}
-                {!projectQuery && (
+                {!projectQuery ? (
                   <Link
                     href={`/projects/${NO_PROJECT_ID}`}
                     prefetch={false}
                     onClick={closeMobile}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                      pathname === `/projects/${NO_PROJECT_ID}`
-                        ? 'bg-muted text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-muted'
-                    }`}
+                    aria-current={pathname === `/projects/${NO_PROJECT_ID}` ? 'page' : undefined}
+                    className={projectLinkClass(pathname === `/projects/${NO_PROJECT_ID}`)}
                   >
                     <span
-                      className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground"
+                      className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
                       aria-hidden="true"
                     >
                       —
                     </span>
                     <span className="min-w-0 flex-1 truncate">{NO_PROJECT_NAME}</span>
                   </Link>
-                )}
-                {recentProjects.length > 1 && (
+                ) : null}
+                {recentProjects.length > 1 ? (
                   <>
-                    <p className="px-2.5 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <p className="px-2.5 pt-1 pb-0.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
                       Недавние
                     </p>
                     {recentProjects.map((project) => {
@@ -337,14 +333,11 @@ export default function Sidebar() {
                           href={`/projects/${project.id}`}
                           prefetch={false}
                           onClick={closeMobile}
-                          className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
-                            active
-                              ? 'bg-muted font-medium text-foreground'
-                              : 'text-muted-foreground hover:bg-muted'
-                          }`}
+                          aria-current={active ? 'page' : undefined}
+                          className={projectLinkClass(active)}
                         >
                           <span
-                            className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                            className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
                             aria-hidden="true"
                           >
                             {getInitials(project.name)}
@@ -355,9 +348,9 @@ export default function Sidebar() {
                         </Link>
                       );
                     })}
-                    <div className="my-1 border-t" />
+                    <Separator className="my-1" />
                   </>
-                )}
+                ) : null}
                 {activeProjects.map((project) => {
                   const active = pathname === `/projects/${project.id}`;
                   return (
@@ -366,14 +359,11 @@ export default function Sidebar() {
                       href={`/projects/${project.id}`}
                       prefetch={false}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                        active
-                          ? 'bg-muted text-foreground font-medium'
-                          : 'text-muted-foreground hover:bg-muted'
-                      }`}
+                      aria-current={active ? 'page' : undefined}
+                      className={projectLinkClass(active)}
                     >
                       <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                        className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
                         aria-hidden="true"
                       >
                         {getProjectInitials(project.name)}
@@ -382,59 +372,60 @@ export default function Sidebar() {
                     </Link>
                   );
                 })}
-                {archivedProjects.length > 0 && (
-                  <div className="mt-2 border-t pt-2">
+                {archivedProjects.length > 0 ? (
+                  <div className="mt-2 border-t border-line pt-2">
                     <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
+                      variant="quiet"
+                      size="sm"
                       onClick={() => setArchiveOpen((open) => !open)}
-                      className="flex w-full justify-start gap-1 px-2.5 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                      className="w-full justify-start gap-1 text-left"
                     >
                       <ChevronDown
-                        className={`size-3 transition-transform ${archiveOpen || projectQuery ? 'rotate-180' : ''}`}
+                        className={`size-3 transition-transform ${
+                          archiveOpen || projectQuery ? 'rotate-180' : ''
+                        }`}
+                        strokeWidth={1.7}
                       />
                       Архив ({archivedProjects.length})
                     </Button>
-                    {(archiveOpen || projectQuery) &&
-                      archivedProjects.map((project) => {
-                        const active = pathname === `/projects/${project.id}`;
-                        return (
-                          <Link
-                            key={project.id}
-                            href={`/projects/${project.id}`}
-                            prefetch={false}
-                            onClick={() => setMobileOpen(false)}
-                            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors ${
-                              active
-                                ? 'bg-muted text-foreground font-medium'
-                                : 'text-muted-foreground hover:bg-muted'
-                            }`}
-                          >
-                            <span
-                              className={`flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold ${getProjectColor(project.name)}`}
+                    {archiveOpen || projectQuery
+                      ? archivedProjects.map((project) => {
+                          const active = pathname === `/projects/${project.id}`;
+                          return (
+                            <Link
+                              key={project.id}
+                              href={`/projects/${project.id}`}
+                              prefetch={false}
+                              onClick={() => setMobileOpen(false)}
+                              aria-current={active ? 'page' : undefined}
+                              className={projectLinkClass(active)}
                             >
-                              {getProjectInitials(project.name)}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                          </Link>
-                        );
-                      })}
+                              <span
+                                className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
+                                aria-hidden="true"
+                              >
+                                {getProjectInitials(project.name)}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                            </Link>
+                          );
+                        })
+                      : null}
                   </div>
-                )}
+                ) : null}
               </>
             ) : projectsFailed ? (
               <div
                 role="alert"
                 className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs"
               >
-                <span className="text-destructive">Не удалось загрузить проекты</span>
-                <Button variant="ghost" size="xs" onClick={() => void loadProjects()}>
+                <span className="text-danger-text">Не удалось загрузить проекты</span>
+                <Button variant="quiet" size="sm" onClick={() => void loadProjects()}>
                   Повторить
                 </Button>
               </div>
             ) : (
-              <div className="px-2.5 py-1.5 text-xs text-muted-foreground">Нет проектов</div>
+              <div className="px-2.5 py-1.5 text-xs text-ink-faint">Нет проектов</div>
             )}
           </div>
         </div>
@@ -443,7 +434,7 @@ export default function Sidebar() {
       {/* User — двухстрочный бар: имя сверху, действия снизу */}
       <div className="p-3">
         <Separator className="mb-3" />
-        <div className="flex items-center gap-2.5 px-1 mb-2">
+        <div className="mb-2 flex items-center gap-2.5 px-1">
           {photo && failedPhoto !== photo ? (
             <img
               src={photo}
@@ -452,23 +443,33 @@ export default function Sidebar() {
               onError={() => setFailedPhoto(photo)}
             />
           ) : (
-            <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-500 text-xs font-semibold text-white">
+            <div className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-ink">
               {currentUser.id ? getInitials(currentUser.name) : '…'}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
+            <p className="truncate text-sm font-medium text-ink">
               {/* «Не определён» пугал, пока профиль просто грузился. */}
               {currentUser.id ? currentUser.name : '…'}
             </p>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-between gap-1">
           <Notifications />
-          <ThemeToggle />
-          <Button variant="ghost" size="icon-sm" onClick={logout} title="Выйти" aria-label="Выйти">
-            <LogOut size={16} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <IconButton
+              label="Выйти"
+              variant="ghost"
+              size="sm"
+              tooltipText=""
+              onClick={() => void logout()}
+            >
+              <LogOut size={16} strokeWidth={1.7} />
+            </IconButton>
+          </div>
+        </div>
+        <div className="mt-2">
+          <ThemeSwitcher />
         </div>
       </div>
     </div>
@@ -478,145 +479,124 @@ export default function Sidebar() {
     <>
       {/* Mobile navigation opens separately from page headers, so it never
           competes with a close button or project actions. */}
-      <Button
+      <IconButton
+        label="Открыть меню"
         variant="outline"
-        size="icon-lg"
+        size="lg"
         onClick={() => setMobileOpen(!mobileOpen)}
-        aria-label="Открыть меню"
-        className="fixed right-4 bottom-4 z-40 size-14 rounded-full border-border bg-background text-foreground shadow-xl lg:hidden dark:bg-popover"
+        className="fixed right-4 bottom-4 z-menu lg:hidden"
       >
-        <Menu size={26} strokeWidth={2.5} />
-      </Button>
+        <Menu size={22} strokeWidth={1.7} />
+      </IconButton>
 
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
-          side="left"
-          showCloseButton={false}
-          aria-label="Меню навигации"
-          className="w-[86vw] max-w-sm p-0 lg:hidden"
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          {SidebarContent()}
-        </SheetContent>
-      </Sheet>
+      <Drawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        side="left"
+        title="Меню"
+        className="w-[86vw] max-w-sm p-0 lg:hidden"
+      >
+        <SidebarContent />
+      </Drawer>
 
       {/* Desktop sidebar */}
       {/* Постоянное меню — с 1024px: на планшете в портрете 256px съедали доску. */}
-      <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r bg-background lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r border-line bg-canvas lg:flex">
         {SidebarContent()}
       </aside>
 
-      <Dialog
+      <Modal
         open={createOpen}
-        onOpenChange={(open) => {
-          setCreateOpen(open);
-          if (open) setCreateError('');
+        onClose={() => {
+          setCreateOpen(false);
         }}
-      >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Новый проект</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <label className="block text-sm font-medium">
-              Название проекта
-              <Input
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                placeholder="Например, Запуск нового продукта"
-                className="mt-1.5"
-                autoFocus
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              Описание
-              <Textarea
-                value={projectDescription}
-                onChange={(event) => setProjectDescription(event.target.value)}
-                placeholder="Цель, контекст и ожидаемый результат"
-                className="mt-1.5 min-h-20 resize-y"
-              />
-            </label>
-            <label className="block text-sm font-medium">
-              Ключевые слова
-              <Input
-                value={projectKeywords}
-                onChange={(event) => setProjectKeywords(event.target.value)}
-                placeholder="Например, запуск, mobile, клиент"
-                className="mt-1.5"
-              />
-              <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                Разделяйте слова запятыми.
-              </span>
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-medium">
-                Дата начала
-                <Input
-                  type="date"
-                  value={projectStartDate}
-                  onChange={(event) => setProjectStartDate(event.target.value)}
-                  className="mt-1.5"
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                Дата окончания
-                <Input
-                  type="date"
-                  value={projectFinishDate}
-                  min={projectStartDate || undefined}
-                  onChange={(event) => setProjectFinishDate(event.target.value)}
-                  className="mt-1.5"
-                />
-              </label>
-            </div>
-            <div className="space-y-3 rounded-lg border p-3">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={projectVisible}
-                  onCheckedChange={(checked) => setProjectVisible(checked === true)}
-                />
-                Показывать проект в общем списке
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <Checkbox
-                  checked={projectOpened}
-                  onCheckedChange={(checked) => setProjectOpened(checked === true)}
-                />
-                Разрешить свободное вступление
-              </label>
-              <label className="block text-sm font-medium">
-                Кто может приглашать участников
-                <Select
-                  value={invitePermissions}
-                  onValueChange={(value) => setInvitePermissions(value as 'A' | 'E' | 'K')}
-                >
-                  <SelectTrigger className="mt-1.5 w-full" aria-label="Права приглашения">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A">Только владелец</SelectItem>
-                    <SelectItem value="E">Владелец и модераторы</SelectItem>
-                    <SelectItem value="K">Все участники</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-            </div>
-            {createError && <p className="text-sm text-destructive">{createError}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
+        title="Новый проект"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={creating}>
               Отмена
             </Button>
             <Button
               onClick={() => void createNewProject()}
               disabled={!projectName.trim() || creating}
+              loading={creating}
             >
               Создать проект
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <TextField
+            label="Название проекта"
+            variant="boxed"
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Например, Запуск нового продукта"
+            autoFocus
+          />
+          <TextArea
+            label="Описание"
+            variant="boxed"
+            value={projectDescription}
+            onChange={(event) => setProjectDescription(event.target.value)}
+            placeholder="Цель, контекст и ожидаемый результат"
+            rows={3}
+          />
+          <TextField
+            label="Ключевые слова"
+            variant="boxed"
+            value={projectKeywords}
+            onChange={(event) => setProjectKeywords(event.target.value)}
+            placeholder="Например, запуск, mobile, клиент"
+            hint="Разделяйте слова запятыми."
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              label="Дата начала"
+              variant="boxed"
+              type="date"
+              value={projectStartDate}
+              onChange={(event) => setProjectStartDate(event.target.value)}
+            />
+            <TextField
+              label="Дата окончания"
+              variant="boxed"
+              type="date"
+              value={projectFinishDate}
+              min={projectStartDate || undefined}
+              onChange={(event) => setProjectFinishDate(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-ui border border-line p-3">
+            <Checkbox
+              checked={projectVisible}
+              onChange={(event) => setProjectVisible(event.target.checked)}
+            >
+              Показывать проект в общем списке
+            </Checkbox>
+            <Checkbox
+              checked={projectOpened}
+              onChange={(event) => setProjectOpened(event.target.checked)}
+            >
+              Разрешить свободное вступление
+            </Checkbox>
+            <SelectField
+              label="Кто может приглашать участников"
+              variant="boxed"
+              value={invitePermissions}
+              onChange={(event) => setInvitePermissions(event.target.value as 'A' | 'E' | 'K')}
+              options={[
+                { value: 'A', label: 'Только владелец' },
+                { value: 'E', label: 'Владелец и модераторы' },
+                { value: 'K', label: 'Все участники' },
+              ]}
+            />
+          </div>
+          {createError ? <Notice tone="danger">{createError}</Notice> : null}
+        </div>
+      </Modal>
     </>
   );
 }

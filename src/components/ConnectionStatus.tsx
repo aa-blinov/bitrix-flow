@@ -29,9 +29,9 @@ export default function ConnectionStatus() {
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs font-medium text-amber-900 dark:text-amber-200"
+      className="sticky top-0 z-modal flex items-center justify-center gap-2 border-b border-line bg-surface px-4 py-1.5 text-xs text-warning-text"
     >
-      <WifiOff className="size-3.5" />
+      <WifiOff className="size-3.5" strokeWidth={1.7} />
       {browserOffline
         ? 'Нет сети — данные на экране могли устареть'
         : 'Связь с сервером потеряна, обновления не приходят'}

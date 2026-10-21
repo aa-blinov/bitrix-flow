@@ -3,24 +3,21 @@
 // Конструктор фильтров в духе Asana: выбираешь поле, потом значение, условие
 // садится чипом в строку. До этого фильтры были фиксированным рядом селектов,
 // которые занимали место даже когда не нужны, и добавить поле было нельзя.
+//
+// В наборе @monos/ui меню состоит из данных, а вложенных подменю и пунктов с
+// галочками в нём нет. Поэтому фильтр собран из примитивов: чип для условия,
+// панель (Popover) со списком полей и значениями. Мультивыбор живёт в панели,
+// поэтому она не закрывается при выборе.
 
-import { ChevronLeft, Check, Filter, Plus, X } from 'lucide-react';
+import { ChevronLeft, Filter, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { toolbarControl } from '@/components/ui/toolbar';
+import { Badge } from '@/components/monos/Badge';
+import { Button } from '@/components/monos/Button';
+import { Checkbox } from '@/components/monos/Checkbox';
+import { Chip } from '@/components/monos/Chip';
+import { Popover } from '@/components/monos/Popover';
+import { Separator } from '@/components/monos/Separator';
+import { toolbarControl } from '@/components/monos/toolbar';
 import {
   splitValues as splitFilterValues,
   type FilterField,
@@ -73,17 +70,44 @@ export default function TaskFilterBar({
   /** На телефоне контролы идут колонкой во всю ширину. */
   stacked?: boolean;
 }) {
-  // На телефоне вложенное подменю Radix уезжало за правый край (left 370 при
-  // ширине экрана 390), поэтому там вместо него drill-down: панель показывает
-  // либо список полей, либо значения выбранного поля.
+  // Вложенное подменю уезжало за правый край экрана на телефоне, поэтому
+  // значения выбранного поля показываются в той же панели: список полей
+  // сменяется списком значений.
   const [drill, setDrill] = useState<FilterFieldKey | null>(null);
-  const drillField = stacked ? fields.find((field) => field.key === drill) : undefined;
+  const drillField = fields.find((field) => field.key === drill);
 
   const active = fields.filter((field) => values[field.key] !== field.empty);
-  // В меню держим все поля, а не только незанятые: иначе после первой галочки
-  // поле уходило из списка, подменю размонтировалось и отметить второе
-  // значение было нельзя.
+  // В панели держим все поля, а не только незанятые: иначе после первой галочки
+  // поле уходило из списка и отметить второе значение было нельзя.
   const available = fields;
+
+  const valueRows = (field: FilterField) =>
+    field.options.map((option) => {
+      const checked = field.multi
+        ? splitFilterValues(values[field.key], field.empty).includes(option.value)
+        : values[field.key] === option.value;
+      return (
+        // Не label: галка приносит свой, а вложенные label браузер считает
+        // некорректной разметкой и имя получается не тем.
+        <div
+          key={option.value}
+          className="flex min-h-8 cursor-pointer items-center gap-2 rounded-ui px-1 py-1 text-sm text-ink-soft hover:text-ink"
+        >
+          <Checkbox
+            checked={checked}
+            ariaLabel={option.label}
+            onChange={() =>
+              onChange(
+                field.key,
+                field.multi ? toggleValue(field, values[field.key], option.value) : option.value,
+              )
+            }
+          />
+          <span className="min-w-0 flex-1 truncate">{option.label}</span>
+          {option.hint ? <span className="text-whisper text-ink-faint">{option.hint}</span> : null}
+        </div>
+      );
+    });
 
   return (
     <div className={stacked ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2'}>
@@ -92,7 +116,7 @@ export default function TaskFilterBar({
           {presets.map((preset) => (
             <Button
               key={preset.id}
-              variant={activePreset === preset.id ? 'secondary' : 'outline'}
+              variant={activePreset === preset.id ? 'secondary' : 'quiet'}
               size="sm"
               className={toolbarControl}
               onClick={() => onApplyPreset?.(preset)}
@@ -103,231 +127,94 @@ export default function TaskFilterBar({
         </div>
       ) : null}
 
-      {active.map((field) =>
-        field.toggle ? (
+      {active.map((field) => (
+        <Chip
+          key={field.key}
+          tone="accent"
+          size="md"
+          removable
+          removeLabel={`Убрать фильтр «${field.label}»`}
+          onRemove={() => onChange(field.key, field.empty)}
+        >
+          {field.toggle ? field.label : `${field.label}: ${optionLabel(field, values[field.key])}`}
+        </Chip>
+      ))}
+
+      <Popover
+        onOpenChange={(open) => {
+          if (!open) setDrill(null);
+        }}
+        trigger={
           <Button
-            key={field.key}
             variant="secondary"
             size="sm"
-            className={`${toolbarControl} ${stacked ? 'w-full justify-between' : ''} gap-1.5`}
-            onClick={() => onChange(field.key, field.empty)}
-            aria-label={`Убрать фильтр «${field.label}»`}
-          >
-            <span>{field.label}</span>
-            <X className="size-3" />
-          </Button>
-        ) : (
-          <DropdownMenu key={field.key}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                className={`${toolbarControl} ${stacked ? 'w-full justify-start' : ''} gap-1.5`}
-                aria-label={field.label}
-              >
-                <span className="text-muted-foreground">{field.label}:</span>
-                {/* На узком экране значение прижимаем к названию, а крестик
-                    к правому краю: иначе оно болталось посередине кнопки. */}
-                <span className={stacked ? 'flex-1 truncate text-left' : 'max-w-40 truncate'}>
-                  {optionLabel(field, values[field.key])}
-                </span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Убрать фильтр «${field.label}»`}
-                  className="-mr-1 ml-0.5 rounded p-0.5 hover:bg-background/60"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onChange(field.key, field.empty);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    onChange(field.key, field.empty);
-                  }}
-                >
-                  <X className="size-3" />
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              collisionPadding={8}
-              className={`max-h-80 overflow-y-auto ${stacked ? 'w-[calc(100vw-2rem)]' : ''}`}
-            >
-              <DropdownMenuLabel>{field.label}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {field.options.map((option) => (
-                <DropdownMenuCheckboxItem
-                  key={option.value}
-                  checked={
-                    field.multi
-                      ? splitFilterValues(values[field.key], field.empty).includes(option.value)
-                      : values[field.key] === option.value
-                  }
-                  onSelect={(event) => {
-                    // Мультивыбор: меню остаётся открытым, чтобы отметить
-                    // несколько значений подряд.
-                    if (field.multi) event.preventDefault();
-                  }}
-                  onCheckedChange={() =>
-                    onChange(
-                      field.key,
-                      field.multi
-                        ? toggleValue(field, values[field.key], option.value)
-                        : option.value,
-                    )
-                  }
-                >
-                  {option.label}
-                  {option.hint ? (
-                    <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                  ) : null}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      )}
-
-      <DropdownMenu onOpenChange={(open) => !open && setDrill(null)}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
             className={`${toolbarControl} ${stacked ? 'w-full justify-center' : ''}`}
+            icon={<Plus size={14} strokeWidth={1.7} />}
           >
-            <Plus size={14} />
             Фильтр
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          collisionPadding={8}
-          className={stacked ? 'max-h-80 w-[calc(100vw-2rem)] overflow-y-auto' : 'min-w-48'}
-        >
+        }
+      >
+        <div className="w-72 max-w-[calc(100vw-2rem)]">
           {drillField ? (
             <>
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setDrill(null);
-                }}
+              <button
+                type="button"
+                onClick={() => setDrill(null)}
+                className="flex min-h-8 w-full items-center gap-2 rounded-ui px-1 text-xs font-bold uppercase tracking-widest text-ink-soft transition-colors duration-fast hover:text-ink"
               >
-                <ChevronLeft className="size-4" />
+                <ChevronLeft size={14} strokeWidth={1.7} />
                 {drillField.label}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {drillField.options.map((option) => (
-                <DropdownMenuCheckboxItem
-                  key={option.value}
-                  checked={
-                    drillField.multi
-                      ? splitFilterValues(values[drillField.key], drillField.empty).includes(
-                          option.value,
-                        )
-                      : values[drillField.key] === option.value
-                  }
-                  onSelect={(event) => {
-                    if (drillField.multi) event.preventDefault();
-                  }}
-                  onCheckedChange={() =>
-                    onChange(
-                      drillField.key,
-                      drillField.multi
-                        ? toggleValue(drillField, values[drillField.key], option.value)
-                        : option.value,
-                    )
-                  }
-                >
-                  {option.label}
-                  {option.hint ? (
-                    <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                  ) : null}
-                </DropdownMenuCheckboxItem>
-              ))}
+              </button>
+              <Separator className="my-1" />
+              <div className="flex flex-col gap-0.5">{valueRows(drillField)}</div>
             </>
           ) : (
             <>
-              <DropdownMenuLabel>Фильтровать по полю</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {available.map((field) =>
-                field.toggle ? (
-                  <DropdownMenuItem
-                    key={field.key}
-                    onClick={() => onChange(field.key, field.options[0]?.value ?? '')}
-                  >
-                    <Check className="size-4 opacity-0" />
-                    {field.label}
-                  </DropdownMenuItem>
-                ) : stacked ? (
-                  <DropdownMenuItem
-                    key={field.key}
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setDrill(field.key);
-                    }}
-                  >
-                    {field.label}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuSub key={field.key}>
-                    <DropdownMenuSubTrigger>{field.label}</DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-                      {field.options.map((option) =>
-                        field.multi ? (
-                          <DropdownMenuCheckboxItem
-                            key={option.value}
-                            checked={splitFilterValues(values[field.key], field.empty).includes(
-                              option.value,
-                            )}
-                            onSelect={(event) => event.preventDefault()}
-                            onCheckedChange={() =>
-                              onChange(
-                                field.key,
-                                toggleValue(field, values[field.key], option.value),
-                              )
-                            }
-                          >
-                            {option.label}
-                            {option.hint ? (
-                              <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                            ) : null}
-                          </DropdownMenuCheckboxItem>
-                        ) : (
-                          <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => onChange(field.key, option.value)}
-                          >
-                            {option.label}
-                            {option.hint ? (
-                              <span className="ml-1 text-muted-foreground">{option.hint}</span>
-                            ) : null}
-                          </DropdownMenuItem>
-                        ),
-                      )}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                ),
-              )}
+              <p className="px-1 py-1 text-xs font-bold uppercase tracking-widest text-ink-faint">
+                Фильтровать по полю
+              </p>
+              <Separator className="my-1" />
+              <div className="flex flex-col gap-0.5">
+                {available.map((field) =>
+                  field.toggle ? (
+                    <button
+                      key={field.key}
+                      type="button"
+                      onClick={() => onChange(field.key, field.options[0]?.value ?? '')}
+                      className="flex min-h-8 w-full items-center rounded-ui px-2 text-left text-sm text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink"
+                    >
+                      {field.label}
+                    </button>
+                  ) : (
+                    <button
+                      key={field.key}
+                      type="button"
+                      onClick={() => setDrill(field.key)}
+                      className="flex min-h-8 w-full items-center rounded-ui px-2 text-left text-sm text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink"
+                    >
+                      {field.label}
+                    </button>
+                  ),
+                )}
+              </div>
             </>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </div>
+      </Popover>
 
-      {active.length > 0 && (
+      {active.length > 0 ? (
         <Button
-          variant="ghost"
+          variant="quiet"
           size="sm"
-          className={`${toolbarControl} ${stacked ? 'w-full' : ''} text-muted-foreground`}
+          className={`${toolbarControl} ${stacked ? 'w-full' : ''} text-ink-soft`}
           onClick={onReset}
+          icon={<Filter size={14} strokeWidth={1.7} />}
+          trailing={<Badge tone="neutral">{active.length}</Badge>}
         >
-          <Filter size={14} />
           Сбросить
-          <Badge variant="secondary">{active.length}</Badge>
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

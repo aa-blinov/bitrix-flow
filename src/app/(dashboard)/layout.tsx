@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   });
 
   return (
-    <div className="min-h-screen bg-background" suppressHydrationWarning>
+    <div className="min-h-screen bg-canvas" suppressHydrationWarning>
       <Sidebar />
       {/* Кнопка меню висит над контентом: снизу оставляем место, иначе она
           перекрывает последнюю карточку списка. */}
