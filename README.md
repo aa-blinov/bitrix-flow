@@ -1,4 +1,4 @@
-# Bitrix24 Kanban
+# BitrixFlow
 
 Рабочее пространство для проектов и задач Bitrix24 в духе Asana. Приложение входит через
 Bitrix24 OAuth, держит зеркало задач в MongoDB и принимает проверенные события задач для
@@ -109,8 +109,8 @@ Tailwind не зависят, поэтому расхождение безоби
 | `MONGO_DB` | `bitrix_kanban` | Имя базы. |
 | `MONGO_USERNAME` | нет | Root-пользователь MongoDB для Docker Compose. |
 | `MONGO_PASSWORD` | нет | Пароль root-пользователя. |
-| `MONGO_APP_USERNAME` | нет | Пользователь приложения в MongoDB. Compose требует его, в `.env.example` переменной нет. |
-| `MONGO_APP_PASSWORD` | нет | Пароль пользователя приложения. Compose требует его, в `.env.example` переменной нет. |
+| `MONGO_APP_USERNAME` | `bitrix_app` | Пользователь приложения в MongoDB. Compose не стартует без него. |
+| `MONGO_APP_PASSWORD` | нет | Пароль пользователя приложения. Compose не стартует без него. |
 | `AUTH_USERNAME` | `admin` | Логин в приложение. |
 | `AUTH_PASSWORD` | нет | Пароль в приложение. |
 | `AUTH_SESSION_SECRET` | нет | Ключ HMAC для подписи сессионной куки. |
