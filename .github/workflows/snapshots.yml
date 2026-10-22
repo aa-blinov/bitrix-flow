@@ -1,0 +1,58 @@
+name: snapshots
+
+# Screenshot baselines are compared pixel by pixel inside one container image,
+# so they have to be produced in that image too. Regenerating them on a
+# developer machine writes images CI will never accept, which is why this
+# workflow exists instead of a line in the README.
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Playwright project whose snapshots to regenerate'
+        required: true
+        default: mobile
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Regenerate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    services:
+      mongodb:
+        image: mongo:7
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Seed the test database
+        run: node scripts/seed-test-db.mjs
+        env:
+          MONGO_URL: mongodb://mongodb:27017
+      - name: Rewrite the baselines
+        run: npx playwright test --project=${{ inputs.project }} --update-snapshots
+        env:
+          CI: 'true'
+          TEST_MONGO_URL: mongodb://mongodb:27017
+      - name: Push the branch
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/snapshot-update
+          git add tests/
+          if git diff --cached --quiet; then
+            echo "Baselines are already current."
+            exit 0
+          fi
+          git commit -m "test: regenerate the screenshot baselines"
+          git push --force origin chore/snapshot-update
