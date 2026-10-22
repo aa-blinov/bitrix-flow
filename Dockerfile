@@ -1,6 +1,9 @@
 FROM node:20-alpine AS dependencies
 WORKDIR /app
-COPY package.json package-lock.json ./
+# .npmrc едет вместе с манифестами: набор @monos/ui объявляет Tailwind 3 как
+# peer-зависимость, а приложение живёт на Tailwind 4, и без
+# legacy-peer-deps npm ci падает на ERESOLVE ещё до сборки.
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
 FROM node:20-alpine AS builder
