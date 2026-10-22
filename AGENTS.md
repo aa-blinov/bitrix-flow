@@ -53,21 +53,21 @@ docker compose --env-file .env.local up -d --build
 
 ## Where things live
 
-| Path | Что там |
-| --- | --- |
-| `src/app/(dashboard)/` | Страницы: главная, мои задачи, все задачи, проекты, сводка, нагрузка, уведомления, поиск. |
-| `src/app/api/` | OAuth, сессия, события Bitrix24, задачи, уведомления, нагрузка, health. |
-| `src/components/` | Клиентские компоненты доски, карточки, фильтров и сайдбара. |
-| `src/components/monos/` | Примитивы `@monos/ui`, перенесённые из Svelte в React. |
-| `src/lib/` | Серверная логика: Mongo, OAuth, сессии, зеркало, запросы к Bitrix24. |
-| `src/store/` | Zustand-состояние доски и фильтров. |
-| `src/hooks/` | `useSSE`, `useIsMobile` и другие клиентские хуки. |
-| `tests/` | Playwright-тесты, скриншот-эталоны, авторизация тестового пользователя. |
-| `scripts/` | Бэкапы, health-watch, seed тестовой базы, скриншоты, проверки палитры. |
-| `docs/` | [architecture.md](docs/architecture.md), порт `@monos/ui`, скриншоты. |
-| `.github/workflows/` | CI и house-style. |
-| `caddy/Caddyfile` | TLS, security-заголовки, SSE без буферизации. |
-| `docker-compose.yml` | Приложение, MongoDB 7, Caddy, фиксированная подсеть. |
+| Path                    | Что там                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `src/app/(dashboard)/`  | Страницы: главная, мои задачи, все задачи, проекты, сводка, нагрузка, уведомления, поиск. |
+| `src/app/api/`          | OAuth, сессия, события Bitrix24, задачи, уведомления, нагрузка, health.                   |
+| `src/components/`       | Клиентские компоненты доски, карточки, фильтров и сайдбара.                               |
+| `src/components/monos/` | Примитивы `@monos/ui`, перенесённые из Svelte в React.                                    |
+| `src/lib/`              | Серверная логика: Mongo, OAuth, сессии, зеркало, запросы к Bitrix24.                      |
+| `src/store/`            | Zustand-состояние доски и фильтров.                                                       |
+| `src/hooks/`            | `useSSE`, `useIsMobile` и другие клиентские хуки.                                         |
+| `tests/`                | Playwright-тесты, скриншот-эталоны, авторизация тестового пользователя.                   |
+| `scripts/`              | Бэкапы, health-watch, seed тестовой базы, скриншоты, проверки палитры.                    |
+| `docs/`                 | [architecture.md](docs/architecture.md), порт `@monos/ui`, скриншоты.                     |
+| `.github/workflows/`    | CI и house-style.                                                                         |
+| `caddy/Caddyfile`       | TLS, security-заголовки, SSE без буферизации.                                             |
+| `docker-compose.yml`    | Приложение, MongoDB 7, Caddy, фиксированная подсеть.                                      |
 
 ## Traps
 

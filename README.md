@@ -99,31 +99,31 @@ Tailwind не зависят, поэтому расхождение безоби
 Значения берутся из `.env.local`. Шаблон лежит в [.env.example](.env.example), а сам
 `.env.local` не коммитится.
 
-| Переменная | По умолчанию | Что задаёт |
-| --- | --- | --- |
-| `BITRIX24_CLIENT_ID` | нет | ID OAuth-приложения Bitrix24. |
-| `BITRIX24_CLIENT_SECRET` | нет | Секрет OAuth-приложения. |
-| `BITRIX24_APP_URL` | `http://localhost:3000` в `.env.example` | Публичный адрес приложения. От него строится URL обработчика событий. |
-| `BITRIX24_REDIRECT_URI` | `http://localhost:3000/api/oauth` | Адрес callback. Должен совпадать с настройкой приложения в Bitrix24. |
-| `MONGO_URL` | `mongodb://localhost:27017` | Подключение к MongoDB. |
-| `MONGO_DB` | `bitrix_kanban` | Имя базы. |
-| `MONGO_USERNAME` | нет | Root-пользователь MongoDB для Docker Compose. |
-| `MONGO_PASSWORD` | нет | Пароль root-пользователя. |
-| `MONGO_APP_USERNAME` | `bitrix_app` | Пользователь приложения в MongoDB. Compose не стартует без него. |
-| `MONGO_APP_PASSWORD` | нет | Пароль пользователя приложения. Compose не стартует без него. |
-| `AUTH_USERNAME` | `admin` | Логин в приложение. |
-| `AUTH_PASSWORD` | нет | Пароль в приложение. |
-| `AUTH_SESSION_SECRET` | нет | Ключ HMAC для подписи сессионной куки. |
-| `DUCKDNS_TOKEN` | нет | Токен DuckDNS для TLS-сертификата Caddy. |
-| `SENTRY_DSN` | пусто | DSN Sentry. Без него отправка ошибок выключена. |
-| `SENTRY_AUTH_TOKEN` | пусто | Токен загрузки source maps на сборке. На работу приложения не влияет. |
-| `APP_RELEASE` | `dev` | Метка релиза в событиях Sentry. |
-| `MOCK_B24` | `0` | Мок Bitrix24 для UI-тестов и скриншотов. В продакшене не включать. |
-| `BACKUP_PASSPHRASE` | пусто | Пароль шифрования дампа MongoDB. |
-| `KEEP_DAYS` | `14` | Сколько дней хранить дампы. |
-| `HEALTH_URL` | `BITRIX24_APP_URL/api/health` | Адрес проверки в `scripts/health-watch.sh`. |
-| `TEST_MONGO_URL` | `mongodb://127.0.0.1:27018` | База UI-тестов. |
-| `SCREENSHOT_PORT` | `3112` | Порт сборки при съёмке скриншотов. |
+| Переменная               | По умолчанию                             | Что задаёт                                                            |
+| ------------------------ | ---------------------------------------- | --------------------------------------------------------------------- |
+| `BITRIX24_CLIENT_ID`     | нет                                      | ID OAuth-приложения Bitrix24.                                         |
+| `BITRIX24_CLIENT_SECRET` | нет                                      | Секрет OAuth-приложения.                                              |
+| `BITRIX24_APP_URL`       | `http://localhost:3000` в `.env.example` | Публичный адрес приложения. От него строится URL обработчика событий. |
+| `BITRIX24_REDIRECT_URI`  | `http://localhost:3000/api/oauth`        | Адрес callback. Должен совпадать с настройкой приложения в Bitrix24.  |
+| `MONGO_URL`              | `mongodb://localhost:27017`              | Подключение к MongoDB.                                                |
+| `MONGO_DB`               | `bitrix_kanban`                          | Имя базы.                                                             |
+| `MONGO_USERNAME`         | нет                                      | Root-пользователь MongoDB для Docker Compose.                         |
+| `MONGO_PASSWORD`         | нет                                      | Пароль root-пользователя.                                             |
+| `MONGO_APP_USERNAME`     | `bitrix_app`                             | Пользователь приложения в MongoDB. Compose не стартует без него.      |
+| `MONGO_APP_PASSWORD`     | нет                                      | Пароль пользователя приложения. Compose не стартует без него.         |
+| `AUTH_USERNAME`          | `admin`                                  | Логин в приложение.                                                   |
+| `AUTH_PASSWORD`          | нет                                      | Пароль в приложение.                                                  |
+| `AUTH_SESSION_SECRET`    | нет                                      | Ключ HMAC для подписи сессионной куки.                                |
+| `DUCKDNS_TOKEN`          | нет                                      | Токен DuckDNS для TLS-сертификата Caddy.                              |
+| `SENTRY_DSN`             | пусто                                    | DSN Sentry. Без него отправка ошибок выключена.                       |
+| `SENTRY_AUTH_TOKEN`      | пусто                                    | Токен загрузки source maps на сборке. На работу приложения не влияет. |
+| `APP_RELEASE`            | `dev`                                    | Метка релиза в событиях Sentry.                                       |
+| `MOCK_B24`               | `0`                                      | Мок Bitrix24 для UI-тестов и скриншотов. В продакшене не включать.    |
+| `BACKUP_PASSPHRASE`      | пусто                                    | Пароль шифрования дампа MongoDB.                                      |
+| `KEEP_DAYS`              | `14`                                     | Сколько дней хранить дампы.                                           |
+| `HEALTH_URL`             | `BITRIX24_APP_URL/api/health`            | Адрес проверки в `scripts/health-watch.sh`.                           |
+| `TEST_MONGO_URL`         | `mongodb://127.0.0.1:27018`              | База UI-тестов.                                                       |
+| `SCREENSHOT_PORT`        | `3112`                                   | Порт сборки при съёмке скриншотов.                                    |
 
 Compose дополнительно задаёт `HOSTNAME`, `PORT` и `MONGO_URL` для контейнера приложения.
 Пароли и токены держи в секретах хостинга или GitHub, не в файлах репозитория.
