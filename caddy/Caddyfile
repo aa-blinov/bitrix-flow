@@ -54,3 +54,65 @@ cast-team.duckdns.org {
     }
     encode gzip zstd
 }
+
+# paratrack — time tracker (~/pet/paratrack). Binary runs as the
+# `paratrack` container on bitrix-kanban_default; SQLite lives in the
+# /home/ubuntu/paratrack-data bind mount.
+paratrack.duckdns.org {
+    tls {
+        dns duckdns {env.DUCKDNS_TOKEN}
+    }
+
+    reverse_proxy paratrack:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+}
+
+
+# paratrack on the petzy.duckdns.org domain — same app container.
+petzy.duckdns.org {
+    tls {
+        dns duckdns {env.DUCKDNS_TOKEN}
+    }
+    reverse_proxy paratrack:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
+    encode gzip zstd
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+}
+
+# cast-agent — the host's own cast daemon (`cast server --port 1337`, not a
+# container), reached through this network's gateway. Voice input in the web
+# UI needs HTTPS: browsers only open the microphone on a secure origin.
+cast-agent.duckdns.org {
+    tls {
+        dns duckdns {env.DUCKDNS_TOKEN}
+    }
+
+    reverse_proxy 172.32.10.1:1337 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    encode gzip zstd
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+}
