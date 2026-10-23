@@ -498,22 +498,34 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     set({ isLoading: reset, isLoadingMore: !reset });
 
     try {
-      const { tasks, hasMore } = await fetchTasksByProject(projectId, {
-        limit: 50,
+      // Список задач берём из того же зеркала, что и грид. Раньше грид и
+      // список шли в разные источники: в зеркале задача полная (id чата,
+      // права на действия), а прямой список Bitrix отдаёт 25 полей — карточка
+      // теряла часть данных и лишний раз ходила в портал за задачей.
+      const params = new URLSearchParams({
+        projectId,
+        page: '1',
+        limit: '50',
         // The board always retains completed tasks in their original phases.
         // Hiding them made a fully completed project look empty.
         status: 'all',
-        filter: {
-          responsibleId: singleFilterValue(taskFilters.assignee),
-          priority: taskFilters.priority === 'all' ? undefined : taskFilters.priority,
-        },
       });
+      const assignee = singleFilterValue(taskFilters.assignee);
+      if (assignee) params.set('assigneeId', assignee);
+      if (taskFilters.priority !== 'all') params.set('priority', taskFilters.priority);
+
+      const res = await fetch(`/api/tasks/all?${params.toString()}`, {
+        headers: getMemberIdHeader(),
+      });
+      if (!res.ok) throw new Error(`tasks/all HTTP ${res.status}`);
+      const data = await res.json();
+      const tasks: Bx24Task[] = Array.isArray(data.tasks) ? data.tasks : [];
 
       const mapped = preserveDetails(tasks.map(convertBxTask), [...get().tasks, ...get().allTasks]);
 
       set({
         tasks: mapped,
-        hasMoreTasks: hasMore,
+        hasMoreTasks: data.nextOffset !== null && data.nextOffset !== undefined,
         isLoading: false,
         isLoadingMore: false,
       });
@@ -563,21 +575,28 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     set({ isLoadingMore: true });
 
     try {
-      const { tasks: newTasks, hasMore } = await fetchTasksByProject(selectedProjectId, {
-        limit: 50,
-        offset: tasks.length,
+      const params = new URLSearchParams({
+        projectId: selectedProjectId,
+        page: String(Math.floor(tasks.length / 50) + 1),
+        limit: '50',
         status: 'all',
-        filter: {
-          responsibleId: singleFilterValue(taskFilters.assignee),
-          priority: taskFilters.priority === 'all' ? undefined : taskFilters.priority,
-        },
       });
+      const assignee = singleFilterValue(taskFilters.assignee);
+      if (assignee) params.set('assigneeId', assignee);
+      if (taskFilters.priority !== 'all') params.set('priority', taskFilters.priority);
+
+      const res = await fetch(`/api/tasks/all?${params.toString()}`, {
+        headers: getMemberIdHeader(),
+      });
+      if (!res.ok) throw new Error(`tasks/all HTTP ${res.status}`);
+      const data = await res.json();
+      const newTasks: Bx24Task[] = Array.isArray(data.tasks) ? data.tasks : [];
 
       const mapped = preserveDetails(newTasks.map(convertBxTask), get().tasks);
 
       set((state) => ({
         tasks: [...state.tasks, ...mapped],
-        hasMoreTasks: hasMore,
+        hasMoreTasks: data.nextOffset !== null && data.nextOffset !== undefined,
         isLoadingMore: false,
       }));
     } catch (err: any) {
