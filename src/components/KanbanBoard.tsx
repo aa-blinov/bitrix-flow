@@ -11,6 +11,7 @@ import {
   taskFilterPresets,
   type FilterFieldKey,
 } from '@/lib/task-filters';
+import { boardStageQueries, coveredStageIds, REST_STAGES_COLUMN } from '@/lib/kanban-stage-queries';
 import {
   useCallback,
   useDeferredValue,
@@ -37,6 +38,7 @@ import { Menu } from '@/components/monos/Menu';
 import { Modal } from '@/components/monos/Modal';
 import { SearchField } from '@/components/monos/SearchField';
 import { SelectField } from '@/components/monos/SelectField';
+import { useToast } from '@/components/monos/toast';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -146,6 +148,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     })),
   );
   const router = useRouter();
+  const toast = useToast();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const openTask = useCallback(
@@ -202,9 +205,23 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [selectedProjectId]);
   const stagesReady = stages.length > 0 || stagesLoadedFor === selectedProjectId || stagesTimedOut;
-  const allStages = (stages.length > 0 ? stages : stagesReady ? defaultStages : [])
-    .slice()
-    .sort((a, b) => a.sort - b.sort);
+  // Набор стадий по подписи, а не по ссылке на массив: store отдаёт новый
+  // массив стадий при каждой загрузке, и список запросов доски пересобирался бы
+  // заново — доска спрашивала бы Битрикс дважды.
+  const stageSignature = `${stagesReady ? 'ready' : 'wait'}|${stages
+    .map((stage) => `${stage.id}:${stage.systemType ?? ''}`)
+    .join('|')}`;
+  // Название фазы — тоже часть содержимого колонки: без него переименованная
+  // фаза осталась бы со старым заголовком до перезагрузки проекта.
+  const stageContentSignature = `${stageSignature}|${stages.map((stage) => stage.name).join('|')}`;
+  const allStages = useMemo(
+    () =>
+      (stages.length > 0 ? stages : stagesReady ? defaultStages : [])
+        .slice()
+        .sort((a, b) => a.sort - b.sort),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- подпись описывает тот же набор
+    [stageContentSignature],
+  );
   const deferredSearch = useDeferredValue(taskSearch);
   // Список тегов проекта — тот же источник, что у списка задач.
   const [boardTags, setBoardTags] = useState<Array<{ tag: string; label: string; count: number }>>(
@@ -226,6 +243,15 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const stageKey = allStages.map((stage) => stage.id).join(',');
   const [stagePages, setStagePages] = useState<Record<string, KanbanStagePage>>({});
   const stageRequestVersion = useRef(0);
+  // Задачи без фазы (stageId «0») в списке фаз проекта отсутствуют, поэтому
+  // отдельным запросом их не достать: без этого они молча пропадали с доски.
+  // Запрашиваем их вместе с системной фазой «Новые» — ровно туда их и
+  // рисует displayedStageId.
+  const stageQueries = useMemo(() => boardStageQueries(allStages), [allStages]);
+  // Фазы, которые доска уже забрала. Всё остальное (удалённые фазы, проекты
+  // без доступа к task.stages.get) доска тоже показывает — отдельной
+  // колонкой «Без фазы».
+  const restStageIds = useMemo(() => coveredStageIds(allStages).join(','), [allStages]);
   // Пока первая выборка колонок не пришла, доска показывает спиннер, а не
   // пустые колонки: так же ведёт себя список задач.
   const [boardReady, setBoardReady] = useState(false);
@@ -236,6 +262,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       page: number,
       replace = false,
       requestVersion = stageRequestVersion.current,
+      excludeStageIds = '',
     ) => {
       if (!selectedProjectId) return;
       setStagePages((current) => ({
@@ -246,17 +273,26 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           loading: true,
         },
       }));
+      // В фильтре стадий может быть несколько значений: «Новые» забирает ещё и
+      // задачи без фазы.
+      const stageParam = stageQueries.find((item) => item.columnId === stageId)?.query || stageId;
       const params = new URLSearchParams({
         // Те же параметры, что шлёт список: фильтры общие, значит и запрос один.
         ...filterQueryParams(taskFilters),
         page: String(page),
         limit: String(KANBAN_PAGE_SIZE),
         projectId: selectedProjectId,
-        stageId,
+        stageId: stageParam,
         query: deferredSearch,
         sortKey: kanbanSort === 'urgency' ? 'deadline' : kanbanSort,
         sortDirection: 'asc',
       });
+      // Колонка «Без фазы» спрашивает всё, чего нет в известных фазах, поэтому
+      // фильтр по конкретной фазе ей не нужен.
+      if (excludeStageIds) {
+        params.delete('stageId');
+        params.set('excludeStageIds', excludeStageIds);
+      }
       try {
         const response = await fetch(`/api/tasks/all?${params.toString()}`);
         if (!response.ok) throw new Error(`tasks/all HTTP ${response.status}`);
@@ -289,16 +325,20 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         }));
       }
     },
-    [deferredSearch, taskFilters, kanbanSort, selectedProjectId],
+    [deferredSearch, taskFilters, kanbanSort, selectedProjectId, stageQueries],
   );
   useEffect(() => {
     if (!selectedProjectId || !stageKey) return;
     const requestVersion = ++stageRequestVersion.current;
     setBoardReady(false);
     startTransition(() => setStagePages({}));
-    const requests = (stageKey ? stageKey.split(',') : []).map((stageId) =>
-      loadStagePage(stageId, 1, true, requestVersion),
-    );
+    // Колонок может быть больше, чем фаз в проекте: к «Новым» добавляется
+    // запрос задач без фазы, а сверху — колонка «Без фазы» для фазы, которой
+    // доска не знает.
+    const requests = [
+      ...stageQueries.map((item) => loadStagePage(item.columnId, 1, true, requestVersion)),
+      loadStagePage(REST_STAGES_COLUMN, 1, true, requestVersion, restStageIds),
+    ];
     // Снимаем спиннер по первому ответу, а не по последнему: доска рисуется
     // сразу, остальные колонки наполняются по мере готовности.
     const reveal = () => {
@@ -306,7 +346,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     };
     if (!requests.length) reveal();
     requests.forEach((request) => void request.then(reveal).catch(reveal));
-  }, [loadStagePage, selectedProjectId, stageKey]);
+  }, [loadStagePage, selectedProjectId, stageKey, stageSignature]);
   const filteredTasks = useMemo(
     () => Object.values(stagePages).flatMap((stage) => stage.tasks),
     [stagePages],
@@ -321,6 +361,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // Tasks whose stageId does not match any known stage (deleted stage,
   // permissions error on task.stages.get, project Kanban disabled, …) get
   // rendered in a dedicated fallback column so they are never silently lost.
+  // Такие задачи приходят отдельным запросом (REST_STAGES_COLUMN), но в
+  // filteredTasks они уже учтены, поэтому фильтр по неизвестной фазе их
+  // тоже находит.
   const knownStageIds = new Set(allStages.map((stage) => stage.id));
   const orphanTasks = filteredTasks.filter((task) => !knownStageIds.has(displayedStageId(task)));
   if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
@@ -501,8 +544,26 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     if (await createStage(stageName)) {
       setStageName('');
       setShowStageDialog(false);
+    } else if (stageName.trim()) {
+      // Иначе диалог просто останется открытым, а пользователь решит, что
+      // приложение зависло.
+      toast({ title: 'Не удалось создать фазу', tone: 'danger' });
     }
     setIsCreatingStage(false);
+  };
+
+  // Отказ Битрикса («Вы не можете управлять стадиями») откатывает название,
+  // но без сообщения переименование выглядит как «ничего не произошло».
+  const handleRenameStage = async (stageId: string, title: string) => {
+    try {
+      await renameStage(stageId, title);
+    } catch (error) {
+      toast({
+        title: 'Не удалось переименовать фазу',
+        description: error instanceof Error ? error.message : undefined,
+        tone: 'danger',
+      });
+    }
   };
 
   // Ровно та же строка фильтров, что в списке задач: поля, пресеты и чипы
@@ -539,7 +600,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col bg-canvas">
       {/* Header */}
-      <header className="sticky top-0 z-10 overflow-hidden border-b border-line bg-canvas px-4 py-4 sm:px-6">
+      {/* overflow-x-clip, а не overflow-hidden: при overflow-hidden шапка
+          становится скролл-контейнером, и браузер прокручивает её, когда
+          фокус уходит в выпадающий список фильтров. Строка фильтров с чипами
+          уезжала при этом за верхний край, и снять фильтр было нечем. */}
+      <header className="sticky top-0 z-10 overflow-x-clip border-b border-line bg-canvas px-4 py-4 sm:px-6">
         {/* На узком экране скрытый горизонтальный скролл прятал «Фильтр» и
             «Добавить задачу» без всякого намёка — переносим строки. */}
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3 lg:overflow-x-auto lg:overflow-y-hidden">
@@ -702,7 +767,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       value={editingStageTitle}
                       onChange={(event) => setEditingStageTitle(event.target.value)}
                       onBlur={() => {
-                        if (editingStageTitle.trim()) void renameStage(stage.id, editingStageTitle);
+                        if (editingStageTitle.trim())
+                          void handleRenameStage(stage.id, editingStageTitle);
                         setEditingStageId(null);
                       }}
                       onKeyDown={(event) => {
@@ -819,6 +885,28 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     isDragging={draggedTask === task.id}
                   />
                 ))}
+                {(stagePages[REST_STAGES_COLUMN]?.tasks.length || 0) <
+                  (stagePages[REST_STAGES_COLUMN]?.total || 0) && (
+                  <Button
+                    variant="quiet"
+                    size="md"
+                    full
+                    disabled={stagePages[REST_STAGES_COLUMN]?.loading}
+                    onClick={() =>
+                      void loadStagePage(
+                        REST_STAGES_COLUMN,
+                        Math.floor(
+                          (stagePages[REST_STAGES_COLUMN]?.tasks.length || 0) / KANBAN_PAGE_SIZE,
+                        ) + 1,
+                        false,
+                        stageRequestVersion.current,
+                        restStageIds,
+                      )
+                    }
+                  >
+                    {stagePages[REST_STAGES_COLUMN]?.loading ? 'Загружаем…' : 'Показать ещё'}
+                  </Button>
+                )}
               </div>
             </Card>
           )}

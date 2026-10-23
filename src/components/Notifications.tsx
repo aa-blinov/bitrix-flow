@@ -31,6 +31,11 @@ function icon(type: string) {
   return <Pencil className="size-4 text-warning-text" strokeWidth={1.7} />;
 }
 
+// Список задач меняют только события о самой задаче. Комментарий задачу не
+// меняет, а перезагрузка списка стирала бы комментарии в открытой карточке:
+// они лежат в чате Bitrix, в списке их нет.
+const TASK_LIST_EVENTS = new Set(['task_added', 'task_updated', 'task_deleted', 'tasks-changed']);
+
 export default function Notifications() {
   const [items, setItems] = useState<Notice[]>([]);
   const [open, setOpen] = useState(false);
@@ -84,7 +89,9 @@ export default function Notifications() {
           ...current,
         ].slice(0, 50);
       });
-      if (selectedProjectId) void loadTasks(selectedProjectId, true);
+      if (selectedProjectId && TASK_LIST_EVENTS.has(String(event.type))) {
+        void loadTasks(selectedProjectId, true);
+      }
     },
     [loadTasks, selectedProjectId],
   );

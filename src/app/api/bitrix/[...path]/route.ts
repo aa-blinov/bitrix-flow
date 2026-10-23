@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
+import { bitrixErrorMessage, getPayload } from '@/lib/bitrix-payload';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
@@ -408,7 +409,17 @@ async function handleRequest(req: NextRequest, method: string) {
       // Зеркало узнавало о правке только от вебхука или следующего прохода
       // поллера, поэтому сразу после сохранения перезагруженная страница
       // показывала старое значение. Обновляем задачу точечно.
-      void refreshMirrorAfterMutation(memberId, method, params, result).catch(() => {});
+      //
+      // Ждём обновления зеркала: клиент сразу после ответа перезапрашивает
+      // список, и без этого новая задача ещё не попадала в выдачу — доска
+      // показывала её только после ручного перезахода страницы.
+      try {
+        await refreshMirrorAfterMutation(memberId, method, params, result);
+      } catch (error) {
+        // Зеркало — кэш, а не источник истины: его не удалось обновить, но и
+        // сама правка в Битриксе уже прошла.
+        console.error('[mirror-refresh] failed', error);
+      }
     } else {
       // ponytail: на холодном старте serverCache пуст, и каждый запрос летит
       // в Битрикс напрямую (10+ проектов × 200-800мс = секунды на первый рендер).
@@ -540,7 +551,7 @@ async function callBitrix24(
       }
 
       if (data.error) {
-        throw new Error(`${data.error}: ${data.error_description}`);
+        throw new Error(bitrixErrorMessage(data));
       }
 
       return getBitrixResult(method, data);
@@ -556,54 +567,6 @@ async function callBitrix24(
     }
   }
   throw lastError;
-}
-
-function getPayload(method: string, params: Record<string, string>): Record<string, unknown> {
-  if (method === 'tasks.task.chat.message.send') {
-    return { fields: { taskId: Number(params.taskId), text: params.text } };
-  }
-
-  if (method === 'tasks.task.result.add') {
-    return { fields: { taskId: Number(params.taskId), text: params.text } };
-  }
-  if (method === 'tasks.task.result.update') {
-    return { resultId: Number(params.resultId), fields: { text: params.text } };
-  }
-  if (method === 'tasks.task.result.delete') {
-    return { resultId: Number(params.resultId) };
-  }
-
-  if (method === 'tasks.task.add' || method === 'tasks.task.update') {
-    const payload: Record<string, unknown> = { ...params };
-    if (typeof params.fields === 'string') {
-      try {
-        payload.fields = JSON.parse(params.fields);
-      } catch {
-        // Let Bitrix return a validation error for malformed caller input.
-      }
-    }
-    return payload;
-  }
-
-  if (method !== 'tasks.task.list') return params;
-
-  const payload: Record<string, any> = {};
-  for (const [key, value] of Object.entries(params)) {
-    const nested = key.match(/^(filter|order|select)\[([^\]]+)\]$/);
-    if (!nested) {
-      payload[key] = value;
-      continue;
-    }
-    const [, field, childKey] = nested;
-    if (field === 'select') {
-      payload.select ||= [];
-      payload.select[Number(childKey)] = value;
-    } else {
-      payload[field] ||= {};
-      payload[field][childKey] = value;
-    }
-  }
-  return payload;
 }
 
 async function refreshToken(token: any): Promise<string | null> {

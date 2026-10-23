@@ -47,6 +47,7 @@ import { SelectField } from '@/components/monos/SelectField';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import { useToast } from '@/components/monos/toast';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { toLocalInputValue } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
@@ -402,7 +403,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   // закрывалась и открывалась доска нового проекта, и человек терял место,
   // где работал. Теперь остаёмся здесь, а в проект ведёт кнопка в тосте.
   const handleMoveProject = async (projectId: string) => {
-    const projectName = projects.find((project) => project.id === projectId)?.name || 'проект';
+    // Псевдо-проект «Без проекта» — это GROUP_ID = 0, отдельной сущности нет.
+    const isNoProject = projectId === 'none' || projectId === NO_PROJECT_ID;
+    const projectName = isNoProject
+      ? NO_PROJECT_NAME
+      : projects.find((project) => project.id === projectId)?.name || 'проект';
+    const targetId = isNoProject ? NO_PROJECT_ID : projectId;
     try {
       await moveTaskToProject(task.id, projectId);
     } catch (error) {
@@ -416,7 +422,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         label: 'Открыть проект',
         onClick: () => {
           onClose();
-          router.push(`/projects/${projectId}?task=${encodeURIComponent(task.id)}`);
+          router.push(`/projects/${targetId}?task=${encodeURIComponent(task.id)}`);
         },
       },
     });
@@ -1093,8 +1099,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       aria-label="Проект"
                       value={task.projectId || 'none'}
                       onChange={(event) => {
-                        if (event.target.value !== 'none')
-                          void handleMoveProject(event.target.value);
+                        void handleMoveProject(event.target.value);
                       }}
                       options={projectOptions}
                     />

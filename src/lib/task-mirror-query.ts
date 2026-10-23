@@ -163,37 +163,51 @@ export function timezoneOffsetString(date: Date) {
   return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
 }
 
-// Свежие записи фонового синка (`tasks`) перекрывают долговременное зеркало
-// (`task_mirror`) по одному и тому же id.
+// Свежесть строки определяется временем её записи: `task_mirror` обновляется
+// сразу после правки в интерфейсе, а `tasks` — только на ближайшем проходе
+// поллера. Раньше приоритет отдавался коллекции `tasks` без учёта времени:
+// отсортированная по priority выборка брала её строку всегда, и свежая правка
+// из зеркала терялась до следующего прохода поллера (до минуты).
+//
+// Пайплайн вынесен в отдельную функцию, чтобы правило сортировки можно было
+// проверить в тестах без поднятой MongoDB.
+export function taskMergeStages(memberId: string): Record<string, unknown>[] {
+  return [
+    { $match: { member_id: memberId } },
+    { $set: { priority: 0, freshAt: { $ifNull: ['$synced_at', '$updated_at'] } } },
+    {
+      $unionWith: {
+        coll: 'tasks',
+        pipeline: [
+          { $match: { member_id: memberId } },
+          { $set: { priority: 1, freshAt: '$updated_at' } },
+        ],
+      },
+    },
+    // Сначала свежесть, при равенстве — коллекция фонового синка.
+    { $sort: { id: 1, freshAt: -1, priority: -1 } },
+    { $group: { _id: '$id', data: { $first: '$data' } } },
+    { $set: normalizedTaskFields },
+    {
+      $set: {
+        deadlineDate: {
+          $convert: { input: '$deadline', to: 'date', onError: null, onNull: null },
+        },
+        createdAt: {
+          $convert: { input: '$createdDate', to: 'date', onError: null, onNull: null },
+        },
+        changedAt: {
+          $convert: { input: '$changedDate', to: 'date', onError: null, onNull: null },
+        },
+      },
+    },
+  ];
+}
+
 export async function taskMirrorStages(memberId: string) {
   const db = await getDb();
   return {
     db,
-    stages: [
-      { $match: { member_id: memberId } },
-      { $set: { priority: 0 } },
-      {
-        $unionWith: {
-          coll: 'tasks',
-          pipeline: [{ $match: { member_id: memberId } }, { $set: { priority: 1 } }],
-        },
-      },
-      { $sort: { id: 1, priority: -1, updated_at: -1 } },
-      { $group: { _id: '$id', data: { $first: '$data' } } },
-      { $set: normalizedTaskFields },
-      {
-        $set: {
-          deadlineDate: {
-            $convert: { input: '$deadline', to: 'date', onError: null, onNull: null },
-          },
-          createdAt: {
-            $convert: { input: '$createdDate', to: 'date', onError: null, onNull: null },
-          },
-          changedAt: {
-            $convert: { input: '$changedDate', to: 'date', onError: null, onNull: null },
-          },
-        },
-      },
-    ] as Record<string, unknown>[],
+    stages: taskMergeStages(memberId) as Record<string, unknown>[],
   };
 }

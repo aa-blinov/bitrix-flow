@@ -41,6 +41,7 @@ import {
   getMemberId,
 } from '@/lib/bitrix24';
 import { mapBitrixTaskStatus } from '@/lib/task-status';
+import { NO_PROJECT_ID } from '@/lib/no-project';
 import {
   EMPTY_FILTERS,
   splitValues,
@@ -195,6 +196,29 @@ interface KanbanStore {
 // карточка не видела изменений до перезагрузки.
 function mapBoth(state: { tasks: BxTask[]; allTasks: BxTask[] }, fn: (task: BxTask) => BxTask) {
   return { tasks: state.tasks.map(fn), allTasks: state.allTasks.map(fn) };
+}
+
+// Детали задачи (комментарии, чек-лист, время, подзадачи, результаты) лежат
+// не в списке, а в отдельных запросах, и convertBxTask их всегда пустыми.
+// Перезагрузка списка не должна их стирать: иначе открытая карточка теряет
+// комментарий сразу после отправки — событие «новый комментарий» приходит из
+// Bitrix уже после отправки и перезаписывает список.
+function preserveDetails(fresh: BxTask[], current: BxTask[]): BxTask[] {
+  const byId = new Map<string, BxTask>();
+  for (const task of current) byId.set(task.id, task);
+  if (!byId.size) return fresh;
+  return fresh.map((task) => {
+    const previous = byId.get(task.id);
+    if (!previous) return task;
+    return {
+      ...task,
+      comments: previous.comments?.length ? previous.comments : task.comments,
+      checklist: previous.checklist?.length ? previous.checklist : task.checklist,
+      timeEntries: previous.timeEntries?.length ? previous.timeEntries : task.timeEntries,
+      subtasks: previous.subtasks?.length ? previous.subtasks : task.subtasks,
+      results: previous.results?.length ? previous.results : task.results,
+    };
+  });
 }
 
 export function convertBxTask(bxTask: Bx24Task): BxTask {
@@ -457,7 +481,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         },
       });
 
-      const mapped = tasks.map(convertBxTask);
+      const mapped = preserveDetails(tasks.map(convertBxTask), [...get().tasks, ...get().allTasks]);
 
       set({
         tasks: mapped,
@@ -484,7 +508,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       });
       if (!res.ok) throw new Error(`tasks/all HTTP ${res.status}`);
       const data = await res.json();
-      const mapped: BxTask[] = (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask);
+      const mapped: BxTask[] = preserveDetails(
+        (Array.isArray(data.tasks) ? data.tasks : []).map(convertBxTask),
+        get().allTasks,
+      );
       set((state) => ({
         allTasks: append
           ? [
@@ -518,7 +545,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         },
       });
 
-      const mapped = newTasks.map(convertBxTask);
+      const mapped = preserveDetails(newTasks.map(convertBxTask), get().tasks);
 
       set((state) => ({
         tasks: [...state.tasks, ...mapped],
@@ -617,19 +644,25 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     try {
       const comments = await commentsPromise;
-      set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId
-            ? { ...t, comments: normalizeComments(comments, taskId, state.users) }
-            : t,
-        ),
-        allTasks: state.allTasks.map((t) =>
-          t.id === taskId
-            ? { ...t, comments: normalizeComments(comments, taskId, state.users) }
-            : t,
-        ),
-        isLoadingTask: false,
-      }));
+      set((state) => {
+        // Пустой ответ — это не «комментариев нет», а неудачный запрос чата:
+        // стирать уже загруженные комментарии из-за него нельзя.
+        const withComments = (task: BxTask) =>
+          task.id === taskId
+            ? {
+                ...task,
+                comments:
+                  comments.length || !task.comments.length
+                    ? normalizeComments(comments, taskId, state.users)
+                    : task.comments,
+              }
+            : task;
+        return {
+          tasks: state.tasks.map(withComments),
+          allTasks: state.allTasks.map(withComments),
+          isLoadingTask: false,
+        };
+      });
       void fetchChecklist(taskId)
         .then((checklist) =>
           set((state) => ({
@@ -807,8 +840,15 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     const previous =
       tasks.find((task) => task.id === taskId) || allTasks.find((task) => task.id === taskId);
     if (!previous || previous.projectId === projectId) return;
-    const stages = await fetchProjectStages(projectId);
-    const stageId = stages.find((stage) => stage.systemType === 'NEW')?.id || stages[0]?.id;
+    // Вне проекта фаз нет: задача просто остаётся без группы (GROUP_ID = 0),
+    // поэтому список стадий проекта тут не нужен.
+    const withoutProject = projectId === 'none' || projectId === NO_PROJECT_ID;
+    const groupId = withoutProject ? NO_PROJECT_ID : projectId;
+    const stageId = withoutProject
+      ? '0'
+      : await fetchProjectStages(projectId)
+          .then((stages) => stages.find((stage) => stage.systemType === 'NEW')?.id || stages[0]?.id)
+          .catch(() => undefined);
     if (!stageId) throw new Error('В проекте нет этапов для переноса задачи');
 
     set((state) => ({
@@ -816,19 +856,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         selectedProjectId === previous.projectId
           ? state.tasks.filter((task) => task.id !== taskId)
           : state.tasks.map((task) =>
-              task.id === taskId ? { ...task, projectId, stageId } : task,
+              task.id === taskId ? { ...task, projectId: groupId, stageId } : task,
             ),
       // Держим задачу в allTasks и тогда, когда её там не было (открыли из
       // списка «Без проекта»): по нему открытая карточка находит задачу после
       // того, как она ушла из списка текущего проекта, и не закрывается.
       allTasks: state.allTasks.some((task) => task.id === taskId)
         ? state.allTasks.map((task) =>
-            task.id === taskId ? { ...task, projectId, stageId } : task,
+            task.id === taskId ? { ...task, projectId: groupId, stageId } : task,
           )
-        : [...state.allTasks, { ...previous, projectId, stageId }],
+        : [...state.allTasks, { ...previous, projectId: groupId, stageId }],
     }));
     try {
-      await bxUpdateTaskFull(taskId, { groupId: projectId, stageId });
+      await bxUpdateTaskFull(taskId, { groupId, stageId });
     } catch (error) {
       set((state) => ({
         tasks:

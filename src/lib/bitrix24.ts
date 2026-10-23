@@ -957,5 +957,8 @@ export async function createTask(fields: any): Promise<string> {
     }),
   });
   await cacheInvalidateByPrefix('tasks:');
+  // Список подзадач родителя закэширован: без сброса кэша новая подзадача
+  // не появилась бы в карточке до конца срока кэша.
+  if (fields.parentId) await cacheInvalidate(`subtasks:${fields.parentId}`);
   return result.task.id;
 }
