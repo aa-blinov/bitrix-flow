@@ -10,6 +10,7 @@
 
 import { bx24OAuth } from './oauth-client';
 import { getDb } from './mongo';
+import { invalidateByPrefix } from './server-cache';
 
 const POLL_INTERVAL_MS = 60_000; // 60 сек между полными проходами
 const FIRST_RUN_DELAY_MS = 15_000; // первый проход после старта сервера
@@ -150,6 +151,10 @@ async function syncMember(memberId: string, since: Date): Promise<void> {
   if (updated.length === 0) return;
 
   await upsertTasks(memberId, updated);
+  // Серверный кэш ответов Bitrix сбрасывается на мутациях через прокси, а
+  // синк пишет в зеркало напрямую: без сброса клиенты до полуминуты видели
+  // старые данные.
+  invalidateByPrefix(`${memberId}:`);
   await markSummaryStale(memberId);
   console.log(`[task-sync] обновлено задач: ${updated.length} (с ${since.toISOString()})`);
 
