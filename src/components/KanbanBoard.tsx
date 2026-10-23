@@ -834,8 +834,17 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       stages={allStages}
                       onMoveToStage={(taskId, stageId) => void moveTaskToStage(taskId, stageId)}
                       onClick={() => {
-                        void loadTaskById(task.id);
-                        openTask(task.id);
+                        // Сначала полная задача: карточке нужны права на действия
+                        // и теги. Открывать раньше — значит перечитывать её
+                        // ещё раз уже в самой карточке.
+                        void (async () => {
+                          try {
+                            await loadTaskById(task.id);
+                          } catch {
+                            // Не открываем карточку вслепую: откроем как есть.
+                          }
+                          openTask(task.id);
+                        })();
                       }}
                       isDragging={draggedTask === task.id}
                     />

@@ -329,6 +329,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
   useEffect(() => {
     let cancelled = false;
+    // Права на действия приезжают вместе с полной задачей — если она уже в
+    // сторе, перечитывать её заново незачем. После смены статуса права в
+    // сторе устаревшие, поэтому перечитываем (actionsVersion > 0).
+    const fromStore = actionsVersion === 0 ? task.actions : undefined;
+    if (fromStore) {
+      setAllowedActions(fromStore);
+      return;
+    }
     void fetchTaskById(task.id)
       .then((freshTask) => {
         if (!cancelled) setAllowedActions(freshTask.actions || {});

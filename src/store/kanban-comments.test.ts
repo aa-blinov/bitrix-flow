@@ -57,11 +57,14 @@ describe('перезагрузка списка задач не стирает �
 
   it('сохраняет комментарии, чек-лист, время и подзадачи', async () => {
     global.fetch = vi.fn(async (url: any) => {
-      if (String(url).includes('tasks.task.list')) {
+      // Список задач приложение берёт из зеркала — тем же API, что и грид.
+      if (String(url).includes('/api/tasks/all')) {
         return {
           ok: true,
           json: async () => ({
-            result: { tasks: [{ id: '1', title: 'Переименованная задача' }], total: 1 },
+            tasks: [{ id: '1', title: 'Переименованная задача' }],
+            total: 1,
+            nextOffset: null,
           }),
         } as Response;
       }
@@ -82,11 +85,13 @@ describe('перезагрузка списка задач не стирает �
   it('не переносит детали одной задачи на другую', async () => {
     useKanbanStore.setState({ tasks: [taskWithDetails('2')], allTasks: [] } as any);
     global.fetch = vi.fn(async (url: any) => {
-      if (String(url).includes('tasks.task.list')) {
+      if (String(url).includes('/api/tasks/all')) {
         return {
           ok: true,
           json: async () => ({
-            result: { tasks: [{ id: '1', title: 'Другая задача' }], total: 1 },
+            tasks: [{ id: '1', title: 'Другая задача' }],
+            total: 1,
+            nextOffset: null,
           }),
         } as Response;
       }
