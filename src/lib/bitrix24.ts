@@ -561,11 +561,17 @@ export async function fetchTaskComments(
     const taskResult = knownChatId ? null : await bx24('tasks.task.get', { taskId });
     const task = taskResult?.task || taskResult;
     const chatId = knownChatId || task?.chatId || task?.CHAT_ID;
-    if (!chatId) return [];
-    const dialog = await bx24('im.dialog.messages.get', {
-      DIALOG_ID: `chat${chatId}`,
-      LIMIT: '50',
-    });
+
+    // Комментарии, оставленные до появления чата задачи, лежат только в
+    // task.commentitem.getlist — в чате их нет. Без второго источника карточка
+    // показывала бы пустую переписку по старым задачам.
+    const legacy = await bx24('task.commentitem.getlist', { TASKID: taskId }).catch(() => []);
+    const dialog = chatId
+      ? await bx24('im.dialog.messages.get', {
+          DIALOG_ID: `chat${chatId}`,
+          LIMIT: '50',
+        }).catch(() => null)
+      : null;
     // Вложения приходят отдельным узлом `files`, сообщение ссылается на них
     // идентификаторами в `files` или в params.FILE_ID.
     const filesNode = dialog?.files;
@@ -589,15 +595,43 @@ export async function fetchTaskComments(
           height: file.image?.height,
         }));
 
-    const comments = (dialog?.messages || [])
+    const legacyComments: Bx24Comment[] = (Array.isArray(legacy) ? legacy : []).map(
+      (item: any): Bx24Comment => ({
+        id: `legacy-${item.ID ?? item.id}`,
+        authorId: String(item.AUTHOR_ID ?? item.author_id ?? ''),
+        authorName: item.AUTHOR_NAME ?? item.author_name ?? '',
+        text: item.POST_MESSAGE ?? item.text ?? '',
+        createdDate: item.POST_DATE ?? item.createdDate ?? '',
+      }),
+    );
+
+    const chatComments: Bx24Comment[] = (dialog?.messages || [])
+      // Служебные сообщения чата («изменил стадию», «стал наблюдателем») — это
+      // события, а не комментарии: в счётчике комментариев Битрикса их нет.
+      .filter((message: any) => {
+        // Именно ??, а не ||: author_id служебного сообщения — это число 0,
+        // а || его проглатывал, и такие сообщения попадали в комментарии.
+        const authorId = String(message.author_id ?? message.authorId ?? message.AUTHOR_ID ?? '');
+        return authorId !== '0';
+      })
       .map((message: any): Bx24Comment => ({
-        id: String(message.id || message.ID),
-        authorId: String(message.author_id || message.authorId || message.AUTHOR_ID || ''),
-        authorName: message.author_name || message.authorName || '',
+        id: `chat-${message.id ?? message.ID}`,
+        authorId: String(message.author_id ?? message.authorId ?? message.AUTHOR_ID ?? ''),
+        authorName: message.author_name ?? message.authorName ?? '',
         text: message.text || message.TEXT || '',
         createdDate: message.date || message.DATE || '',
         files: messageFiles(message),
-      }))
+      }));
+
+    // Один и тот же комментарий может встретиться в обоих источниках.
+    const seen = new Set<string>();
+    const comments = [...legacyComments, ...chatComments]
+      .filter((comment) => {
+        const fingerprint = `${comment.authorId}|${comment.text}|${comment.createdDate}`;
+        if (seen.has(fingerprint)) return false;
+        seen.add(fingerprint);
+        return true;
+      })
       .sort(
         (left: Bx24Comment, right: Bx24Comment) =>
           (Date.parse(left.createdDate) || 0) - (Date.parse(right.createdDate) || 0),
@@ -690,6 +724,24 @@ const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 's
 // Вложения описания задачи. tasks.task.get отдаёт UF_TASK_WEBDAV_FILES только
 // при явном select, и там лежат id прикреплений (disk.attachedObject), а не
 // файлов на диске — имя и размер приходится добирать вторым вызовом.
+// Прикрепление файла к задаче: загрузка в папку проекта и привязка к задаче.
+export async function attachFileToTask(
+  taskId: string,
+  file: File,
+): Promise<{ id: string; name: string }> {
+  const body = new FormData();
+  body.append('taskId', taskId);
+  body.append('file', file);
+  const response = await fetch('/api/task-file/upload', { method: 'POST', body });
+  if (!response.ok) {
+    const reason = await response.json().catch(() => null);
+    throw new Error(reason?.detail || reason?.error || 'Не удалось прикрепить файл');
+  }
+  const result = await response.json();
+  await cacheInvalidate(`attachments:${taskId}`);
+  return result;
+}
+
 export async function fetchTaskAttachments(taskId: string): Promise<Bx24File[]> {
   const key = `attachments:${taskId}`;
   const cached = await cacheGet<Bx24File[]>(key);
@@ -797,7 +849,7 @@ export async function fetchChecklist(taskId: string) {
 export async function addChecklistItem(taskId: string, title: string, parentId?: string) {
   return bx24('task.checklistitem.add', {
     TASKID: taskId,
-    'FIELDS[TITLE]': title,
+    'fields[TITLE]': title,
     'FIELDS[PARENT_ID]': parentId || '0',
   });
 }
@@ -878,6 +930,31 @@ export async function addTimeEntry(
     TASKID: taskId,
     'fields[SECONDS]': seconds.toString(),
     'fields[COMMENT_TEXT]': description,
+  });
+  await cacheInvalidate(`time:${taskId}`);
+}
+
+// Правка и удаление записи времени: без них ошибочную запись было нечем
+// исправить — в карточке была только форма «Записать время».
+export async function updateTimeEntry(
+  taskId: string,
+  entryId: string,
+  seconds: number,
+  description: string,
+): Promise<void> {
+  await bx24('task.elapseditem.update', {
+    TASKID: taskId,
+    ELAPSEDITEMID: entryId,
+    'fields[SECONDS]': seconds.toString(),
+    'fields[COMMENT_TEXT]': description,
+  });
+  await cacheInvalidate(`time:${taskId}`);
+}
+
+export async function deleteTimeEntry(taskId: string, entryId: string): Promise<void> {
+  await bx24('task.elapseditem.delete', {
+    TASKID: taskId,
+    ELAPSEDITEMID: entryId,
   });
   await cacheInvalidate(`time:${taskId}`);
 }

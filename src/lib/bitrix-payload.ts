@@ -12,6 +12,32 @@ export function getPayload(
     return { fields: { taskId: Number(params.taskId), text: params.text } };
   }
 
+  // Правка и удаление записи времени: портал ждёт целые числа в
+  // идентификаторах («expected to be of type integer»), поэтому тело собираем
+  // руками, а не строкой из query-параметров.
+  if (method === 'task.elapseditem.update' || method === 'task.elapseditem.delete') {
+    const payload: Record<string, unknown> = { TASKID: Number(params.TASKID) };
+    if (params.ELAPSEDITEMID) payload.ELAPSEDITEMID = Number(params.ELAPSEDITEMID);
+    if (method === 'task.elapseditem.update') {
+      const fields: Record<string, unknown> = {};
+      const seconds = params['fields[SECONDS]'] ?? params['FIELDS[SECONDS]'];
+      const comment = params['fields[COMMENT_TEXT]'] ?? params['FIELDS[COMMENT_TEXT]'];
+      if (seconds !== undefined) fields.SECONDS = seconds;
+      if (comment !== undefined) fields.COMMENT_TEXT = comment;
+      payload.fields = fields;
+    }
+    return payload;
+  }
+
+  // То же с пунктом чек-листа: идентификаторы — числа.
+  if (method === 'task.checklistitem.update') {
+    return {
+      TASKID: Number(params.TASKID),
+      ITEMID: Number(params.ITEMID),
+      fields: { TITLE: params['fields[TITLE]'] ?? params['FIELDS[TITLE]'] },
+    };
+  }
+
   if (method === 'tasks.task.result.add') {
     return { fields: { taskId: Number(params.taskId), text: params.text } };
   }
