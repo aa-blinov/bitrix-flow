@@ -231,6 +231,13 @@ export async function GET(req: NextRequest) {
   if (unassigned) filter.responsibleId = { $in: ['', '0'] };
   if (projectId !== 'all') filter.groupId = oneOf(projectId);
   if (stageId !== 'all') filter.stageId = oneOf(stageId);
+  // Стадии вне списка фаз проекта: task.stages.get может не отдать фазы (нет
+  // прав), и тогда задачи с такими stageId не попадали ни в одну колонку.
+  // excludeStageIds запрашивает всё, чего нет в известных фазах.
+  const excludeStageIds = req.nextUrl.searchParams.get('excludeStageIds') || '';
+  if (excludeStageIds) {
+    filter.stageId = { $nin: many(excludeStageIds) };
+  }
   if (creatorId !== 'all') filter.creatorId = oneOf(creatorId);
   if (accompliceId !== 'all') filter.accompliceIds = { $in: many(accompliceId) };
   if (auditorId !== 'all') filter.auditorIds = { $in: many(auditorId) };
