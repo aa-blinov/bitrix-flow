@@ -6,7 +6,91 @@ import { sessionCookie } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
-// SSE stream — браузер подключается и получает real-time события
+// SSE stream — браузер подключается и получает real-time события.
+//
+// Раньше каждое соединение опрашивало MongoDB раз в секунду: две вкладки —
+// два опроса, десять — десять. Теперь опрос один на сервер, а подписчики
+// получают из него свои события.
+
+type Subscriber = {
+  memberId: string;
+  /** Курсор подписчика: до какого события ему уже отдали. */
+  lastSentId: ObjectId | null;
+  enqueue: (chunk: string) => void;
+};
+
+const subscribers = new Set<Subscriber>();
+let pump: NodeJS.Timeout | null = null;
+let heartbeatTimer: NodeJS.Timeout | null = null;
+
+async function queryEvents(memberId: string, after: ObjectId | null) {
+  const db = await getDb();
+  return db
+    .collection('events_stream')
+    .find({
+      member_id: memberId,
+      ...(after ? { _id: { $gt: after } } : {}),
+    })
+    .limit(50)
+    .sort({ _id: 1 })
+    .toArray();
+}
+
+// Один проход в секунду на всех подписчиков: забираем события с самой
+// ранней позиции, а каждому подписчику отдаём только те, что он ещё не видел.
+async function pumpOnce() {
+  const byMember = new Map<string, Subscriber[]>();
+  for (const subscriber of subscribers) {
+    const list = byMember.get(subscriber.memberId) || [];
+    list.push(subscriber);
+    byMember.set(subscriber.memberId, list);
+  }
+
+  for (const [memberId, list] of byMember) {
+    let oldest: ObjectId | null = null;
+    for (const subscriber of list) {
+      if (!subscriber.lastSentId) {
+        oldest = null;
+        break;
+      }
+      if (!oldest || subscriber.lastSentId < oldest) oldest = subscriber.lastSentId;
+    }
+    let events: Awaited<ReturnType<typeof queryEvents>> = [];
+    try {
+      events = await queryEvents(memberId, oldest);
+    } catch (error) {
+      console.error('SSE poll error:', error);
+      continue;
+    }
+    for (const subscriber of list) {
+      for (const event of events) {
+        if (subscriber.lastSentId && event._id <= subscriber.lastSentId) continue;
+        subscriber.lastSentId = event._id;
+        try {
+          subscriber.enqueue(`data: ${JSON.stringify(event.event)}\n\n`);
+        } catch {
+          // Подписчик отключился между выборкой и отправкой.
+        }
+      }
+    }
+  }
+}
+
+function ensurePump() {
+  if (pump) return;
+  pump = setInterval(() => {
+    if (!subscribers.size) return;
+    void pumpOnce();
+  }, 1000);
+  heartbeatTimer = setInterval(() => {
+    for (const subscriber of subscribers) {
+      try {
+        subscriber.enqueue(': heartbeat\n\n');
+      } catch {}
+    }
+  }, 30000);
+}
+
 export async function GET(req: NextRequest) {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
   if (!memberId) return new Response('Unauthorized', { status: 401 });
@@ -24,41 +108,20 @@ export async function GET(req: NextRequest) {
         .sort({ _id: -1 })
         .limit(1)
         .toArray();
-      let lastSentId: ObjectId | null = latest[0]?._id || null;
+      const lastSentId: ObjectId | null = latest[0]?._id || null;
+
+      const subscriber: Subscriber = {
+        memberId,
+        lastSentId,
+        enqueue: (chunk) => controller.enqueue(encoder.encode(chunk)),
+      };
+      subscribers.add(subscriber);
+      ensurePump();
+
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
 
-      // Polling MongoDB каждую секунду для новых событий
-      const interval = setInterval(async () => {
-        try {
-          const eventsDb = await getDb();
-          const events = await eventsDb
-            .collection('events_stream')
-            .find({
-              member_id: memberId,
-              ...(lastSentId ? { _id: { $gt: lastSentId } } : {}),
-            })
-            .limit(10)
-            .sort({ _id: 1 })
-            .toArray();
-
-          for (const e of events) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(e.event)}\n\n`));
-            lastSentId = e._id;
-          }
-        } catch (err) {
-          console.error('SSE poll error:', err);
-        }
-      }, 1000);
-
-      // Heartbeat каждые 30 секунд
-      const heartbeat = setInterval(() => {
-        controller.enqueue(encoder.encode(`: heartbeat\n\n`));
-      }, 30000);
-
-      // Закрытие
       req.signal.addEventListener('abort', () => {
-        clearInterval(interval);
-        clearInterval(heartbeat);
+        subscribers.delete(subscriber);
         controller.close();
       });
     },
