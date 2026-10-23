@@ -178,10 +178,24 @@ async function syncMember(memberId: string, since: Date): Promise<void> {
   notify({ type: 'sync-complete', memberId, updatedTotal: updated.length });
 }
 
+// Фильтр CHANGED_DATE на портале работает не на всех узлах: один и тот же
+// запрос на одном узле возвращает только изменённые задачи, на другом —
+// первую страницу задач вообще. Поэтому дату проверяем сами: иначе в зеркало
+// попадали бы тысячи неизменившихся задач, а реальные правки терялись.
+export function isChangedSince(task: any, sinceMs: number): boolean {
+  const raw = task?.changedDate ?? task?.CHANGED_DATE ?? '';
+  const changedMs = Date.parse(String(raw));
+  // Дату не разобрали — считаем задачу изменённой: лучше лишняя запись в
+  // зеркале, чем потерянная правка.
+  if (!Number.isFinite(changedMs)) return true;
+  return changedMs >= sinceMs;
+}
+
 async function fetchChanged(memberId: string, since: Date): Promise<any[]> {
   // Bitrix24 tasks.task.list с фильтром >=CHANGED_DATE возвращает только
   // изменённые после указанной даты. Идём постранично.
   const allTasks: any[] = [];
+  const sinceMs = since.getTime();
   let start = 0;
   // На всякий случай — защита от бесконечного цикла (макс 1000 задач за проход)
   for (let page = 0; page < 20; page += 1) {
@@ -200,7 +214,7 @@ async function fetchChanged(memberId: string, since: Date): Promise<any[]> {
     );
     const batch = data?.result?.tasks || data?.tasks || [];
     if (!Array.isArray(batch) || batch.length === 0) break;
-    allTasks.push(...batch);
+    allTasks.push(...batch.filter((task: any) => isChangedSince(task, sinceMs)));
     if (batch.length < PAGE_SIZE) break;
     start += PAGE_SIZE;
   }
