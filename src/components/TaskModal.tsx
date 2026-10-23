@@ -124,6 +124,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     updateTaskResult,
     deleteTaskResult,
     addTimeEntry,
+    updateTimeEntry,
+    deleteTimeEntry,
     users,
     projects,
     tasks,
@@ -136,6 +138,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     addChecklistItem,
     setChecklistItemCompleted,
     deleteChecklistItem,
+    updateChecklistItem,
+    attachFile,
     isLoadingTask,
   } = useKanbanStore(
     useShallow((s) => ({
@@ -147,6 +151,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       updateTaskResult: s.updateTaskResult,
       deleteTaskResult: s.deleteTaskResult,
       addTimeEntry: s.addTimeEntry,
+      updateTimeEntry: s.updateTimeEntry,
+      deleteTimeEntry: s.deleteTimeEntry,
       users: s.users,
       projects: s.projects,
       tasks: s.tasks,
@@ -159,6 +165,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       addChecklistItem: s.addChecklistItem,
       setChecklistItemCompleted: s.setChecklistItemCompleted,
       deleteChecklistItem: s.deleteChecklistItem,
+      updateChecklistItem: s.updateChecklistItem,
+      attachFile: s.attachFile,
       isLoadingTask: s.isLoadingTask,
     })),
   );
@@ -175,6 +183,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [editingResultText, setEditingResultText] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [showTimeEntry, setShowTimeEntry] = useState(false);
+  // Какую запись времени правим: пусто — значит добавляем новую.
+  const [editingTimeEntryId, setEditingTimeEntryId] = useState<string | null>(null);
   const [showSubtaskAdd, setShowSubtaskAdd] = useState(false);
   const [showExistingSubtaskPicker, setShowExistingSubtaskPicker] = useState(false);
   const [existingSubtaskQuery, setExistingSubtaskQuery] = useState('');
@@ -186,6 +196,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [isAttaching, setIsAttaching] = useState(false);
+  // Пункт чек-листа, который сейчас переименовывают.
+  const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | null>(null);
+  const [checklistItemDraft, setChecklistItemDraft] = useState('');
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [parentQuery, setParentQuery] = useState('');
   const [parentSearchResults, setParentSearchResults] = useState<Bx24Task[]>([]);
@@ -482,11 +496,69 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   };
 
   const handleAddTime = async () => {
-    if (timeHours > 0) {
-      await addTimeEntry(task.id, timeHours, timeDesc);
+    if (timeHours <= 0) return;
+    try {
+      if (editingTimeEntryId) {
+        await updateTimeEntry(task.id, editingTimeEntryId, timeHours, timeDesc);
+      } else {
+        await addTimeEntry(task.id, timeHours, timeDesc);
+      }
+      setEditingTimeEntryId(null);
       setTimeHours(1);
       setTimeDesc('');
       setShowTimeEntry(false);
+    } catch (error) {
+      toast({
+        title: editingTimeEntryId
+          ? 'Не удалось изменить запись времени'
+          : 'Не удалось записать время',
+        description: error instanceof Error ? error.message : undefined,
+        tone: 'danger',
+      });
+    }
+  };
+
+  const handleDeleteTime = async (entryId: string) => {
+    try {
+      await deleteTimeEntry(task.id, entryId);
+    } catch (error) {
+      toast({
+        title: 'Не удалось удалить запись времени',
+        description: error instanceof Error ? error.message : undefined,
+        tone: 'danger',
+      });
+    }
+  };
+
+  const handleAttachFile = async (file: File | undefined) => {
+    if (!file) return;
+    setIsAttaching(true);
+    try {
+      await attachFile(task.id, file);
+    } catch (error) {
+      toast({
+        title: 'Не удалось прикрепить файл',
+        description: error instanceof Error ? error.message : undefined,
+        tone: 'danger',
+      });
+    } finally {
+      setIsAttaching(false);
+    }
+  };
+
+  const commitChecklistItemRename = async (itemId: string) => {
+    const title = checklistItemDraft.trim();
+    setEditingChecklistItemId(null);
+    setChecklistItemDraft('');
+    if (!title) return;
+    try {
+      await updateChecklistItem(task.id, itemId, title);
+    } catch (error) {
+      toast({
+        title: 'Не удалось переименовать пункт',
+        description: error instanceof Error ? error.message : undefined,
+        tone: 'danger',
+      });
     }
   };
 
@@ -748,6 +820,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               )}
               {/* Вложения описания кликабельны и вне режима редактирования */}
               <FileAttachments files={task.attachments} attached />
+              <div className="mt-2 flex items-center gap-2">
+                <label
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-ui border border-line px-3 py-1.5 text-xs text-ink-soft transition-colors hover:text-ink ${
+                    isAttaching ? 'pointer-events-none opacity-60' : ''
+                  }`}
+                >
+                  <Paperclip size={14} strokeWidth={1.7} className="text-ink-faint" />
+                  {isAttaching ? 'Прикрепляем…' : 'Прикрепить файл'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    aria-label="Прикрепить файл к задаче"
+                    onChange={(event) => {
+                      void handleAttachFile(event.target.files?.[0]);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
             </div>
 
             <div>
@@ -998,13 +1089,40 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                 void setChecklistItemCompleted(task.id, item.id, !item.completed)
                               }
                             />
-                            <span
-                              className={`min-w-0 flex-1 text-sm ${
-                                item.completed ? 'text-ink-faint line-through' : 'text-ink'
-                              }`}
-                            >
-                              {item.title}
-                            </span>
+                            {editingChecklistItemId === item.id ? (
+                              <TextField
+                                variant="underline"
+                                size="sm"
+                                autoFocus
+                                className="min-w-0 flex-1"
+                                value={checklistItemDraft}
+                                aria-label="Название пункта чек-листа"
+                                onChange={(event) => setChecklistItemDraft(event.target.value)}
+                                onBlur={() => void commitChecklistItemRename(item.id)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter')
+                                    void commitChecklistItemRename(item.id);
+                                  if (event.key === 'Escape') {
+                                    setEditingChecklistItemId(null);
+                                    setChecklistItemDraft('');
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                title="Переименовать пункт"
+                                className={`min-w-0 flex-1 text-left text-sm ${
+                                  item.completed ? 'text-ink-faint line-through' : 'text-ink'
+                                }`}
+                                onClick={() => {
+                                  setEditingChecklistItemId(item.id);
+                                  setChecklistItemDraft(item.title);
+                                }}
+                              >
+                                {item.title}
+                              </button>
+                            )}
                             <IconButton
                               label="Удалить пункт"
                               variant="ghost"
@@ -1393,17 +1511,54 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     onChange={(event) => setTimeDesc(event.target.value)}
                   />
                   <Button full onClick={() => void handleAddTime()}>
-                    Записать время
+                    {editingTimeEntryId ? 'Сохранить время' : 'Записать время'}
                   </Button>
+                  {editingTimeEntryId && (
+                    <Button
+                      full
+                      variant="quiet"
+                      onClick={() => {
+                        setEditingTimeEntryId(null);
+                        setTimeHours(1);
+                        setTimeDesc('');
+                        setShowTimeEntry(false);
+                      }}
+                    >
+                      Отмена
+                    </Button>
+                  )}
                 </div>
               )}
 
               <div className="space-y-2 p-4">
-                {task.timeEntries.slice(0, 3).map((entry) => (
+                {task.timeEntries.map((entry) => (
                   <div key={entry.id} className="rounded-ui bg-surface-2 p-2 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-info-text">{entry.hours} ч</span>
                       <span className="text-whisper text-ink-faint">{entry.date}</span>
+                      <span className="flex items-center gap-1">
+                        <IconButton
+                          label="Изменить запись времени"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingTimeEntryId(entry.id);
+                            setTimeHours(entry.hours);
+                            setTimeDesc(entry.description);
+                            setShowTimeEntry(true);
+                          }}
+                        >
+                          <Pencil size={13} strokeWidth={1.7} />
+                        </IconButton>
+                        <IconButton
+                          label="Удалить запись времени"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleDeleteTime(entry.id)}
+                        >
+                          <Trash2 size={13} strokeWidth={1.7} />
+                        </IconButton>
+                      </span>
                     </div>
                     {entry.description && (
                       <p className="mt-1 text-whisper text-ink-faint">{entry.description}</p>

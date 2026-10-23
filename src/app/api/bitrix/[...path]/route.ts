@@ -167,6 +167,11 @@ const JSON_PAYLOAD_METHODS = new Set([
   'tasks.task.result.add',
   'tasks.task.result.update',
   'tasks.task.result.delete',
+  // Эти методы портал принимает только с целыми числами в идентификаторах,
+  // поэтому уходят JSON-телом, а не строкой из query-параметров.
+  'task.elapseditem.update',
+  'task.elapseditem.delete',
+  'task.checklistitem.update',
 ]);
 const REST_V3_METHODS = new Set([
   'tasks.task.chat.message.send',
@@ -253,6 +258,14 @@ const ALLOWED_METHODS = new Set([
   'task.checklistitem.delete',
   'task.elapseditem.getlist',
   'task.elapseditem.add',
+  'task.elapseditem.update',
+  'task.elapseditem.delete',
+  // Комментарии, оставленные до появления чата задачи, лежат только здесь:
+  // в чате их нет, и без этого метода карточка теряла бы всю переписку.
+  'task.commentitem.getlist',
+  // Имя и размер вложения задачи: без этого метода карточка показывала
+  // пустой список файлов, даже когда они прикреплены.
+  'disk.attachedObject.get',
   'tasks.task.result.add',
   'tasks.task.result.update',
   'tasks.task.result.delete',

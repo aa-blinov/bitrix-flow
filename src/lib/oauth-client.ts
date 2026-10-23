@@ -55,7 +55,9 @@ export async function bx24OAuth(
   params: Record<string, any> | unknown[] = {},
   // Гонку по нескольким адресам портала включаем только для чтения: часть
   // адресов регулярно не отвечает, и одиночная попытка роняла фоновый проход.
-  options: { parallel?: boolean } = {},
+  // v3 — адрес rest/api (у этих методов другой набор полей), json — тело
+  // запроса уходит JSON-объектом, а не формой.
+  options: { parallel?: boolean; v3?: boolean; json?: boolean } = {},
 ): Promise<any> {
   const db = await getDb();
   const token = await db.collection('user_tokens').findOne({ member_id });
@@ -64,9 +66,9 @@ export async function bx24OAuth(
 
   const call = (accessToken: string) =>
     postBitrixJson(
-      `https://${token.domain}/rest/${method}?auth=${accessToken}`,
+      `https://${token.domain}/${options.v3 ? 'rest/api' : 'rest'}/${method}?auth=${accessToken}`,
       params,
-      Array.isArray(params),
+      options.json ?? Array.isArray(params),
       options.parallel === true,
     );
 

@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from '@/lib/task-tags';
 import { BxTask, BxComment, BxTaskResult, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
+import type { Bx24TimeEntry } from '@/lib/bitrix24';
 import * as persist from './persist';
 import {
   fetchTasksByProject,
   fetchProjectList,
   fetchSubtasks,
   fetchTaskAttachments,
+  attachFileToTask as bxAttachFile,
   fetchTaskComments,
   fetchTaskById,
   fetchTaskTimeLog,
+  fetchTaskTimeLog as bxFetchTimeLog,
   fetchProjectMembers,
   fetchChecklist,
   addChecklistItem as bxAddChecklistItem,
@@ -30,6 +33,8 @@ import {
   updateTaskResult as bxUpdateTaskResult,
   deleteTaskResult as bxDeleteTaskResult,
   addTimeEntry as bxAddTime,
+  updateTimeEntry as bxUpdateTime,
+  deleteTimeEntry as bxDeleteTime,
   createTask as bxCreateTask,
   Bx24Task,
   Bx24Project,
@@ -163,6 +168,14 @@ interface KanbanStore {
   updateTaskResult: (taskId: string, resultId: string, text: string) => Promise<void>;
   deleteTaskResult: (taskId: string, resultId: string) => Promise<void>;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
+  attachFile: (taskId: string, file: File) => Promise<void>;
+  updateTimeEntry: (
+    taskId: string,
+    entryId: string,
+    hours: number,
+    description: string,
+  ) => Promise<void>;
+  deleteTimeEntry: (taskId: string, entryId: string) => Promise<void>;
   addChecklistItem: (taskId: string, title: string, parentId?: string) => Promise<void>;
   updateChecklistItem: (taskId: string, itemId: string, title: string) => Promise<void>;
   setChecklistItemCompleted: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
@@ -196,6 +209,17 @@ interface KanbanStore {
 // карточка не видела изменений до перезагрузки.
 function mapBoth(state: { tasks: BxTask[]; allTasks: BxTask[] }, fn: (task: BxTask) => BxTask) {
   return { tasks: state.tasks.map(fn), allTasks: state.allTasks.map(fn) };
+}
+
+// Журнал времени в карточке живёт в форме { id, hours }, а портал отдаёт
+// { id, seconds }. После любой правки перечитываем журнал: у оптимистичной
+// записи id временный («temp-…»), и правка по нему уходила бы в пустоту.
+function toTimeEntries(log: Bx24TimeEntry[], taskId: string) {
+  return log.map((entry) => ({
+    ...entry,
+    taskId,
+    hours: secondsToHours(entry.seconds),
+  }));
 }
 
 // Детали задачи (комментарии, чек-лист, время, подзадачи, результаты) лежат
@@ -1126,6 +1150,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     try {
       await bxAddTime(taskId, hoursToSeconds(hours), description);
+      const log = await bxFetchTimeLog(taskId).catch(() => null);
+      if (log) {
+        set((state) => ({
+          ...mapBoth(state, (t) =>
+            t.id === taskId ? { ...t, timeEntries: toTimeEntries(log, taskId) } : t,
+          ),
+        }));
+      }
     } catch {
       set((state) => ({
         ...mapBoth(state, (t) =>
@@ -1138,6 +1170,87 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
             : t,
         ),
       }));
+    }
+  },
+
+  attachFile: async (taskId, file) => {
+    await bxAttachFile(taskId, file);
+    const attachments = await fetchTaskAttachments(taskId).catch(() => null);
+    if (!attachments) return;
+    set((state) => ({
+      ...mapBoth(state, (task) => (task.id === taskId ? { ...task, attachments } : task)),
+    }));
+  },
+
+  updateTimeEntry: async (taskId, entryId, hours, description) => {
+    const previous = get()
+      .tasks.find((task) => task.id === taskId)
+      ?.timeEntries?.find((entry) => entry.id === entryId);
+    const apply = (task: BxTask) =>
+      task.id === taskId
+        ? {
+            ...task,
+            timeEntries: task.timeEntries.map((entry) =>
+              entry.id === entryId ? { ...entry, hours, description } : entry,
+            ),
+            actualTime: previous ? task.actualTime - previous.hours + hours : task.actualTime,
+          }
+        : task;
+
+    set((state) => ({ ...mapBoth(state, apply) }));
+    try {
+      await bxUpdateTime(taskId, entryId, hoursToSeconds(hours), description);
+      const log = await bxFetchTimeLog(taskId).catch(() => null);
+      if (log) {
+        set((state) => ({
+          ...mapBoth(state, (t) =>
+            t.id === taskId ? { ...t, timeEntries: toTimeEntries(log, taskId) } : t,
+          ),
+        }));
+      }
+    } catch (error) {
+      if (previous) set((state) => ({ ...mapBoth(state, apply) }));
+      throw error;
+    }
+  },
+
+  deleteTimeEntry: async (taskId, entryId) => {
+    const previous = get()
+      .tasks.find((task) => task.id === taskId)
+      ?.timeEntries?.find((entry) => entry.id === entryId);
+    const remove = (task: BxTask) =>
+      task.id === taskId
+        ? {
+            ...task,
+            timeEntries: task.timeEntries.filter((entry) => entry.id !== entryId),
+            actualTime: previous ? task.actualTime - previous.hours : task.actualTime,
+          }
+        : task;
+
+    set((state) => ({ ...mapBoth(state, remove) }));
+    try {
+      await bxDeleteTime(taskId, entryId);
+      const log = await bxFetchTimeLog(taskId).catch(() => null);
+      if (log) {
+        set((state) => ({
+          ...mapBoth(state, (t) =>
+            t.id === taskId ? { ...t, timeEntries: toTimeEntries(log, taskId) } : t,
+          ),
+        }));
+      }
+    } catch (error) {
+      if (previous) {
+        const restore = (task: BxTask) =>
+          task.id === taskId
+            ? {
+                ...task,
+                timeEntries: [...task.timeEntries, previous],
+                actualTime: task.actualTime + previous.hours,
+              }
+            : task;
+        set((state) => ({ ...mapBoth(state, restore) }));
+      }
+      throw error;
     }
   },
 

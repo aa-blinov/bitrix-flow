@@ -26,6 +26,37 @@ describe('тело запроса к Bitrix24', () => {
     ).toEqual({ taskId: '1', fields: { TITLE: 'Новое название' } });
   });
 
+  it('запись времени: идентификаторы становятся числами', () => {
+    expect(
+      getPayload('task.elapseditem.update', {
+        TASKID: '5471',
+        ELAPSEDITEMID: '8647',
+        'fields[SECONDS]': '3600',
+        'fields[COMMENT_TEXT]': 'Работа',
+      }),
+    ).toEqual({
+      TASKID: 5471,
+      ELAPSEDITEMID: 8647,
+      fields: { SECONDS: '3600', COMMENT_TEXT: 'Работа' },
+    });
+  });
+
+  it('удаление записи времени: только идентификаторы', () => {
+    expect(
+      getPayload('task.elapseditem.delete', { TASKID: '5471', ELAPSEDITEMID: '8647' }),
+    ).toEqual({ TASKID: 5471, ELAPSEDITEMID: 8647 });
+  });
+
+  it('пункт чек-листа: идентификаторы становятся числами', () => {
+    expect(
+      getPayload('task.checklistitem.update', {
+        TASKID: '5471',
+        ITEMID: '1393',
+        'fields[TITLE]': 'Новое название',
+      }),
+    ).toEqual({ TASKID: 5471, ITEMID: 1393, fields: { TITLE: 'Новое название' } });
+  });
+
   it('вложенные фильтры списка собираются в объекты', () => {
     expect(
       getPayload('tasks.task.list', {
