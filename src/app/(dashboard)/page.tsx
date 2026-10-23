@@ -197,6 +197,9 @@ export default function DashboardPage() {
                   <Link
                     key={project.id}
                     href={`/projects/${project.id}`}
+                    // Без этого Next подтягивал все страницы проектов вперёд:
+                    // на портале их 51, и вход стоил 67 запросов.
+                    prefetch={false}
                     className="group flex items-center gap-4 px-5 py-3.5 transition-colors duration-fast hover:bg-surface"
                   >
                     {/* Метка проекта: в наборе цвет означает состояние, поэтому
