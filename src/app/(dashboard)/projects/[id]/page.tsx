@@ -101,11 +101,15 @@ export default function ProjectPage() {
     [tasks, projectId],
   );
   useEffect(() => {
-    if (!notificationTaskId) {
-      setSelectedTask(null);
-      return;
-    }
+    // Без задачи в адресе выбор не трогаем: карточку закрывает сама доска
+    // (и её очистка при уходе со страницы). Сбрасывать здесь означало закрыть
+    // только что открытую карточку в момент, когда адрес ещё не обновился.
+    if (!notificationTaskId) return;
     const openTask = async () => {
+      // Задача уже открыта — не ходим за ней на портал снова. Проверка стоит
+      // до loadTaskById: эффект перезапускается при каждом обновлении списка
+      // задач, и иначе карточка перечитывалась бы из портала по несколько раз.
+      if (useKanbanStore.getState().selectedTaskId === notificationTaskId) return;
       const task =
         projectTasks.find((item) => item.id === notificationTaskId) ||
         (await loadTaskById(notificationTaskId));

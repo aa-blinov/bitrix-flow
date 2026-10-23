@@ -15,6 +15,16 @@ export const normalizedTaskFields = {
   },
   title: { $ifNull: ['$data.title', '$data.TITLE'] },
   description: { $ifNull: ['$data.description', '$data.DESCRIPTION'] },
+  // Чат задачи: без него карточка тянула задачу ещё раз, только чтобы узнать
+  // id чата для чтения комментариев.
+  chatId: {
+    $convert: {
+      input: { $ifNull: ['$data.chatId', '$data.CHAT_ID'] },
+      to: 'string',
+      onError: '',
+      onNull: '',
+    },
+  },
   rawStatus: {
     $convert: {
       input: { $ifNull: ['$data.status', '$data.STATUS'] },
@@ -186,7 +196,14 @@ export function taskMergeStages(memberId: string): Record<string, unknown>[] {
     },
     // Сначала свежесть, при равенстве — коллекция фонового синка.
     { $sort: { id: 1, freshAt: -1, priority: -1 } },
-    { $group: { _id: '$id', data: { $first: '$data' } } },
+    // Коллекции хранят разный набор полей: у полного снимка задачи их 70+, у
+    // фонового списка — 25, и там нет ни chatId, ни прав на действия (action),
+    // ни счётчика комментариев. Раньше бралась целиком свежайшая строка, и
+    // карточка теряла эти поля вместе с ними. Теперь берём обе: свежая
+    // побеждает, а пробелы добираются из полного снимка.
+    { $group: { _id: '$id', rows: { $push: '$data' } } },
+    { $set: { data: mergeRows() } },
+    { $unset: 'rows' },
     { $set: normalizedTaskFields },
     {
       $set: {
@@ -202,6 +219,26 @@ export function taskMergeStages(memberId: string): Record<string, unknown>[] {
       },
     },
   ];
+}
+
+// Две строки задачи в одно поле: первая (свежая) побеждает, но пустые
+// значения в ней — это «поля нет», а не «значение пустое», поэтому пробелы
+// добираются из второй строки.
+function mergeRows(): Record<string, unknown> {
+  // $rows.0 у массива документов читается как «поле 0 у каждого» — берём
+  // элемент через $arrayElemAt.
+  const withoutEmpties = (index: number) => ({
+    $arrayToObject: {
+      $filter: {
+        input: { $objectToArray: { $ifNull: [{ $arrayElemAt: ['$rows', index] }, {}] } },
+        as: 'kv',
+        cond: { $and: [{ $ne: ['$$kv.v', ''] }, { $ne: ['$$kv.v', null] }] },
+      },
+    },
+  });
+  return {
+    $mergeObjects: [withoutEmpties(1), withoutEmpties(0)],
+  };
 }
 
 export async function taskMirrorStages(memberId: string) {

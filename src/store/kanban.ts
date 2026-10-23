@@ -245,6 +245,10 @@ function preserveDetails(fresh: BxTask[], current: BxTask[]): BxTask[] {
   });
 }
 
+// Незавершённые загрузки задач: повторный вызов ждёт тот же запрос, а не
+// начинает новый (иначе карточка читалась из портала по несколько раз).
+const taskFetches = new Map<string, Promise<BxTask | null>>();
+
 export function convertBxTask(bxTask: Bx24Task): BxTask {
   return {
     id: bxTask.id,
@@ -594,19 +598,31 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   },
 
   loadTaskById: async (taskId) => {
+    // Одну и ту же задачу просят часто (карточка, эффект синхронизации URL,
+    // перетаскивание) — повторные запросы в портал не нужны.
+    const inFlight = taskFetches.get(taskId);
+    if (inFlight) return inFlight;
+    const request = (async () => {
+      try {
+        const task = convertBxTask(await fetchTaskById(taskId));
+        set((state) => ({
+          tasks: state.tasks.some((item) => item.id === taskId)
+            ? state.tasks
+            : [...state.tasks, task],
+          allTasks: state.allTasks.some((item) => item.id === taskId)
+            ? state.allTasks
+            : [...state.allTasks, task],
+        }));
+        return task;
+      } catch {
+        return null;
+      }
+    })();
+    taskFetches.set(taskId, request);
     try {
-      const task = convertBxTask(await fetchTaskById(taskId));
-      set((state) => ({
-        tasks: state.tasks.some((item) => item.id === taskId)
-          ? state.tasks
-          : [...state.tasks, task],
-        allTasks: state.allTasks.some((item) => item.id === taskId)
-          ? state.allTasks
-          : [...state.allTasks, task],
-      }));
-      return task;
-    } catch {
-      return null;
+      return await request;
+    } finally {
+      taskFetches.delete(taskId);
     }
   },
 
@@ -615,9 +631,14 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
 
     // Независимые REST-вызовы запускаем вместе: журнал времени не должен
     // ждать медленную загрузку комментариев из чата Bitrix24.
-    const task =
+    // Задача могла ещё грузиться (карточка открыта до ответа портала). Дожидаемся
+    // её: без этого комментарии снова сходили в портал за той же задачей —
+    // ведь в списке у задачи нет id чата.
+    const known =
       get().tasks.find((item) => item.id === taskId) ||
       get().allTasks.find((item) => item.id === taskId);
+    const pending = taskFetches.get(taskId);
+    const task = known || (pending ? await pending : undefined);
     const commentsPromise = fetchTaskComments(taskId, task?.chatId);
     // Вложения описания: id известны из задачи, имя и размер — из disk.
     void fetchTaskAttachments(taskId)

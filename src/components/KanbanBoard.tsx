@@ -151,8 +151,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const toast = useToast();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Задача, которую мы только что открыли: пока адрес не обновился, её нельзя
+  // закрывать — иначе карточка мигнёт и перечитается из портала дважды.
+  const pendingTaskRef = useRef<string | null>(null);
+
   const openTask = useCallback(
     (taskId: string) => {
+      pendingTaskRef.current = taskId;
       setSelectedTask(taskId);
       const params = new URLSearchParams(searchParams.toString());
       params.set('task', taskId);
@@ -167,6 +172,20 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [pathname, router, searchParams, setSelectedTask]);
+
+  // Кнопка «назад» убирает задачу из адреса — карточку надо закрыть. Раньше
+  // это делал эффект страницы проекта, но он же закрывал её и в момент
+  // открытия, когда адрес ещё не успел обновиться.
+  const taskFromUrl = searchParams.get('task');
+  const selectedTaskId = useKanbanStore((s) => s.selectedTaskId);
+  useEffect(() => {
+    if (taskFromUrl) {
+      pendingTaskRef.current = null;
+      return;
+    }
+    if (pendingTaskRef.current) return;
+    if (selectedTaskId) setSelectedTask(null);
+  }, [setSelectedTask, selectedTaskId, taskFromUrl]);
 
   // Доска и список проекта делят один набор фильтров: входим в тот же scope,
   // тогда переключение вида их не сбрасывает, а смена проекта — сбрасывает.
