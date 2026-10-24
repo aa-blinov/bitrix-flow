@@ -163,7 +163,12 @@ function httpRequest(
 // Скачивание вложения. Тот же обход мёртвых edge-адресов, что и для REST, но
 // GET и стримом: плейн fetch() висит 10 с на первом же неотвечающем адресе.
 // Адреса пробуем по одному — параллельная гонка тянула бы файл дважды.
-export async function getBitrixFileStream(url: string): Promise<{
+export async function getBitrixFileStream(
+  url: string,
+  // Range нужен плееру: Safari не играет звук и видео без частичных ответов,
+  // а перемотка в остальных браузерах идёт ими же.
+  range?: string,
+): Promise<{
   status: number;
   headers: Record<string, string | string[] | undefined>;
   stream: import('node:stream').Readable;
@@ -181,6 +186,7 @@ export async function getBitrixFileStream(url: string): Promise<{
           lookup: (_host, _opts, cb) => cb(null, entry.address, 4),
           servername: hostname,
           timeout: RESPONSE_TIMEOUT_MS,
+          headers: range ? { Range: range } : {},
         });
         guardConnect(req);
         req.on('error', reject);

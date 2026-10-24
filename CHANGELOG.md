@@ -20,6 +20,12 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
   Opens with `g` then `c`.
   Dialogs and message history page through the portal cursors ("show more",
   "show earlier").
+- Messenger shows who read your message (one tick sent, two ticks read, a count in
+  groups with the names on hover).
+- Messages read both Bitrix tags and Markdown; attachments arrive as real images,
+  audio, video and file links, bot cards render as blocks instead of "[Вложение]".
+- Messenger sends files (picker or paste, up to 20 MB, caption from the input) and
+  voice messages recorded in the browser.
 
 ## 0.1.0 — 2026
 

@@ -5,6 +5,9 @@ import {
   mergeMessages,
   normalizeDialogs,
   normalizeMessages,
+  normalizeReaders,
+  readersOf,
+  VOICE_NAME,
 } from './messenger';
 
 describe('messenger', () => {
@@ -73,7 +76,15 @@ describe('messenger', () => {
   });
 
   it('merges overlapping pages without duplicates and keeps order', () => {
-    const msg = (id: number) => ({ id, authorId: 1, text: String(id), date: '' });
+    const msg = (id: number) => ({
+      id,
+      authorId: 1,
+      text: String(id),
+      date: '',
+      edited: false,
+      files: [],
+      attach: [],
+    });
     expect(
       mergeMessages([msg(3), msg(4)], [msg(1), msg(2), msg(3), msg(5)]).map((m) => m.id),
     ).toEqual([1, 2, 3, 4, 5]);
@@ -94,5 +105,75 @@ describe('messenger', () => {
       ['b', 0],
       ['c', 0],
     ]);
+  });
+
+  it('attaches files and cards to messages, params may be an empty array', () => {
+    const { messages } = normalizeMessages({
+      messages: [
+        { id: 3, author_id: 9, text: '', date: 'd', params: { FILE_ID: [10, 11, 12] } },
+        { id: 2, author_id: 9, text: 'x', date: 'd', params: [] },
+        {
+          id: 1,
+          author_id: 0,
+          text: 'y',
+          date: 'd',
+          params: {
+            IS_EDITED: 'Y',
+            ATTACH: [
+              { BLOCKS: [{ MESSAGE: 'сервис упал' }, { GRID: [{ NAME: 'Хост', VALUE: 'a' }] }] },
+            ],
+          },
+        },
+      ],
+      files: [
+        { id: 10, name: 'a.png', type: 'image', size: 5 },
+        { id: 11, name: `${VOICE_NAME} 01.webm`, type: 'video', size: 5 },
+        { id: 12, name: 'r.pdf', type: 'file', size: 5, isVoiceNote: false },
+      ],
+    });
+    expect(messages.map((m) => m.id)).toEqual([1, 2, 3]);
+    expect(messages[2].files.map((f) => f.kind)).toEqual(['image', 'audio', 'file']);
+    expect(messages[1].files).toEqual([]);
+    expect(messages[0].edited).toBe(true);
+    expect(messages[0].attach[0].blocks.map((b) => b.type)).toEqual(['text', 'grid']);
+  });
+
+  it('counts a message as read by those whose last read id is not older', () => {
+    const readers = normalizeReaders(
+      {
+        readed_list: [
+          { user_id: 9, user_name: 'Я', message_id: 100 },
+          { user_id: 2, user_name: 'Анна', message_id: 50 },
+          { user_id: 3, user_name: 'Иван', message_id: 0 },
+        ],
+      },
+      9,
+    );
+    expect(readers).toEqual([{ id: 2, name: 'Анна', messageId: 50 }]);
+    const message = (id: number) => ({
+      id,
+      authorId: 9,
+      text: '',
+      date: '',
+      edited: false,
+      files: [],
+      attach: [],
+    });
+    expect(readersOf(message(50), readers)).toHaveLength(1);
+    expect(readersOf(message(51), readers)).toHaveLength(0);
+  });
+
+  it('shows a plain preview of a markup message in the dialog list', () => {
+    const [dialog] = normalizeDialogs({
+      items: [
+        {
+          id: '83',
+          type: 'user',
+          user: { name: 'Анна' },
+          message: { id: 1, text: '[B]Релиз[/B] **завтра** [USER=2 REPLACE]Дима[/USER]' },
+        },
+      ],
+    });
+    expect(dialog.lastMessage?.text).toBe('Релиз завтра Дима');
   });
 });

@@ -10,16 +10,27 @@ import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 export async function withMessenger(
   req: NextRequest,
   run: (
-    call: (method: string, params?: Record<string, string>, mutation?: boolean) => Promise<any>,
+    call: (
+      method: string,
+      params?: Record<string, unknown>,
+      mutation?: boolean,
+      json?: boolean,
+    ) => Promise<any>,
   ) => Promise<NextResponse>,
 ): Promise<NextResponse> {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
   if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
 
-  const call = async (method: string, params: Record<string, string> = {}, mutation = false) => {
-    if (isMockEnabled()) return mockHandle(method, params);
+  const call = async (
+    method: string,
+    params: Record<string, unknown> = {},
+    mutation = false,
+    json = false,
+  ) => {
+    if (isMockEnabled()) return mockHandle(method, params as Record<string, string>);
     // Повтор POST отправил бы сообщение дважды, поэтому гонка адресов только на чтении.
-    return bx24OAuth(memberId, method, params, { parallel: !mutation });
+    // json нужен методам im.v2.*: вложенные fields форма передать не может.
+    return bx24OAuth(memberId, method, params, { parallel: !mutation, json });
   };
 
   try {

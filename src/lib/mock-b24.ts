@@ -629,10 +629,39 @@ const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
   return {
     id,
     author_id: id % 2 ? 1 : 2,
-    text: id === 60 ? 'Посмотришь ревью?' : `Сообщение ${id}`,
+    text:
+      id === 60
+        ? 'Посмотришь ревью?'
+        : id === 58
+          ? '**Важно**: смотри [схему](https://example.com/schema) и `npm test`'
+          : id === 56
+            ? '[B]Релиз[/B] в [USER=2]Дмитрий[/USER]\n> цитата из markdown\n- первый пункт\n- второй пункт'
+            : `Сообщение ${id}`,
     date: `2026-03-02T09:${String(id % 60).padStart(2, '0')}:00+03:00`,
+    params:
+      id === 59
+        ? { FILE_ID: [501, 502] }
+        : id === 57
+          ? {
+              ATTACH: [
+                {
+                  ID: 1,
+                  BLOCKS: [
+                    { MESSAGE: 'Мониторинг: сервис недоступен' },
+                    { GRID: [{ NAME: 'Хост', VALUE: 'api-1' }] },
+                  ],
+                },
+              ],
+            }
+          : [],
   };
 }).reverse();
+
+// Файлы сообщения 59: картинка и голосовое, как их отдаёт портал.
+const MOCK_FILES = [
+  { id: 501, name: 'схема.png', size: 2144, type: 'image', isVoiceNote: false },
+  { id: 502, name: 'Голосовое сообщение 02.03 09-59.webm', size: 9000, type: 'video' },
+];
 
 function mockMessagesPage(params: Record<string, string>) {
   const before = Number(params.LAST_ID) || Infinity;
@@ -645,6 +674,7 @@ function mockMessagesPage(params: Record<string, string>) {
       { id: 1, name: 'Анна Кузнецова' },
       { id: 2, name: 'Дмитрий Соколов' },
     ],
+    files: MOCK_FILES,
   };
 }
 
@@ -730,6 +760,15 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'im.message.add':
       return 1000;
+
+    case 'im.v2.File.upload':
+      return { messageId: 1001, file: { id: 600 } };
+
+    // Дмитрий прочитал по 57-е сообщение: мои 1..57 прочитаны, 59-е нет.
+    case 'im.dialog.get':
+      return {
+        readed_list: [{ user_id: 2, user_name: 'Дмитрий Соколов', message_id: 57, date: null }],
+      };
 
     case 'im.dialog.read':
       return true;

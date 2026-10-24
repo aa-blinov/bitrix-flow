@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withMessenger } from '@/lib/messenger-api';
-import { DIALOG_ID, MESSAGES_PAGE, normalizeMessages } from '@/lib/messenger';
+import { DIALOG_ID, MESSAGES_PAGE, normalizeMessages, normalizeReaders } from '@/lib/messenger';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,14 +16,23 @@ export function GET(req: NextRequest) {
   // последние сообщения диалога.
   const beforeId = req.nextUrl.searchParams.get('beforeId') || '';
   const afterId = req.nextUrl.searchParams.get('afterId') || '';
+  const me = Number(req.nextUrl.searchParams.get('me')) || 0;
   return withMessenger(req, async (call) => {
-    const result = await call('im.dialog.messages.get', {
-      DIALOG_ID: dialogId,
-      LIMIT: String(MESSAGES_PAGE),
-      ...(/^\d{1,12}$/.test(beforeId) ? { LAST_ID: beforeId } : {}),
-      ...(/^\d{1,12}$/.test(afterId) ? { FIRST_ID: afterId } : {}),
+    // Прочитанность нужна только свежей порции: при листании вверх историю
+    // читать заново незачем. Сбой этого вызова не должен ронять сами сообщения.
+    const [result, dialog] = await Promise.all([
+      call('im.dialog.messages.get', {
+        DIALOG_ID: dialogId,
+        LIMIT: String(MESSAGES_PAGE),
+        ...(/^\d{1,12}$/.test(beforeId) ? { LAST_ID: beforeId } : {}),
+        ...(/^\d{1,12}$/.test(afterId) ? { FIRST_ID: afterId } : {}),
+      }),
+      beforeId ? null : call('im.dialog.get', { DIALOG_ID: dialogId }).catch(() => null),
+    ]);
+    return NextResponse.json({
+      ...normalizeMessages(result),
+      ...(dialog ? { readers: normalizeReaders(dialog, me) } : {}),
     });
-    return NextResponse.json(normalizeMessages(result));
   });
 }
 

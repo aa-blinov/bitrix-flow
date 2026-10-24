@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, FileText, Mic, Paperclip, Send, X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -13,14 +13,22 @@ import BitrixText from '@/components/BitrixText';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import {
+  MAX_FILE_SIZE,
   MESSAGES_PAGE,
+  VOICE_NAME,
+  formatBytes,
   mergeDialogs,
   mergeMessages,
+  readersOf,
+  type Attach,
   type Dialog,
   type DialogKind,
   type Message,
+  type MessageFile,
   type Person,
+  type Reader,
 } from '@/lib/messenger';
+import { safeHref } from '@/lib/safe-url';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
   { value: 'all', label: 'Все' },
@@ -258,6 +266,14 @@ function Conversation({
   const [error, setError] = useState('');
   const [hasOlder, setHasOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  // null пока портал не ответил: галочки без данных не рисуем.
+  const [readers, setReaders] = useState<Reader[] | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [canRecord, setCanRecord] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const picker = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const newestRef = useRef(0);
@@ -268,13 +284,18 @@ function Conversation({
   const dialogId = dialog.id;
   const request = useCallback(
     (cursor: string) =>
-      fetch(`/api/messenger/messages?dialogId=${encodeURIComponent(dialogId)}${cursor}`).then(
-        (response) =>
-          response.ok
-            ? (response.json() as Promise<{ messages: Message[]; people: Record<string, Person> }>)
-            : Promise.reject(new Error(String(response.status))),
+      fetch(
+        `/api/messenger/messages?dialogId=${encodeURIComponent(dialogId)}&me=${me}${cursor}`,
+      ).then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              messages: Message[];
+              people: Record<string, Person>;
+              readers?: Reader[];
+            }>)
+          : Promise.reject(new Error(String(response.status))),
       ),
-    [dialogId],
+    [dialogId, me],
   );
 
   // Первый запрос берёт последние сообщения, дальше опрос идёт курсором
@@ -285,6 +306,7 @@ function Conversation({
       .then((data) => {
         setMessages((current) => mergeMessages(current || [], data.messages));
         setPeople((known) => ({ ...known, ...data.people }));
+        if (data.readers) setReaders(data.readers);
         if (!after) setHasOlder(data.messages.length >= MESSAGES_PAGE);
         // Пришло чужое сообщение в открытом диалоге: сразу прочитано.
         if (after && data.messages.some((m) => m.id > after && m.authorId !== me)) onRead(dialogId);
@@ -347,6 +369,112 @@ function Conversation({
     } finally {
       setSending(false);
     }
+  }
+
+  async function upload(file: File, caption = '') {
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`Файл «${file.name}» больше ${formatBytes(MAX_FILE_SIZE)}.`);
+      return false;
+    }
+    setSending(true);
+    setError('');
+    try {
+      const body = new FormData();
+      body.set('dialogId', dialog.id);
+      body.set('file', file);
+      if (caption) body.set('message', caption);
+      const response = await fetch('/api/messenger/files', { method: 'POST', body });
+      if (!response.ok) throw new Error(String(response.status));
+      stickToBottom.current = true;
+      load();
+      onSent();
+      return true;
+    } catch {
+      setError(`Не удалось отправить «${file.name}». Попробуйте ещё раз.`);
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Подпись из поля ввода уходит с первым файлом, как в самом Битриксе.
+  async function sendFiles(files: File[]) {
+    let caption = draft.trim();
+    for (const file of files) {
+      if (!(await upload(file, caption))) return;
+      if (caption) setDraft('');
+      caption = '';
+    }
+  }
+
+  useEffect(() => {
+    setCanRecord(typeof MediaRecorder !== 'undefined' && Boolean(navigator.mediaDevices));
+  }, []);
+
+  useEffect(() => {
+    if (!recording) return;
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [recording]);
+
+  // Диалог закрыт посреди записи: микрофон отпускаем, запись не отправляем.
+  useEffect(
+    () => () => {
+      const recorder = recorderRef.current;
+      if (!recorder) return;
+      recorder.onstop = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+      recorder.stream.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  async function startRecording() {
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Firefox пишет ogg, Safari mp4, Chrome только webm: берём лучшее из поддерживаемого.
+      const mimeType = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus'].find(
+        (type) => MediaRecorder.isTypeSupported(type),
+      );
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunks.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.current.push(event.data);
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setSeconds(0);
+      setRecording(true);
+    } catch {
+      setError('Нет доступа к микрофону. Разрешите его в настройках браузера.');
+    }
+  }
+
+  function finishRecording(send: boolean) {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    recorderRef.current = null;
+    recorder.onstop = () => {
+      recorder.stream.getTracks().forEach((track) => track.stop());
+      const type = recorder.mimeType || 'audio/webm';
+      if (send && chunks.current.length) {
+        const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm';
+        const stamp = new Date()
+          .toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          .replace(',', '')
+          .replace(':', '-');
+        void upload(new File(chunks.current, `${VOICE_NAME} ${stamp}.${ext}`, { type }));
+      }
+      chunks.current = [];
+    };
+    recorder.stop();
+    setRecording(false);
   }
 
   const link =
@@ -421,15 +549,30 @@ function Conversation({
                       {people[String(message.authorId)]?.name || `Пользователь ${message.authorId}`}
                     </p>
                   )}
-                  <p className="whitespace-pre-wrap break-words text-sm text-ink">
-                    <BitrixText text={message.text || '[Вложение]'} />
-                  </p>
-                  <time
-                    className="mt-1 block text-right text-xs text-ink-soft"
-                    dateTime={message.date}
-                  >
-                    {when(message.date)}
-                  </time>
+                  {message.text && (
+                    <div className="break-words text-sm text-ink">
+                      <BitrixText text={message.text} markdown />
+                    </div>
+                  )}
+                  {message.files.map((file) => (
+                    <FileView key={file.id} file={file} dialogId={dialog.id} />
+                  ))}
+                  {message.attach.map((attach, index) => (
+                    <AttachView key={index} attach={attach} />
+                  ))}
+                  {!message.text && !message.files.length && !message.attach.length && (
+                    <p className="text-sm text-ink-soft">Сообщение без текста</p>
+                  )}
+                  <div className="mt-1 flex items-center justify-end gap-1.5 text-xs text-ink-soft">
+                    {message.edited && <span>изменено</span>}
+                    <time dateTime={message.date}>{when(message.date)}</time>
+                    {mine && readers && (
+                      <ReadMark
+                        readers={readersOf(message, readers)}
+                        group={dialog.kind !== 'user'}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -442,33 +585,205 @@ function Conversation({
           {error}
         </p>
       )}
-      <form
-        className="flex items-end gap-2 border-t border-line p-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void send();
-        }}
-      >
-        <TextArea
-          aria-label="Сообщение"
-          placeholder="Сообщение"
-          variant="boxed"
-          rows={1}
-          className="flex-1"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter отправляет, Shift+Enter переносит строку, как в самом Битриксе.
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              void send();
-            }
+      {recording ? (
+        <div className="flex items-center gap-3 border-t border-line p-3">
+          <Mic className="size-4 animate-pulse text-danger-text" strokeWidth={1.7} />
+          <span className="flex-1 text-sm text-ink" role="timer">
+            Запись {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+          </span>
+          <Button
+            variant="quiet"
+            onClick={() => finishRecording(false)}
+            aria-label="Отменить запись"
+          >
+            <X className="size-4" strokeWidth={1.7} />
+          </Button>
+          <Button onClick={() => finishRecording(true)} aria-label="Отправить голосовое">
+            <Send className="size-4" strokeWidth={1.7} />
+          </Button>
+        </div>
+      ) : (
+        <form
+          className="flex items-end gap-2 border-t border-line p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void send();
           }}
-        />
-        <Button type="submit" disabled={!draft.trim() || sending} aria-label="Отправить">
-          <Send className="size-4" strokeWidth={1.7} />
-        </Button>
-      </form>
+        >
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            aria-label="Файлы"
+            onChange={(event) => {
+              const files = [...(event.target.files || [])];
+              event.target.value = '';
+              if (files.length) void sendFiles(files);
+            }}
+          />
+          <Button
+            variant="quiet"
+            disabled={sending}
+            onClick={() => picker.current?.click()}
+            aria-label="Прикрепить файл"
+          >
+            <Paperclip className="size-4" strokeWidth={1.7} />
+          </Button>
+          <TextArea
+            aria-label="Сообщение"
+            placeholder="Сообщение"
+            variant="boxed"
+            rows={1}
+            className="flex-1"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onPaste={(event) => {
+              const files = [...event.clipboardData.files];
+              if (!files.length) return;
+              event.preventDefault();
+              void sendFiles(files);
+            }}
+            onKeyDown={(event) => {
+              // Enter отправляет, Shift+Enter переносит строку, как в самом Битриксе.
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void send();
+              }
+            }}
+          />
+          {!draft.trim() && canRecord ? (
+            <Button
+              disabled={sending}
+              onClick={() => void startRecording()}
+              aria-label="Записать голосовое"
+            >
+              <Mic className="size-4" strokeWidth={1.7} />
+            </Button>
+          ) : (
+            <Button type="submit" disabled={!draft.trim() || sending} aria-label="Отправить">
+              <Send className="size-4" strokeWidth={1.7} />
+            </Button>
+          )}
+        </form>
+      )}
     </>
+  );
+}
+
+function ReadMark({ readers, group }: { readers: Reader[]; group: boolean }) {
+  const seen = readers.length > 0;
+  const label = seen ? `Прочитано: ${readers.map((r) => r.name).join(', ')}` : 'Не прочитано';
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={`inline-flex items-center gap-0.5 ${seen ? 'text-accent-text' : ''}`}
+    >
+      {seen ? (
+        <CheckCheck className="size-3.5" strokeWidth={1.7} />
+      ) : (
+        <Check className="size-3.5" strokeWidth={1.7} />
+      )}
+      {group && seen && <span>{readers.length}</span>}
+    </span>
+  );
+}
+
+function FileView({ file, dialogId }: { file: MessageFile; dialogId: string }) {
+  const src = `/api/messenger/file?dialogId=${encodeURIComponent(dialogId)}&fileId=${file.id}&name=${encodeURIComponent(file.name)}`;
+  if (file.kind === 'image')
+    return (
+      <a href={src} target="_blank" rel="noreferrer" className="mt-1 block">
+        <img src={src} alt={file.name} loading="lazy" className="max-h-64 max-w-full rounded-ui" />
+      </a>
+    );
+  if (file.kind === 'audio')
+    return (
+      <div className="mt-1">
+        <audio
+          controls
+          preload="none"
+          src={src}
+          aria-label={file.name}
+          className="w-64 max-w-full"
+        />
+      </div>
+    );
+  if (file.kind === 'video')
+    return (
+      <video
+        controls
+        preload="metadata"
+        src={src}
+        aria-label={file.name}
+        className="mt-1 max-h-64 max-w-full rounded-ui"
+      />
+    );
+  return (
+    <a
+      href={`${src}&download=1`}
+      className="mt-1 flex items-center gap-2 rounded-ui border border-line px-2 py-1.5 text-sm text-ink hover:bg-surface-2"
+    >
+      <FileText className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
+      <span className="min-w-0 flex-1 truncate">{file.name}</span>
+      <span className="shrink-0 text-xs text-ink-soft">{formatBytes(file.size)}</span>
+    </a>
+  );
+}
+
+function AttachView({ attach }: { attach: Attach }) {
+  return (
+    <div className="mt-1 space-y-1 border-l-2 border-line pl-3 text-sm text-ink">
+      {attach.description && <p className="text-xs text-ink-soft">{attach.description}</p>}
+      {attach.blocks.map((block, index) => {
+        if (block.type === 'text')
+          return (
+            <div key={index}>
+              <BitrixText text={block.text} markdown />
+            </div>
+          );
+        if (block.type === 'user')
+          return (
+            <p key={index} className="text-xs font-medium text-accent-text">
+              {block.name}
+            </p>
+          );
+        if (block.type === 'link')
+          return (
+            <div key={index}>
+              <a
+                href={safeHref(block.link)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-text hover:underline"
+              >
+                {block.name}
+              </a>
+              {block.desc && <p className="text-xs text-ink-soft">{block.desc}</p>}
+            </div>
+          );
+        if (block.type === 'grid')
+          return (
+            <dl key={index} className="grid grid-cols-[auto_1fr] gap-x-3 text-xs">
+              {block.rows.map((row, rowIndex) => (
+                <div key={rowIndex} className="contents">
+                  <dt className="text-ink-soft">{row.name}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          );
+        if (block.type === 'files')
+          return (
+            <p key={index} className="flex items-center gap-1 text-xs text-ink-soft">
+              <Paperclip className="size-3.5" strokeWidth={1.7} />
+              {block.names.join(', ')}
+            </p>
+          );
+        return <hr key={index} className="border-line" />;
+      })}
+    </div>
   );
 }
