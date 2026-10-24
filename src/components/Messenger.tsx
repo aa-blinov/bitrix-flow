@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell, BellOff, Ellipsis, Pin, SquarePen } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
@@ -21,7 +21,7 @@ import {
   useRealtime,
 } from '@/components/messenger/realtime';
 import { usePolling, when } from '@/components/messenger/util';
-import { mergeDialogs, type Dialog, type DialogKind } from '@/lib/messenger';
+import { DIALOG_ID, mergeDialogs, type Dialog, type DialogKind } from '@/lib/messenger';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
   { value: 'all', label: 'Все' },
@@ -33,6 +33,7 @@ const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
 
 // Портал не присылает событий о сообщениях обычному приложению (они есть
 // только у чат-ботов), поэтому список и открытый диалог обновляются опросом.
+const LAST_DIALOG_KEY = 'bitrix-flow-last-dialog';
 const DIALOGS_POLL_MS = 15_000;
 // Пока жив SSE, список обновляют события, а опрос только подстраховывает.
 const DIALOGS_POLL_REALTIME_MS = 60_000;
@@ -50,15 +51,40 @@ export default function Messenger() {
   const [query, setQuery] = useState('');
   const [activeId, setActiveId] = useState('');
   const [newChatOpen, setNewChatOpen] = useState(false);
+  const lastActive = useRef('');
   const [notifyOn, setNotifyOn] = useState(false);
   const realtime = useRealtime();
 
   useEffect(() => {
     setNotifyOn(chatNotifyEnabled());
-    // Уведомление браузера ведёт сюда с номером диалога.
-    const dialog = new URLSearchParams(window.location.search).get('dialog');
-    if (dialog) setActiveId(dialog);
+    // Адрес с номером диалога (ссылка уведомления или обновление страницы) главнее
+    // последнего открытого диалога, который хранится в браузере.
+    let dialog = new URLSearchParams(window.location.search).get('dialog');
+    if (!dialog) {
+      try {
+        dialog = localStorage.getItem(LAST_DIALOG_KEY);
+      } catch {}
+    }
+    if (dialog && DIALOG_ID.test(dialog)) setActiveId(dialog);
   }, []);
+
+  // Открытый диалог держим в адресе и в браузере: после обновления страницы человек
+  // возвращается в ту же переписку.
+  useEffect(() => {
+    // Пока диалог не меняли, адрес и хранилище не трогаем: иначе пустой начальный
+    // activeId стёр бы сохранённый диалог раньше, чем он восстановится.
+    if (activeId === lastActive.current) return;
+    lastActive.current = activeId;
+    try {
+      if (activeId) localStorage.setItem(LAST_DIALOG_KEY, activeId);
+      else localStorage.removeItem(LAST_DIALOG_KEY);
+    } catch {}
+    window.history.replaceState(
+      null,
+      '',
+      activeId ? `?dialog=${encodeURIComponent(activeId)}` : window.location.pathname,
+    );
+  }, [activeId]);
 
   // Курсор «Показать ещё»: опрос обновляет только первую страницу и курсор
   // не трогает, иначе подгруженные диалоги терялись бы каждые 15 секунд.
@@ -103,6 +129,24 @@ export default function Messenger() {
     );
   }, [dialogs, tab, query]);
   const active = dialogs?.find((dialog) => dialog.id === activeId);
+
+  // Диалога из адреса нет на первой странице списка: спрашиваем портал о нём отдельно.
+  const missing = Boolean(activeId && dialogs && !dialogs.some((dialog) => dialog.id === activeId));
+  useEffect(() => {
+    if (!missing) return;
+    let cancelled = false;
+    void fetch(`/api/messenger/dialogs?dialogId=${encodeURIComponent(activeId)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.dialog) setDialogs((current) => mergeDialogs(current || [], [data.dialog]));
+        else setActiveId('');
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [missing, activeId]);
 
   const markRead = useCallback((id: string) => {
     setDialogs((current) => current && current.map((d) => (d.id === id ? { ...d, unread: 0 } : d)));
@@ -164,9 +208,9 @@ export default function Messenger() {
   }, []);
 
   return (
-    // fixed по окну, а не h-dvh в потоке: над страницей стоит пустая обёртка подсказки
-    // кнопки меню, она сдвигает всё вниз на строку, и поле ввода уходило за край окна.
-    <div className="fixed inset-0 flex flex-col bg-canvas lg:left-64">
+    // На телефоне внизу страницы 5rem под плавающую кнопку меню (pb-20 у main): отнимаем их,
+    // чтобы страница не прокручивалась и кнопка не лежала на поле ввода.
+    <div className="flex h-[calc(100dvh-5rem)] flex-col bg-canvas lg:h-dvh">
       <PageHeader
         title="Сообщения"
         description="Личные чаты, группы и обсуждения задач из Битрикс24"
@@ -363,6 +407,7 @@ export default function Messenger() {
               onBack={() => setActiveId('')}
               onRead={markRead}
               onSent={loadDialogs}
+              onPin={() => void dialogAction(active, active.pinned ? 'unpin' : 'pin')}
             />
           ) : (
             <p className="m-auto p-6 text-sm text-ink-soft">Выберите диалог слева</p>

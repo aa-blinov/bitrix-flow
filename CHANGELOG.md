@@ -13,6 +13,8 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## 0.2.0 — 2026-10-24
+
 ### Added
 
 - Messenger (`/messenger`): personal chats, project groups, task discussions and
@@ -48,14 +50,24 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 - Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
   arrows, Space); the order is kept in the browser.
 
+- Files in messages show their names (images and video with the size), voice messages
+  are labelled, show their length at once and play at 1x, 1.5x or 2x.
+- After a page reload the messenger reopens the dialog you were in (address `?dialog=`
+  and the browser), even when it is not on the first page of the list.
+- A dialog can also be pinned with a button in its header.
 - Files wait in a tray before sending (picker, paste or drag-and-drop into the dialog),
   show a preview and can be removed; sending shows upload progress.
 
 ### Fixed
 
-- The messenger page sat 24 px below the window (an empty tooltip wrapper above the
-  page), so the message field was cut off at the bottom; the page is now pinned to the
-  window, and on phones the floating menu button no longer covers the send button.
+- The "online" dot showed for everyone: the portal user `status` is the chosen status,
+  not presence. A person is online only with fresh activity (web, phone or desktop, up
+  to five minutes) and no "away" mark.
+- Every page had an empty 24 px line at the top: the tooltip of the floating phone menu
+  button is an inline span, and in the page flow it made a line box. The button now sits
+  in a fixed container. This also stopped the messenger field from being cut off at the
+  bottom; on phones the messenger leaves a strip for the menu button instead of sitting
+  under it.
 - Voice recording asked for the microphone but the browser never showed a prompt:
   the proxy sent `Permissions-Policy: microphone=()`. It now allows `microphone=(self)`.
 - The message field sat 7 px above the attach and microphone buttons.

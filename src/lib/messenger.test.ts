@@ -3,6 +3,7 @@ import {
   DIALOG_ID,
   mergeDialogs,
   mergeMessages,
+  isOnline,
   normalizeDialogs,
   normalizeMessages,
   normalizeReaders,
@@ -177,5 +178,28 @@ describe('messenger', () => {
       ],
     });
     expect(dialog.lastMessage?.text).toBe('Релиз завтра Дима');
+  });
+
+  it('counts a person as online only with fresh activity, not by the chosen status alone', () => {
+    const now = Date.parse('2026-10-24T12:00:00Z');
+    const base = { status: 'online', idle: false, absent: false };
+    expect(isOnline({ ...base, last_activity_date: '2026-10-24T11:58:00Z' }, now)).toBe(true);
+    expect(isOnline({ ...base, last_activity_date: '2026-10-24T07:00:00Z' }, now)).toBe(false);
+    expect(
+      isOnline(
+        {
+          ...base,
+          last_activity_date: '2026-10-23T00:00:00Z',
+          mobile_last_date: '2026-10-24T11:59:00Z',
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(isOnline({ ...base, idle: true, last_activity_date: '2026-10-24T11:59:00Z' }, now)).toBe(
+      false,
+    );
+    expect(isOnline({ status: 'dnd', last_activity_date: '2026-10-24T11:59:00Z' }, now)).toBe(
+      false,
+    );
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 import { Check, CheckCheck, Download, FileText, Paperclip, PlayCircle } from 'lucide-react';
 import { Button } from '@/components/monos/Button';
 import { Popover } from '@/components/monos/Popover';
@@ -8,7 +9,14 @@ import { Skeleton } from '@/components/monos/Skeleton';
 import { Spinner } from '@/components/monos/Spinner';
 import BitrixText from '@/components/BitrixText';
 import { MediaError, useMediaLoad } from '@/components/MediaState';
-import { fileUrl, formatBytes, type Attach, type MessageFile, type Reader } from '@/lib/messenger';
+import {
+  VOICE_NAME,
+  fileUrl,
+  formatBytes,
+  type Attach,
+  type MessageFile,
+  type Reader,
+} from '@/lib/messenger';
 import { internalHref } from '@/lib/portal-links';
 import { safeHref } from '@/lib/safe-url';
 
@@ -72,6 +80,13 @@ export function ReadMark({
   );
 }
 
+const SPEEDS = [1, 1.5, 2];
+
+// Подпись под медиа: имя файла, у голосового вместо длинного имени с датой понятная метка.
+function Caption({ children }: { children: string }) {
+  return <span className="mt-0.5 block max-w-64 truncate text-xs text-ink-soft">{children}</span>;
+}
+
 export function FileView({
   file,
   dialogId,
@@ -84,6 +99,9 @@ export function FileView({
   // Звук не грузится, пока его не включат (preload none): до этого он готов.
   const media = useMediaLoad(file.kind === 'audio' ? 'ready' : 'loading');
   const src = media.url(fileUrl(dialogId, file));
+  const audio = useRef<HTMLAudioElement>(null);
+  const [rate, setRate] = useState(1);
+  const isVoice = file.name.startsWith(VOICE_NAME);
 
   if (file.kind === 'image' || file.kind === 'video') {
     if (media.status === 'error') return <MediaError name={file.name} onRetry={media.retry} />;
@@ -92,73 +110,96 @@ export function FileView({
     // так переписка не прыгает, и ленивая загрузка картинки остаётся ленивой.
     const hidden = 'absolute inset-0 size-full opacity-0';
     return (
-      <button
-        type="button"
-        onClick={() => onOpen(file.id)}
-        aria-label={file.kind === 'video' ? `Открыть видео ${file.name}` : undefined}
-        className={`relative mt-1 block ${file.kind === 'image' ? 'cursor-zoom-in' : ''}`}
-      >
-        {loading && (
-          <span className="relative block h-40 w-56 max-w-full">
-            <Skeleton width="100%" height="100%" />
-            <Spinner
-              label="Загрузка файла"
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-ink-soft"
-            />
-          </span>
-        )}
-        {file.kind === 'image' ? (
-          <img
-            key={media.attempt}
-            src={src}
-            alt={file.name}
-            loading="lazy"
-            onLoad={media.onReady}
-            onError={media.onError}
-            className={loading ? hidden : 'max-h-64 max-w-full rounded-ui'}
-          />
-        ) : (
-          <>
-            <video
+      <div className="mt-1">
+        <button
+          type="button"
+          onClick={() => onOpen(file.id)}
+          aria-label={file.kind === 'video' ? `Открыть видео ${file.name}` : undefined}
+          className={`relative block ${file.kind === 'image' ? 'cursor-zoom-in' : ''}`}
+        >
+          {loading && (
+            <span className="relative block h-40 w-56 max-w-full">
+              <Skeleton width="100%" height="100%" />
+              <Spinner
+                label="Загрузка файла"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-ink-soft"
+              />
+            </span>
+          )}
+          {file.kind === 'image' ? (
+            <img
               key={media.attempt}
-              preload="metadata"
-              muted
-              playsInline
               src={src}
-              onLoadedData={media.onReady}
+              alt={file.name}
+              loading="lazy"
+              onLoad={media.onReady}
               onError={media.onError}
               className={loading ? hidden : 'max-h-64 max-w-full rounded-ui'}
             />
-            {!loading && (
-              <PlayCircle
-                className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-ink"
-                strokeWidth={1.4}
+          ) : (
+            <>
+              <video
+                key={media.attempt}
+                preload="metadata"
+                muted
+                playsInline
+                src={src}
+                onLoadedData={media.onReady}
+                onError={media.onError}
+                className={loading ? hidden : 'max-h-64 max-w-full rounded-ui'}
               />
-            )}
-          </>
-        )}
-      </button>
+              {!loading && (
+                <PlayCircle
+                  className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-ink"
+                  strokeWidth={1.4}
+                />
+              )}
+            </>
+          )}
+        </button>
+        <Caption>{`${file.name} · ${formatBytes(file.size)}`}</Caption>
+      </div>
     );
   }
   if (file.kind === 'audio') {
     if (media.status === 'error') return <MediaError name={file.name} onRetry={media.retry} />;
     return (
-      <div className="mt-1 flex items-center gap-2">
-        <audio
-          key={media.attempt}
-          controls
-          preload="none"
-          src={src}
-          aria-label={file.name}
-          onWaiting={media.onLoading}
-          onCanPlay={media.onReady}
-          onPlaying={media.onReady}
-          onError={media.onError}
-          className="w-64 max-w-full"
-        />
-        {media.status === 'loading' && (
-          <Spinner label="Загрузка файла" size="sm" className="text-ink-soft" />
-        )}
+      <div className="mt-1">
+        <Caption>{isVoice ? 'Голосовое сообщение' : file.name}</Caption>
+        <div className="mt-0.5 flex items-center gap-2">
+          <audio
+            ref={audio}
+            key={media.attempt}
+            controls
+            // У голосового сразу видна длительность; обычный звук грузится по нажатию.
+            preload={isVoice ? 'metadata' : 'none'}
+            src={src}
+            aria-label={file.name}
+            onWaiting={media.onLoading}
+            onCanPlay={media.onReady}
+            onPlaying={media.onReady}
+            onLoadedMetadata={() => {
+              if (audio.current) audio.current.playbackRate = rate;
+            }}
+            onError={media.onError}
+            className="w-64 max-w-full"
+          />
+          {media.status === 'loading' && (
+            <Spinner label="Загрузка файла" size="sm" className="text-ink-soft" />
+          )}
+          <button
+            type="button"
+            aria-label={`Скорость воспроизведения ${rate}×`}
+            onClick={() => {
+              const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
+              setRate(next);
+              if (audio.current) audio.current.playbackRate = next;
+            }}
+            className="shrink-0 rounded-ui border border-line px-1.5 py-0.5 text-xs text-ink-soft hover:text-ink"
+          >
+            {rate}×
+          </button>
+        </div>
       </div>
     );
   }

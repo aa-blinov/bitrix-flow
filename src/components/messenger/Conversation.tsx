@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CornerUpLeft,
   FileText,
+  Pin,
   Forward,
   Heart,
   Mic,
@@ -59,6 +60,7 @@ export default function Conversation({
   onBack,
   onRead,
   onSent,
+  onPin,
 }: {
   dialog: Dialog;
   dialogs: Dialog[];
@@ -66,6 +68,7 @@ export default function Conversation({
   onBack: () => void;
   onRead: (id: string) => void;
   onSent: () => void;
+  onPin: () => void;
 }) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [people, setPeople] = useState<Record<string, Person>>({});
@@ -648,6 +651,14 @@ export default function Conversation({
           </Link>
         )}
         <IconButton
+          label={dialog.pinned ? 'Открепить диалог' : 'Закрепить диалог'}
+          variant="ghost"
+          pressed={Boolean(dialog.pinned)}
+          onClick={onPin}
+        >
+          <Pin className={`size-4 ${dialog.pinned ? 'fill-current' : ''}`} strokeWidth={1.7} />
+        </IconButton>
+        <IconButton
           label="Поиск по сообщениям"
           variant="ghost"
           pressed={searchOpen}
@@ -659,6 +670,7 @@ export default function Conversation({
       {searchOpen && (
         <div className="space-y-2 border-b border-line p-3">
           <SearchField
+            id="message-search"
             label="Поиск по сообщениям"
             placeholder="Поиск по сообщениям (от двух букв)"
             size="sm"
@@ -882,7 +894,7 @@ export default function Conversation({
           В этом канале писать могут только администраторы
         </p>
       ) : recording ? (
-        <div className="flex items-center gap-3 border-t border-line p-3 max-lg:pr-20">
+        <div className="flex items-center gap-3 border-t border-line p-3">
           <Mic className="size-4 animate-pulse text-danger-text" strokeWidth={1.7} />
           <span className="flex-1 text-sm text-ink" role="timer">
             Запись {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
@@ -971,8 +983,7 @@ export default function Conversation({
             </ul>
           )}
           <form
-            // На телефоне справа внизу плавает кнопка меню: отступ, чтобы она не лежала на отправке.
-            className="flex items-end gap-2 p-3 max-lg:pr-20"
+            className="flex items-end gap-2 p-3"
             onSubmit={(event) => {
               event.preventDefault();
               void send();
