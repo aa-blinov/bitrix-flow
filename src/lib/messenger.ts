@@ -1,3 +1,5 @@
+import { bitrixPlainText } from '@/lib/bitrix-markup';
+import { parseMessageNodes } from '@/lib/message-markdown';
 import { usableAvatar } from '@/lib/utils';
 
 // Нормализация ответов im.* в то, что рисует мессенджер. Сырой ответ портала
@@ -18,12 +20,36 @@ export type Dialog = {
   date: string;
 };
 
+export type MessageFile = {
+  id: number;
+  name: string;
+  size: number;
+  kind: 'image' | 'audio' | 'video' | 'file';
+};
+
+// Вложение-карточка (params.ATTACH): уведомления систем мониторинга, ботов и
+// интеграций приходят так, а не текстом.
+export type AttachBlock =
+  | { type: 'text'; text: string }
+  | { type: 'user'; name: string }
+  | { type: 'link'; name: string; link: string; desc?: string }
+  | { type: 'grid'; rows: { name: string; value: string }[] }
+  | { type: 'files'; names: string[] }
+  | { type: 'delimiter' };
+export type Attach = { description?: string; blocks: AttachBlock[] };
+
 export type Message = {
   id: number;
   authorId: number;
   text: string;
   date: string;
+  edited: boolean;
+  files: MessageFile[];
+  attach: Attach[];
 };
+
+/** Кто из участников прочитал диалог и до какого сообщения. */
+export type Reader = { id: number; name: string; messageId: number };
 
 export type Person = { id: number; name: string; avatar?: string };
 
@@ -56,6 +82,15 @@ export function mergeMessages(current: Message[], incoming: Message[]): Message[
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
+// Свои голосовые мы отправляем файлом с этим началом имени: портал не даёт
+// REST-приложению выставить признак голосового сообщения, а Chrome пишет звук
+// в webm, который портал считает видео. По имени плеер узнаёт запись.
+export const VOICE_NAME = 'Голосовое сообщение';
+
+// Потолок вложения: файл идёт через память приложения в base64. Тот же предел
+// у загрузки файлов в задачи; proxyClientMaxBodySize в next.config.ts выше него.
+export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
 export const DIALOGS_PAGE = 50;
 // LIMIT метода im.dialog.messages.get: больше 50 портал не отдаёт.
 export const MESSAGES_PAGE = 50;
@@ -79,7 +114,9 @@ export function normalizeDialogs(result: any): Dialog[] {
         lastMessage: message?.id
           ? {
               id: Number(message.id),
-              text: String(message.text || (message.file ? '[Файл]' : '')),
+              text:
+                bitrixPlainText(String(message.text || ''), parseMessageNodes) ||
+                (message.file ? 'Файл' : message.attach ? 'Вложение' : ''),
               date: String(message.date || ''),
               authorId: Number(message.author_id) || 0,
             }
@@ -88,6 +125,46 @@ export function normalizeDialogs(result: any): Dialog[] {
       };
     })
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+function fileKind(file: any): MessageFile['kind'] {
+  if (file.isVoiceNote || String(file.name || '').startsWith(VOICE_NAME)) return 'audio';
+  return ['image', 'audio', 'video'].includes(file.type) ? file.type : 'file';
+}
+
+function normalizeAttach(raw: any): Attach[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item): Attach => {
+    const blocks: AttachBlock[] = [];
+    for (const block of Array.isArray(item?.BLOCKS) ? item.BLOCKS : []) {
+      if (block.MESSAGE) blocks.push({ type: 'text', text: String(block.MESSAGE) });
+      else if (block.USER?.NAME) blocks.push({ type: 'user', name: String(block.USER.NAME) });
+      else if (block.LINK?.LINK)
+        blocks.push({
+          type: 'link',
+          name: String(block.LINK.NAME || block.LINK.LINK),
+          link: String(block.LINK.LINK),
+          desc: block.LINK.DESC ? String(block.LINK.DESC) : undefined,
+        });
+      else if (Array.isArray(block.GRID))
+        blocks.push({
+          type: 'grid',
+          rows: block.GRID.map((cell: any) => ({
+            name: String(cell.NAME || ''),
+            value: String(cell.VALUE || ''),
+          })),
+        });
+      else if (Array.isArray(block.FILE) || Array.isArray(block.IMAGE))
+        blocks.push({
+          type: 'files',
+          names: [...(block.FILE || []), ...(block.IMAGE || [])].map((f: any) =>
+            String(f.NAME || f.LINK || ''),
+          ),
+        });
+      else if (block.DELIMITER) blocks.push({ type: 'delimiter' });
+    }
+    return { description: item?.DESCRIPTION ? String(item.DESCRIPTION) : undefined, blocks };
+  });
 }
 
 export function normalizeMessages(result: any): {
@@ -103,6 +180,15 @@ export function normalizeMessages(result: any): {
       avatar: usableAvatar(user.avatar),
     };
   }
+  const files = new Map<number, MessageFile>();
+  for (const file of Array.isArray(result?.files) ? result.files : []) {
+    files.set(Number(file.id), {
+      id: Number(file.id),
+      name: String(file.name || 'Файл'),
+      size: Number(file.size) || 0,
+      kind: fileKind(file),
+    });
+  }
   return {
     // Портал отдаёт новые сообщения первыми, а читают сверху вниз.
     messages: raw
@@ -111,8 +197,38 @@ export function normalizeMessages(result: any): {
         authorId: Number(m.author_id) || 0,
         text: String(m.text || ''),
         date: String(m.date || ''),
+        edited: m.params?.IS_EDITED === 'Y',
+        // params приходит пустым массивом, а не объектом, если параметров нет.
+        files: ((m.params?.FILE_ID as unknown[]) || [])
+          .map((id) => files.get(Number(id)))
+          .filter((file): file is MessageFile => Boolean(file)),
+        attach: normalizeAttach(m.params?.ATTACH),
       }))
       .sort((a, b) => a.id - b.id),
     people,
   };
+}
+
+// readed_list из im.dialog.get: у каждого участника id последнего прочитанного
+// им сообщения. Поля нет в документации метода, но портал отдаёт его всегда.
+export function normalizeReaders(result: any, me: number): Reader[] {
+  const list: any[] = Array.isArray(result?.readed_list) ? result.readed_list : [];
+  return list
+    .filter((entry) => Number(entry.user_id) !== me && Number(entry.message_id) > 0)
+    .map((entry) => ({
+      id: Number(entry.user_id),
+      name: String(entry.user_name || ''),
+      messageId: Number(entry.message_id),
+    }));
+}
+
+/** Участники, прочитавшие сообщение: те, чей последний прочитанный не раньше него. */
+export function readersOf(message: Message, readers: Reader[]): Reader[] {
+  return readers.filter((reader) => reader.messageId >= message.id);
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
 }

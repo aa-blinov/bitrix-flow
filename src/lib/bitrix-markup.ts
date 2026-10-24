@@ -6,11 +6,11 @@ export type BitrixNode =
   | { type: 'link'; href: string; children: BitrixNode[] }
   | { type: 'format'; format: 'b' | 'i' | 'u' | 's'; children: BitrixNode[] }
   | { type: 'quote'; children: BitrixNode[] }
-  | { type: 'code'; text: string }
+  | { type: 'code'; text: string; block?: boolean }
   | { type: 'list'; ordered: boolean; items: BitrixNode[][] }
   | { type: 'image'; src: string };
 
-function safeUrl(value: string): string | undefined {
+export function safeUrl(value: string): string | undefined {
   try {
     const url = new URL(value);
     return ['http:', 'https:', 'mailto:'].includes(url.protocol) ? url.href : undefined;
@@ -39,6 +39,10 @@ function normalizeTimestamps(text: string) {
   });
 }
 
+// Теги, у которых нечего показать кроме содержимого: размер, цвет и ссылки на
+// чат или команды работают только внутри самого Битрикса.
+const TRANSPARENT_TAGS = new Set(['chat', 'size', 'color', 'font', 'send', 'put', 'call']);
+
 function closingIndex(text: string, tag: string, from: number) {
   const pattern = new RegExp(`\\[(/?)${tag}(?:=[^\\]]+)?\\]`, 'gi');
   pattern.lastIndex = from;
@@ -52,7 +56,8 @@ function closingIndex(text: string, tag: string, from: number) {
 
 function parseNodes(text: string): BitrixNode[] {
   const nodes: BitrixNode[] = [];
-  const opener = /\[(b|i|u|s|strike|quote|code|url|user|img|list)(?:=([^\]]+))?\]/gi;
+  const opener =
+    /\[(b|i|u|s|strike|quote|code|url|user|img|list|chat|size|color|font|send|put|call)(?:=([^\]]+))?\]/gi;
   let position = 0;
 
   for (const match of text.matchAll(opener)) {
@@ -68,9 +73,12 @@ function parseNodes(text: string): BitrixNode[] {
     }
     const body = text.slice(match.index! + match[0].length, close.start);
     const value = match[2] || '';
-    if (tag === 'url' || tag === 'user') {
-      const href =
-        tag === 'user' && /^\d+$/.test(value) ? getBitrixUserUrl(value) : safeUrl(value || body);
+    if (TRANSPARENT_TAGS.has(tag)) {
+      nodes.push(...parseNodes(body));
+    } else if (tag === 'url' || tag === 'user') {
+      // Служебные сообщения несут [USER=9 REPLACE]: id идёт первым словом.
+      const userId = tag === 'user' ? /^(\d+)\b/.exec(value)?.[1] : undefined;
+      const href = userId ? getBitrixUserUrl(userId) : safeUrl(value || body);
       nodes.push(
         href ? { type: 'link', href, children: parseNodes(body) } : { type: 'text', text: body },
       );
@@ -78,7 +86,7 @@ function parseNodes(text: string): BitrixNode[] {
       const src = safeUrl(body.trim());
       nodes.push(src ? { type: 'image', src } : { type: 'text', text: body });
     } else if (tag === 'code') {
-      nodes.push({ type: 'code', text: body });
+      nodes.push({ type: 'code', text: body, block: body.includes('\n') });
     } else if (tag === 'list') {
       const items = body
         .split(/\[\*\]/i)
@@ -106,6 +114,20 @@ function parseNodes(text: string): BitrixNode[] {
 
 export function parseBitrixNodes(text: string): BitrixNode[] {
   return parseNodes(normalizeTimestamps(text));
+}
+
+// Текст без разметки для превью в списке диалогов: одна строка, без тегов.
+export function bitrixPlainText(text: string, parse = parseBitrixNodes): string {
+  const flat = (nodes: BitrixNode[]): string =>
+    nodes
+      .map((node) => {
+        if (node.type === 'text' || node.type === 'code') return node.text;
+        if (node.type === 'image') return '';
+        if (node.type === 'list') return node.items.map(flat).join(' ');
+        return flat(node.children);
+      })
+      .join('');
+  return flat(parse(text)).replace(/\s+/g, ' ').trim();
 }
 
 export function parseBitrixMarkup(text: string): BitrixMarkupPart[] {

@@ -24,6 +24,11 @@ export default defineConfig({
     channel: process.env.CI ? undefined : 'chrome',
     locale: 'ru-RU',
     timezoneId: 'Europe/Moscow',
+    // Фальшивый микрофон: запись голосовых идёт без живого устройства и без
+    // диалога разрешения. launchOptions нельзя задать внутри describe.
+    launchOptions: {
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+    },
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },

@@ -170,13 +170,127 @@ test('мессенджер: диалоги делятся по вкладкам,
   const send = page.waitForRequest(
     (request) => request.method() === 'POST' && request.url().includes('/api/messenger/messages'),
   );
-  await chat.getByLabel('Сообщение').fill('Да, смотрю');
+  await chat.getByLabel('Сообщение', { exact: true }).fill('Да, смотрю');
   await chat.getByRole('button', { name: 'Отправить' }).click();
   expect((await send).postDataJSON()).toEqual({ dialogId: '2', text: 'Да, смотрю' });
-  await expect(chat.getByLabel('Сообщение')).toHaveValue('');
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('');
 });
 
 test('мессенджер: чужой формат DIALOG_ID не уходит в портал', async ({ page }) => {
   const response = await page.request.get('/api/messenger/messages?dialogId=user2');
   expect(response.status()).toBe(400);
+});
+
+// Playwright не видит тело multipart-запроса с файлом (postData пустой), поэтому
+// поля формы записываются прямо в fetch страницы.
+async function recordUploads(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const original = window.fetch;
+    (window as unknown as { __uploads: string[] }).__uploads = [];
+    window.fetch = (input, init) => {
+      if (init?.body instanceof FormData)
+        (window as unknown as { __uploads: string[] }).__uploads.push(
+          [...init.body.entries()]
+            .map(([key, value]) => `${key}=${value instanceof File ? value.name : value}`)
+            .join('&'),
+        );
+      return original(input, init);
+    };
+  });
+  return () =>
+    page.evaluate(() => (window as unknown as { __uploads: string[] }).__uploads.join('\n'));
+}
+
+async function openDmitry(page: import('@playwright/test').Page) {
+  await page.goto('/messenger');
+  await page
+    .getByRole('region', { name: 'Диалоги' })
+    .getByRole('button', { name: /Дмитрий Соколов/ })
+    .click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  await expect(chat).toContainText('Посмотришь ревью?');
+  return chat;
+}
+
+test('мессенджер: Markdown и теги Битрикса, файлы, карточки и прочитанность', async ({ page }) => {
+  const chat = await openDmitry(page);
+
+  // Сообщение 58 написано Markdown, 56 смесью тегов Битрикса и Markdown.
+  await expect(chat.locator('strong', { hasText: 'Важно' })).toBeVisible();
+  await expect(chat.getByRole('link', { name: 'схему' })).toHaveAttribute(
+    'href',
+    'https://example.com/schema',
+  );
+  await expect(chat.locator('code', { hasText: 'npm test' })).toBeVisible();
+  await expect(chat.locator('strong', { hasText: 'Релиз' })).toBeVisible();
+  await expect(chat.locator('blockquote', { hasText: 'цитата из markdown' })).toBeVisible();
+  await expect(chat.getByRole('listitem').filter({ hasText: 'второй пункт' })).toBeVisible();
+
+  // Карточка (params.ATTACH) вместо пустого сообщения.
+  await expect(chat.getByText('Мониторинг: сервис недоступен')).toBeVisible();
+  await expect(chat.getByText('api-1')).toBeVisible();
+
+  // Файлы идут через наш роут, а не ссылкой портала, которая ведёт на вход.
+  await expect(chat.getByRole('img', { name: 'схема.png' })).toHaveAttribute(
+    'src',
+    /\/api\/messenger\/file\?dialogId=2&fileId=501/,
+  );
+  await expect(chat.locator('audio[aria-label^="Голосовое сообщение"]')).toHaveCount(1);
+  await expect(chat.getByText('[Вложение]')).toHaveCount(0);
+
+  // Дмитрий прочитал по 57-е: свои сообщения до него прочитаны, 59-е нет.
+  await expect(chat.getByRole('img', { name: 'Прочитано: Дмитрий Соколов' }).first()).toBeVisible();
+  await expect(chat.getByRole('img', { name: 'Не прочитано' })).toHaveCount(1);
+});
+
+test('мессенджер: файл уходит multipart-запросом с подписью из поля', async ({ page }) => {
+  const uploads = await recordUploads(page);
+  const chat = await openDmitry(page);
+  await chat.getByLabel('Сообщение', { exact: true }).fill('Вот отчёт');
+  const upload = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/files'),
+  );
+  await chat
+    .getByLabel('Файлы')
+    .setInputFiles({ name: 'отчёт.txt', mimeType: 'text/plain', buffer: Buffer.from('данные') });
+  await upload;
+  const body = await uploads();
+  expect(body).toContain('file=отчёт.txt');
+  expect(body).toContain('message=Вот отчёт');
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('');
+  await expect(chat.getByRole('alert')).toHaveCount(0);
+});
+
+test('мессенджер: слишком большой файл не уходит', async ({ page }) => {
+  const chat = await openDmitry(page);
+  let called = false;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/files')) called = true;
+  });
+  await chat.getByLabel('Файлы').setInputFiles({
+    name: 'big.bin',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.alloc(21 * 1024 * 1024),
+  });
+  await expect(chat.getByRole('alert')).toContainText('больше');
+  expect(called).toBe(false);
+});
+
+test.describe('мессенджер: голосовые', () => {
+  test.use({ permissions: ['microphone'] });
+
+  test('запись уходит файлом «Голосовое сообщение»', async ({ page }) => {
+    const uploads = await recordUploads(page);
+    const chat = await openDmitry(page);
+    await chat.getByRole('button', { name: 'Записать голосовое' }).click();
+    await expect(chat.getByRole('timer')).toContainText('Запись');
+    await page.waitForTimeout(1200);
+    const upload = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/files'),
+    );
+    await chat.getByRole('button', { name: 'Отправить голосовое' }).click();
+    await upload;
+    expect(await uploads()).toContain('file=Голосовое сообщение');
+    await expect(chat.getByRole('button', { name: 'Записать голосовое' })).toBeVisible();
+  });
 });

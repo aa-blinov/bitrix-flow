@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { parseBitrixNodes, type BitrixNode } from '@/lib/bitrix-markup';
+import { parseMessageNodes } from '@/lib/message-markdown';
 import { safeHref, safeImageSrc } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +31,15 @@ function render(nodes: BitrixNode[]): ReactNode[] {
           className="my-1 inline-block max-h-80 max-w-full rounded-ui"
         />
       );
+    if (node.type === 'code' && node.block)
+      return (
+        <pre
+          key={index}
+          className="my-2 overflow-x-auto rounded-ui bg-surface-2 p-2 font-ui text-xs whitespace-pre"
+        >
+          {node.text}
+        </pre>
+      );
     if (node.type === 'code')
       return (
         <code key={index} className="rounded-ui bg-surface-2 px-1 py-0.5 font-ui text-xs">
@@ -58,10 +68,20 @@ function render(nodes: BitrixNode[]): ReactNode[] {
   });
 }
 
-export default function BitrixText({ text, className }: { text: string; className?: string }) {
+// markdown: в чате пишут и тегами Битрикса, и обычным Markdown. В задачах
+// и комментариях звёздочки и подчёркивания остаются текстом, как их написали.
+export default function BitrixText({
+  text,
+  className,
+  markdown = false,
+}: {
+  text: string;
+  className?: string;
+  markdown?: boolean;
+}) {
   return (
     <span className={cn('whitespace-pre-wrap wrap-anywhere', className)}>
-      {render(parseBitrixNodes(text))}
+      {render(markdown ? parseMessageNodes(text) : parseBitrixNodes(text))}
     </span>
   );
 }
