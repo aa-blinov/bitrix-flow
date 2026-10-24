@@ -560,7 +560,8 @@ test('мессенджер: поиск по сообщениям ведёт к �
     .getByRole('list', { name: 'Найденные сообщения' })
     .getByRole('button', { name: /Сообщение 30/ })
     .click();
-  await expect(chat.getByText('Сообщение 30', { exact: true })).toBeVisible();
+  // Панель поиска закрывается после ответа портала: считаем только само сообщение в ленте.
+  await expect(chat.locator('#message-30')).toBeVisible();
   await expect(chat.getByRole('button', { name: 'К последним сообщениям' })).toBeVisible();
   await chat.getByRole('button', { name: 'К последним сообщениям' }).click();
   await expect(chat).toContainText('Посмотришь ревью?');
