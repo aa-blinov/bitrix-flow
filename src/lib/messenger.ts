@@ -5,7 +5,7 @@ import { usableAvatar } from '@/lib/utils';
 // Нормализация ответов im.* в то, что рисует мессенджер. Сырой ответ портала
 // несёт десятки полей чата и пользователя, которые клиенту не нужны.
 
-export type DialogKind = 'user' | 'group' | 'task' | 'chat';
+export type DialogKind = 'user' | 'group' | 'task' | 'channel' | 'chat';
 
 export type Dialog = {
   id: string;
@@ -44,6 +44,8 @@ export type Message = {
   text: string;
   date: string;
   edited: boolean;
+  /** Кто поставил лайк: params.LIKE, список id пользователей. */
+  likes: number[];
   files: MessageFile[];
   attach: Attach[];
 };
@@ -55,11 +57,15 @@ export type Person = { id: number; name: string; avatar?: string };
 
 // Допустимый DIALOG_ID: человек это голое число, чат это chat<число>. Всё
 // остальное (user12, sg5, произвольная строка) в портал не отправляем.
+export const MESSAGE_ID = /^[1-9]\d{0,11}$/;
+
 export const DIALOG_ID = /^(chat)?[1-9]\d{0,11}$/;
 
 function kindOf(item: any): DialogKind {
   if (item.type === 'user') return 'user';
   const entity = String(item.chat?.entity_type || '');
+  // Каналы Битрикса: channel, openChannel и общий канал компании generalChannel.
+  if (/channel$/i.test(String(item.chat?.type || ''))) return 'channel';
   if (entity === 'SONET_GROUP') return 'group';
   if (/^TASKS/.test(entity)) return 'task';
   return 'chat';
@@ -198,6 +204,7 @@ export function normalizeMessages(result: any): {
         text: String(m.text || ''),
         date: String(m.date || ''),
         edited: m.params?.IS_EDITED === 'Y',
+        likes: Array.isArray(m.params?.LIKE) ? m.params.LIKE.map(Number) : [],
         // params приходит пустым массивом, а не объектом, если параметров нет.
         files: ((m.params?.FILE_ID as unknown[]) || [])
           .map((id) => files.get(Number(id)))
@@ -236,4 +243,64 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} Б`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
   return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+export type UserHit = {
+  id: number;
+  name: string;
+  position?: string;
+  avatar?: string;
+  online: boolean;
+};
+
+// im.search.user.list отдаёт объект по id, im.dialog.users.list массив: оба вида
+// приводятся к одному списку, боты и отключённые пользователи отсеиваются.
+export function normalizeUsers(result: any): UserHit[] {
+  const list: any[] = Array.isArray(result) ? result : Object.values(result || {});
+  return list
+    .filter((user) => user?.id && !user.bot && user.active !== false)
+    .map((user) => ({
+      id: Number(user.id),
+      name: String(user.name || ''),
+      position: user.work_position ? String(user.work_position) : undefined,
+      avatar: usableAvatar(user.avatar),
+      online: user.status === 'online' && !user.idle,
+    }));
+}
+
+// REST не возвращает связь «ответ на сообщение» (REPLY_ID приходит пустым в
+// params), поэтому ответ и пересылка уходят цитатой в тексте: она одинаково
+// читается и у нас, и в самом Битриксе.
+export function quoteBlock(
+  author: string,
+  message: Pick<Message, 'text' | 'files'>,
+  label = '',
+): string {
+  const plain = bitrixPlainText(message.text, parseMessageNodes)
+    .replace(/\[\/?quote\]/gi, '')
+    .slice(0, 300);
+  const snippet = plain || message.files.map((file) => file.name).join(', ') || 'Сообщение';
+  return `[QUOTE]${label}${author}: ${snippet}[/QUOTE]\n`;
+}
+
+// В поле ввода упоминание выглядит как @Имя, а в тег Битрикса превращается при отправке.
+export function applyMentions(
+  text: string,
+  mentions: { id: number | 'all'; name: string }[],
+): string {
+  return mentions.reduce(
+    (result, mention) =>
+      result.replace(`@${mention.name}`, `[USER=${mention.id}]${mention.name}[/USER]`),
+    text,
+  );
+}
+
+const POST_RANK: Record<string, number> = { member: 1, manager: 2, owner: 3 };
+
+// В канале писать могут не все: правило лежит в permissions.canPost, роль
+// пользователя в role. Если чего-то из этого нет, решает сам портал при отправке.
+export function canPostIn(dialog: any): boolean {
+  const need = POST_RANK[String(dialog?.permissions?.canPost || '')];
+  const have = POST_RANK[String(dialog?.role || '')];
+  return !need || !have || have >= need;
 }

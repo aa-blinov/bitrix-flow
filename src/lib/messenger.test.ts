@@ -82,6 +82,7 @@ describe('messenger', () => {
       text: String(id),
       date: '',
       edited: false,
+      likes: [],
       files: [],
       attach: [],
     });
@@ -156,6 +157,7 @@ describe('messenger', () => {
       text: '',
       date: '',
       edited: false,
+      likes: [],
       files: [],
       attach: [],
     });

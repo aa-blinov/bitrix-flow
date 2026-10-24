@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withMessenger } from '@/lib/messenger-api';
-import { DIALOG_ID, MESSAGES_PAGE, normalizeMessages, normalizeReaders } from '@/lib/messenger';
+import {
+  DIALOG_ID,
+  MESSAGES_PAGE,
+  canPostIn,
+  normalizeMessages,
+  normalizeReaders,
+} from '@/lib/messenger';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +37,7 @@ export function GET(req: NextRequest) {
     ]);
     return NextResponse.json({
       ...normalizeMessages(result),
-      ...(dialog ? { readers: normalizeReaders(dialog, me) } : {}),
+      ...(dialog ? { readers: normalizeReaders(dialog, me), canPost: canPostIn(dialog) } : {}),
     });
   });
 }

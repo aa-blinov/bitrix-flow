@@ -596,6 +596,15 @@ const MOCK_DIALOGS = {
       chat: { entity_type: 'SONET_GROUP', entity_id: '10' },
     },
     {
+      id: 'chat30',
+      type: 'chat',
+      title: 'Новости компании',
+      counter: 0,
+      date_last_activity: '2026-02-27T10:00:00+03:00',
+      message: { id: 51, text: 'Итоги квартала', author_id: 3, date: '2026-02-27T10:00:00+03:00' },
+      chat: { type: 'openChannel' },
+    },
+    {
       id: 'chat21',
       type: 'chat',
       title: 'Задача: схема GraphQL',
@@ -634,9 +643,11 @@ const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
         ? 'Посмотришь ревью?'
         : id === 58
           ? '**Важно**: смотри [схему](https://example.com/schema) и `npm test`'
-          : id === 56
-            ? '[B]Релиз[/B] в [USER=2]Дмитрий[/USER]\n> цитата из markdown\n- первый пункт\n- второй пункт'
-            : `Сообщение ${id}`,
+          : id === 52
+            ? '[URL]https://eora.bitrix24.ru/company/personal/user/9/tasks/task/view/4521/[/URL]'
+            : id === 56
+              ? '[B]Релиз[/B] в [USER=2]Дмитрий[/USER]\n> цитата из markdown\n- первый пункт\n- второй пункт'
+              : `Сообщение ${id}`,
     date: `2026-03-02T09:${String(id % 60).padStart(2, '0')}:00+03:00`,
     params:
       id === 59
@@ -771,9 +782,55 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return { messageId: 1001, file: { id: 600 } };
 
     // Дмитрий прочитал по 57-е сообщение: мои 1..57 прочитаны, 59-е нет.
+    // В канале «Новости компании» писать могут только менеджеры.
     case 'im.dialog.get':
+      return params.DIALOG_ID === 'chat30'
+        ? { id: 30, role: 'member', permissions: { canPost: 'manager' }, readed_list: [] }
+        : {
+            id: 2,
+            role: 'owner',
+            permissions: { canPost: 'member' },
+            readed_list: [{ user_id: 2, user_name: 'Дмитрий Соколов', message_id: 57, date: null }],
+          };
+
+    case 'im.message.like':
+    case 'im.message.update':
+    case 'im.message.delete':
+      return true;
+
+    case 'im.chat.add':
+      return 77;
+
+    case 'im.search.user.list':
       return {
-        readed_list: [{ user_id: 2, user_name: 'Дмитрий Соколов', message_id: 57, date: null }],
+        '5': {
+          id: 5,
+          name: 'Анна Новикова',
+          work_position: 'Дизайнер',
+          status: 'online',
+          idle: false,
+        },
+      };
+
+    case 'im.dialog.users.list':
+      return [
+        { id: 1, name: 'Анна Кузнецова', active: true },
+        { id: 2, name: 'Дмитрий Соколов', active: true },
+      ];
+
+    case 'im.dialog.messages.search':
+      return {
+        messages: [
+          {
+            id: 30,
+            author_id: 2,
+            text: 'Сообщение 30',
+            date: '2026-03-02T09:30:00+03:00',
+            params: [],
+          },
+        ],
+        users: [{ id: 2, name: 'Дмитрий Соколов' }],
+        files: [],
       };
 
     case 'im.dialog.read':
