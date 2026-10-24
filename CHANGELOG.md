@@ -48,8 +48,14 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 - Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
   arrows, Space); the order is kept in the browser.
 
+- Files wait in a tray before sending (picker, paste or drag-and-drop into the dialog),
+  show a preview and can be removed; sending shows upload progress.
+
 ### Fixed
 
+- The messenger page sat 24 px below the window (an empty tooltip wrapper above the
+  page), so the message field was cut off at the bottom; the page is now pinned to the
+  window, and on phones the floating menu button no longer covers the send button.
 - Voice recording asked for the microphone but the browser never showed a prompt:
   the proxy sent `Permissions-Policy: microphone=()`. It now allows `microphone=(self)`.
 - The message field sat 7 px above the attach and microphone buttons.

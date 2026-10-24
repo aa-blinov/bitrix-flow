@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   CornerUpLeft,
+  FileText,
   Forward,
   Heart,
   Mic,
@@ -82,6 +83,12 @@ export default function Conversation({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const picker = useRef<HTMLInputElement>(null);
+  // Файлы ждут в очереди до отправки: можно убрать лишний и дописать подпись.
+  const [pending, setPending] = useState<File[]>([]);
+  // Доля загрузки текущего файла на наш сервер; null когда ничего не отправляется.
+  const [progress, setProgress] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -210,7 +217,7 @@ export default function Conversation({
 
   async function send() {
     const raw = draft.trim();
-    if (!raw || sending) return;
+    if ((!raw && !pending.length) || sending) return;
     setSending(true);
     setError('');
     try {
@@ -232,12 +239,15 @@ export default function Conversation({
       }
       const text =
         (replyTo ? quoteBlock(nameOf(replyTo), replyTo) : '') + applyMentions(raw, mentions);
-      const response = await fetch('/api/messenger/messages', {
-        method: 'POST',
-        headers: json,
-        body: JSON.stringify({ dialogId: dialog.id, text }),
-      });
-      if (!response.ok) throw new Error(String(response.status));
+      if (pending.length) await sendPending(text);
+      else {
+        const response = await fetch('/api/messenger/messages', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ dialogId: dialog.id, text }),
+        });
+        if (!response.ok) throw new Error(String(response.status));
+      }
       setDraft('');
       setReplyTo(null);
       setMentions([]);
@@ -454,40 +464,62 @@ export default function Conversation({
     return () => window.clearTimeout(timer);
   }, [highlightId, messages]);
 
-  async function upload(file: File, caption = '') {
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`Файл «${file.name}» больше ${formatBytes(MAX_FILE_SIZE)}.`);
-      return false;
-    }
-    setSending(true);
-    setError('');
-    try {
+  // XMLHttpRequest, а не fetch: только он отдаёт ход загрузки файла.
+  function postFile(file: File, caption: string): Promise<boolean> {
+    return new Promise((resolve) => {
       const body = new FormData();
       body.set('dialogId', dialog.id);
       body.set('file', file);
       if (caption) body.set('message', caption);
-      const response = await fetch('/api/messenger/files', { method: 'POST', body });
-      if (!response.ok) throw new Error(String(response.status));
+      const request = new XMLHttpRequest();
+      request.open('POST', '/api/messenger/files');
+      request.upload.onprogress = (event) => {
+        if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+      };
+      request.onload = () => resolve(request.status >= 200 && request.status < 300);
+      request.onerror = () => resolve(false);
+      setProgress(0);
+      request.send(body);
+    });
+  }
+
+  function addFiles(files: File[]) {
+    const tooBig = files.find((file) => file.size > MAX_FILE_SIZE);
+    if (tooBig) setError(`Файл «${tooBig.name}» больше ${formatBytes(MAX_FILE_SIZE)}.`);
+    const fits = files.filter((file) => file.size <= MAX_FILE_SIZE);
+    if (fits.length) setPending((current) => [...current, ...fits]);
+  }
+
+  // Голосовое уходит сразу: проверять в нём нечего.
+  async function upload(file: File) {
+    setSending(true);
+    setError('');
+    try {
+      if (!(await postFile(file, ''))) throw new Error('upload');
       stickToBottom.current = true;
       load();
       onSent();
-      return true;
     } catch {
       setError(`Не удалось отправить «${file.name}». Попробуйте ещё раз.`);
-      return false;
     } finally {
+      setProgress(null);
       setSending(false);
     }
   }
 
-  // Подпись из поля ввода уходит с первым файлом, как в самом Битриксе.
-  async function sendFiles(files: File[]) {
-    let caption = draft.trim();
-    for (const file of files) {
-      if (!(await upload(file, caption))) return;
-      if (caption) setDraft('');
-      caption = '';
+  // Подпись уходит с первым файлом, как в самом Битриксе. Отправленные файлы
+  // покидают очередь сразу: при сбое остаются только неотправленные.
+  async function sendPending(caption: string) {
+    let first = true;
+    for (const file of pending) {
+      if (!(await postFile(file, first ? caption : ''))) {
+        setProgress(null);
+        throw new Error(file.name);
+      }
+      first = false;
+      setPending((current) => current.filter((item) => item !== file));
     }
+    setProgress(null);
   }
 
   useEffect(() => {
@@ -568,7 +600,33 @@ export default function Conversation({
         : null;
 
   return (
-    <>
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragEnter={(event) => {
+        if (!event.dataTransfer.types.includes('Files')) return;
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        const files = [...event.dataTransfer.files];
+        if (files.length && canPost) addFiles(files);
+      }}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-2 border-dashed border-ink-soft bg-canvas/80 text-sm text-ink">
+          Отпустите файлы, чтобы прикрепить
+        </div>
+      )}
       <div className="flex min-h-14 items-center gap-3 border-b border-line px-3">
         <Button
           variant="quiet"
@@ -824,7 +882,7 @@ export default function Conversation({
           В этом канале писать могут только администраторы
         </p>
       ) : recording ? (
-        <div className="flex items-center gap-3 border-t border-line p-3">
+        <div className="flex items-center gap-3 border-t border-line p-3 max-lg:pr-20">
           <Mic className="size-4 animate-pulse text-danger-text" strokeWidth={1.7} />
           <span className="flex-1 text-sm text-ink" role="timer">
             Запись {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
@@ -863,6 +921,33 @@ export default function Conversation({
               </IconButton>
             </div>
           )}
+          {pending.length > 0 && (
+            <ul
+              className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
+              aria-label="Прикреплённые файлы"
+            >
+              {pending.map((file, index) => (
+                <PendingFile
+                  key={`${file.name}-${file.size}-${index}`}
+                  file={file}
+                  disabled={sending}
+                  onRemove={() => setPending((current) => current.filter((item) => item !== file))}
+                />
+              ))}
+            </ul>
+          )}
+          {progress !== null && (
+            <div
+              role="progressbar"
+              aria-label="Отправка файла"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              className="h-1 bg-surface-2"
+            >
+              <div className="h-full bg-ink transition-[width]" style={{ width: `${progress}%` }} />
+            </div>
+          )}
           {mention && suggestions.length > 0 && (
             <ul
               role="listbox"
@@ -886,7 +971,8 @@ export default function Conversation({
             </ul>
           )}
           <form
-            className="flex items-end gap-2 p-3"
+            // На телефоне справа внизу плавает кнопка меню: отступ, чтобы она не лежала на отправке.
+            className="flex items-end gap-2 p-3 max-lg:pr-20"
             onSubmit={(event) => {
               event.preventDefault();
               void send();
@@ -901,7 +987,7 @@ export default function Conversation({
               onChange={(event) => {
                 const files = [...(event.target.files || [])];
                 event.target.value = '';
-                if (files.length) void sendFiles(files);
+                if (files.length) addFiles(files);
               }}
             />
             <Button
@@ -928,7 +1014,7 @@ export default function Conversation({
                 const files = [...event.clipboardData.files];
                 if (!files.length) return;
                 event.preventDefault();
-                void sendFiles(files);
+                addFiles(files);
               }}
               onKeyDown={(event) => {
                 if (mention && suggestions.length) {
@@ -961,7 +1047,7 @@ export default function Conversation({
                 }
               }}
             />
-            {!draft.trim() && canRecord ? (
+            {!draft.trim() && !pending.length && canRecord ? (
               <Button
                 disabled={sending}
                 onClick={() => void startRecording()}
@@ -970,7 +1056,11 @@ export default function Conversation({
                 <Mic className="size-4" strokeWidth={1.7} />
               </Button>
             ) : (
-              <Button type="submit" disabled={!draft.trim() || sending} aria-label="Отправить">
+              <Button
+                type="submit"
+                disabled={(!draft.trim() && !pending.length) || sending}
+                aria-label="Отправить"
+              >
                 <Send className="size-4" strokeWidth={1.7} />
               </Button>
             )}
@@ -1010,6 +1100,47 @@ export default function Conversation({
           onClose={() => setViewingId(null)}
         />
       )}
-    </>
+    </div>
+  );
+}
+
+// Файл в очереди: у картинки превью, у остальных значок. Превью живёт, пока файл в очереди.
+function PendingFile({
+  file,
+  disabled,
+  onRemove,
+}: {
+  file: File;
+  disabled: boolean;
+  onRemove: () => void;
+}) {
+  const [preview, setPreview] = useState('');
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return (
+    <li className="flex max-w-56 items-center gap-2 rounded-ui border border-line px-2 py-1 text-xs text-ink">
+      {preview ? (
+        <img src={preview} alt="" className="size-8 shrink-0 rounded-ui object-cover" />
+      ) : (
+        <FileText className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{file.name}</span>
+        <span className="text-ink-soft">{formatBytes(file.size)}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label={`Убрать ${file.name}`}
+        className="shrink-0 text-ink-soft hover:text-ink disabled:opacity-30"
+      >
+        <X className="size-3.5" strokeWidth={1.7} />
+      </button>
+    </li>
   );
 }

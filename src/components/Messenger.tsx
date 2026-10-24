@@ -164,7 +164,9 @@ export default function Messenger() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas">
+    // fixed по окну, а не h-dvh в потоке: над страницей стоит пустая обёртка подсказки
+    // кнопки меню, она сдвигает всё вниз на строку, и поле ввода уходило за край окна.
+    <div className="fixed inset-0 flex flex-col bg-canvas lg:left-64">
       <PageHeader
         title="Сообщения"
         description="Личные чаты, группы и обсуждения задач из Битрикс24"
