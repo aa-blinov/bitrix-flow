@@ -26,6 +26,16 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
   audio, video and file links, bot cards render as blocks instead of "[Вложение]".
 - Messenger sends files (picker or paste, up to 20 MB, caption from the input) and
   voice messages recorded in the browser.
+- Photos and videos open in an in-page viewer with paging across the whole dialog,
+  zoom and download instead of a new tab; other formats download with their name.
+- Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
+  arrows, Space); the order is kept in the browser.
+
+### Fixed
+
+- Voice recording asked for the microphone but the browser never showed a prompt:
+  the proxy sent `Permissions-Policy: microphone=()`. It now allows `microphone=(self)`.
+- The message field sat 7 px above the attach and microphone buttons.
 
 ## 0.1.0 — 2026
 

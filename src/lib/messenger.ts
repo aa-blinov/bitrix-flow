@@ -227,6 +227,11 @@ export function readersOf(message: Message, readers: Reader[]): Reader[] {
   return readers.filter((reader) => reader.messageId >= message.id);
 }
 
+// Файл отдаёт наш роут, а не ссылка портала: та без cookie портала ведёт на вход.
+export function fileUrl(dialogId: string, file: MessageFile, download = false): string {
+  return `/api/messenger/file?dialogId=${encodeURIComponent(dialogId)}&fileId=${file.id}&name=${encodeURIComponent(file.name)}${download ? '&download=1' : ''}`;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} Б`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;

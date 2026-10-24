@@ -1,7 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Check, CheckCheck, FileText, Mic, Paperclip, Send, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  Download,
+  FileText,
+  Mic,
+  Paperclip,
+  PlayCircle,
+  Send,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -10,12 +21,14 @@ import { SearchField } from '@/components/monos/SearchField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
+import FileViewer from '@/components/FileViewer';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import {
   MAX_FILE_SIZE,
   MESSAGES_PAGE,
   VOICE_NAME,
+  fileUrl,
   formatBytes,
   mergeDialogs,
   mergeMessages,
@@ -274,6 +287,7 @@ function Conversation({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const picker = useRef<HTMLInputElement>(null);
+  const [viewingId, setViewingId] = useState<number | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const newestRef = useRef(0);
@@ -341,6 +355,16 @@ function Conversation({
     box.scrollTop += box.scrollHeight - heightBeforePrepend.current;
     heightBeforePrepend.current = 0;
   }, [oldestId]);
+
+  // Фото и видео всего диалога листаются в одном просмотрщике, по порядку сообщений.
+  const media = useMemo(
+    () =>
+      (messages || []).flatMap((message) =>
+        message.files.filter((file) => file.kind === 'image' || file.kind === 'video'),
+      ),
+    [messages],
+  );
+  const viewerIndex = media.findIndex((file) => file.id === viewingId);
 
   const newestId = messages?.at(-1)?.id;
   useEffect(() => {
@@ -555,7 +579,12 @@ function Conversation({
                     </div>
                   )}
                   {message.files.map((file) => (
-                    <FileView key={file.id} file={file} dialogId={dialog.id} />
+                    <FileView
+                      key={file.id}
+                      file={file}
+                      dialogId={dialog.id}
+                      onOpen={setViewingId}
+                    />
                   ))}
                   {message.attach.map((attach, index) => (
                     <AttachView key={index} attach={attach} />
@@ -635,7 +664,10 @@ function Conversation({
             placeholder="Сообщение"
             variant="boxed"
             rows={1}
-            className="flex-1"
+            // textarea по умолчанию строчный: под ним остаётся зазор в 7 px, обёртка выше
+            // поля, и поле висит над кнопками. block убирает зазор, а высота в одну строку
+            // равна кнопкам (min-h-9, на телефоне min-h-11).
+            className="flex-1 [&_textarea]:block [&_textarea]:min-h-9 [&_textarea]:py-1.5 max-sm:[&_textarea]:min-h-11"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onPaste={(event) => {
@@ -667,6 +699,20 @@ function Conversation({
           )}
         </form>
       )}
+      {viewerIndex >= 0 && (
+        <FileViewer
+          items={media.map((file) => ({
+            id: file.id,
+            name: file.name,
+            kind: file.kind as 'image' | 'video',
+            src: fileUrl(dialog.id, file),
+            downloadSrc: fileUrl(dialog.id, file, true),
+          }))}
+          index={viewerIndex}
+          onIndex={(index) => setViewingId(media[index].id)}
+          onClose={() => setViewingId(null)}
+        />
+      )}
     </>
   );
 }
@@ -691,13 +737,42 @@ function ReadMark({ readers, group }: { readers: Reader[]; group: boolean }) {
   );
 }
 
-function FileView({ file, dialogId }: { file: MessageFile; dialogId: string }) {
-  const src = `/api/messenger/file?dialogId=${encodeURIComponent(dialogId)}&fileId=${file.id}&name=${encodeURIComponent(file.name)}`;
+function FileView({
+  file,
+  dialogId,
+  onOpen,
+}: {
+  file: MessageFile;
+  dialogId: string;
+  onOpen: (id: number) => void;
+}) {
+  const src = fileUrl(dialogId, file);
   if (file.kind === 'image')
     return (
-      <a href={src} target="_blank" rel="noreferrer" className="mt-1 block">
+      <button type="button" onClick={() => onOpen(file.id)} className="mt-1 block cursor-zoom-in">
         <img src={src} alt={file.name} loading="lazy" className="max-h-64 max-w-full rounded-ui" />
-      </a>
+      </button>
+    );
+  if (file.kind === 'video')
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(file.id)}
+        aria-label={`Открыть видео ${file.name}`}
+        className="relative mt-1 block"
+      >
+        <video
+          preload="metadata"
+          muted
+          playsInline
+          src={src}
+          className="max-h-64 max-w-full rounded-ui"
+        />
+        <PlayCircle
+          className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-ink"
+          strokeWidth={1.4}
+        />
+      </button>
     );
   if (file.kind === 'audio')
     return (
@@ -711,24 +786,16 @@ function FileView({ file, dialogId }: { file: MessageFile; dialogId: string }) {
         />
       </div>
     );
-  if (file.kind === 'video')
-    return (
-      <video
-        controls
-        preload="metadata"
-        src={src}
-        aria-label={file.name}
-        className="mt-1 max-h-64 max-w-full rounded-ui"
-      />
-    );
   return (
     <a
-      href={`${src}&download=1`}
+      href={fileUrl(dialogId, file, true)}
+      download={file.name}
       className="mt-1 flex items-center gap-2 rounded-ui border border-line px-2 py-1.5 text-sm text-ink hover:bg-surface-2"
     >
       <FileText className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
       <span className="min-w-0 flex-1 truncate">{file.name}</span>
       <span className="shrink-0 text-xs text-ink-soft">{formatBytes(file.size)}</span>
+      <Download className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
     </a>
   );
 }

@@ -641,19 +641,23 @@ const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
     params:
       id === 59
         ? { FILE_ID: [501, 502] }
-        : id === 57
-          ? {
-              ATTACH: [
-                {
-                  ID: 1,
-                  BLOCKS: [
-                    { MESSAGE: 'Мониторинг: сервис недоступен' },
-                    { GRID: [{ NAME: 'Хост', VALUE: 'api-1' }] },
+        : id === 53
+          ? { FILE_ID: [503] }
+          : id === 51
+            ? { FILE_ID: [504] }
+            : id === 57
+              ? {
+                  ATTACH: [
+                    {
+                      ID: 1,
+                      BLOCKS: [
+                        { MESSAGE: 'Мониторинг: сервис недоступен' },
+                        { GRID: [{ NAME: 'Хост', VALUE: 'api-1' }] },
+                      ],
+                    },
                   ],
-                },
-              ],
-            }
-          : [],
+                }
+              : [],
   };
 }).reverse();
 
@@ -661,6 +665,8 @@ const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
 const MOCK_FILES = [
   { id: 501, name: 'схема.png', size: 2144, type: 'image', isVoiceNote: false },
   { id: 502, name: 'Голосовое сообщение 02.03 09-59.webm', size: 9000, type: 'video' },
+  { id: 503, name: 'фото.jpg', size: 5000, type: 'image' },
+  { id: 504, name: 'договор.pdf', size: 52000, type: 'file' },
 ];
 
 function mockMessagesPage(params: Record<string, string>) {
