@@ -9,6 +9,12 @@ async function settle(page: Page) {
 }
 
 test('карточка задачи открывается по названию', async ({ page }) => {
+  // Селект фазы рисуется, только когда успели подгрузиться стадии проекта, и
+  // снимок зависел от скорости загрузки: на одной машине с селектом, на другой
+  // без. Стадии здесь пустые всегда, поэтому снимок один и тот же.
+  await page.route('**/api/bitrix/task.stages.get**', (route) =>
+    route.fulfill({ json: { result: [] } }),
+  );
   await page.goto('/all-tasks');
   await settle(page);
   await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
