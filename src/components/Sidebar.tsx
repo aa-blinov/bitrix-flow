@@ -1,24 +1,10 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import {
-  Search,
-  LayoutDashboard,
-  ListChecks,
-  Menu,
-  LogOut,
-  TableProperties,
-  ChevronDown,
-  Bell,
-  Plus,
-  UserCheck,
-  CalendarDays,
-  MessagesSquare,
-} from 'lucide-react';
+import { Menu, LogOut, ChevronDown, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Checkbox } from '@/components/monos/Checkbox';
 import { Drawer } from '@/components/monos/Drawer';
@@ -33,40 +19,7 @@ import Notifications from '@/components/Notifications';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
-
-// Строка навигации остаётся кодом приложения: это продуктовый паттерн, а не
-// примитив набора. Вид — как у NavItem из @monos/ui.
-function NavLink({
-  href,
-  icon: Icon,
-  label,
-  badge,
-  pathname,
-  onNavigate,
-}: {
-  href: string;
-  icon: typeof LayoutDashboard;
-  label: string;
-  badge?: number;
-  pathname: string;
-  onNavigate: () => void;
-}) {
-  const active = pathname === href;
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      aria-current={active ? 'page' : undefined}
-      className={`flex min-h-9 items-center gap-2.5 rounded-ui px-2.5 text-sm transition-colors duration-fast max-sm:min-h-11 ${
-        active ? 'bg-surface font-bold text-ink' : 'text-ink-soft hover:bg-surface hover:text-ink'
-      }`}
-    >
-      <Icon size={16} strokeWidth={1.7} />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {badge !== undefined && badge > 0 ? <Badge tone="neutral">{badge}</Badge> : null}
-    </Link>
-  );
-}
+import SortableNav, { useNavOrder } from '@/components/SortableNav';
 
 export default function Sidebar() {
   // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
@@ -111,6 +64,7 @@ export default function Sidebar() {
   const closeMobile = () => setMobileOpen(false);
   const pathname = usePathname();
   const router = useRouter();
+  const [navOrder, setNavOrder] = useNavOrder();
 
   // Недавно открытые — сверху: пятьдесят один проект по алфавиту означает, что
   // свои три-четыре приходится каждый раз искать заново.
@@ -220,64 +174,12 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 py-4">
-        <div className="space-y-0.5">
-          <NavLink
-            href="/"
-            icon={LayoutDashboard}
-            label="Главная"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/projects-summary"
-            icon={TableProperties}
-            label="Сводка проектов"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/search"
-            icon={Search}
-            label="Поиск"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/all-tasks"
-            icon={ListChecks}
-            label="Все задачи"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/my-tasks"
-            icon={UserCheck}
-            label="Мои задачи"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/team-workload"
-            icon={CalendarDays}
-            label="Нагрузка команды"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/messenger"
-            icon={MessagesSquare}
-            label="Сообщения"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-          <NavLink
-            href="/notifications"
-            icon={Bell}
-            label="Уведомления"
-            pathname={pathname}
-            onNavigate={closeMobile}
-          />
-        </div>
+        <SortableNav
+          order={navOrder}
+          onReorder={setNavOrder}
+          pathname={pathname}
+          onNavigate={closeMobile}
+        />
 
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
         <div className="flex min-h-0 flex-1 flex-col">

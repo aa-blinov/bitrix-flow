@@ -106,6 +106,12 @@ docker compose --env-file .env.local up -d --build
   `im.v2.File.upload` (JSON, base64), `im.message.add` файл не несёт. Признак
   голосового сообщения REST выставить не даёт: свои записи узнаются по имени
   `VOICE_NAME`. `readed_list` из `im.dialog.get` нет в документации, но он есть в ответе.
+- **Микрофон открывает заголовок `Permissions-Policy`.** С `microphone=()` браузер молча
+  отказывает в `getUserMedia`, и запрос разрешения не появляется. Боевой Caddy читает
+  `/home/ubuntu/infra/caddy/Caddyfile`, а не копию в `caddy/`; файл примонтирован одним
+  файлом, поэтому после `sed -i` контейнер видит старый inode, и правку надо подавать через
+  `docker cp` и `caddy reload --config <копия>`. В iframe портала запись заработает только
+  при `allow="microphone"` на самом iframe.
 - **Публичный маршрут добавляется в `src/proxy.ts`.** Список `PUBLIC_PATHS` это
   единственное место, где маршрут обходит проверку сессии.
 - **`next dev` перезаписывает блок в начале файла.** Не удаляй его из диффа, иначе он

@@ -294,3 +294,78 @@ test.describe('мессенджер: голосовые', () => {
     await expect(chat.getByRole('button', { name: 'Записать голосовое' })).toBeVisible();
   });
 });
+
+test('мессенджер: фото открываются в просмотрщике, а не в новой вкладке, файлы скачиваются', async ({
+  page,
+}) => {
+  let popups = 0;
+  page.on('popup', () => popups++);
+  const chat = await openDmitry(page);
+
+  await chat.getByRole('img', { name: 'фото.jpg' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Просмотр: фото.jpg' });
+  await expect(viewer).toBeVisible();
+  await expect(viewer).toContainText('1 из 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('dialog', { name: 'Просмотр: схема.png' })).toContainText('2 из 2');
+  await expect(page.getByRole('link', { name: 'Скачать' })).toHaveAttribute(
+    'href',
+    /fileId=501.*download=1/,
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(popups).toBe(0);
+
+  // Остальные форматы это ссылка на скачивание с именем файла.
+  const pdf = chat.getByRole('link', { name: /договор\.pdf/ });
+  await expect(pdf).toHaveAttribute('href', /fileId=504.*download=1/);
+  await expect(pdf).toHaveAttribute('download', 'договор.pdf');
+});
+
+test('мессенджер: скрепка, поле и микрофон стоят в одну линию', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const boxes = await Promise.all(
+    [
+      chat.getByRole('button', { name: 'Прикрепить файл' }),
+      chat.getByLabel('Сообщение', { exact: true }),
+      chat.getByRole('button', { name: 'Записать голосовое' }),
+    ].map((locator) => locator.boundingBox()),
+  );
+  const [clip, field, mic] = boxes;
+  expect(clip && field && mic).toBeTruthy();
+  for (const box of [clip!, mic!]) {
+    expect(Math.abs(box.y - field!.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(box.height - field!.height)).toBeLessThanOrEqual(1);
+  }
+});
+
+test('меню: пункты переставляются перетаскиванием, порядок переживает перезагрузку', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  const nav = page.locator('aside nav');
+  // Во время перезагрузки страницы чтение падает с «контекст уничтожен»: пустой ответ
+  // заставляет poll повторить попытку, а не упасть.
+  const order = async () =>
+    (
+      await nav
+        .getByRole('link')
+        .allInnerTexts()
+        .catch(() => [])
+    ).slice(0, 3);
+  await expect.poll(order).toEqual(['Главная', 'Сводка проектов', 'Поиск']);
+
+  const from = (await nav.getByRole('link', { name: 'Поиск' }).boundingBox())!;
+  const to = (await nav.getByRole('link', { name: 'Главная' }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 - 12, { steps: 4 });
+  await page.mouse.move(to.x + to.width / 2, to.y + 2, { steps: 12 });
+  await page.mouse.up();
+
+  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сводка проектов']);
+  await page.reload();
+  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сводка проектов']);
+});
