@@ -20,6 +20,7 @@ import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 import SortableNav, { useNavOrder } from '@/components/SortableNav';
+import { useChatAlerts } from '@/components/messenger/useChatAlerts';
 
 export default function Sidebar() {
   // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
@@ -65,6 +66,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [navOrder, setNavOrder] = useNavOrder();
+  const chatUnread = useChatAlerts(pathname);
 
   // Недавно открытые — сверху: пятьдесят один проект по алфавиту означает, что
   // свои три-четыре приходится каждый раз искать заново.
@@ -179,6 +181,7 @@ export default function Sidebar() {
           onReorder={setNavOrder}
           pathname={pathname}
           onNavigate={closeMobile}
+          badges={{ '/messenger': chatUnread }}
         />
 
         {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}

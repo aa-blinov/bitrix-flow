@@ -14,6 +14,13 @@ export type Dialog = {
   avatar?: string;
   color?: string;
   unread: number;
+  /** Номер чата для методов портала, которым нужен CHAT_ID. */
+  chatId?: number;
+  pinned?: boolean;
+  /** Звук отключён: уведомления о сообщениях не показываем. */
+  muted?: boolean;
+  /** Собеседник в сети (только личные диалоги). */
+  online?: boolean;
   /** Задача или проект, к которым привязан чат, для ссылки из шапки. */
   entityId?: string;
   lastMessage?: { id: number; text: string; date: string; authorId: number };
@@ -77,7 +84,12 @@ function kindOf(item: any): DialogKind {
 export function mergeDialogs(current: Dialog[], incoming: Dialog[]): Dialog[] {
   const byId = new Map(current.map((dialog) => [dialog.id, dialog]));
   for (const dialog of incoming) byId.set(dialog.id, dialog);
-  return [...byId.values()].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  // Закреплённые наверху, как в самом Битриксе, внутри групп по свежести.
+  return [...byId.values()].sort(
+    (a, b) =>
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      Date.parse(b.date) - Date.parse(a.date),
+  );
 }
 
 // Новые сообщения (FIRST_ID) и более ранние (LAST_ID) приходят отдельными
@@ -101,7 +113,7 @@ export const DIALOGS_PAGE = 50;
 // LIMIT метода im.dialog.messages.get: больше 50 портал не отдаёт.
 export const MESSAGES_PAGE = 50;
 
-export function normalizeDialogs(result: any): Dialog[] {
+export function normalizeDialogs(result: any, me = 0): Dialog[] {
   const items: any[] = Array.isArray(result?.items) ? result.items : [];
   return items
     .filter((item) => item?.id && item.type !== 'notify')
@@ -116,6 +128,15 @@ export function normalizeDialogs(result: any): Dialog[] {
         color: item.avatar?.color || item.user?.color,
         // unread без счётчика значит «отмечен непрочитанным вручную».
         unread: Number(item.counter) || (item.unread ? 1 : 0),
+        chatId: Number(item.chat_id) || undefined,
+        pinned: Boolean(item.pinned),
+        // mute_list приходит объектом {userId: true} или списком id.
+        muted:
+          me > 0 &&
+          (Array.isArray(item.chat?.mute_list)
+            ? item.chat.mute_list.map(Number).includes(me)
+            : Boolean(item.chat?.mute_list?.[me])),
+        online: kind === 'user' && item.user?.status === 'online' && !item.user?.idle,
         entityId: item.chat?.entity_id ? String(item.chat.entity_id) : undefined,
         lastMessage: message?.id
           ? {

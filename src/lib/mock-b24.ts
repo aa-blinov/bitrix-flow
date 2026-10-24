@@ -793,6 +793,9 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
             readed_list: [{ user_id: 2, user_name: 'Дмитрий Соколов', message_id: 57, date: null }],
           };
 
+    case 'im.counters.get':
+      return { TYPE: { MESSENGER: 0 } };
+
     case 'im.message.like':
     case 'im.message.update':
     case 'im.message.delete':

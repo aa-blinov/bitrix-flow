@@ -20,6 +20,8 @@ type Subscriber = {
 };
 
 const subscribers = new Set<Subscriber>();
+// Поллер событий чата читает очередь портала только пока есть открытые вкладки.
+globalThis.__sseSubscribers = subscribers;
 let pump: NodeJS.Timeout | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
