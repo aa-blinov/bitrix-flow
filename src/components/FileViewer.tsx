@@ -2,7 +2,9 @@
 
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { MediaError, useMediaLoad } from '@/components/MediaState';
 import { IconButton } from '@/components/monos/IconButton';
+import { Spinner } from '@/components/monos/Spinner';
 
 export type ViewerItem = {
   id: number;
@@ -27,13 +29,9 @@ export default function FileViewer({
   onClose: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  const [zoomed, setZoomed] = useState(false);
   const item = items[index];
   const hasPrev = index > 0;
   const hasNext = index < items.length - 1;
-
-  // Другой файл открывается в обычном размере, а не в увеличенном от прошлого.
-  useEffect(() => setZoomed(false), [item?.id]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -110,32 +108,7 @@ export default function FileViewer({
         // Клик по фону закрывает, клик по самому файлу нет.
         onClick={(event) => event.target === event.currentTarget && onClose()}
       >
-        {item.kind === 'image' ? (
-          <button
-            type="button"
-            onClick={() => setZoomed((value) => !value)}
-            aria-label={zoomed ? 'Уменьшить' : 'Увеличить'}
-            className={zoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}
-          >
-            <img
-              src={item.src}
-              alt={item.name}
-              className={
-                zoomed ? 'max-w-none' : 'max-h-[calc(100dvh-8rem)] max-w-full object-contain'
-              }
-            />
-          </button>
-        ) : (
-          <video
-            key={item.id}
-            controls
-            autoPlay
-            playsInline
-            src={item.src}
-            aria-label={item.name}
-            className="max-h-[calc(100dvh-8rem)] max-w-full"
-          />
-        )}
+        <ViewerMedia key={item.id} item={item} />
         {hasPrev && (
           <IconButton
             label="Предыдущий файл"
@@ -158,5 +131,56 @@ export default function FileViewer({
         )}
       </div>
     </div>
+  );
+}
+
+// Одно открытое медиа: состояние загрузки и увеличение живут здесь, а ключ по id
+// сбрасывает их при листании, чтобы следующий файл открывался обычным размером.
+function ViewerMedia({ item }: { item: ViewerItem }) {
+  const media = useMediaLoad();
+  const [zoomed, setZoomed] = useState(false);
+  const src = media.url(item.src);
+  const loading = media.status === 'loading';
+
+  if (media.status === 'error')
+    return <MediaError name={item.name} onRetry={media.retry} className="max-w-md" />;
+
+  // Пока файл идёт, он невидим, но уже грузится: поверх крутится индикатор.
+  const hidden = 'sr-only';
+  return (
+    <>
+      {loading && <Spinner size="xl" label="Загрузка файла" className="text-ink-soft" />}
+      {item.kind === 'image' ? (
+        <button
+          type="button"
+          onClick={() => setZoomed((value) => !value)}
+          aria-label={zoomed ? 'Уменьшить' : 'Увеличить'}
+          className={`${zoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'} ${loading ? hidden : ''}`}
+        >
+          <img
+            key={media.attempt}
+            src={src}
+            alt={item.name}
+            onLoad={media.onReady}
+            onError={media.onError}
+            className={
+              zoomed ? 'max-w-none' : 'max-h-[calc(100dvh-8rem)] max-w-full object-contain'
+            }
+          />
+        </button>
+      ) : (
+        <video
+          key={media.attempt}
+          controls
+          autoPlay
+          playsInline
+          src={src}
+          aria-label={item.name}
+          onLoadedData={media.onReady}
+          onError={media.onError}
+          className={loading ? hidden : 'max-h-[calc(100dvh-8rem)] max-w-full'}
+        />
+      )}
+    </>
   );
 }
