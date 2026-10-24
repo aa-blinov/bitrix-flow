@@ -17,7 +17,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
         run: docker build --build-arg APP_RELEASE="${{ steps.version.outputs.version }}" -t bitrix-flow:${{ steps.version.outputs.version }} .
 
       - name: Publish
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body_path: RELEASE_NOTES.md
