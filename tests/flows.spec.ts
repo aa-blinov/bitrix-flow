@@ -135,3 +135,32 @@ test('доска проекта раскладывает задачи по ко�
   ).toBeVisible();
   await expect(page).toHaveScreenshot('board.png', { mask: [page.locator('time')] });
 });
+
+test('мессенджер: диалоги делятся по вкладкам, сообщение уходит', async ({ page }) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
+
+  await list.getByRole('button', { name: 'Группы' }).click();
+  await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
+  await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
+
+  await list.getByRole('button', { name: 'Личные' }).click();
+  await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  await expect(chat).toContainText('Посмотришь ревью?');
+
+  const send = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().includes('/api/messenger/messages'),
+  );
+  await chat.getByLabel('Сообщение').fill('Да, смотрю');
+  await chat.getByRole('button', { name: 'Отправить' }).click();
+  expect((await send).postDataJSON()).toEqual({ dialogId: '2', text: 'Да, смотрю' });
+  await expect(chat.getByLabel('Сообщение')).toHaveValue('');
+});
+
+test('мессенджер: чужой формат DIALOG_ID не уходит в портал', async ({ page }) => {
+  const response = await page.request.get('/api/messenger/messages?dialogId=user2');
+  expect(response.status()).toBe(400);
+});

@@ -569,6 +569,56 @@ const TIME_LOG: Record<string, any[]> = {
   ],
 };
 
+const MOCK_DIALOGS = {
+  items: [
+    {
+      id: '2',
+      type: 'user',
+      title: 'Дмитрий Соколов',
+      counter: 2,
+      date_last_activity: '2026-03-02T10:00:00+03:00',
+      message: {
+        id: 12,
+        text: 'Посмотришь ревью?',
+        author_id: 2,
+        date: '2026-03-02T10:00:00+03:00',
+      },
+      user: { id: 2, name: 'Дмитрий Соколов' },
+    },
+    {
+      id: 'chat20',
+      type: 'chat',
+      title: 'Разработка API v2',
+      counter: 0,
+      date_last_activity: '2026-03-01T10:00:00+03:00',
+      message: { id: 21, text: 'Релиз в четверг', author_id: 1, date: '2026-03-01T10:00:00+03:00' },
+      chat: { entity_type: 'SONET_GROUP', entity_id: '10' },
+    },
+    {
+      id: 'chat21',
+      type: 'chat',
+      title: 'Задача: схема GraphQL',
+      counter: 0,
+      date_last_activity: '2026-02-28T10:00:00+03:00',
+      message: { id: 31, text: 'Схему обновил', author_id: 3, date: '2026-02-28T10:00:00+03:00' },
+      chat: { entity_type: 'TASKS_TASK', entity_id: '101' },
+    },
+  ],
+};
+
+const MOCK_MESSAGES: Record<string, unknown> = {
+  '2': {
+    messages: [
+      { id: 11, author_id: 1, text: 'Привет', date: '2026-03-02T09:59:00+03:00' },
+      { id: 12, author_id: 2, text: 'Посмотришь ревью?', date: '2026-03-02T10:00:00+03:00' },
+    ],
+    users: [
+      { id: 1, name: 'Анна Кузнецова' },
+      { id: 2, name: 'Дмитрий Соколов' },
+    ],
+  },
+};
+
 export function isMockEnabled(): boolean {
   return ON;
 }
@@ -646,7 +696,17 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return task ? { ...task, chatId: '1' } : null;
     }
 
+    case 'im.recent.list':
+      return MOCK_DIALOGS;
+
+    case 'im.message.add':
+      return 1000;
+
+    case 'im.dialog.read':
+      return true;
+
     case 'im.dialog.messages.get': {
+      if (params.DIALOG_ID) return MOCK_MESSAGES[params.DIALOG_ID] || { messages: [], users: [] };
       const comments = COMMENTS[params.taskId] || [];
       return { messages: comments };
     }
