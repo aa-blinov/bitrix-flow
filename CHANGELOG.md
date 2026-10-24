@@ -37,6 +37,13 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
   list of who read a group message and who did not.
 - New chat with any person (portal search) and group chat creation; a "Channels" tab
   for Bitrix channels, read-only when the user may not post.
+- Messenger updates in real time: the server reads the portal event queue
+  (`im.v2.Event.get`) while a tab is open and pushes events through the existing SSE,
+  so new messages, edits, deletions and likes appear at once; polling is only a fallback.
+- Unread badge on "Messages" in the sidebar and optional browser notifications with a
+  sound (a bell button in the dialog list), skipped for muted chats.
+- Dialog menu: pin, mark unread, mute; pinned dialogs stay on top. "Typing…" signal to
+  the other side and an online dot for people.
 - Links to portal tasks and projects open inside BitrixFlow and show as "Task #N".
 - Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
   arrows, Space); the order is kept in the browser.

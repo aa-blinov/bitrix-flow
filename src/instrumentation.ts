@@ -13,6 +13,8 @@ export async function register() {
   // Импорт динамический — чтобы клиентский бандл не тянул server-only код.
   const { startBackgroundSync } = await import('./lib/background-sync');
   startBackgroundSync();
+  const { startMessengerEvents } = await import('./lib/messenger-events');
+  startMessengerEvents();
 }
 
 // Next вызывает этот хук на каждую необработанную ошибку серверного рендера и

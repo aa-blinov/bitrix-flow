@@ -26,6 +26,7 @@ import FileViewer from '@/components/FileViewer';
 import LoadingState from '@/components/LoadingState';
 import { ForwardModal } from '@/components/messenger/Dialogs';
 import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
+import { useMessengerEvents, useRealtime } from '@/components/messenger/realtime';
 import { usePolling, when } from '@/components/messenger/util';
 import {
   MAX_FILE_SIZE,
@@ -46,7 +47,9 @@ import {
 import { bitrixPlainText } from '@/lib/bitrix-markup';
 import { parseMessageNodes } from '@/lib/message-markdown';
 
+// Пока жив SSE, обновление приходит событием, и опрос только подстраховывает.
 const MESSAGES_POLL_MS = 5_000;
+const MESSAGES_POLL_REALTIME_MS = 20_000;
 
 export default function Conversation({
   dialog,
@@ -147,7 +150,16 @@ export default function Conversation({
       })
       .catch(() => setError('Не удалось загрузить сообщения.'));
   }, [request, dialogId, me, onRead]);
-  usePolling(load, MESSAGES_POLL_MS);
+  const realtime = useRealtime();
+  usePolling(load, realtime ? MESSAGES_POLL_REALTIME_MS : MESSAGES_POLL_MS);
+
+  // Событие по этому диалогу: новое сообщение подтягивается сразу, а правка, удаление
+  // и лайк перечитывают страницу целиком (курсор afterId такие изменения не отдаёт).
+  useMessengerEvents((event) => {
+    if (event.dialogId !== dialog.id) return;
+    if (event.kind !== 'add') polls.current = 5;
+    load();
+  });
 
   const oldestId = messages?.[0]?.id;
   async function loadOlder() {
@@ -327,8 +339,19 @@ export default function Conversation({
 
   // Упоминание: после @ в чате предлагаем участников. В поле оно остаётся @Именем,
   // а тегом Битрикса становится при отправке.
+  const lastTyping = useRef(0);
+
   function onDraftChange(value: string, caret: number) {
     setDraft(value);
+    // «Печатает…» у собеседников: сигнал не чаще раза в четыре секунды.
+    if (value.trim() && !editing && Date.now() - lastTyping.current > 4000) {
+      lastTyping.current = Date.now();
+      void fetch('/api/messenger/typing', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ dialogId: dialog.id }),
+      }).catch(() => {});
+    }
     if (dialog.kind === 'user') return;
     const match = /(?:^|\s)@([^\s@]{0,30})$/.exec(value.slice(0, caret));
     if (!match) {
@@ -557,7 +580,10 @@ export default function Conversation({
           <ArrowLeft className="size-4" strokeWidth={1.7} />
         </Button>
         <Avatar name={dialog.title} src={dialog.avatar} size="sm" />
-        <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{dialog.title}</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-bold text-ink">{dialog.title}</h2>
+          {dialog.online && <p className="text-xs text-success-text">в сети</p>}
+        </div>
         {link && (
           <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
             {dialog.kind === 'task' ? 'Открыть задачу' : 'Открыть проект'}

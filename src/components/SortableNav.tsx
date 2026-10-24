@@ -131,11 +131,13 @@ export default function SortableNav({
   onReorder,
   pathname,
   onNavigate,
+  badges = {},
 }: {
   order: string[];
   onReorder: (order: string[]) => void;
   pathname: string;
   onNavigate: () => void;
+  badges?: Record<string, number>;
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -191,6 +193,7 @@ export default function SortableNav({
               item={item}
               pathname={pathname}
               onNavigate={onNavigate}
+              badge={badges[item.href]}
             />
           ))}
         </div>

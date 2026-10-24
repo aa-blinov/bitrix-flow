@@ -16,6 +16,14 @@ export async function getAuthorizedMemberId(session?: string): Promise<string | 
   if (!sessionId) return null;
   const active = await hasActiveStoredSessionById(sessionId);
   if (!active) return null;
+  return getProtectedMemberId();
+}
+
+/**
+ * Владелец токена защищённого портала. Фоновым задачам (поллер событий чата)
+ * сессия не нужна, но выбор токена должен быть тем же, что у запросов.
+ */
+export async function getProtectedMemberId(): Promise<string | null> {
   const db = await getDb();
   const token = await db
     .collection('user_tokens')

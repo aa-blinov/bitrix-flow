@@ -1,3 +1,4 @@
+import { MongoClient } from 'mongodb';
 import { test, expect, type Page } from '@playwright/test';
 
 // Состояния, которые не видно на голом экране: модалка, фильтры, диалоги,
@@ -558,4 +559,108 @@ test('мессенджер: ссылка на задачу портала отк
   const link = chat.getByRole('link', { name: 'Задача #4521' });
   await expect(link).toHaveAttribute('href', '/all-tasks?task=4521');
   await expect(link).not.toHaveAttribute('target', '_blank');
+});
+
+test('мессенджер: диалог закрепляется, глушится и помечается непрочитанным', async ({ page }) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  const actions: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/dialog')) actions.push(request.postDataJSON());
+  });
+
+  const row = list.getByRole('listitem').filter({ hasText: 'Разработка API v2' });
+  await row.hover();
+  await row.getByRole('button', { name: 'Действия с диалогом' }).click();
+  await page.getByRole('menuitem', { name: 'Закрепить' }).click();
+  await expect(list.getByRole('listitem').first()).toContainText('Разработка API v2');
+  await expect(row.getByLabel('Закреплён')).toBeVisible();
+
+  await row.hover();
+  await row.getByRole('button', { name: 'Действия с диалогом' }).click();
+  await page.getByRole('menuitem', { name: 'Отключить звук' }).click();
+  await expect(row.getByLabel('Звук отключён')).toBeVisible();
+
+  await row.hover();
+  await row.getByRole('button', { name: 'Действия с диалогом' }).click();
+  await page.getByRole('menuitem', { name: 'Пометить непрочитанным' }).click();
+  await expect(row.getByLabel('Непрочитанных: 1')).toBeVisible();
+
+  expect(actions).toEqual([
+    { dialogId: 'chat20', action: 'pin' },
+    { dialogId: 'chat20', action: 'mute' },
+    { dialogId: 'chat20', action: 'unread' },
+  ]);
+});
+
+test('меню: у «Сообщений» стоит значок непрочитанных', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
+  await page.route('**/api/messenger/counters', (route) =>
+    route.fulfill({ json: { unread: 4, me: 1 } }),
+  );
+  await page.goto('/');
+  await expect(page.locator('aside nav').getByRole('link', { name: /Сообщения/ })).toContainText(
+    '4',
+  );
+});
+
+test('мессенджер: набор текста шлёт сигнал «печатает» не чаще раза в несколько секунд', async ({
+  page,
+}) => {
+  const chat = await openDmitry(page);
+  const signals: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/typing')) signals.push(request.postDataJSON());
+  });
+  await chat.getByLabel('Сообщение', { exact: true }).pressSequentially('Привет, как дела?');
+  await expect.poll(() => signals.length).toBe(1);
+  expect(signals[0]).toEqual({ dialogId: '2' });
+});
+
+test('событие из очереди портала показывает уведомление браузера', async ({ page }) => {
+  await page.addInitScript(() => {
+    const notes: string[][] = [];
+    (window as unknown as { __notes: string[][] }).__notes = notes;
+    class FakeNotification {
+      static permission = 'granted';
+      onclick: (() => void) | null = null;
+      constructor(title: string, options: { body?: string }) {
+        notes.push([title, options.body || '']);
+      }
+      close() {}
+    }
+    (window as unknown as { Notification: unknown }).Notification = FakeNotification;
+    localStorage.setItem('bitrix-flow-chat-notify', '1');
+  });
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  // Событие кладёт в очередь поллер сервера; здесь его заменяет запись в events_stream.
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    const db = client.db('bitrix_kanban_test');
+    const token = await db.collection('user_tokens').findOne({});
+    await db.collection('events_stream').insertOne({
+      member_id: token?.member_id,
+      event: {
+        type: 'messenger',
+        kind: 'add',
+        dialogId: '2',
+        chatId: 2,
+        messageId: 900,
+        authorId: 2,
+        author: 'Дмитрий Соколов',
+        chat: 'Дмитрий Соколов',
+        text: 'Посмотришь ревью?',
+        muted: false,
+        at: new Date().toISOString(),
+      },
+      created_at: new Date(),
+    });
+  } finally {
+    await client.close();
+  }
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __notes: string[][] }).__notes))
+    .toContainEqual(['Дмитрий Соколов', 'Посмотришь ревью?']);
 });
