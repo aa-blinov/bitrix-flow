@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeft, Send } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
@@ -12,7 +12,15 @@ import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
-import type { Dialog, DialogKind, Message, Person } from '@/lib/messenger';
+import {
+  MESSAGES_PAGE,
+  mergeDialogs,
+  mergeMessages,
+  type Dialog,
+  type DialogKind,
+  type Message,
+  type Person,
+} from '@/lib/messenger';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
   { value: 'all', label: 'Все' },
@@ -50,6 +58,11 @@ function usePolling(run: () => void, delay: number, enabled = true) {
   }, [run, delay, enabled]);
 }
 
+const fetchDialogs = (offset: number) =>
+  fetch(`/api/messenger/dialogs?offset=${offset}`).then((response) =>
+    response.ok ? response.json() : Promise.reject(new Error(String(response.status))),
+  );
+
 export default function Messenger() {
   const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
   const [me, setMe] = useState(0);
@@ -58,19 +71,36 @@ export default function Messenger() {
   const [query, setQuery] = useState('');
   const [activeId, setActiveId] = useState('');
 
+  // Курсор «Показать ещё»: опрос обновляет только первую страницу и курсор
+  // не трогает, иначе подгруженные диалоги терялись бы каждые 15 секунд.
+  const [paging, setPaging] = useState<{ hasMore: boolean; nextOffset: number } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const loadDialogs = useCallback(() => {
-    void fetch('/api/messenger/dialogs')
-      .then((response) =>
-        response.ok ? response.json() : Promise.reject(new Error(String(response.status))),
-      )
+    void fetchDialogs(0)
       .then((data) => {
-        setDialogs(data.dialogs);
+        setDialogs((current) => mergeDialogs(current || [], data.dialogs));
         setMe(data.me);
+        setPaging((current) => current || { hasMore: data.hasMore, nextOffset: data.nextOffset });
         setError('');
       })
       .catch(() => setError('Не удалось загрузить диалоги. Обновите страницу.'));
   }, []);
   usePolling(loadDialogs, DIALOGS_POLL_MS);
+
+  async function loadMoreDialogs() {
+    if (!paging || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await fetchDialogs(paging.nextOffset);
+      setDialogs((current) => mergeDialogs(current || [], data.dialogs));
+      setPaging({ hasMore: data.hasMore, nextOffset: data.nextOffset });
+    } catch {
+      setError('Не удалось загрузить ещё диалоги.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ru');
@@ -171,6 +201,19 @@ export default function Messenger() {
                 ))}
               </ul>
             )}
+            {paging?.hasMore && (
+              <div className="p-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void loadMoreDialogs()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Загрузка' : 'Показать ещё'}
+                </Button>
+              </div>
+            )}
           </div>
         </section>
         <section
@@ -213,30 +256,73 @@ function Conversation({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
-  const lastSeen = useRef(0);
+  const newestRef = useRef(0);
+  // Читатель отлистал вверх: новое сообщение не должно утаскивать его вниз.
+  const stickToBottom = useRef(true);
+  const heightBeforePrepend = useRef(0);
 
+  const dialogId = dialog.id;
+  const request = useCallback(
+    (cursor: string) =>
+      fetch(`/api/messenger/messages?dialogId=${encodeURIComponent(dialogId)}${cursor}`).then(
+        (response) =>
+          response.ok
+            ? (response.json() as Promise<{ messages: Message[]; people: Record<string, Person> }>)
+            : Promise.reject(new Error(String(response.status))),
+      ),
+    [dialogId],
+  );
+
+  // Первый запрос берёт последние сообщения, дальше опрос идёт курсором
+  // afterId (FIRST_ID портала) и тянет только новое, не затирая подгруженную историю.
   const load = useCallback(() => {
-    void fetch(`/api/messenger/messages?dialogId=${encodeURIComponent(dialog.id)}`)
-      .then((response) =>
-        response.ok ? response.json() : Promise.reject(new Error(String(response.status))),
-      )
-      .then((data: { messages: Message[]; people: Record<string, Person> }) => {
-        setMessages(data.messages);
+    const after = newestRef.current;
+    void request(after ? `&afterId=${after}` : '')
+      .then((data) => {
+        setMessages((current) => mergeMessages(current || [], data.messages));
         setPeople((known) => ({ ...known, ...data.people }));
-        const newest = data.messages.at(-1)?.id || 0;
+        if (!after) setHasOlder(data.messages.length >= MESSAGES_PAGE);
         // Пришло чужое сообщение в открытом диалоге: сразу прочитано.
-        if (newest > lastSeen.current && lastSeen.current && data.messages.at(-1)?.authorId !== me)
-          onRead(dialog.id);
-        lastSeen.current = newest;
+        if (after && data.messages.some((m) => m.id > after && m.authorId !== me)) onRead(dialogId);
+        newestRef.current = Math.max(after, ...data.messages.map((m) => m.id));
       })
       .catch(() => setError('Не удалось загрузить сообщения.'));
-  }, [dialog.id, me, onRead]);
+  }, [request, dialogId, me, onRead]);
   usePolling(load, MESSAGES_POLL_MS);
+
+  const oldestId = messages?.[0]?.id;
+  async function loadOlder() {
+    if (!oldestId || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const data = await request(`&beforeId=${oldestId}`);
+      heightBeforePrepend.current = scroller.current?.scrollHeight || 0;
+      setMessages((current) => mergeMessages(current || [], data.messages));
+      setPeople((known) => ({ ...known, ...data.people }));
+      // Портал может вернуть больше LIMIT, но не меньше, пока история не кончилась.
+      setHasOlder(data.messages.length >= MESSAGES_PAGE);
+    } catch {
+      setError('Не удалось загрузить более ранние сообщения.');
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  // Добавленная сверху история сдвигает всё вниз: возвращаем читателя на то же сообщение.
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    if (!box || !heightBeforePrepend.current) return;
+    box.scrollTop += box.scrollHeight - heightBeforePrepend.current;
+    heightBeforePrepend.current = 0;
+  }, [oldestId]);
 
   const newestId = messages?.at(-1)?.id;
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: 'end' });
+    if (stickToBottom.current) bottom.current?.scrollIntoView({ block: 'end' });
   }, [newestId]);
 
   async function send() {
@@ -252,6 +338,7 @@ function Conversation({
       });
       if (!response.ok) throw new Error(String(response.status));
       setDraft('');
+      stickToBottom.current = true;
       load();
       onSent();
     } catch {
@@ -289,7 +376,27 @@ function Conversation({
           </Link>
         )}
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4" aria-live="polite">
+      <div
+        ref={scroller}
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4"
+        aria-live="polite"
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+        }}
+      >
+        {hasOlder && (
+          <div className="flex justify-center">
+            <Button
+              variant="quiet"
+              size="sm"
+              onClick={() => void loadOlder()}
+              disabled={loadingOlder}
+            >
+              {loadingOlder ? 'Загрузка' : 'Показать более ранние'}
+            </Button>
+          </div>
+        )}
         {messages === null ? (
           error ? null : (
             <LoadingState className="min-h-40 bg-transparent" />

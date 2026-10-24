@@ -39,6 +39,27 @@ function kindOf(item: any): DialogKind {
   return 'chat';
 }
 
+// Страницы im.recent.list перекрываются: портал сначала выбирает записи, а потом
+// схлопывает их в диалоги, и один диалог может попасть на соседние страницы.
+// Свежая версия записи вытесняет старую.
+export function mergeDialogs(current: Dialog[], incoming: Dialog[]): Dialog[] {
+  const byId = new Map(current.map((dialog) => [dialog.id, dialog]));
+  for (const dialog of incoming) byId.set(dialog.id, dialog);
+  return [...byId.values()].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+// Новые сообщения (FIRST_ID) и более ранние (LAST_ID) приходят отдельными
+// запросами и могут пересечься по границе: дубли отсекаются по id.
+export function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) byId.set(message.id, message);
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+export const DIALOGS_PAGE = 50;
+// LIMIT метода im.dialog.messages.get: больше 50 портал не отдаёт.
+export const MESSAGES_PAGE = 50;
+
 export function normalizeDialogs(result: any): Dialog[] {
   const items: any[] = Array.isArray(result?.items) ? result.items : [];
   return items

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withMessenger } from '@/lib/messenger-api';
-import { DIALOG_ID, normalizeMessages } from '@/lib/messenger';
+import { DIALOG_ID, MESSAGES_PAGE, normalizeMessages } from '@/lib/messenger';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,13 +11,17 @@ const badRequest = (error: string) => NextResponse.json({ error }, { status: 400
 export function GET(req: NextRequest) {
   const dialogId = req.nextUrl.searchParams.get('dialogId') || '';
   if (!DIALOG_ID.test(dialogId)) return Promise.resolve(badRequest('BAD_DIALOG_ID'));
-  // Пагинация вверх по истории: сообщения старше beforeId.
+  // Курсоры портала: beforeId отдаёт сообщения старше него (LAST_ID, листание
+  // вверх по истории), afterId новее (FIRST_ID, опрос новых). Без них приходят
+  // последние сообщения диалога.
   const beforeId = req.nextUrl.searchParams.get('beforeId') || '';
+  const afterId = req.nextUrl.searchParams.get('afterId') || '';
   return withMessenger(req, async (call) => {
     const result = await call('im.dialog.messages.get', {
       DIALOG_ID: dialogId,
-      LIMIT: '50',
-      ...(/^\d+$/.test(beforeId) ? { LAST_ID: beforeId } : {}),
+      LIMIT: String(MESSAGES_PAGE),
+      ...(/^\d{1,12}$/.test(beforeId) ? { LAST_ID: beforeId } : {}),
+      ...(/^\d{1,12}$/.test(afterId) ? { FIRST_ID: afterId } : {}),
     });
     return NextResponse.json(normalizeMessages(result));
   });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DIALOG_ID, normalizeDialogs, normalizeMessages } from './messenger';
+import {
+  DIALOG_ID,
+  mergeDialogs,
+  mergeMessages,
+  normalizeDialogs,
+  normalizeMessages,
+} from './messenger';
 
 describe('messenger', () => {
   it('accepts only person ids and chat ids as DIALOG_ID', () => {
@@ -64,5 +70,29 @@ describe('messenger', () => {
     });
     expect(messages.map((m) => m.id)).toEqual([1, 2]);
     expect(people['83'].avatar).toBeUndefined();
+  });
+
+  it('merges overlapping pages without duplicates and keeps order', () => {
+    const msg = (id: number) => ({ id, authorId: 1, text: String(id), date: '' });
+    expect(
+      mergeMessages([msg(3), msg(4)], [msg(1), msg(2), msg(3), msg(5)]).map((m) => m.id),
+    ).toEqual([1, 2, 3, 4, 5]);
+
+    const dialog = (id: string, date: string, unread = 0) => ({
+      id,
+      kind: 'chat' as const,
+      title: id,
+      unread,
+      date,
+    });
+    const merged = mergeDialogs(
+      [dialog('a', '2026-10-01T00:00:00Z', 5), dialog('b', '2026-10-02T00:00:00Z')],
+      [dialog('a', '2026-10-03T00:00:00Z', 0), dialog('c', '2026-09-01T00:00:00Z')],
+    );
+    expect(merged.map((d) => [d.id, d.unread])).toEqual([
+      ['a', 0],
+      ['b', 0],
+      ['c', 0],
+    ]);
   });
 });
