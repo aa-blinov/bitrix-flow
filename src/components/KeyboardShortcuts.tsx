@@ -54,7 +54,7 @@ export default function KeyboardShortcuts() {
         event.preventDefault();
         toast({
           title: 'Горячие клавиши',
-          description: '/ — поиск, n — новая задача, g затем h/t/m — переходы, ? — эта подсказка',
+          description: '/ — поиск, n — новая задача, g затем h/t/m/c — переходы, ? — эта подсказка',
           durationMs: 7000,
         });
         return;
@@ -69,6 +69,7 @@ export default function KeyboardShortcuts() {
             m: '/my-tasks',
             w: '/team-workload',
             s: '/search',
+            c: '/messenger',
           };
           const route = routes[next.key];
           if (route && !isTyping(next.target)) {

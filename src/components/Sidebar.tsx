@@ -13,6 +13,7 @@ import {
   Plus,
   UserCheck,
   CalendarDays,
+  MessagesSquare,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -259,6 +260,13 @@ export default function Sidebar() {
             href="/team-workload"
             icon={CalendarDays}
             label="Нагрузка команды"
+            pathname={pathname}
+            onNavigate={closeMobile}
+          />
+          <NavLink
+            href="/messenger"
+            icon={MessagesSquare}
+            label="Сообщения"
             pathname={pathname}
             onNavigate={closeMobile}
           />
