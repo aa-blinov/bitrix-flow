@@ -369,3 +369,41 @@ test('меню: пункты переставляются перетаскива
   await page.reload();
   await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сводка проектов']);
 });
+
+test('мессенджер: пока фото грузится, на его месте заглушка с индикатором', async ({ page }) => {
+  await page.route(/\/api\/messenger\/file\?.*fileId=501/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  const chat = await openDmitry(page);
+  await expect(chat.getByRole('status', { name: 'Загрузка файла' })).toBeVisible();
+  await expect(chat.getByRole('status', { name: 'Загрузка файла' })).toHaveCount(0);
+  await expect(chat.getByRole('img', { name: 'схема.png' })).toBeVisible();
+});
+
+test('мессенджер: фото, которое не загрузилось, можно запросить заново', async ({ page }) => {
+  const failing = /\/api\/messenger\/file\?.*fileId=503/;
+  await page.route(failing, (route) => route.abort());
+  const chat = await openDmitry(page);
+  await expect(chat.getByText('Не удалось загрузить фото.jpg')).toBeVisible();
+
+  await page.unroute(failing);
+  await chat.getByRole('button', { name: 'Повторить' }).click();
+  await expect(chat.getByRole('img', { name: 'фото.jpg' })).toBeVisible();
+  await expect(chat.getByText('Не удалось загрузить фото.jpg')).toHaveCount(0);
+});
+
+test('мессенджер: в просмотрщике упавшее фото показывает ошибку и повтор', async ({ page }) => {
+  const chat = await openDmitry(page);
+  await chat.getByRole('img', { name: 'фото.jpg' }).click();
+  await expect(page.getByRole('dialog', { name: 'Просмотр: фото.jpg' })).toBeVisible();
+  // Следующее фото в просмотрщике не загрузится: роут оборван до листания.
+  const failing = /\/api\/messenger\/file\?.*fileId=501/;
+  await page.route(failing, (route) => route.abort());
+  await page.keyboard.press('ArrowRight');
+  const viewer = page.getByRole('dialog', { name: 'Просмотр: схема.png' });
+  await expect(viewer.getByText('Не удалось загрузить схема.png')).toBeVisible();
+  await page.unroute(failing);
+  await viewer.getByRole('button', { name: 'Повторить' }).click();
+  await expect(viewer.getByRole('img', { name: 'схема.png' })).toBeVisible();
+});

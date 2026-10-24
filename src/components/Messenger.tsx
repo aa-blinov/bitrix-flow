@@ -19,9 +19,12 @@ import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { SearchField } from '@/components/monos/SearchField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
+import { Skeleton } from '@/components/monos/Skeleton';
+import { Spinner } from '@/components/monos/Spinner';
 import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
 import FileViewer from '@/components/FileViewer';
+import { MediaError, useMediaLoad } from '@/components/MediaState';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import {
@@ -746,46 +749,87 @@ function FileView({
   dialogId: string;
   onOpen: (id: number) => void;
 }) {
-  const src = fileUrl(dialogId, file);
-  if (file.kind === 'image')
-    return (
-      <button type="button" onClick={() => onOpen(file.id)} className="mt-1 block cursor-zoom-in">
-        <img src={src} alt={file.name} loading="lazy" className="max-h-64 max-w-full rounded-ui" />
-      </button>
-    );
-  if (file.kind === 'video')
+  // Звук не грузится, пока его не включат (preload none): до этого он готов.
+  const media = useMediaLoad(file.kind === 'audio' ? 'ready' : 'loading');
+  const src = media.url(fileUrl(dialogId, file));
+
+  if (file.kind === 'image' || file.kind === 'video') {
+    if (media.status === 'error') return <MediaError name={file.name} onRetry={media.retry} />;
+    const loading = media.status === 'loading';
+    // Место под файл занимает заглушка, а сам файл догружается поверх невидимым:
+    // так переписка не прыгает, и ленивая загрузка картинки остаётся ленивой.
+    const hidden = 'absolute inset-0 size-full opacity-0';
     return (
       <button
         type="button"
         onClick={() => onOpen(file.id)}
-        aria-label={`Открыть видео ${file.name}`}
-        className="relative mt-1 block"
+        aria-label={file.kind === 'video' ? `Открыть видео ${file.name}` : undefined}
+        className={`relative mt-1 block ${file.kind === 'image' ? 'cursor-zoom-in' : ''}`}
       >
-        <video
-          preload="metadata"
-          muted
-          playsInline
-          src={src}
-          className="max-h-64 max-w-full rounded-ui"
-        />
-        <PlayCircle
-          className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-ink"
-          strokeWidth={1.4}
-        />
+        {loading && (
+          <span className="relative block h-40 w-56 max-w-full">
+            <Skeleton width="100%" height="100%" />
+            <Spinner
+              label="Загрузка файла"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-ink-soft"
+            />
+          </span>
+        )}
+        {file.kind === 'image' ? (
+          <img
+            key={media.attempt}
+            src={src}
+            alt={file.name}
+            loading="lazy"
+            onLoad={media.onReady}
+            onError={media.onError}
+            className={loading ? hidden : 'max-h-64 max-w-full rounded-ui'}
+          />
+        ) : (
+          <>
+            <video
+              key={media.attempt}
+              preload="metadata"
+              muted
+              playsInline
+              src={src}
+              onLoadedData={media.onReady}
+              onError={media.onError}
+              className={loading ? hidden : 'max-h-64 max-w-full rounded-ui'}
+            />
+            {!loading && (
+              <PlayCircle
+                className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-ink"
+                strokeWidth={1.4}
+              />
+            )}
+          </>
+        )}
       </button>
     );
-  if (file.kind === 'audio')
+  }
+  if (file.kind === 'audio') {
+    if (media.status === 'error') return <MediaError name={file.name} onRetry={media.retry} />;
     return (
-      <div className="mt-1">
+      <div className="mt-1 flex items-center gap-2">
         <audio
+          key={media.attempt}
           controls
           preload="none"
           src={src}
           aria-label={file.name}
+          onWaiting={media.onLoading}
+          onCanPlay={media.onReady}
+          onPlaying={media.onReady}
+          onError={media.onError}
           className="w-64 max-w-full"
         />
+        {media.status === 'loading' && (
+          <Spinner label="Загрузка файла" size="sm" className="text-ink-soft" />
+        )}
       </div>
     );
+  }
   return (
     <a
       href={fileUrl(dialogId, file, true)}

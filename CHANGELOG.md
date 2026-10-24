@@ -28,6 +28,9 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
   voice messages recorded in the browser.
 - Photos and videos open in an in-page viewer with paging across the whole dialog,
   zoom and download instead of a new tab; other formats download with their name.
+- Media in the messenger shows a skeleton with a spinner while it loads, and a
+  "could not load" message with a retry button when the portal drops the file, both in
+  the dialog and in the viewer.
 - Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
   arrows, Space); the order is kept in the browser.
 
