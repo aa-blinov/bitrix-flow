@@ -186,16 +186,22 @@ test('мессенджер: чужой формат DIALOG_ID не уходит 
 // поля формы записываются прямо в fetch страницы.
 async function recordUploads(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
-    const original = window.fetch;
-    (window as unknown as { __uploads: string[] }).__uploads = [];
+    const store = window as unknown as { __uploads: string[] };
+    store.__uploads = [];
+    const describe = (body: FormData) =>
+      [...body.entries()]
+        .map(([key, value]) => `${key}=${value instanceof File ? value.name : value}`)
+        .join('&');
+    const originalFetch = window.fetch;
     window.fetch = (input, init) => {
-      if (init?.body instanceof FormData)
-        (window as unknown as { __uploads: string[] }).__uploads.push(
-          [...init.body.entries()]
-            .map(([key, value]) => `${key}=${value instanceof File ? value.name : value}`)
-            .join('&'),
-        );
-      return original(input, init);
+      if (init?.body instanceof FormData) store.__uploads.push(describe(init.body));
+      return originalFetch(input, init);
+    };
+    // Файлы уходят через XMLHttpRequest ради хода загрузки.
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function (body) {
+      if (body instanceof FormData) store.__uploads.push(describe(body));
+      return originalSend.call(this, body);
     };
   });
   return () =>
@@ -244,22 +250,59 @@ test('мессенджер: Markdown и теги Битрикса, файлы, �
   await expect(chat.getByRole('img', { name: 'Не прочитано' })).toHaveCount(1);
 });
 
-test('мессенджер: файл уходит multipart-запросом с подписью из поля', async ({ page }) => {
+test('мессенджер: файл ждёт в очереди и уходит с подписью из поля', async ({ page }) => {
   const uploads = await recordUploads(page);
   const chat = await openDmitry(page);
   await chat.getByLabel('Сообщение', { exact: true }).fill('Вот отчёт');
-  const upload = page.waitForRequest(
-    (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/files'),
-  );
   await chat
     .getByLabel('Файлы')
     .setInputFiles({ name: 'отчёт.txt', mimeType: 'text/plain', buffer: Buffer.from('данные') });
+
+  // До нажатия «Отправить» ничего не ушло, а файл можно убрать.
+  const tray = chat.getByRole('list', { name: 'Прикреплённые файлы' });
+  await expect(tray).toContainText('отчёт.txt');
+  expect(await uploads()).toBe('');
+  await tray.getByRole('button', { name: 'Убрать отчёт.txt' }).click();
+  await expect(tray).toHaveCount(0);
+
+  await chat
+    .getByLabel('Файлы')
+    .setInputFiles({ name: 'отчёт.txt', mimeType: 'text/plain', buffer: Buffer.from('данные') });
+  const upload = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/files'),
+  );
+  await chat.getByRole('button', { name: 'Отправить' }).click();
   await upload;
   const body = await uploads();
   expect(body).toContain('file=отчёт.txt');
   expect(body).toContain('message=Вот отчёт');
   await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('');
+  await expect(tray).toHaveCount(0);
   await expect(chat.getByRole('alert')).toHaveCount(0);
+});
+
+test('мессенджер: перетащенные в окно файлы попадают в очередь, отправка показывает ход', async ({
+  page,
+}) => {
+  await page.route('**/api/messenger/files', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.fulfill({ json: { id: 1 } });
+  });
+  const chat = await openDmitry(page);
+  const dataTransfer = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['x'], 'схема.pdf', { type: 'application/pdf' }));
+    return transfer;
+  });
+  await chat.locator('div.relative.flex').first().dispatchEvent('dragenter', { dataTransfer });
+  await expect(chat.getByText('Отпустите файлы, чтобы прикрепить')).toBeVisible();
+  await chat.locator('div.relative.flex').first().dispatchEvent('drop', { dataTransfer });
+  await expect(chat.getByRole('list', { name: 'Прикреплённые файлы' })).toContainText('схема.pdf');
+
+  await chat.getByRole('button', { name: 'Отправить' }).click();
+  await expect(chat.getByRole('progressbar', { name: 'Отправка файла' })).toBeVisible();
+  await expect(chat.getByRole('progressbar')).toHaveCount(0);
+  await expect(chat.getByRole('list', { name: 'Прикреплённые файлы' })).toHaveCount(0);
 });
 
 test('мессенджер: слишком большой файл не уходит', async ({ page }) => {
@@ -334,6 +377,14 @@ test('мессенджер: скрепка, поле и микрофон сто�
   );
   const [clip, field, mic] = boxes;
   expect(clip && field && mic).toBeTruthy();
+  // Поле целиком в окне: раньше страница стояла ниже окна, и поле уходило за край.
+  expect(field!.y + field!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  // Плавающая кнопка меню на телефоне не лежит на кнопке отправки.
+  const menuButton = page.getByRole('button', { name: 'Открыть меню' });
+  if (await menuButton.count()) {
+    const menu = (await menuButton.boundingBox())!;
+    expect(mic!.x + mic!.width).toBeLessThanOrEqual(menu.x);
+  }
   for (const box of [clip!, mic!]) {
     expect(Math.abs(box.y - field!.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(box.height - field!.height)).toBeLessThanOrEqual(1);
@@ -636,31 +687,35 @@ test('событие из очереди портала показывает у�
   await page.waitForLoadState('networkidle');
 
   // Событие кладёт в очередь поллер сервера; здесь его заменяет запись в events_stream.
+  // SSE отдаёт только события новее своего курсора, а курсор ставится при подключении:
+  // запись, сделанная раньше, потерялась бы, поэтому повторяем с новым номером сообщения.
   const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  const notes = () => page.evaluate(() => (window as unknown as { __notes: string[][] }).__notes);
   try {
     const db = client.db('bitrix_kanban_test');
     const token = await db.collection('user_tokens').findOne({});
-    await db.collection('events_stream').insertOne({
-      member_id: token?.member_id,
-      event: {
-        type: 'messenger',
-        kind: 'add',
-        dialogId: '2',
-        chatId: 2,
-        messageId: 900,
-        authorId: 2,
-        author: 'Дмитрий Соколов',
-        chat: 'Дмитрий Соколов',
-        text: 'Посмотришь ревью?',
-        muted: false,
-        at: new Date().toISOString(),
-      },
-      created_at: new Date(),
-    });
+    for (let attempt = 0; attempt < 8 && !(await notes()).length; attempt++) {
+      await db.collection('events_stream').insertOne({
+        member_id: token?.member_id,
+        event: {
+          type: 'messenger',
+          kind: 'add',
+          dialogId: '2',
+          chatId: 2,
+          messageId: 900 + attempt,
+          authorId: 2,
+          author: 'Дмитрий Соколов',
+          chat: 'Дмитрий Соколов',
+          text: 'Посмотришь ревью?',
+          muted: false,
+          at: new Date().toISOString(),
+        },
+        created_at: new Date(),
+      });
+      await page.waitForTimeout(1500);
+    }
   } finally {
     await client.close();
   }
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __notes: string[][] }).__notes))
-    .toContainEqual(['Дмитрий Соколов', 'Посмотришь ревью?']);
+  await expect.poll(notes).toContainEqual(['Дмитрий Соколов', 'Посмотришь ревью?']);
 });
