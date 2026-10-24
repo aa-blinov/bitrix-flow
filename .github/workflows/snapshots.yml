@@ -45,6 +45,11 @@ jobs:
           TEST_MONGO_URL: mongodb://mongodb:27017
           PROJECT: ${{ inputs.project }}
       - name: Push the branch
+        # checkout стоит с persist-credentials: false, поэтому токен отдаётся
+        # только этому шагу и только на время пуша, а не живёт в конфиге git.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
@@ -56,4 +61,4 @@ jobs:
             exit 0
           fi
           git commit -m "test: regenerate the screenshot baselines"
-          git push --force origin chore/snapshot-update
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git" chore/snapshot-update
