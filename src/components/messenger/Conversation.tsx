@@ -1,0 +1,989 @@
+'use client';
+
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  CornerUpLeft,
+  Forward,
+  Heart,
+  Mic,
+  Paperclip,
+  Pencil,
+  Search,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Avatar } from '@/components/monos/Avatar';
+import { Button } from '@/components/monos/Button';
+import { AlertDialog } from '@/components/monos/AlertDialog';
+import { IconButton } from '@/components/monos/IconButton';
+import { SearchField } from '@/components/monos/SearchField';
+import { TextArea } from '@/components/monos/TextArea';
+import BitrixText from '@/components/BitrixText';
+import FileViewer from '@/components/FileViewer';
+import LoadingState from '@/components/LoadingState';
+import { ForwardModal } from '@/components/messenger/Dialogs';
+import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
+import { usePolling, when } from '@/components/messenger/util';
+import {
+  MAX_FILE_SIZE,
+  MESSAGES_PAGE,
+  VOICE_NAME,
+  applyMentions,
+  fileUrl,
+  formatBytes,
+  mergeMessages,
+  quoteBlock,
+  readersOf,
+  type Dialog,
+  type Message,
+  type Person,
+  type Reader,
+  type UserHit,
+} from '@/lib/messenger';
+import { bitrixPlainText } from '@/lib/bitrix-markup';
+import { parseMessageNodes } from '@/lib/message-markdown';
+
+const MESSAGES_POLL_MS = 5_000;
+
+export default function Conversation({
+  dialog,
+  dialogs,
+  me,
+  onBack,
+  onRead,
+  onSent,
+}: {
+  dialog: Dialog;
+  dialogs: Dialog[];
+  me: number;
+  onBack: () => void;
+  onRead: (id: string) => void;
+  onSent: () => void;
+}) {
+  const [messages, setMessages] = useState<Message[] | null>(null);
+  const [people, setPeople] = useState<Record<string, Person>>({});
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  // null пока портал не ответил: галочки без данных не рисуем.
+  const [readers, setReaders] = useState<Reader[] | null>(null);
+  const [canPost, setCanPost] = useState(true);
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [canRecord, setCanRecord] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const picker = useRef<HTMLInputElement>(null);
+  const [viewingId, setViewingId] = useState<number | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [deleting, setDeleting] = useState<Message | null>(null);
+  const [forwarding, setForwarding] = useState<Message | null>(null);
+  const [notice, setNotice] = useState('');
+  // Сообщение, у которого открыта панель действий (на телефоне вместо наведения).
+  const [actionsFor, setActionsFor] = useState<number | null>(null);
+  const [mentions, setMentions] = useState<{ id: number | 'all'; name: string }[]>([]);
+  const [mention, setMention] = useState<{ query: string; from: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [members, setMembers] = useState<UserHit[] | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [results, setResults] = useState<Message[] | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  // После перехода к найденному сообщению окно истории не доходит до последних.
+  const [jumped, setJumped] = useState(false);
+  const polls = useRef(0);
+  const jumpedRef = useRef(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const newestRef = useRef(0);
+  // Читатель отлистал вверх: новое сообщение не должно утаскивать его вниз.
+  const stickToBottom = useRef(true);
+  const heightBeforePrepend = useRef(0);
+
+  const dialogId = dialog.id;
+  const request = useCallback(
+    (cursor: string) =>
+      fetch(
+        `/api/messenger/messages?dialogId=${encodeURIComponent(dialogId)}&me=${me}${cursor}`,
+      ).then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              messages: Message[];
+              people: Record<string, Person>;
+              readers?: Reader[];
+              canPost?: boolean;
+            }>)
+          : Promise.reject(new Error(String(response.status))),
+      ),
+    [dialogId, me],
+  );
+
+  // Первый запрос берёт последние сообщения, дальше опрос идёт курсором
+  // afterId (FIRST_ID портала) и тянет только новое, не затирая подгруженную историю.
+  const load = useCallback(() => {
+    // Каждый шестой опрос (раз в полминуты) перечитывает последнюю страницу целиком:
+    // правки, удаления и лайки чужих сообщений курсором afterId не приходят.
+    polls.current += 1;
+    const after = polls.current % 6 === 0 && !jumpedRef.current ? 0 : newestRef.current;
+    const latest = newestRef.current;
+    void request(after ? `&afterId=${after}` : '')
+      .then((data) => {
+        setMessages((current) => mergeMessages(current || [], data.messages));
+        setPeople((known) => ({ ...known, ...data.people }));
+        if (data.readers) setReaders(data.readers);
+        if (data.canPost !== undefined) setCanPost(data.canPost);
+        if (!latest) setHasOlder(data.messages.length >= MESSAGES_PAGE);
+        // Пришло чужое сообщение в открытом диалоге: сразу прочитано.
+        if (latest && data.messages.some((m) => m.id > latest && m.authorId !== me))
+          onRead(dialogId);
+        newestRef.current = Math.max(latest, ...data.messages.map((m) => m.id));
+      })
+      .catch(() => setError('Не удалось загрузить сообщения.'));
+  }, [request, dialogId, me, onRead]);
+  usePolling(load, MESSAGES_POLL_MS);
+
+  const oldestId = messages?.[0]?.id;
+  async function loadOlder() {
+    if (!oldestId || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const data = await request(`&beforeId=${oldestId}`);
+      heightBeforePrepend.current = scroller.current?.scrollHeight || 0;
+      setMessages((current) => mergeMessages(current || [], data.messages));
+      setPeople((known) => ({ ...known, ...data.people }));
+      // Портал может вернуть больше LIMIT, но не меньше, пока история не кончилась.
+      setHasOlder(data.messages.length >= MESSAGES_PAGE);
+    } catch {
+      setError('Не удалось загрузить более ранние сообщения.');
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  // Добавленная сверху история сдвигает всё вниз: возвращаем читателя на то же сообщение.
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    if (!box || !heightBeforePrepend.current) return;
+    box.scrollTop += box.scrollHeight - heightBeforePrepend.current;
+    heightBeforePrepend.current = 0;
+  }, [oldestId]);
+
+  // Фото и видео всего диалога листаются в одном просмотрщике, по порядку сообщений.
+  const media = useMemo(
+    () =>
+      (messages || []).flatMap((message) =>
+        message.files.filter((file) => file.kind === 'image' || file.kind === 'video'),
+      ),
+    [messages],
+  );
+  const viewerIndex = media.findIndex((file) => file.id === viewingId);
+
+  const newestId = messages?.at(-1)?.id;
+  useEffect(() => {
+    if (stickToBottom.current) bottom.current?.scrollIntoView({ block: 'end' });
+  }, [newestId]);
+
+  const nameOf = (message: Message) =>
+    people[String(message.authorId)]?.name ||
+    (message.authorId === me ? 'Я' : `Пользователь ${message.authorId}`);
+
+  const json = { 'Content-Type': 'application/json' };
+
+  async function send() {
+    const raw = draft.trim();
+    if (!raw || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      if (editing) {
+        const response = await fetch('/api/messenger/message', {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ messageId: editing.id, text: raw }),
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const id = editing.id;
+        setMessages(
+          (current) =>
+            current && current.map((m) => (m.id === id ? { ...m, text: raw, edited: true } : m)),
+        );
+        setEditing(null);
+        setDraft('');
+        return;
+      }
+      const text =
+        (replyTo ? quoteBlock(nameOf(replyTo), replyTo) : '') + applyMentions(raw, mentions);
+      const response = await fetch('/api/messenger/messages', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ dialogId: dialog.id, text }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      setDraft('');
+      setReplyTo(null);
+      setMentions([]);
+      stickToBottom.current = true;
+      if (jumpedRef.current) showLatest();
+      else load();
+      onSent();
+    } catch {
+      // Черновик остаётся в поле: текст не теряется, можно отправить ещё раз.
+      setError(
+        editing
+          ? 'Не удалось изменить сообщение: править можно только свои и недолго после отправки.'
+          : 'Сообщение не отправилось. Попробуйте ещё раз.',
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Лайк виден сразу, а откатывается, если портал отказал.
+  async function toggleLike(message: Message) {
+    const liked = message.likes.includes(me);
+    const apply = (likes: number[]) =>
+      setMessages(
+        (current) => current && current.map((m) => (m.id === message.id ? { ...m, likes } : m)),
+      );
+    apply(liked ? message.likes.filter((id) => id !== me) : [...message.likes, me]);
+    const response = await fetch('/api/messenger/message', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ messageId: message.id, action: liked ? 'unlike' : 'like' }),
+    }).catch(() => null);
+    if (!response?.ok) apply(message.likes);
+  }
+
+  function startEdit(message: Message) {
+    setReplyTo(null);
+    setEditing(message);
+    setDraft(message.text);
+    inputRef.current?.focus();
+  }
+
+  function startReply(message: Message) {
+    setEditing(null);
+    setReplyTo(message);
+    inputRef.current?.focus();
+  }
+
+  async function confirmDelete() {
+    const target = deleting;
+    setDeleting(null);
+    if (!target) return;
+    const response = await fetch('/api/messenger/message', {
+      method: 'DELETE',
+      headers: json,
+      body: JSON.stringify({ messageId: target.id }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError('Не удалось удалить сообщение: удалять можно только свои и недолго после отправки.');
+      return;
+    }
+    // Как в самом Битриксе: на месте сообщения остаётся пометка об удалении.
+    setMessages(
+      (current) =>
+        current &&
+        current.map((m) =>
+          m.id === target.id
+            ? { ...m, text: 'Это сообщение было удалено.', files: [], attach: [], likes: [] }
+            : m,
+        ),
+    );
+  }
+
+  // Пересылка текстом с цитатой: REST не умеет пересылать сообщение целиком, а
+  // файлы пришлось бы заново загружать, поэтому от файлов остаются имена.
+  async function forwardTo(target: Dialog) {
+    const message = forwarding;
+    setForwarding(null);
+    if (!message) return;
+    const response = await fetch('/api/messenger/messages', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        dialogId: target.id,
+        text: quoteBlock(nameOf(message), message, 'Переслано от '),
+      }),
+    }).catch(() => null);
+    if (response?.ok) {
+      setNotice(`Переслано в «${target.title}»`);
+      onSent();
+    } else setError('Не удалось переслать сообщение.');
+  }
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  // Упоминание: после @ в чате предлагаем участников. В поле оно остаётся @Именем,
+  // а тегом Битрикса становится при отправке.
+  function onDraftChange(value: string, caret: number) {
+    setDraft(value);
+    if (dialog.kind === 'user') return;
+    const match = /(?:^|\s)@([^\s@]{0,30})$/.exec(value.slice(0, caret));
+    if (!match) {
+      setMention(null);
+      return;
+    }
+    setMention({ query: match[1], from: caret - match[1].length - 1 });
+    setMentionIndex(0);
+    if (members === null) {
+      setMembers([]);
+      void fetch(`/api/messenger/users?dialogId=${encodeURIComponent(dialog.id)}`)
+        .then((response) => (response.ok ? response.json() : { users: [] }))
+        .then((data) => setMembers(data.users))
+        .catch(() => setMembers([]));
+    }
+  }
+
+  const suggestions = useMemo(() => {
+    if (!mention) return [];
+    const needle = mention.query.toLocaleLowerCase('ru');
+    const everyone: { id: number | 'all'; name: string }[] = [{ id: 'all', name: 'Все' }];
+    return [...everyone, ...(members || []).filter((user) => user.id !== me)]
+      .filter((user) => user.name.toLocaleLowerCase('ru').includes(needle))
+      .slice(0, 6);
+  }, [mention, members, me]);
+
+  function pickMention(user: { id: number | 'all'; name: string }) {
+    if (!mention) return;
+    const caret = inputRef.current?.selectionStart ?? draft.length;
+    const insert = `@${user.name} `;
+    setDraft(draft.slice(0, mention.from) + insert + draft.slice(caret));
+    setMentions((current) =>
+      current.some((item) => item.id === user.id) ? current : [...current, user],
+    );
+    setMention(null);
+    const position = mention.from + insert.length;
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(position, position);
+    });
+  }
+
+  // Поиск по диалогу: запрос уходит после паузы в наборе.
+  useEffect(() => {
+    const needle = searchQuery.trim();
+    if (!searchOpen || needle.length < 2) {
+      setResults(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(
+        `/api/messenger/search?dialogId=${encodeURIComponent(dialog.id)}&q=${encodeURIComponent(needle)}`,
+        { signal: controller.signal },
+      )
+        .then((response) => (response.ok ? response.json() : { messages: [], people: {} }))
+        .then((data) => {
+          setResults([...data.messages].reverse());
+          setPeople((known) => ({ ...known, ...data.people }));
+        })
+        .catch(() => {});
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery, searchOpen, dialog.id]);
+
+  // Переход к найденному: берём страницу истории, оканчивающуюся этим сообщением.
+  async function jumpTo(id: number) {
+    try {
+      const data = await request(`&beforeId=${id + 1}`);
+      setMessages(data.messages);
+      setPeople((known) => ({ ...known, ...data.people }));
+      newestRef.current = Math.max(...data.messages.map((m) => m.id));
+      setHasOlder(data.messages.length >= MESSAGES_PAGE);
+      stickToBottom.current = false;
+      jumpedRef.current = true;
+      setJumped(true);
+      setHighlightId(id);
+      setSearchOpen(false);
+    } catch {
+      setError('Не удалось открыть найденное сообщение.');
+    }
+  }
+
+  function showLatest() {
+    jumpedRef.current = false;
+    setJumped(false);
+    setMessages(null);
+    newestRef.current = 0;
+    stickToBottom.current = true;
+    load();
+  }
+
+  useEffect(() => {
+    if (highlightId === null) return;
+    document.getElementById(`message-${highlightId}`)?.scrollIntoView({ block: 'center' });
+    const timer = window.setTimeout(() => setHighlightId(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [highlightId, messages]);
+
+  async function upload(file: File, caption = '') {
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`Файл «${file.name}» больше ${formatBytes(MAX_FILE_SIZE)}.`);
+      return false;
+    }
+    setSending(true);
+    setError('');
+    try {
+      const body = new FormData();
+      body.set('dialogId', dialog.id);
+      body.set('file', file);
+      if (caption) body.set('message', caption);
+      const response = await fetch('/api/messenger/files', { method: 'POST', body });
+      if (!response.ok) throw new Error(String(response.status));
+      stickToBottom.current = true;
+      load();
+      onSent();
+      return true;
+    } catch {
+      setError(`Не удалось отправить «${file.name}». Попробуйте ещё раз.`);
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Подпись из поля ввода уходит с первым файлом, как в самом Битриксе.
+  async function sendFiles(files: File[]) {
+    let caption = draft.trim();
+    for (const file of files) {
+      if (!(await upload(file, caption))) return;
+      if (caption) setDraft('');
+      caption = '';
+    }
+  }
+
+  useEffect(() => {
+    setCanRecord(typeof MediaRecorder !== 'undefined' && Boolean(navigator.mediaDevices));
+  }, []);
+
+  useEffect(() => {
+    if (!recording) return;
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [recording]);
+
+  // Диалог закрыт посреди записи: микрофон отпускаем, запись не отправляем.
+  useEffect(
+    () => () => {
+      const recorder = recorderRef.current;
+      if (!recorder) return;
+      recorder.onstop = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+      recorder.stream.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  async function startRecording() {
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Firefox пишет ogg, Safari mp4, Chrome только webm: берём лучшее из поддерживаемого.
+      const mimeType = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus'].find(
+        (type) => MediaRecorder.isTypeSupported(type),
+      );
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunks.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.current.push(event.data);
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setSeconds(0);
+      setRecording(true);
+    } catch {
+      setError('Нет доступа к микрофону. Разрешите его в настройках браузера.');
+    }
+  }
+
+  function finishRecording(send: boolean) {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    recorderRef.current = null;
+    recorder.onstop = () => {
+      recorder.stream.getTracks().forEach((track) => track.stop());
+      const type = recorder.mimeType || 'audio/webm';
+      if (send && chunks.current.length) {
+        const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm';
+        const stamp = new Date()
+          .toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          .replace(',', '')
+          .replace(':', '-');
+        void upload(new File(chunks.current, `${VOICE_NAME} ${stamp}.${ext}`, { type }));
+      }
+      chunks.current = [];
+    };
+    recorder.stop();
+    setRecording(false);
+  }
+
+  const link =
+    dialog.kind === 'task' && dialog.entityId
+      ? `/all-tasks?task=${encodeURIComponent(dialog.entityId)}`
+      : dialog.kind === 'group' && dialog.entityId
+        ? `/projects/${encodeURIComponent(dialog.entityId)}`
+        : null;
+
+  return (
+    <>
+      <div className="flex min-h-14 items-center gap-3 border-b border-line px-3">
+        <Button
+          variant="quiet"
+          size="sm"
+          className="md:hidden"
+          onClick={onBack}
+          aria-label="К списку диалогов"
+        >
+          <ArrowLeft className="size-4" strokeWidth={1.7} />
+        </Button>
+        <Avatar name={dialog.title} src={dialog.avatar} size="sm" />
+        <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{dialog.title}</h2>
+        {link && (
+          <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
+            {dialog.kind === 'task' ? 'Открыть задачу' : 'Открыть проект'}
+          </Link>
+        )}
+        <IconButton
+          label="Поиск по сообщениям"
+          variant="ghost"
+          pressed={searchOpen}
+          onClick={() => setSearchOpen((value) => !value)}
+        >
+          <Search className="size-4" strokeWidth={1.7} />
+        </IconButton>
+      </div>
+      {searchOpen && (
+        <div className="space-y-2 border-b border-line p-3">
+          <SearchField
+            label="Поиск по сообщениям"
+            placeholder="Поиск по сообщениям (от двух букв)"
+            size="sm"
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
+          {results !== null && (
+            <ul className="max-h-56 overflow-y-auto" aria-label="Найденные сообщения">
+              {results.map((message) => (
+                <li key={message.id}>
+                  <button
+                    type="button"
+                    onClick={() => void jumpTo(message.id)}
+                    className="block w-full rounded-ui px-2 py-1.5 text-left hover:bg-surface-2"
+                  >
+                    <span className="flex items-baseline justify-between gap-2 text-xs text-ink-soft">
+                      <span className="truncate">{nameOf(message)}</span>
+                      <time dateTime={message.date}>{when(message.date)}</time>
+                    </span>
+                    <span className="line-clamp-2 text-sm text-ink">
+                      {bitrixPlainText(message.text, parseMessageNodes) || 'Вложение'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {results.length === 0 && (
+                <li className="p-2 text-xs text-ink-soft">Ничего не найдено</li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+      <div
+        ref={scroller}
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4"
+        aria-live="polite"
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+        }}
+      >
+        {jumped && (
+          <div className="sticky top-0 z-10 flex justify-center">
+            <Button variant="secondary" size="sm" onClick={showLatest}>
+              К последним сообщениям
+            </Button>
+          </div>
+        )}
+        {hasOlder && (
+          <div className="flex justify-center">
+            <Button
+              variant="quiet"
+              size="sm"
+              onClick={() => void loadOlder()}
+              disabled={loadingOlder}
+            >
+              {loadingOlder ? 'Загрузка' : 'Показать более ранние'}
+            </Button>
+          </div>
+        )}
+        {messages === null ? (
+          error ? null : (
+            <LoadingState className="min-h-40 bg-transparent" />
+          )
+        ) : (
+          messages.map((message) => {
+            const mine = message.authorId === me;
+            // Служебные записи чата (автор 0) показываем тихой строкой по центру.
+            if (message.authorId === 0)
+              return (
+                <p key={message.id} className="text-center text-xs text-ink-soft">
+                  <BitrixText text={message.text} />
+                </p>
+              );
+            const liked = message.likes.includes(me);
+            const deleted = message.text === 'Это сообщение было удалено.';
+            const seen = readers ? readersOf(message, readers) : [];
+            return (
+              <div
+                key={message.id}
+                id={`message-${message.id}`}
+                className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  onClick={() =>
+                    setActionsFor((current) => (current === message.id ? null : message.id))
+                  }
+                  className={`group relative max-w-[80%] rounded-ui border px-3 py-2 ${
+                    highlightId === message.id ? 'border-ink' : 'border-line'
+                  } ${mine ? 'bg-surface-2' : 'bg-surface'}`}
+                >
+                  {!deleted && (
+                    <div
+                      className={`absolute right-2 bottom-full z-10 mb-1 gap-0.5 rounded-ui border border-line bg-canvas p-0.5 shadow-overlay group-focus-within:flex group-hover:flex ${
+                        actionsFor === message.id ? 'flex' : 'hidden'
+                      }`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <IconButton
+                        label="Ответить"
+                        variant="ghost"
+                        size="sm"
+                        className="max-sm:h-9 max-sm:w-9"
+                        onClick={() => startReply(message)}
+                      >
+                        <CornerUpLeft className="size-3.5" strokeWidth={1.7} />
+                      </IconButton>
+                      <IconButton
+                        label={liked ? 'Убрать лайк' : 'Нравится'}
+                        variant="ghost"
+                        size="sm"
+                        className="max-sm:h-9 max-sm:w-9"
+                        pressed={liked}
+                        onClick={() => void toggleLike(message)}
+                      >
+                        <Heart
+                          className={`size-3.5 ${liked ? 'fill-current text-accent-text' : ''}`}
+                          strokeWidth={1.7}
+                        />
+                      </IconButton>
+                      <IconButton
+                        label="Переслать"
+                        variant="ghost"
+                        size="sm"
+                        className="max-sm:h-9 max-sm:w-9"
+                        onClick={() => setForwarding(message)}
+                      >
+                        <Forward className="size-3.5" strokeWidth={1.7} />
+                      </IconButton>
+                      {mine && message.text && (
+                        <IconButton
+                          label="Изменить"
+                          variant="ghost"
+                          size="sm"
+                          className="max-sm:h-9 max-sm:w-9"
+                          onClick={() => startEdit(message)}
+                        >
+                          <Pencil className="size-3.5" strokeWidth={1.7} />
+                        </IconButton>
+                      )}
+                      {mine && (
+                        <IconButton
+                          label="Удалить"
+                          variant="ghost"
+                          size="sm"
+                          className="max-sm:h-9 max-sm:w-9"
+                          onClick={() => setDeleting(message)}
+                        >
+                          <Trash2 className="size-3.5" strokeWidth={1.7} />
+                        </IconButton>
+                      )}
+                    </div>
+                  )}
+                  {!mine && dialog.kind !== 'user' && (
+                    <p className="text-xs font-medium text-accent-text">
+                      {people[String(message.authorId)]?.name || `Пользователь ${message.authorId}`}
+                    </p>
+                  )}
+                  {message.text && (
+                    <div className="break-words text-sm text-ink">
+                      <BitrixText text={message.text} markdown />
+                    </div>
+                  )}
+                  {message.files.map((file) => (
+                    <FileView
+                      key={file.id}
+                      file={file}
+                      dialogId={dialog.id}
+                      onOpen={setViewingId}
+                    />
+                  ))}
+                  {message.attach.map((attach, index) => (
+                    <AttachView key={index} attach={attach} />
+                  ))}
+                  {!message.text && !message.files.length && !message.attach.length && (
+                    <p className="text-sm text-ink-soft">Сообщение без текста</p>
+                  )}
+                  <div className="mt-1 flex items-center justify-end gap-1.5 text-xs text-ink-soft">
+                    {message.likes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void toggleLike(message);
+                        }}
+                        aria-pressed={liked}
+                        aria-label={`Нравится: ${message.likes.length}`}
+                        className="mr-auto inline-flex items-center gap-1 rounded-ui border border-line px-1.5 py-0.5"
+                      >
+                        <Heart
+                          className={`size-3 ${liked ? 'fill-current text-accent-text' : ''}`}
+                          strokeWidth={1.7}
+                        />
+                        {message.likes.length}
+                      </button>
+                    )}
+                    {message.edited && <span>изменено</span>}
+                    <time dateTime={message.date}>{when(message.date)}</time>
+                    {mine && readers && dialog.kind !== 'channel' && (
+                      <ReadMark
+                        readers={seen}
+                        unread={readers.filter((reader) => reader.messageId < message.id)}
+                        group={dialog.kind !== 'user'}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottom} />
+      </div>
+      {error && (
+        <p role="alert" className="px-4 pb-1 text-sm text-danger-text">
+          {error}
+        </p>
+      )}
+      {!canPost ? (
+        <p className="border-t border-line p-3 text-center text-sm text-ink-soft">
+          В этом канале писать могут только администраторы
+        </p>
+      ) : recording ? (
+        <div className="flex items-center gap-3 border-t border-line p-3">
+          <Mic className="size-4 animate-pulse text-danger-text" strokeWidth={1.7} />
+          <span className="flex-1 text-sm text-ink" role="timer">
+            Запись {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+          </span>
+          <Button
+            variant="quiet"
+            onClick={() => finishRecording(false)}
+            aria-label="Отменить запись"
+          >
+            <X className="size-4" strokeWidth={1.7} />
+          </Button>
+          <Button onClick={() => finishRecording(true)} aria-label="Отправить голосовое">
+            <Send className="size-4" strokeWidth={1.7} />
+          </Button>
+        </div>
+      ) : (
+        <div className="relative border-t border-line">
+          {(replyTo || editing) && (
+            <div className="flex items-center gap-2 border-b border-line px-3 py-1.5 text-xs text-ink-soft">
+              <span className="min-w-0 flex-1 truncate">
+                {editing
+                  ? 'Редактирование сообщения'
+                  : `Ответ для ${nameOf(replyTo!)}: ${bitrixPlainText(replyTo!.text, parseMessageNodes) || 'вложение'}`}
+              </span>
+              <IconButton
+                label="Отменить"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setReplyTo(null);
+                  setEditing(null);
+                  if (editing) setDraft('');
+                }}
+              >
+                <X className="size-3.5" strokeWidth={1.7} />
+              </IconButton>
+            </div>
+          )}
+          {mention && suggestions.length > 0 && (
+            <ul
+              role="listbox"
+              aria-label="Упомянуть"
+              className="absolute bottom-full left-3 z-10 mb-1 w-64 rounded-ui border border-line bg-canvas p-1 shadow-overlay"
+            >
+              {suggestions.map((user, index) => (
+                <li
+                  key={user.id}
+                  role="option"
+                  aria-selected={index === mentionIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => pickMention(user)}
+                  className={`cursor-pointer rounded-ui px-2 py-1.5 text-sm text-ink ${
+                    index === mentionIndex ? 'bg-surface-2' : ''
+                  }`}
+                >
+                  {user.name}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form
+            className="flex items-end gap-2 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+          >
+            <input
+              ref={picker}
+              type="file"
+              multiple
+              hidden
+              aria-label="Файлы"
+              onChange={(event) => {
+                const files = [...(event.target.files || [])];
+                event.target.value = '';
+                if (files.length) void sendFiles(files);
+              }}
+            />
+            <Button
+              variant="quiet"
+              disabled={sending}
+              onClick={() => picker.current?.click()}
+              aria-label="Прикрепить файл"
+            >
+              <Paperclip className="size-4" strokeWidth={1.7} />
+            </Button>
+            <TextArea
+              aria-label="Сообщение"
+              placeholder="Сообщение"
+              variant="boxed"
+              rows={1}
+              // textarea по умолчанию строчный: под ним остаётся зазор в 7 px, обёртка выше
+              // поля, и поле висит над кнопками. block убирает зазор, а высота в одну строку
+              // равна кнопкам (min-h-9, на телефоне min-h-11).
+              className="flex-1 [&_textarea]:block [&_textarea]:min-h-9 [&_textarea]:py-1.5 max-sm:[&_textarea]:min-h-11"
+              ref={inputRef}
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value, event.target.selectionStart)}
+              onPaste={(event) => {
+                const files = [...event.clipboardData.files];
+                if (!files.length) return;
+                event.preventDefault();
+                void sendFiles(files);
+              }}
+              onKeyDown={(event) => {
+                if (mention && suggestions.length) {
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const step = event.key === 'ArrowDown' ? 1 : suggestions.length - 1;
+                    setMentionIndex((index) => (index + step) % suggestions.length);
+                    return;
+                  }
+                  if (event.key === 'Enter' || event.key === 'Tab') {
+                    event.preventDefault();
+                    pickMention(suggestions[mentionIndex] || suggestions[0]);
+                    return;
+                  }
+                  if (event.key === 'Escape') {
+                    setMention(null);
+                    return;
+                  }
+                }
+                if (event.key === 'Escape' && (replyTo || editing)) {
+                  setReplyTo(null);
+                  if (editing) setDraft('');
+                  setEditing(null);
+                  return;
+                }
+                // Enter отправляет, Shift+Enter переносит строку, как в самом Битриксе.
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            {!draft.trim() && canRecord ? (
+              <Button
+                disabled={sending}
+                onClick={() => void startRecording()}
+                aria-label="Записать голосовое"
+              >
+                <Mic className="size-4" strokeWidth={1.7} />
+              </Button>
+            ) : (
+              <Button type="submit" disabled={!draft.trim() || sending} aria-label="Отправить">
+                <Send className="size-4" strokeWidth={1.7} />
+              </Button>
+            )}
+          </form>
+        </div>
+      )}
+      {notice && (
+        <p role="status" className="px-4 pb-1 text-xs text-ink-soft">
+          {notice}
+        </p>
+      )}
+      <AlertDialog
+        open={deleting !== null}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void confirmDelete()}
+        title="Удалить сообщение?"
+        description="Сообщение удалится у всех участников чата."
+        confirmLabel="Удалить"
+      />
+      <ForwardModal
+        open={forwarding !== null}
+        dialogs={dialogs}
+        onPick={(target) => void forwardTo(target)}
+        onClose={() => setForwarding(null)}
+      />
+      {viewerIndex >= 0 && (
+        <FileViewer
+          items={media.map((file) => ({
+            id: file.id,
+            name: file.name,
+            kind: file.kind as 'image' | 'video',
+            src: fileUrl(dialog.id, file),
+            downloadSrc: fileUrl(dialog.id, file, true),
+          }))}
+          index={viewerIndex}
+          onIndex={(index) => setViewingId(media[index].id)}
+          onClose={() => setViewingId(null)}
+        />
+      )}
+    </>
+  );
+}

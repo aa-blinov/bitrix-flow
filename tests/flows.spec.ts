@@ -407,3 +407,155 @@ test('мессенджер: в просмотрщике упавшее фото 
   await viewer.getByRole('button', { name: 'Повторить' }).click();
   await expect(viewer.getByRole('img', { name: 'схема.png' })).toBeVisible();
 });
+
+// Панель действий над сообщением видна по наведению, поэтому открываем её явно.
+async function bubble(chat: import('@playwright/test').Locator, text: string) {
+  const message = chat
+    .getByText(text, { exact: true })
+    .locator('xpath=ancestor::div[contains(@class,"group")][1]');
+  await message.hover();
+  // На телефоне наведения нет: панель действий открывается нажатием на сообщение.
+  if (!(await message.getByRole('button', { name: 'Ответить' }).isVisible()))
+    await message.click({ position: { x: 6, y: 6 } });
+  return message;
+}
+
+test('мессенджер: ответ, лайк и пересылка чужого сообщения', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const posts: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && /\/api\/messenger\/(messages|message)$/.test(request.url()))
+      posts.push(request.postDataJSON());
+  });
+
+  const message = await bubble(chat, 'Сообщение 54');
+  await message.getByRole('button', { name: 'Нравится' }).click();
+  await expect(chat.getByRole('button', { name: 'Нравится: 1' })).toBeVisible();
+  expect(posts).toContainEqual({ messageId: 54, action: 'like' });
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ответить' }).click();
+  await expect(chat.getByText('Ответ для Дмитрий Соколов: Сообщение 54')).toBeVisible();
+  await chat.getByLabel('Сообщение', { exact: true }).fill('Согласен');
+  await chat.getByRole('button', { name: 'Отправить' }).click();
+  await expect
+    .poll(() => JSON.stringify(posts))
+    .toContain('[QUOTE]Дмитрий Соколов: Сообщение 54[/QUOTE]');
+  await expect(chat.getByText('Ответ для Дмитрий Соколов')).toHaveCount(0);
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Переслать' }).click();
+  await page
+    .getByRole('dialog', { name: 'Переслать в чат' })
+    .getByRole('button', { name: /Разработка API v2/ })
+    .click();
+  await expect(chat.getByRole('status')).toContainText('Переслано в «Разработка API v2»');
+  expect(JSON.stringify(posts)).toContain('Переслано от Дмитрий Соколов: Сообщение 54');
+});
+
+test('мессенджер: свои сообщения правятся и удаляются, чужие нет', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const calls: { method: string; body: unknown }[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/message'))
+      calls.push({ method: request.method(), body: request.postDataJSON() });
+  });
+
+  const foreign = await bubble(chat, 'Сообщение 54');
+  await expect(foreign.getByRole('button', { name: 'Изменить' })).toHaveCount(0);
+  await expect(foreign.getByRole('button', { name: 'Удалить' })).toHaveCount(0);
+
+  await (await bubble(chat, 'Сообщение 55')).getByRole('button', { name: 'Изменить' }).click();
+  const field = chat.getByLabel('Сообщение', { exact: true });
+  await expect(field).toHaveValue('Сообщение 55');
+  await field.fill('Сообщение 55, поправил');
+  await field.press('Enter');
+  await expect(chat.getByText('Сообщение 55, поправил')).toBeVisible();
+  expect(calls).toContainEqual({
+    method: 'PUT',
+    body: { messageId: 55, text: 'Сообщение 55, поправил' },
+  });
+
+  await (await bubble(chat, 'Сообщение 49')).getByRole('button', { name: 'Удалить' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect(chat.getByText('Это сообщение было удалено.')).toBeVisible();
+  expect(calls).toContainEqual({ method: 'DELETE', body: { messageId: 49 } });
+});
+
+test('мессенджер: упоминание в группе становится тегом Битрикса', async ({ page }) => {
+  await page.goto('/messenger');
+  await page
+    .getByRole('region', { name: 'Диалоги' })
+    .getByRole('button', { name: /Разработка API v2/ })
+    .click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  const field = chat.getByLabel('Сообщение', { exact: true });
+  await field.click();
+  await field.pressSequentially('Привет @Дми');
+  await expect(chat.getByRole('option', { name: 'Дмитрий Соколов' })).toBeVisible();
+  await field.press('Enter');
+  await expect(field).toHaveValue('Привет @Дмитрий Соколов ');
+  const send = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/messages'),
+  );
+  await field.press('Enter');
+  expect((await send).postDataJSON().text).toBe('Привет [USER=2]Дмитрий Соколов[/USER]');
+});
+
+test('мессенджер: поиск по сообщениям ведёт к найденному', async ({ page }) => {
+  const chat = await openDmitry(page);
+  await chat.getByRole('button', { name: 'Поиск по сообщениям' }).click();
+  await chat.getByPlaceholder('Поиск по сообщениям (от двух букв)').fill('Сообщение 30');
+  await chat
+    .getByRole('list', { name: 'Найденные сообщения' })
+    .getByRole('button', { name: /Сообщение 30/ })
+    .click();
+  await expect(chat.getByText('Сообщение 30', { exact: true })).toBeVisible();
+  await expect(chat.getByRole('button', { name: 'К последним сообщениям' })).toBeVisible();
+  await chat.getByRole('button', { name: 'К последним сообщениям' }).click();
+  await expect(chat).toContainText('Посмотришь ревью?');
+});
+
+test('мессенджер: новый личный чат и новая группа', async ({ page }) => {
+  await page.goto('/messenger');
+  await page.getByRole('button', { name: 'Новый чат' }).click();
+  const modal = page.getByRole('dialog', { name: 'Новый чат' });
+  await modal.getByLabel('Найти человека').fill('Анн');
+  await modal.getByRole('button', { name: /Анна Новикова/ }).click();
+  await expect(
+    page.getByRole('region', { name: 'Переписка' }).getByRole('heading', { name: 'Анна Новикова' }),
+  ).toBeVisible();
+
+  // На телефоне список диалогов прячется за открытым чатом.
+  const back = page.getByRole('button', { name: 'К списку диалогов' });
+  if (await back.isVisible()) await back.click();
+  await page.getByRole('button', { name: 'Новый чат' }).click();
+  await modal.getByRole('button', { name: 'Группа' }).click();
+  await modal.getByLabel('Название группы').fill('Команда');
+  await modal.getByLabel('Найти человека').fill('Анн');
+  await modal.getByRole('button', { name: /Анна Новикова/ }).click();
+  const create = page.waitForRequest((request) => request.url().endsWith('/api/messenger/chats'));
+  await modal.getByRole('button', { name: 'Создать группу' }).click();
+  expect((await create).postDataJSON()).toEqual({ title: 'Команда', userIds: [5] });
+  await expect(
+    page.getByRole('region', { name: 'Переписка' }).getByRole('heading', { name: 'Команда' }),
+  ).toBeVisible();
+});
+
+test('мессенджер: каналы Битрикса лежат на своей вкладке, писать в них нельзя без прав', async ({
+  page,
+}) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  await list.getByRole('button', { name: 'Каналы' }).click();
+  await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
+  await list.getByRole('button', { name: /Новости компании/ }).click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  await expect(chat).toContainText('писать могут только администраторы');
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveCount(0);
+});
+
+test('мессенджер: ссылка на задачу портала открывается в BitrixFlow', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const link = chat.getByRole('link', { name: 'Задача #4521' });
+  await expect(link).toHaveAttribute('href', '/all-tasks?task=4521');
+  await expect(link).not.toHaveAttribute('target', '_blank');
+});

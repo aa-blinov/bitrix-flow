@@ -31,6 +31,13 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 - Media in the messenger shows a skeleton with a spinner while it loads, and a
   "could not load" message with a retry button when the portal drops the file, both in
   the dialog and in the viewer.
+- Messenger message actions: reply (as a quote, REST does not return reply links),
+  like, forward as a quote, edit and delete your own messages, `@` mentions with a
+  participant list, search inside a dialog with a jump to the found message, and a
+  list of who read a group message and who did not.
+- New chat with any person (portal search) and group chat creation; a "Channels" tab
+  for Bitrix channels, read-only when the user may not post.
+- Links to portal tasks and projects open inside BitrixFlow and show as "Task #N".
 - Sidebar items can be reordered by dragging (touch: long press; keyboard: Space,
   arrows, Space); the order is kept in the browser.
 

@@ -106,6 +106,10 @@ docker compose --env-file .env.local up -d --build
   `im.v2.File.upload` (JSON, base64), `im.message.add` файл не несёт. Признак
   голосового сообщения REST выставить не даёт: свои записи узнаются по имени
   `VOICE_NAME`. `readed_list` из `im.dialog.get` нет в документации, но он есть в ответе.
+- **REST не отдаёт «ответ на сообщение».** `REPLY_ID` принимается в `im.message.add`, но в
+  `im.dialog.messages.get` связь не возвращается, поэтому ответ и пересылка уходят цитатой
+  `[QUOTE]` в тексте. Пустой `MESSAGE` в `im.message.update` удаляет сообщение: роут правки
+  отклоняет пустой текст сам.
 - **Микрофон открывает заголовок `Permissions-Policy`.** С `microphone=()` браузер молча
   отказывает в `getUserMedia`, и запрос разрешения не появляется. Боевой Caddy читает
   `/home/ubuntu/infra/caddy/Caddyfile`, а не копию в `caddy/`; файл примонтирован одним

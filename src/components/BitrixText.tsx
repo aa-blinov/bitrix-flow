@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
 import { parseBitrixNodes, type BitrixNode } from '@/lib/bitrix-markup';
 import { parseMessageNodes } from '@/lib/message-markdown';
+import { internalHref, internalLabel } from '@/lib/portal-links';
 import { safeHref, safeImageSrc } from '@/lib/safe-url';
 import { cn } from '@/lib/utils';
 
@@ -8,7 +10,23 @@ function render(nodes: BitrixNode[]): ReactNode[] {
   return nodes.map((node, index) => {
     const children = render('children' in node ? node.children : []);
     if (node.type === 'text') return <Fragment key={index}>{node.text}</Fragment>;
-    if (node.type === 'link')
+    if (node.type === 'link') {
+      // Задача или проект портала открываются у нас, остальное во внешней вкладке.
+      const internal = internalHref(node.href);
+      if (internal)
+        return (
+          <Link
+            key={index}
+            href={internal}
+            className="text-ink underline underline-offset-2 hover:opacity-70"
+          >
+            {node.children.length === 1 &&
+            node.children[0].type === 'text' &&
+            node.children[0].text.trim() === node.href
+              ? internalLabel(internal)
+              : children}
+          </Link>
+        );
       return (
         <a
           key={index}
@@ -22,6 +40,7 @@ function render(nodes: BitrixNode[]): ReactNode[] {
           {children}
         </a>
       );
+    }
     if (node.type === 'image')
       return (
         <img
