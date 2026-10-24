@@ -584,7 +584,31 @@ const MOCK_DIALOGS = {
         author_id: 2,
         date: '2026-03-02T10:00:00+03:00',
       },
-      user: { id: 2, name: 'Дмитрий Соколов' },
+      // Свежая активность: единственный в моке «в сети».
+      user: {
+        id: 2,
+        name: 'Дмитрий Соколов',
+        status: 'online',
+        // Getter, а не значение: сервер тестов живёт много минут, а «в сети» считается от текущего времени.
+        get last_activity_date() {
+          return new Date().toISOString();
+        },
+      },
+    },
+    {
+      id: '3',
+      type: 'user',
+      title: 'Мария Орлова',
+      counter: 0,
+      date_last_activity: '2026-02-26T10:00:00+03:00',
+      message: { id: 15, text: 'Спасибо', author_id: 3, date: '2026-02-26T10:00:00+03:00' },
+      // status online стоит у всех, но активность давняя: в сети её нет.
+      user: {
+        id: 3,
+        name: 'Мария Орлова',
+        status: 'online',
+        last_activity_date: '2026-02-26T10:00:00+03:00',
+      },
     },
     {
       id: 'chat20',
@@ -784,6 +808,16 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     // Дмитрий прочитал по 57-е сообщение: мои 1..57 прочитаны, 59-е нет.
     // В канале «Новости компании» писать могут только менеджеры.
     case 'im.dialog.get':
+      if (params.DIALOG_ID === 'chat777')
+        return {
+          id: 777,
+          name: 'Старый чат',
+          type: 'chat',
+          entity_type: '',
+          role: 'owner',
+          permissions: { canPost: 'member' },
+          readed_list: [],
+        };
       return params.DIALOG_ID === 'chat30'
         ? { id: 30, role: 'member', permissions: { canPost: 'manager' }, readed_list: [] }
         : {

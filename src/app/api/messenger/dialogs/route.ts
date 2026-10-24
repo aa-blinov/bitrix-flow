@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withMessenger } from '@/lib/messenger-api';
-import { DIALOGS_PAGE, normalizeDialogs } from '@/lib/messenger';
+import { DIALOG_ID, DIALOGS_PAGE, normalizeDialogInfo, normalizeDialogs } from '@/lib/messenger';
 
 export const dynamic = 'force-dynamic';
 
 export function GET(req: NextRequest) {
+  // Один диалог по номеру: так открывается переписка, где человек был до обновления страницы.
+  const single = req.nextUrl.searchParams.get('dialogId');
+  if (single !== null) {
+    if (!DIALOG_ID.test(single))
+      return Promise.resolve(NextResponse.json({ error: 'BAD_DIALOG_ID' }, { status: 400 }));
+    return withMessenger(req, async (call) => {
+      const info = normalizeDialogInfo(await call('im.dialog.get', { DIALOG_ID: single }), single);
+      return info
+        ? NextResponse.json({ dialog: info })
+        : NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    });
+  }
   // OFFSET портал двигает на размер страницы, а не на число вернувшихся диалогов.
   const raw = req.nextUrl.searchParams.get('offset') || '0';
   const offset = /^\d{1,6}$/.test(raw) ? Number(raw) : 0;

@@ -21,24 +21,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Extract the version
         id: version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Building $VERSION"
+          # Раздел версии из CHANGELOG становится телом релиза.
+          awk -v v="$VERSION" '$0 ~ "^## \\[?" v {found=1; next} found && /^## / {exit} found' CHANGELOG.md > RELEASE_NOTES.md
+          test -s RELEASE_NOTES.md || { echo "В CHANGELOG.md нет раздела $VERSION"; exit 1; }
 
       - name: Build
-        # Replace with the real build. The rule is that the artefact that
-        # ships is produced by the same command the README documents.
-        run: echo "Replace with the build command for this stack."
+        # Образ, который уходит в прод, собирается Dockerfile (так же, как docker compose
+        # up --build из README). Секрет Sentry не нужен: без него просто не грузятся source maps.
+        run: docker build --build-arg APP_RELEASE="${{ steps.version.outputs.version }}" -t bitrix-flow:${{ steps.version.outputs.version }} .
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          body_path: CHANGELOG.md
+          body_path: RELEASE_NOTES.md

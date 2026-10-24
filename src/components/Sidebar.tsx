@@ -392,15 +392,18 @@ export default function Sidebar() {
     <>
       {/* Mobile navigation opens separately from page headers, so it never
           competes with a close button or project actions. */}
-      <IconButton
-        label="Открыть меню"
-        variant="outline"
-        size="lg"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed right-4 bottom-4 z-menu lg:hidden"
-      >
-        <Menu size={22} strokeWidth={1.7} />
-      </IconButton>
+      {/* Обёртка fixed, а не сама кнопка: подсказка кнопки это строчный span, и в потоке
+          страницы он занимал пустую строку в 24 px над всем содержимым. */}
+      <div className="fixed right-4 bottom-4 z-menu lg:hidden">
+        <IconButton
+          label="Открыть меню"
+          variant="outline"
+          size="lg"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <Menu size={22} strokeWidth={1.7} />
+        </IconButton>
+      </div>
 
       <Drawer
         open={mobileOpen}

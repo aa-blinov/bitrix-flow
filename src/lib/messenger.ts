@@ -5,6 +5,19 @@ import { usableAvatar } from '@/lib/utils';
 // Нормализация ответов im.* в то, что рисует мессенджер. Сырой ответ портала
 // несёт десятки полей чата и пользователя, которые клиенту не нужны.
 
+// status у пользователя Битрикса это выбранный им статус, а не присутствие: «online»
+// стоит у всех, кто его не менял. Реально в сети тот, у кого свежая активность
+// (веб, телефон или приложение) и нет метки «отошёл».
+const ONLINE_WINDOW_MS = 5 * 60_000;
+
+export function isOnline(user: any, now = Date.now()): boolean {
+  if (!user || user.status !== 'online' || user.idle || user.absent) return false;
+  const seen = [user.last_activity_date, user.mobile_last_date, user.desktop_last_date]
+    .map((value) => (value ? Date.parse(String(value)) : 0))
+    .filter((time) => Number.isFinite(time));
+  return Math.max(0, ...seen) > now - ONLINE_WINDOW_MS;
+}
+
 export type DialogKind = 'user' | 'group' | 'task' | 'channel' | 'chat';
 
 export type Dialog = {
@@ -136,7 +149,7 @@ export function normalizeDialogs(result: any, me = 0): Dialog[] {
           (Array.isArray(item.chat?.mute_list)
             ? item.chat.mute_list.map(Number).includes(me)
             : Boolean(item.chat?.mute_list?.[me])),
-        online: kind === 'user' && item.user?.status === 'online' && !item.user?.idle,
+        online: kind === 'user' && isOnline(item.user),
         entityId: item.chat?.entity_id ? String(item.chat.entity_id) : undefined,
         lastMessage: message?.id
           ? {
@@ -285,7 +298,7 @@ export function normalizeUsers(result: any): UserHit[] {
       name: String(user.name || ''),
       position: user.work_position ? String(user.work_position) : undefined,
       avatar: usableAvatar(user.avatar),
-      online: user.status === 'online' && !user.idle,
+      online: isOnline(user),
     }));
 }
 
@@ -324,4 +337,32 @@ export function canPostIn(dialog: any): boolean {
   const need = POST_RANK[String(dialog?.permissions?.canPost || '')];
   const have = POST_RANK[String(dialog?.role || '')];
   return !need || !have || have >= need;
+}
+
+// Сведения об одном диалоге из im.dialog.get: нужны, когда диалог открыт по адресу
+// страницы, а в первой странице списка его нет.
+export function normalizeDialogInfo(result: any, id: string): Dialog | null {
+  if (!result?.id) return null;
+  const entity = String(result.entity_type || '');
+  const type = String(result.type || '');
+  const kind: DialogKind =
+    type === 'private'
+      ? 'user'
+      : /channel$/i.test(type)
+        ? 'channel'
+        : entity === 'SONET_GROUP'
+          ? 'group'
+          : /^TASKS/.test(entity)
+            ? 'task'
+            : 'chat';
+  return {
+    id,
+    kind,
+    title: String(result.name || 'Без названия'),
+    avatar: usableAvatar(result.avatar),
+    chatId: Number(result.id) || undefined,
+    entityId: result.entity_id ? String(result.entity_id) : undefined,
+    unread: Number(result.counter) || 0,
+    date: String(result.date_create || new Date().toISOString()),
+  };
 }

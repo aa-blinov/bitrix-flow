@@ -142,6 +142,7 @@ export function NewChatModal({
         />
         {mode === 'group' && (
           <TextField
+            id="new-chat-title"
             label="Название группы"
             variant="boxed"
             size="sm"
@@ -168,6 +169,7 @@ export function NewChatModal({
           </ul>
         )}
         <SearchField
+          id="new-chat-search"
           label="Найти человека"
           placeholder="Найти человека (от двух букв)"
           size="sm"
@@ -244,6 +246,7 @@ export function ForwardModal({
     <Modal open={open} onClose={onClose} title="Переслать в чат" size="md">
       <div className="space-y-3">
         <SearchField
+          id="forward-search"
           label="Найти чат"
           placeholder="Найти чат"
           size="sm"
