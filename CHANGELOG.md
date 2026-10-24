@@ -18,6 +18,8 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 - Messenger (`/messenger`): personal chats, project groups, task discussions and
   other Bitrix24 chats in one list with tabs, reading, sending and read marks.
   Opens with `g` then `c`.
+  Dialogs and message history page through the portal cursors ("show more",
+  "show earlier").
 
 ## 0.1.0 — 2026
 

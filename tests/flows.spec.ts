@@ -142,6 +142,10 @@ test('мессенджер: диалоги делятся по вкладкам,
   await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
 
+  await list.getByRole('button', { name: 'Показать ещё' }).click();
+  await expect(list.getByRole('button', { name: /Архивный чат/ })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Показать ещё' })).toHaveCount(0);
+
   await list.getByRole('button', { name: 'Группы' }).click();
   await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
   await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
@@ -150,6 +154,12 @@ test('мессенджер: диалоги делятся по вкладкам,
   await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
   const chat = page.getByRole('region', { name: 'Переписка' });
   await expect(chat).toContainText('Посмотришь ревью?');
+
+  // Страница истории: в мок-диалоге 60 сообщений, первая пачка берёт последние 50.
+  await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(0);
+  await chat.getByRole('button', { name: 'Показать более ранние' }).click();
+  await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(1);
+  await expect(chat.getByRole('button', { name: 'Показать более ранние' })).toHaveCount(0);
 
   const send = page.waitForRequest(
     (request) => request.method() === 'POST' && request.url().includes('/api/messenger/messages'),

@@ -570,6 +570,7 @@ const TIME_LOG: Record<string, any[]> = {
 };
 
 const MOCK_DIALOGS = {
+  hasMore: true,
   items: [
     {
       id: '2',
@@ -606,18 +607,46 @@ const MOCK_DIALOGS = {
   ],
 };
 
-const MOCK_MESSAGES: Record<string, unknown> = {
-  '2': {
-    messages: [
-      { id: 11, author_id: 1, text: 'Привет', date: '2026-03-02T09:59:00+03:00' },
-      { id: 12, author_id: 2, text: 'Посмотришь ревью?', date: '2026-03-02T10:00:00+03:00' },
-    ],
+const MOCK_DIALOGS_NEXT = {
+  hasMore: false,
+  items: [
+    {
+      id: 'chat22',
+      type: 'chat',
+      title: 'Архивный чат',
+      counter: 0,
+      date_last_activity: '2026-01-01T10:00:00+03:00',
+      message: { id: 41, text: 'Давно было', author_id: 1, date: '2026-01-01T10:00:00+03:00' },
+      chat: {},
+    },
+  ],
+};
+
+// 60 сообщений в диалоге с Дмитрием: больше одной страницы (LIMIT 50), чтобы
+// проверить подгрузку более ранних. Портал отдаёт новые первыми.
+const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
+  const id = index + 1;
+  return {
+    id,
+    author_id: id % 2 ? 1 : 2,
+    text: id === 60 ? 'Посмотришь ревью?' : `Сообщение ${id}`,
+    date: `2026-03-02T09:${String(id % 60).padStart(2, '0')}:00+03:00`,
+  };
+}).reverse();
+
+function mockMessagesPage(params: Record<string, string>) {
+  const before = Number(params.LAST_ID) || Infinity;
+  const after = Number(params.FIRST_ID) || 0;
+  const limit = Math.min(Number(params.LIMIT) || 20, 50);
+  const messages = MOCK_HISTORY.filter((m) => m.id < before && m.id > after).slice(0, limit);
+  return {
+    messages,
     users: [
       { id: 1, name: 'Анна Кузнецова' },
       { id: 2, name: 'Дмитрий Соколов' },
     ],
-  },
-};
+  };
+}
 
 export function isMockEnabled(): boolean {
   return ON;
@@ -697,7 +726,7 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     }
 
     case 'im.recent.list':
-      return MOCK_DIALOGS;
+      return Number(params.OFFSET) > 0 ? MOCK_DIALOGS_NEXT : MOCK_DIALOGS;
 
     case 'im.message.add':
       return 1000;
@@ -706,7 +735,8 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return true;
 
     case 'im.dialog.messages.get': {
-      if (params.DIALOG_ID) return MOCK_MESSAGES[params.DIALOG_ID] || { messages: [], users: [] };
+      if (params.DIALOG_ID === '2') return mockMessagesPage(params);
+      if (params.DIALOG_ID) return { messages: [], users: [] };
       const comments = COMMENTS[params.taskId] || [];
       return { messages: comments };
     }
