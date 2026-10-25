@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import type { Tone } from './Badge';
+import { t } from '@/lib/i18n';
 
 /** Небольшая метка, а не фильтр. Тон меняет только текст, форма остаётся тихой. */
 const TONES: Record<Tone, string> = {
@@ -32,7 +33,7 @@ export function Chip({
   tone = 'neutral',
   size = 'sm',
   removable = false,
-  removeLabel = 'Убрать',
+  removeLabel = t('Убрать'),
   onRemove,
   children,
   ...props

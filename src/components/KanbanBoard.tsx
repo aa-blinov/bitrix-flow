@@ -45,6 +45,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import { type KanbanSort } from '@/lib/kanban-sort';
 import { extractTaskTags } from '@/lib/task-tags';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 
 // Панель над доской: контролы набора — 44px на телефоне и 36px на мыши.
 // Ниже 36px мышь промахивается, а палец по 32px не попадает.
@@ -75,9 +76,9 @@ const PRIORITY_TONES: Record<string, { tone: Tone; className: string }> = {
 
 // Форматтеры один раз на модуль: toLocale*String строит новый на каждый
 // вызов, а formatDeadline зовётся на каждую карточку доски.
-const DAY_MONTH = new Intl.DateTimeFormat('ru-RU', { month: 'short', day: 'numeric' });
-const WEEKDAY = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' });
-const HOUR_MINUTE = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const DAY_MONTH = dateFormat({ month: 'short', day: 'numeric' });
+const WEEKDAY = dateFormat({ weekday: 'short' });
+const HOUR_MINUTE = dateFormat({ hour: '2-digit', minute: '2-digit' });
 
 function formatDeadline(dateStr: string | undefined): string {
   if (!dateStr) return '';
@@ -86,9 +87,9 @@ function formatDeadline(dateStr: string | undefined): string {
     const now = new Date();
     const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     let day = DAY_MONTH.format(date);
-    if (diff === 0) day = 'Сегодня';
-    else if (diff === 1) day = 'Завтра';
-    else if (diff === -1) day = 'Вчера';
+    if (diff === 0) day = t('Сегодня');
+    else if (diff === 1) day = t('Завтра');
+    else if (diff === -1) day = t('Вчера');
     else if (diff > 1 && diff < 7) day = WEEKDAY.format(date);
     else if (diff < 0 && diff > -7) day = WEEKDAY.format(date);
 
@@ -388,7 +389,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
     // ponytail: dev-only — silent in prod, noisy when something is misconfigured.
     console.warn(
-      `[kanban] ${orphanTasks.length} задач(а) вне известных стадий — проверь task.stages.get`,
+      t('[kanban] {0} задач(а) вне известных стадий — проверь task.stages.get', orphanTasks.length),
     );
   }
 
@@ -436,8 +437,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <div className="flex min-h-[60vh] items-center justify-center bg-canvas">
         <EmptyState
           icon={<Search size={28} strokeWidth={1.7} />}
-          title="Проект не выбран"
-          description="Выберите проект в боковой панели, чтобы увидеть задачи"
+          title={t('Проект не выбран')}
+          description={t('Выберите проект в боковой панели, чтобы увидеть задачи')}
         />
       </div>
     );
@@ -566,7 +567,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     } else if (stageName.trim()) {
       // Иначе диалог просто останется открытым, а пользователь решит, что
       // приложение зависло.
-      toast({ title: 'Не удалось создать фазу', tone: 'danger' });
+      toast({ title: t('Не удалось создать фазу'), tone: 'danger' });
     }
     setIsCreatingStage(false);
   };
@@ -578,7 +579,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       await renameStage(stageId, title);
     } catch (error) {
       toast({
-        title: 'Не удалось переименовать фазу',
+        title: t('Не удалось переименовать фазу'),
         description: error instanceof Error ? error.message : undefined,
         tone: 'danger',
       });
@@ -632,20 +633,20 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             value={kanbanSort}
             onChange={(event) => setKanbanSort(event.target.value as KanbanSort)}
             options={[
-              { value: 'urgency', label: 'По срочности' },
-              { value: 'updated', label: 'По обновлению' },
-              { value: 'deadline', label: 'По дедлайну' },
-              { value: 'title', label: 'По названию' },
+              { value: 'urgency', label: t('По срочности') },
+              { value: 'updated', label: t('По обновлению') },
+              { value: 'deadline', label: t('По дедлайну') },
+              { value: 'title', label: t('По названию') },
             ]}
             variant="boxed"
             className={`${toolbarSelect} w-40 shrink-0`}
-            aria-label="Сортировка задач"
+            aria-label={t('Сортировка задач')}
           />
           <SearchField
             value={taskSearch}
             onChange={(value) => setTaskSearch(value)}
-            placeholder="Поиск задач…"
-            label="Поиск задач на доске"
+            placeholder={t('Поиск задач…')}
+            label={t('Поиск задач на доске')}
             className="w-48 shrink-0"
           />
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
@@ -656,7 +657,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               onClick={() => setShowFilters(!showFilters)}
               icon={<Filter size={14} strokeWidth={1.7} />}
             >
-              Фильтры
+              {t('Фильтры')}
               {activeFiltersCount > 0 && <Badge tone="accent">{activeFiltersCount}</Badge>}
             </Button>
 
@@ -667,7 +668,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               onClick={() => setShowStageDialog(true)}
               icon={<Plus size={14} strokeWidth={1.7} />}
             >
-              Фаза
+              {t('Фаза')}
             </Button>
 
             <Button
@@ -676,7 +677,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               onClick={openAddDialog}
               icon={<Plus size={14} strokeWidth={1.7} />}
             >
-              Добавить задачу
+              {t('Добавить задачу')}
             </Button>
           </div>
         </div>
@@ -692,7 +693,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           open={showFilters}
           onClose={() => setShowFilters(false)}
           side="right"
-          title="Фильтры"
+          title={t('Фильтры')}
         >
           <div className="flex flex-col gap-3 [&_[data-slot=select-trigger]]:h-11 [&_button:not([role=checkbox])]:h-11">
             {filterControls}
@@ -703,19 +704,19 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <Modal
         open={showStageDialog}
         onClose={() => setShowStageDialog(false)}
-        title="Новая фаза"
+        title={t('Новая фаза')}
         size="md"
         initialFocus={stageNameRef}
         footer={
           <>
             <Button variant="quiet" onClick={() => setShowStageDialog(false)}>
-              Отмена
+              {t('Отмена')}
             </Button>
             <Button
               onClick={() => void handleCreateStage()}
               disabled={!stageName.trim() || isCreatingStage}
             >
-              {isCreatingStage ? 'Создаём…' : 'Создать'}
+              {isCreatingStage ? t('Создаём…') : t('Создать')}
             </Button>
           </>
         }
@@ -725,8 +726,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           value={stageName}
           onChange={(event) => setStageName(event.target.value)}
           onKeyDown={(event) => event.key === 'Enter' && void handleCreateStage()}
-          placeholder="Например, На согласовании"
-          aria-label="Название фазы"
+          placeholder={t('Например, На согласовании')}
+          aria-label={t('Название фазы')}
           autoFocus
         />
       </Modal>
@@ -796,7 +797,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       }}
                       size="sm"
                       className="min-w-0 flex-1"
-                      aria-label="Название фазы"
+                      aria-label={t('Название фазы')}
                     />
                   ) : (
                     <h2
@@ -814,7 +815,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
                   </span>
                   <IconButton
-                    label={`Добавить задачу в фазу ${stage.name}`}
+                    label={t('Добавить задачу в фазу {0}', stage.name)}
                     variant="ghost"
                     size="sm"
                     onClick={() => setInlineAddStage(stage.id)}
@@ -873,7 +874,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                         )
                       }
                     >
-                      {stagePages[stage.id]?.loading ? 'Загружаем…' : 'Показать ещё'}
+                      {stagePages[stage.id]?.loading ? t('Загружаем…') : t('Показать ещё')}
                     </Button>
                   )}
                 </div>
@@ -897,7 +898,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             >
               <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
                 <div className="w-2 h-2 rounded-full bg-ink-muted" />
-                <h2 className="flex-1 text-sm font-bold text-ink">Без фазы</h2>
+                <h2 className="flex-1 text-sm font-bold text-ink">{t('Без фазы')}</h2>
                 <span className="text-xs text-ink-faint">{orphanTasks.length}</span>
               </div>
               <div className="flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[200px]">
@@ -932,7 +933,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       )
                     }
                   >
-                    {stagePages[REST_STAGES_COLUMN]?.loading ? 'Загружаем…' : 'Показать ещё'}
+                    {stagePages[REST_STAGES_COLUMN]?.loading ? t('Загружаем…') : t('Показать ещё')}
                   </Button>
                 )}
               </div>
@@ -945,46 +946,46 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <Modal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Новая задача"
+        title={t('Новая задача')}
         size="lg"
         initialFocus={newTaskTitleRef}
         footer={
           <>
             <Button variant="quiet" onClick={() => setShowAddModal(false)}>
-              Отмена
+              {t('Отмена')}
             </Button>
             <Button
               onClick={handleAddTask}
               disabled={!newTask.title.trim() || !newTask.responsibleId}
             >
-              Создать задачу
+              {t('Создать задачу')}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
           <div className="rounded-ui bg-surface-2 px-3 py-2 text-sm text-ink-soft">
-            Проект: <span className="font-medium text-ink">{currentProject?.name}</span>
+            {t('Проект:')} <span className="font-medium text-ink">{currentProject?.name}</span>
           </div>
           <TextField
             ref={newTaskTitleRef}
-            label="Название задачи *"
+            label={t('Название задачи *')}
             value={newTask.title}
             onChange={(event) => setNewTask((value) => ({ ...value, title: event.target.value }))}
-            placeholder="Что нужно сделать"
+            placeholder={t('Что нужно сделать')}
             autoFocus
           />
           <TextArea
-            label="Описание"
+            label={t('Описание')}
             value={newTask.description}
             onChange={(event) =>
               setNewTask((value) => ({ ...value, description: event.target.value }))
             }
-            placeholder="Контекст и ожидаемый результат"
+            placeholder={t('Контекст и ожидаемый результат')}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <SelectField
-              label="Исполнитель"
+              label={t('Исполнитель')}
               value={newTask.responsibleId || 'unassigned'}
               onChange={(event) =>
                 setNewTask((item) => ({
@@ -993,24 +994,24 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 }))
               }
               options={[
-                { value: 'unassigned', label: 'Выберите исполнителя', disabled: true },
+                { value: 'unassigned', label: t('Выберите исполнителя'), disabled: true },
                 ...users.map((user) => ({ value: user.id, label: user.name })),
               ]}
             />
             <SelectField
-              label="Приоритет"
+              label={t('Приоритет')}
               value={newTask.priority}
               onChange={(event) =>
                 setNewTask((item) => ({ ...item, priority: event.target.value }))
               }
               options={[
-                { value: 'low', label: 'Низкий' },
-                { value: 'medium', label: 'Обычный' },
-                { value: 'high', label: 'Высокий' },
+                { value: 'low', label: t('Низкий') },
+                { value: 'medium', label: t('Обычный') },
+                { value: 'high', label: t('Высокий') },
               ]}
             />
             <TextField
-              label="Дедлайн"
+              label={t('Дедлайн')}
               type="datetime-local"
               value={newTask.deadline}
               onChange={(event) =>
@@ -1018,7 +1019,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               }
             />
             <TextField
-              label="Оценка, часы"
+              label={t('Оценка, часы')}
               type="number"
               min="0"
               step="0.5"
@@ -1026,11 +1027,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               onChange={(event) =>
                 setNewTask((item) => ({ ...item, estimate: event.target.value }))
               }
-              placeholder="Например, 2.5"
+              placeholder={t('Например, 2.5')}
             />
           </div>
           <SelectField
-            label="Фаза"
+            label={t('Фаза')}
             value={newTask.stageId || 'none'}
             onChange={(event) =>
               setNewTask((item) => ({
@@ -1039,7 +1040,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               }))
             }
             options={[
-              { value: 'none', label: 'Не выбрана' },
+              { value: 'none', label: t('Не выбрана') },
               ...allStages.map((stage) => ({ value: stage.id, label: stage.name })),
             ]}
           />
@@ -1098,8 +1099,8 @@ function InlineAddForm({
           }
           if (e.key === 'Escape') onCancel();
         }}
-        placeholder="Название задачи…"
-        aria-label="Название задачи"
+        placeholder={t('Название задачи…')}
+        aria-label={t('Название задачи')}
         disabled={submitting}
       />
       <div className="mt-2 flex items-center gap-1">
@@ -1109,33 +1110,33 @@ function InlineAddForm({
             setAssigneeId(event.target.value === 'unassigned' ? '' : event.target.value)
           }
           options={[
-            { value: 'unassigned', label: 'Без исполнителя' },
+            { value: 'unassigned', label: t('Без исполнителя') },
             ...users.map((u) => ({ value: u.id, label: u.name })),
           ]}
           size="sm"
           disabled={submitting}
           className="min-w-0 flex-1"
-          aria-label="Исполнитель"
+          aria-label={t('Исполнитель')}
         />
         <SelectField
           value={priority}
           onChange={(event) => setPriority(event.target.value)}
           options={[
-            { value: 'low', label: 'Низкий' },
-            { value: 'medium', label: 'Обычный' },
-            { value: 'high', label: 'Высокий' },
+            { value: 'low', label: t('Низкий') },
+            { value: 'medium', label: t('Обычный') },
+            { value: 'high', label: t('Высокий') },
           ]}
           size="sm"
           className="w-24"
-          aria-label="Приоритет"
+          aria-label={t('Приоритет')}
         />
       </div>
       <div className="mt-2 flex items-center justify-end gap-1">
         <Button size="md" variant="quiet" onClick={onCancel} disabled={submitting}>
-          Отмена
+          {t('Отмена')}
         </Button>
         <Button size="md" onClick={() => void submit()} disabled={!title.trim() || submitting}>
-          {submitting ? '…' : 'Создать'}
+          {submitting ? '…' : t('Создать')}
         </Button>
       </div>
     </div>
@@ -1191,7 +1192,7 @@ function TaskCard({
         onClick={(event) => event.stopPropagation()}
       >
         <Menu
-          label="Переместить в фазу"
+          label={t('Переместить в фазу')}
           align="end"
           width="auto"
           items={stages.map((stage) => ({
@@ -1202,7 +1203,7 @@ function TaskCard({
           }))}
           trigger={
             <IconButton
-              label={`Переместить задачу ${task.title}`}
+              label={t('Переместить задачу {0}', task.title)}
               variant="ghost"
               size="sm"
               onClick={(event) => event.stopPropagation()}
@@ -1228,7 +1229,7 @@ function TaskCard({
             </Chip>
           ))}
           {taskTags.length > 3 && <Chip>+{taskTags.length - 3}</Chip>}
-          {task.parentId && <Chip tone="accent">Подзадача</Chip>}
+          {task.parentId && <Chip tone="accent">{t('Подзадача')}</Chip>}
         </div>
       )}
 
@@ -1255,15 +1256,15 @@ function TaskCard({
             className={`flex min-w-0 items-center gap-1 ${isOverdue ? 'text-danger-text font-medium' : ''}`}
           >
             <Calendar size={12} strokeWidth={1.7} className="shrink-0" />
-            <span className="truncate">{dueDate || 'Без срока'}</span>
+            <span className="truncate">{dueDate || t('Без срока')}</span>
           </span>
           {(task.estimate > 0 || task.actualTime > 0) && (
             <span className="flex items-center gap-1">
               <Timer size={12} strokeWidth={1.7} className="shrink-0" />
               <span className="truncate">
-                {task.estimate > 0 && `План ${task.estimate} ч`}
+                {task.estimate > 0 && t('План {0} ч', task.estimate)}
                 {task.estimate > 0 && task.actualTime > 0 && ', '}
-                {task.actualTime > 0 && `Факт ${task.actualTime} ч`}
+                {task.actualTime > 0 && t('Факт {0} ч', task.actualTime)}
               </span>
             </span>
           )}

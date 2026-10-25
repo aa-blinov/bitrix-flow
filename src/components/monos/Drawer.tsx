@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { IconButton } from './IconButton';
+import { t } from '@/lib/i18n';
 
 export type DrawerProps = {
   open: boolean;
@@ -80,7 +81,7 @@ export function Drawer({
   side = 'right',
   title = '',
   description = '',
-  closeLabel = 'Закрыть',
+  closeLabel = t('Закрыть'),
   className,
   children,
 }: DrawerProps) {

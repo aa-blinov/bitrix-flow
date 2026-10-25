@@ -263,3 +263,8 @@ body {
     animation-iteration-count: infinite !important;
   }
 }
+
+/* До применения выбранного языка страница скрыта (см. LocaleProvider). */
+html[data-locale-pending] body {
+  visibility: hidden;
+}

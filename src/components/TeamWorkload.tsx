@@ -24,6 +24,7 @@ import { Card } from '@/components/monos/Card';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 
 type WorkloadBucket = { userId: string; count: number; hours: number };
 type WorkloadSummary = {
@@ -34,8 +35,8 @@ type WorkloadSummary = {
 
 const EMPTY_BUCKET: WorkloadBucket = { userId: '', count: 0, hours: 0 };
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const DAY_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
-const WEEK_FORMATTER = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+const DAY_FORMATTER = dateFormat({ day: 'numeric', month: 'short' });
+const WEEK_FORMATTER = dateFormat({ day: 'numeric', month: 'long' });
 
 function startOfWeek(date: Date) {
   const result = new Date(date);
@@ -55,13 +56,13 @@ function calendarDayKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-const HOURS_FORMAT = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+const HOURS_FORMAT = numberFormat({ maximumFractionDigits: 1 });
 
 function formatHours(hours: number) {
-  return hours % 1 === 0 ? `${hours} ч` : `${HOURS_FORMAT.format(hours)} ч`;
+  return hours % 1 === 0 ? t('{0} ч', hours) : t('{0} ч', HOURS_FORMAT.format(hours));
 }
 
-const taskLabel = (count: number) => pluralRu(count, ['задача', 'задачи', 'задач']);
+const taskLabel = (count: number) => pluralRu(count, [t('задача'), t('задачи'), t('задач')]);
 
 // Пустая ячейка — фон, а не карточка: десятки рамок с «—» забивали сетку, и
 // дни с задачами не выделялись.
@@ -116,11 +117,15 @@ function WorkloadValue({
           </span>
           {/* Явный цвет вместо opacity: в ячейке с просрочкой текст наследует
               сигнальный, и приглушение опускало контраст ниже 4.5:1. */}
-          <span className="text-xs text-ink-soft">План {formatHours(hours)}</span>
+          <span className="text-xs text-ink-soft">
+            {t('План')} {formatHours(hours)}
+          </span>
         </>
       )}
       {actualHours !== undefined && (
-        <span className="text-xs text-ink-soft">Факт {formatHours(actualHours)}</span>
+        <span className="text-xs text-ink-soft">
+          {t('Факт')} {formatHours(actualHours)}
+        </span>
       )}
     </span>
   );
@@ -170,7 +175,7 @@ export default function TeamWorkload() {
       setTimeError(null);
     } catch (error) {
       console.error('[workload-time] failed to load actual time', error);
-      setTimeError('Не удалось загрузить факт времени');
+      setTimeError(t('Не удалось загрузить факт времени'));
     }
   };
 
@@ -193,7 +198,7 @@ export default function TeamWorkload() {
         if (!cancelled) setSummary(payload);
       })
       .catch(() => {
-        if (!cancelled) setSummaryError('Не удалось загрузить нагрузку');
+        if (!cancelled) setSummaryError(t('Не удалось загрузить нагрузку'));
       });
     return () => {
       cancelled = true;
@@ -265,7 +270,7 @@ export default function TeamWorkload() {
       .filter((user) => ids.has(user.id))
       .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
     return ids.has('unassigned')
-      ? [...known, { id: 'unassigned', name: 'Без исполнителя' } as Bx24User]
+      ? [...known, { id: 'unassigned', name: t('Без исполнителя') } as Bx24User]
       : known;
   }, [dayBuckets, employees, noDeadlineBuckets, overdueBuckets]);
 
@@ -294,8 +299,8 @@ export default function TeamWorkload() {
 
   const projectOptions = useMemo(
     () => [
-      { value: 'all', label: 'Все проекты' },
-      { value: NO_PROJECT_ID, label: NO_PROJECT_NAME },
+      { value: 'all', label: t('Все проекты') },
+      { value: NO_PROJECT_ID, label: t(NO_PROJECT_NAME) },
       ...projects
         .filter((project) => !project.isArchived)
         .sort((left, right) => left.name.localeCompare(right.name, 'ru'))
@@ -306,7 +311,7 @@ export default function TeamWorkload() {
 
   // Длинный формат: строка на исполнителя и срок. В таком виде файл удобно сводить в Excel.
   const exportCsv = () => {
-    const rows: unknown[][] = [['Сотрудник', 'Срок', 'Задач', 'План, ч']];
+    const rows: unknown[][] = [[t('Сотрудник'), t('Срок'), t('Задач'), t('План, ч')]];
     for (const user of assignees) {
       for (const day of days) {
         const key = calendarDayKey(day);
@@ -314,9 +319,10 @@ export default function TeamWorkload() {
         if (bucket.count) rows.push([user.name, key, bucket.count, bucket.hours]);
       }
       const noDeadline = bucketFor(user.id, null);
-      if (noDeadline.count) rows.push([user.name, 'Без срока', noDeadline.count, noDeadline.hours]);
+      if (noDeadline.count)
+        rows.push([user.name, t('Без срока'), noDeadline.count, noDeadline.hours]);
       const overdue = overdueBuckets.get(user.id);
-      if (overdue?.count) rows.push([user.name, 'Просрочено', overdue.count, overdue.hours]);
+      if (overdue?.count) rows.push([user.name, t('Просрочено'), overdue.count, overdue.hours]);
     }
     downloadCsv(`workload-${calendarDayKey(days[0])}.csv`, rows);
   };
@@ -324,15 +330,15 @@ export default function TeamWorkload() {
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
-        title="Нагрузка команды"
-        description="План по срокам: количество задач и часы на каждого исполнителя"
+        title={t('Нагрузка команды')}
+        description={t('План по срокам: количество задач и часы на каждого исполнителя')}
         actions={
           <Button
             variant="secondary"
             size="sm"
             onClick={exportCsv}
             disabled={!summary || !assignees.length}
-            title="Выгрузить в CSV нагрузку на выбранной неделе"
+            title={t('Выгрузить в CSV нагрузку на выбранной неделе')}
             icon={<Download size={14} strokeWidth={1.7} />}
           >
             <span className="hidden sm:inline">CSV</span>
@@ -347,7 +353,7 @@ export default function TeamWorkload() {
             <div>
               <p className="text-2xl font-bold tabular-nums">{weekTotals.count}</p>
               <p className="text-sm text-ink-soft">
-                {taskLabel(weekTotals.count)} со сроком на этой неделе
+                {taskLabel(weekTotals.count)} {t('со сроком на этой неделе')}
               </p>
             </div>
           </Card>
@@ -355,14 +361,16 @@ export default function TeamWorkload() {
             <Clock3 className="size-5 shrink-0 text-accent" strokeWidth={1.7} />
             <div>
               <p className="text-2xl font-bold tabular-nums">{formatHours(weekTotals.hours)}</p>
-              <p className="text-sm text-ink-soft">план на этой неделе</p>
+              <p className="text-sm text-ink-soft">{t('план на этой неделе')}</p>
             </div>
           </Card>
           <Card className="flex items-center gap-3">
             <CalendarOff className="size-5 shrink-0 text-ink-faint" strokeWidth={1.7} />
             <div>
               <p className="text-2xl font-bold tabular-nums">{noDeadlineCount}</p>
-              <p className="text-sm text-ink-soft">{taskLabel(noDeadlineCount)} без срока</p>
+              <p className="text-sm text-ink-soft">
+                {taskLabel(noDeadlineCount)} {t('без срока')}
+              </p>
             </div>
           </Card>
           <Card className="flex items-center gap-3">
@@ -384,9 +392,9 @@ export default function TeamWorkload() {
               </p>
               <p className="text-sm text-ink-soft">
                 {pluralRu(overdueCount, [
-                  'просроченная задача',
-                  'просроченные задачи',
-                  'просроченных задач',
+                  t('просроченная задача'),
+                  t('просроченные задачи'),
+                  t('просроченных задач'),
                 ])}
               </p>
             </div>
@@ -396,8 +404,8 @@ export default function TeamWorkload() {
         <Card padding="none" className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <div>
-              <h2 className="font-bold">Календарь нагрузки</h2>
-              <p className="text-sm text-ink-soft">План по срокам и списания времени</p>
+              <h2 className="font-bold">{t('Календарь нагрузки')}</h2>
+              <p className="text-sm text-ink-soft">{t('План по срокам и списания времени')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <SelectField
@@ -407,7 +415,7 @@ export default function TeamWorkload() {
                 variant="boxed"
                 size="md"
                 className="w-52 shrink-0"
-                aria-label="Проект"
+                aria-label={t('Проект')}
               />
               <Button
                 variant="secondary"
@@ -421,10 +429,10 @@ export default function TeamWorkload() {
                   />
                 }
               >
-                Обновить факт
+                {t('Обновить факт')}
               </Button>
               <IconButton
-                label="Предыдущая неделя"
+                label={t('Предыдущая неделя')}
                 variant="outline"
                 size="md"
                 onClick={() => setWeekStart((current) => addDays(current, -7))}
@@ -432,10 +440,10 @@ export default function TeamWorkload() {
                 <ChevronLeft className="size-4" strokeWidth={1.7} />
               </IconButton>
               <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>
-                Сегодня
+                {t('Сегодня')}
               </Button>
               <IconButton
-                label="Следующая неделя"
+                label={t('Следующая неделя')}
                 variant="outline"
                 size="md"
                 onClick={() => setWeekStart((current) => addDays(current, 7))}
@@ -449,7 +457,8 @@ export default function TeamWorkload() {
               просто оставались без «Факт», как будто никто ничего не списывал. */}
           {timeError && (
             <p role="alert" className="border-b border-line px-4 py-2 text-sm text-danger-text">
-              {timeError}. Нажмите «Обновить факт», чтобы повторить.
+              {timeError}
+              {t('. Нажмите «Обновить факт», чтобы повторить.')}
             </p>
           )}
           {summaryError ? (
@@ -460,14 +469,14 @@ export default function TeamWorkload() {
             <div className="overflow-x-auto">
               <div className="min-w-[1090px]">
                 <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line bg-surface-2 text-sm">
-                  <div className="px-4 py-3 font-medium">Исполнитель</div>
+                  <div className="px-4 py-3 font-medium">{t('Исполнитель')}</div>
                   {days.map((day, index) => (
                     <div
                       key={calendarDayKey(day)}
                       aria-current={calendarDayKey(day) === todayKey ? 'date' : undefined}
                       className="relative border-l border-line px-2 py-3 text-center"
                     >
-                      <p className="font-medium">{DAY_NAMES[index]}</p>
+                      <p className="font-medium">{t(DAY_NAMES[index])}</p>
                       <p className="text-xs text-ink-faint">{DAY_FORMATTER.format(day)}</p>
                       {/* Сегодняшний день отмечен чертой чернил — так же, как
                           набор отмечает выбранную вкладку. */}
@@ -480,10 +489,10 @@ export default function TeamWorkload() {
                     </div>
                   ))}
                   <div className="border-l border-line px-2 py-3 text-center font-medium">
-                    Без срока
+                    {t('Без срока')}
                   </div>
                   <div className="border-l border-line px-2 py-3 text-center font-medium">
-                    Просрочено
+                    {t('Просрочено')}
                   </div>
                 </div>
                 {assignees.map((assignee) => {
@@ -511,7 +520,7 @@ export default function TeamWorkload() {
                             {assignee.name}
                           </span>
                           <span className="block text-xs whitespace-nowrap text-ink-faint tabular-nums">
-                            План {formatHours(memberPlannedHours)} · факт{' '}
+                            {t('План')} {formatHours(memberPlannedHours)} {t('· факт')}{' '}
                             {formatHours(memberActualHours)}
                           </span>
                         </div>
@@ -575,10 +584,14 @@ export default function TeamWorkload() {
       <Modal
         open={Boolean(selectedActual)}
         onClose={() => setSelectedActual(null)}
-        title="Списания времени"
+        title={t('Списания времени')}
         description={
           selectedActual
-            ? `${assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник'}, ${selectedActual.day}`
+            ? t(
+                '{0}, {1}',
+                assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник',
+                selectedActual.day,
+              )
             : ''
         }
         size="md"
@@ -596,15 +609,17 @@ export default function TeamWorkload() {
                   router.push(`/team-workload?task=${entry.taskId}`);
                 }}
               >
-                <p className="font-medium">{task?.title || `Задача #${entry.taskId}`}</p>
+                <p className="font-medium">{task?.title || t('Задача #{0}', entry.taskId)}</p>
                 <p className="mt-1 text-sm text-ink-soft">
-                  {formatHours(entry.seconds / 3600)}, задача #{entry.taskId}
+                  {formatHours(entry.seconds / 3600)}
+                  {t(', задача #')}
+                  {entry.taskId}
                 </p>
               </button>
             );
           })}
           {selectedEntries.length === 0 && (
-            <p className="text-sm text-ink-soft">Списаний за этот день нет.</p>
+            <p className="text-sm text-ink-soft">{t('Списаний за этот день нет.')}</p>
           )}
         </div>
       </Modal>

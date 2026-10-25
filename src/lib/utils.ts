@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { getLocale, t } from './i18n';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,6 +39,9 @@ const RU_PLURAL = new Intl.PluralRules('ru');
 
 // «1 задача, 3 задачи, 5 задач»: forms — [one, few, many].
 export function pluralRu(count: number, forms: readonly [string, string, string]): string {
+  // Формы передаются русскими, перевод берётся у выбранной: в английском их две
+  // (один или много), и правила русского склонения к нему не подходят.
+  if (getLocale() === 'en') return t(count === 1 ? forms[0] : forms[2]);
   const rule = RU_PLURAL.select(count);
   return rule === 'one' ? forms[0] : rule === 'few' ? forms[1] : forms[2];
 }

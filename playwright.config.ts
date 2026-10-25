@@ -59,7 +59,7 @@ export default defineConfig({
       'npm run build && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/ && node .next/standalone/server.js',
     url: `${BASE_URL}/login`,
     reuseExistingServer: !process.env.CI,
-    timeout: 240_000,
+    timeout: 600_000,
     env: {
       NODE_ENV: 'production',
       PORT: String(PORT),

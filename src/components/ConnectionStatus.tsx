@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { subscribeToConnection } from '@/hooks/useSSE';
+import { t } from '@/lib/i18n';
 
 export default function ConnectionStatus() {
   const [offline, setOffline] = useState(false);
@@ -33,8 +34,8 @@ export default function ConnectionStatus() {
     >
       <WifiOff className="size-3.5" strokeWidth={1.7} />
       {browserOffline
-        ? 'Нет сети — данные на экране могли устареть'
-        : 'Связь с сервером потеряна, обновления не приходят'}
+        ? t('Нет сети — данные на экране могли устареть')
+        : t('Связь с сервером потеряна, обновления не приходят')}
     </div>
   );
 }

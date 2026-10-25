@@ -10,6 +10,7 @@ import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { TextField } from '@/components/monos/TextField';
 import { PresenceDot } from '@/components/messenger/Presence';
 import { presenceText, type Dialog, type UserHit } from '@/lib/messenger';
+import { t } from '@/lib/i18n';
 
 // Поиск людей по порталу: портал ищет от двух букв, поэтому короче не спрашиваем.
 // Запрос уходит после паузы в наборе, чтобы не слать по запросу на каждую букву.
@@ -116,7 +117,7 @@ export function NewChatModal({
       const data = await response.json();
       onOpen({ id: data.dialogId, kind: 'chat', title: title.trim() });
     } catch {
-      setError('Не удалось создать чат. Попробуйте ещё раз.');
+      setError(t('Не удалось создать чат. Попробуйте ещё раз.'));
     } finally {
       setCreating(false);
     }
@@ -130,14 +131,14 @@ export function NewChatModal({
     );
 
   return (
-    <Modal open={open} onClose={onClose} title="Новый чат" size="md">
+    <Modal open={open} onClose={onClose} title={t('Новый чат')} size="md">
       <div className="space-y-3">
         <SegmentedControl
-          label="Тип чата"
+          label={t('Тип чата')}
           size="sm"
           options={[
-            { value: 'user', label: 'Личный' },
-            { value: 'group', label: 'Группа' },
+            { value: 'user', label: t('Личный') },
+            { value: 'group', label: t('Группа') },
           ]}
           value={mode}
           onChange={(value) => setMode(value as 'user' | 'group')}
@@ -145,7 +146,7 @@ export function NewChatModal({
         {mode === 'group' && (
           <TextField
             id="new-chat-title"
-            label="Название группы"
+            label={t('Название группы')}
             variant="boxed"
             size="sm"
             value={title}
@@ -154,13 +155,13 @@ export function NewChatModal({
           />
         )}
         {mode === 'group' && picked.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5" aria-label="Участники">
+          <ul className="flex flex-wrap gap-1.5" aria-label={t('Участники')}>
             {picked.map((user) => (
               <li key={user.id}>
                 <button
                   type="button"
                   onClick={() => toggle(user)}
-                  aria-label={`Убрать ${user.name}`}
+                  aria-label={t('Убрать {0}', user.name)}
                   className="inline-flex items-center gap-1 rounded-ui border border-line px-2 py-1 text-xs text-ink hover:bg-surface-2"
                 >
                   {user.name}
@@ -172,17 +173,19 @@ export function NewChatModal({
         )}
         <SearchField
           id="new-chat-search"
-          label="Найти человека"
-          placeholder="Найти человека (от двух букв)"
+          label={t('Найти человека')}
+          placeholder={t('Найти человека (от двух букв)')}
           size="sm"
           value={query}
           onChange={setQuery}
         />
         <div className="max-h-64 overflow-y-auto" aria-busy={searching}>
           {needle.length < 2 ? (
-            <p className="p-2 text-xs text-ink-soft">Введите имя или фамилию</p>
+            <p className="p-2 text-xs text-ink-soft">{t('Введите имя или фамилию')}</p>
           ) : hits.length === 0 ? (
-            <p className="p-2 text-xs text-ink-soft">{searching ? 'Поиск' : 'Никого не нашли'}</p>
+            <p className="p-2 text-xs text-ink-soft">
+              {searching ? t('Поиск') : t('Никого не нашли')}
+            </p>
           ) : (
             <ul>
               {hits.map((user) => (
@@ -217,7 +220,7 @@ export function NewChatModal({
               onClick={() => void createGroup()}
               disabled={!title.trim() || !picked.length || creating}
             >
-              {creating ? 'Создаём' : 'Создать группу'}
+              {creating ? t('Создаём') : t('Создать группу')}
             </Button>
           </div>
         )}
@@ -246,12 +249,12 @@ export function ForwardModal({
     (dialog) => !needle || dialog.title.toLocaleLowerCase('ru').includes(needle),
   );
   return (
-    <Modal open={open} onClose={onClose} title="Переслать в чат" size="md">
+    <Modal open={open} onClose={onClose} title={t('Переслать в чат')} size="md">
       <div className="space-y-3">
         <SearchField
           id="forward-search"
-          label="Найти чат"
-          placeholder="Найти чат"
+          label={t('Найти чат')}
+          placeholder={t('Найти чат')}
           size="sm"
           value={query}
           onChange={setQuery}
@@ -269,7 +272,9 @@ export function ForwardModal({
               </button>
             </li>
           ))}
-          {shown.length === 0 && <li className="p-2 text-xs text-ink-soft">Ничего не найдено</li>}
+          {shown.length === 0 && (
+            <li className="p-2 text-xs text-ink-soft">{t('Ничего не найдено')}</li>
+          )}
         </ul>
       </div>
     </Modal>

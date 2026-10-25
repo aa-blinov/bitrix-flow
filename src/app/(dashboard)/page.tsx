@@ -19,6 +19,7 @@ import { cn, getProjectInitials, pluralRu } from '@/lib/utils';
 import PageHeader from '@/components/PageHeader';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
+import { t } from '@/lib/i18n';
 
 export default function DashboardPage() {
   const { projects, allTasks, isLoading, selectedProjectId, setSelectedProject } = useKanbanStore(
@@ -90,7 +91,7 @@ export default function DashboardPage() {
   // групп, и без этой карточки с главной до них было не добраться.
   const noProject = {
     id: NO_PROJECT_ID,
-    name: NO_PROJECT_NAME,
+    name: t(NO_PROJECT_NAME),
     description: '',
     membersCount: 0,
     isArchived: false,
@@ -122,7 +123,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-full bg-canvas">
-      <PageHeader title="Главная" description="Обзор проектов, задач и сроков" />
+      <PageHeader title={t('Главная')} description={t('Обзор проектов, задач и сроков')} />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
         {/* Stats */}
@@ -130,26 +131,26 @@ export default function DashboardPage() {
           <StatCard
             href="/all-tasks?status=attention"
             icon={AlertTriangle}
-            label="Требуют внимания"
+            label={t('Требуют внимания')}
             value={totals?.attention}
             alarm
           />
           <StatCard
             href="/all-tasks?status=in_progress"
             icon={ListChecks}
-            label="В работе"
+            label={t('В работе')}
             value={totals?.inProgress}
           />
           <StatCard
             href="/all-tasks?status=week"
             icon={CalendarDays}
-            label="Дедлайн на неделе"
+            label={t('Дедлайн на неделе')}
             value={totals?.week}
           />
           <StatCard
             href="/all-tasks?status=no_deadline"
             icon={CalendarOff}
-            label="Без дедлайна"
+            label={t('Без дедлайна')}
             value={totals?.noDeadline}
           />
         </div>
@@ -157,13 +158,13 @@ export default function DashboardPage() {
         {/* Projects list */}
         <Card padding="none">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
-            <p className="text-sm font-bold text-ink">Проекты</p>
+            <p className="text-sm font-bold text-ink">{t('Проекты')}</p>
             <div className="flex items-center gap-2">
               <TextField
                 variant="boxed"
                 size="sm"
-                placeholder="Поиск…"
-                aria-label="Найти проект"
+                placeholder={t('Поиск…')}
+                aria-label={t('Найти проект')}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="w-40 sm:w-64"
@@ -174,11 +175,11 @@ export default function DashboardPage() {
                 value={archiveFilter}
                 onChange={(event) => setArchiveFilter(event.target.value as typeof archiveFilter)}
                 options={[
-                  { value: 'active', label: 'Активные' },
-                  { value: 'archived', label: 'Архив' },
-                  { value: 'all', label: 'Все' },
+                  { value: 'active', label: t('Активные') },
+                  { value: 'archived', label: t('Архив') },
+                  { value: 'all', label: t('Все') },
                 ]}
-                aria-label="Проекты"
+                aria-label={t('Проекты')}
                 className="w-28"
               />
             </div>
@@ -216,12 +217,16 @@ export default function DashboardPage() {
                       <div className="mt-0.5 flex items-center gap-3 text-xs text-ink-soft">
                         <span>
                           {project.taskCount > 0
-                            ? `${project.taskCount} ${pluralRu(project.taskCount, ['задача', 'задачи', 'задач'])}`
-                            : 'Нет задач'}
+                            ? t(
+                                '{0} {1}',
+                                project.taskCount,
+                                pluralRu(project.taskCount, ['задача', 'задачи', 'задач']),
+                              )
+                            : t('Нет задач')}
                         </span>
                         {project.overdue > 0 && (
                           <span className="font-medium text-danger-text">
-                            Просрочено: {project.overdue}
+                            {t('Просрочено:')} {project.overdue}
                           </span>
                         )}
                       </div>
@@ -233,7 +238,7 @@ export default function DashboardPage() {
                         <>
                           <Progress
                             value={progressPercent}
-                            label={`Готовность проекта «${project.name}»`}
+                            label={t('Готовность проекта «{0}»', project.name)}
                             tone={progressPercent === 100 ? 'success' : 'accent'}
                             className="flex-1"
                           />
@@ -254,7 +259,7 @@ export default function DashboardPage() {
 
             {filteredProjects.length === 0 && !isLoading && (
               <div className="py-12 text-center text-sm text-ink-soft">
-                {searchQuery ? 'Проекты не найдены' : 'Проектов пока нет'}
+                {searchQuery ? t('Проекты не найдены') : t('Проектов пока нет')}
               </div>
             )}
           </div>

@@ -13,6 +13,14 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
+### Added
+
+- Interface in English next to Russian. The language switch is in the sidebar, the choice lives in the
+  `bitrix-flow-locale` cookie. Texts sent to colleagues in Bitrix (quotes, forwards) stay Russian.
+  `i18n.test.ts` fails if a `t('...')` string has no English entry.
+
 ### Fixed
 
 - When the portal refuses every request because its disk quota is exhausted, the messenger now

@@ -5,6 +5,7 @@
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { SelectField } from '@/components/monos/SelectField';
 import { THEME_LABELS, THEME_NAMES, useTheme } from '@/components/monos/theme';
+import { t } from '@/lib/i18n';
 
 export default function ThemeSwitcher() {
   const { theme, mode, setTheme, setMode } = useTheme();
@@ -14,7 +15,7 @@ export default function ThemeSwitcher() {
     // в одну строку они не влезали и ломали ширину панели.
     <div className="flex flex-col gap-2">
       <SelectField
-        aria-label="Палитра оформления"
+        aria-label={t('Палитра оформления')}
         size="sm"
         variant="boxed"
         value={theme}
@@ -23,12 +24,12 @@ export default function ThemeSwitcher() {
       />
       <SegmentedControl
         size="sm"
-        label="Режим оформления"
+        label={t('Режим оформления')}
         value={mode}
         onChange={(value) => setMode(value === 'dark' ? 'dark' : 'light')}
         options={[
-          { value: 'light', label: 'Светлая' },
-          { value: 'dark', label: 'Тёмная' },
+          { value: 'light', label: t('Светлая') },
+          { value: 'dark', label: t('Тёмная') },
         ]}
         className="w-full [&>button]:flex-1"
       />

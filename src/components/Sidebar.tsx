@@ -16,11 +16,13 @@ import { Separator } from '@/components/monos/Separator';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import Notifications from '@/components/Notifications';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 import SortableNav, { useNavOrder } from '@/components/SortableNav';
 import { useChatAlerts } from '@/components/messenger/useChatAlerts';
+import { t } from '@/lib/i18n';
 
 export default function Sidebar() {
   // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
@@ -116,7 +118,7 @@ export default function Sidebar() {
   async function createNewProject() {
     if (!projectName.trim()) return;
     if (projectStartDate && projectFinishDate && projectStartDate > projectFinishDate) {
-      setCreateError('Дата окончания не может быть раньше даты начала.');
+      setCreateError(t('Дата окончания не может быть раньше даты начала.'));
       return;
     }
     setCreating(true);
@@ -144,7 +146,7 @@ export default function Sidebar() {
       setMobileOpen(false);
       router.push(`/projects/${id}`);
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Не удалось создать проект.');
+      setCreateError(error instanceof Error ? error.message : t('Не удалось создать проект.'));
     } finally {
       setCreating(false);
     }
@@ -188,10 +190,11 @@ export default function Sidebar() {
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
             <p className="text-whisper font-bold uppercase tracking-widest text-ink-faint">
-              Проекты ({(isLoading || projectsFailed) && !projects.length ? '…' : projects.length})
+              {t('Проекты (')}
+              {(isLoading || projectsFailed) && !projects.length ? '…' : projects.length})
             </p>
             <IconButton
-              label="Создать проект"
+              label={t('Создать проект')}
               variant="ghost"
               size="sm"
               tooltipText=""
@@ -205,8 +208,8 @@ export default function Sidebar() {
             size="sm"
             value={projectQuery}
             onChange={(event) => setProjectQuery(event.target.value)}
-            placeholder="Найти проект…"
-            aria-label="Поиск по проектам"
+            placeholder={t('Найти проект…')}
+            aria-label={t('Поиск по проектам')}
             className="mb-2"
           />
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
@@ -230,13 +233,13 @@ export default function Sidebar() {
                     >
                       —
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{NO_PROJECT_NAME}</span>
+                    <span className="min-w-0 flex-1 truncate">{t(NO_PROJECT_NAME)}</span>
                   </Link>
                 ) : null}
                 {recentProjects.length > 1 ? (
                   <>
                     <p className="px-2.5 pt-1 pb-0.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      Недавние
+                      {t('Недавние')}
                     </p>
                     {recentProjects.map((project) => {
                       const active = pathname === `/projects/${project.id}`;
@@ -299,7 +302,8 @@ export default function Sidebar() {
                         }`}
                         strokeWidth={1.7}
                       />
-                      Архив ({archivedProjects.length})
+                      {t('Архив (')}
+                      {archivedProjects.length})
                     </Button>
                     {archiveOpen || projectQuery
                       ? archivedProjects.map((project) => {
@@ -332,13 +336,13 @@ export default function Sidebar() {
                 role="alert"
                 className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs"
               >
-                <span className="text-danger-text">Не удалось загрузить проекты</span>
+                <span className="text-danger-text">{t('Не удалось загрузить проекты')}</span>
                 <Button variant="quiet" size="sm" onClick={() => void loadProjects()}>
-                  Повторить
+                  {t('Повторить')}
                 </Button>
               </div>
             ) : (
-              <div className="px-2.5 py-1.5 text-xs text-ink-faint">Нет проектов</div>
+              <div className="px-2.5 py-1.5 text-xs text-ink-faint">{t('Нет проектов')}</div>
             )}
           </div>
         </div>
@@ -371,7 +375,7 @@ export default function Sidebar() {
           <Notifications />
           <div className="flex items-center gap-1">
             <IconButton
-              label="Выйти"
+              label={t('Выйти')}
               variant="ghost"
               size="sm"
               tooltipText=""
@@ -381,8 +385,9 @@ export default function Sidebar() {
             </IconButton>
           </div>
         </div>
-        <div className="mt-2">
+        <div className="mt-2 flex items-center gap-2">
           <ThemeSwitcher />
+          <LanguageSwitcher />
         </div>
       </div>
     </div>
@@ -396,7 +401,7 @@ export default function Sidebar() {
           страницы он занимал пустую строку в 24 px над всем содержимым. */}
       <div className="fixed right-4 bottom-4 z-menu lg:hidden">
         <IconButton
-          label="Открыть меню"
+          label={t('Открыть меню')}
           variant="outline"
           size="lg"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -409,7 +414,7 @@ export default function Sidebar() {
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         side="left"
-        title="Меню"
+        title={t('Меню')}
         className="w-[86vw] max-w-sm p-0 lg:hidden"
       >
         <SidebarContent />
@@ -426,58 +431,58 @@ export default function Sidebar() {
         onClose={() => {
           setCreateOpen(false);
         }}
-        title="Новый проект"
+        title={t('Новый проект')}
         size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={creating}>
-              Отмена
+              {t('Отмена')}
             </Button>
             <Button
               onClick={() => void createNewProject()}
               disabled={!projectName.trim() || creating}
               loading={creating}
             >
-              Создать проект
+              {t('Создать проект')}
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-4">
           <TextField
-            label="Название проекта"
+            label={t('Название проекта')}
             variant="boxed"
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
-            placeholder="Например, Запуск нового продукта"
+            placeholder={t('Например, Запуск нового продукта')}
             autoFocus
           />
           <TextArea
-            label="Описание"
+            label={t('Описание')}
             variant="boxed"
             value={projectDescription}
             onChange={(event) => setProjectDescription(event.target.value)}
-            placeholder="Цель, контекст и ожидаемый результат"
+            placeholder={t('Цель, контекст и ожидаемый результат')}
             rows={3}
           />
           <TextField
-            label="Ключевые слова"
+            label={t('Ключевые слова')}
             variant="boxed"
             value={projectKeywords}
             onChange={(event) => setProjectKeywords(event.target.value)}
-            placeholder="Например, запуск, mobile, клиент"
-            hint="Разделяйте слова запятыми."
+            placeholder={t('Например, запуск, mobile, клиент')}
+            hint={t('Разделяйте слова запятыми.')}
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <TextField
-              label="Дата начала"
+              label={t('Дата начала')}
               variant="boxed"
               type="date"
               value={projectStartDate}
               onChange={(event) => setProjectStartDate(event.target.value)}
             />
             <TextField
-              label="Дата окончания"
+              label={t('Дата окончания')}
               variant="boxed"
               type="date"
               value={projectFinishDate}
@@ -490,23 +495,23 @@ export default function Sidebar() {
               checked={projectVisible}
               onChange={(event) => setProjectVisible(event.target.checked)}
             >
-              Показывать проект в общем списке
+              {t('Показывать проект в общем списке')}
             </Checkbox>
             <Checkbox
               checked={projectOpened}
               onChange={(event) => setProjectOpened(event.target.checked)}
             >
-              Разрешить свободное вступление
+              {t('Разрешить свободное вступление')}
             </Checkbox>
             <SelectField
-              label="Кто может приглашать участников"
+              label={t('Кто может приглашать участников')}
               variant="boxed"
               value={invitePermissions}
               onChange={(event) => setInvitePermissions(event.target.value as 'A' | 'E' | 'K')}
               options={[
-                { value: 'A', label: 'Только владелец' },
-                { value: 'E', label: 'Владелец и модераторы' },
-                { value: 'K', label: 'Все участники' },
+                { value: 'A', label: t('Только владелец') },
+                { value: 'E', label: t('Владелец и модераторы') },
+                { value: 'K', label: t('Все участники') },
               ]}
             />
           </div>
