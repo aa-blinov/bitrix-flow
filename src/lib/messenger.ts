@@ -426,3 +426,14 @@ export function normalizeChatHits(result: any): Dialog[] {
       };
     });
 }
+
+// Сбои портала, у которых есть понятная причина и понятное действие. Остальное остаётся
+// общим «не удалось загрузить»: догадка в тексте ошибки хуже честного «не знаем».
+export function portalErrorHint(message: unknown): string | null {
+  const text = String(message || '');
+  if (/дисковый ресурс|disk (space|quota)/i.test(text))
+    return 'Портал Битрикс24 отклоняет все запросы: на нём закончилось место на диске. Нужно освободить место или расширить тариф.';
+  if (/expired_token|invalid_token|NO_AUTH/i.test(text))
+    return 'Доступ приложения к порталу истёк. Откройте приложение из Битрикс24 заново.';
+  return null;
+}

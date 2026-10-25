@@ -22,7 +22,13 @@ import {
 } from '@/components/messenger/realtime';
 import { PresenceDot } from '@/components/messenger/Presence';
 import { usePolling, when } from '@/components/messenger/util';
-import { DIALOG_ID, mergeDialogs, type Dialog, type DialogKind } from '@/lib/messenger';
+import {
+  DIALOG_ID,
+  mergeDialogs,
+  portalErrorHint,
+  type Dialog,
+  type DialogKind,
+} from '@/lib/messenger';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
   { value: 'all', label: 'Все' },
@@ -39,10 +45,13 @@ const DIALOGS_POLL_MS = 15_000;
 // Пока жив SSE, список обновляют события, а опрос только подстраховывает.
 const DIALOGS_POLL_REALTIME_MS = 60_000;
 
+// Ошибка портала приходит в теле ответа: из неё берётся причина, если она понятна.
 const fetchDialogs = (offset: number, me: number) =>
-  fetch(`/api/messenger/dialogs?offset=${offset}&me=${me}`).then((response) =>
-    response.ok ? response.json() : Promise.reject(new Error(String(response.status))),
-  );
+  fetch(`/api/messenger/dialogs?offset=${offset}&me=${me}`).then(async (response) => {
+    if (response.ok) return response.json();
+    const body = await response.json().catch(() => null);
+    throw new Error(portalErrorHint(body?.message) || String(response.status));
+  });
 
 export default function Messenger() {
   const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
@@ -105,7 +114,13 @@ export default function Messenger() {
         setPaging((current) => current || { hasMore: data.hasMore, nextOffset: data.nextOffset });
         setError('');
       })
-      .catch(() => setError('Не удалось загрузить диалоги. Обновите страницу.'));
+      .catch((failure: Error) =>
+        setError(
+          /^\d+$/.test(failure.message)
+            ? 'Не удалось загрузить диалоги. Обновите страницу.'
+            : failure.message,
+        ),
+      );
   }, [me]);
   usePolling(loadDialogs, realtime ? DIALOGS_POLL_REALTIME_MS : DIALOGS_POLL_MS);
 

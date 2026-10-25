@@ -13,6 +13,13 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+### Fixed
+
+- When the portal refuses every request because its disk quota is exhausted, the messenger now
+  says so ("на портале закончилось место на диске") instead of a generic load error.
+- `health-watch.sh` marks a poller warning as sent only after the Sentry alert really went out;
+  Sentry answers 429 when its quota is spent, and the alert used to be lost for an hour.
+
 ## 0.4.0 — 2026-10-25
 
 ### Added

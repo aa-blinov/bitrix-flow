@@ -72,9 +72,12 @@ if [ $status -eq 0 ] && is_ok "$body"; then
     LAST_TEXT="$(sed -n 2p "$WARN_STAMP" 2>/dev/null)"
     LAST_AT="$(sed -n 1p "$WARN_STAMP" 2>/dev/null || echo 0)"
     if [ "$warnings" != "$LAST_TEXT" ] || [ $((NOW - ${LAST_AT:-0})) -gt 3600 ]; then
-      printf '%s\n%s\n' "$NOW" "$warnings" > "$WARN_STAMP"
       echo "[$STAMP] health WARNING: $warnings" >&2
-      send_alert "PollerStale" "$warnings" "0" || true
+      # Отметку «отправлено» ставим только после успешной отправки: Sentry отвечает 429, когда
+      # исчерпана квота, и тогда алерт должен уйти при следующей проверке, а не через час.
+      if send_alert "PollerStale" "$warnings" "0" 2>&1 | tail -1 >&2 && [ "${PIPESTATUS[0]}" -eq 0 ]; then
+        printf '%s\n%s\n' "$NOW" "$warnings" > "$WARN_STAMP"
+      fi
     fi
     exit 0
   fi
