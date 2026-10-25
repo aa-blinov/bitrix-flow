@@ -7,15 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { taskMirrorStages, timezoneOffsetString } from '@/lib/task-mirror-query';
+import { bucketize, type WorkloadTask } from '@/lib/workload';
 
 export const dynamic = 'force-dynamic';
-
-type Bucket = { userId: string; count: number; hours: number };
-type DayBucket = Bucket & { day: string };
-
-function hoursOf(seconds: unknown) {
-  return Math.round(((Number(seconds) || 0) / 3600) * 100) / 100;
-}
 
 export async function GET(req: NextRequest) {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
@@ -36,18 +30,6 @@ export async function GET(req: NextRequest) {
 
   const openTask: Record<string, unknown> = { rawStatus: { $ne: '5' } };
   if (projectId !== 'all') openTask.groupId = projectId;
-
-  const group = (id: Record<string, unknown>) => [
-    {
-      $group: {
-        _id: id,
-        count: { $sum: 1 },
-        seconds: {
-          $sum: { $convert: { input: '$estimate', to: 'double', onError: 0, onNull: 0 } },
-        },
-      },
-    },
-  ];
 
   const { db, stages } = await taskMirrorStages(memberId);
   const result = await db
@@ -76,33 +58,28 @@ export async function GET(req: NextRequest) {
         },
       },
       {
-        $facet: {
-          days: [
-            { $match: { deadlineDate: { $gte: weekStart, $lt: weekEnd } } },
-            ...group({ userId: '$assignee', day: '$day' }),
-          ],
-          noDeadline: [{ $match: { day: null } }, ...group({ userId: '$assignee' })],
-          overdue: [
-            { $match: { deadlineDate: { $ne: null, $lt: today } } },
-            ...group({ userId: '$assignee' }),
-          ],
+        $project: {
+          _id: 0,
+          id: '$taskId',
+          parent: { $convert: { input: '$parent', to: 'string', onError: '', onNull: '' } },
+          seconds: { $convert: { input: '$estimate', to: 'double', onError: 0, onNull: 0 } },
+          assignee: 1,
+          day: 1,
+          deadline: '$deadlineDate',
         },
       },
     ])
-    .next();
+    .toArray();
 
-  const toBucket = (row: any): Bucket => ({
-    userId: String(row._id.userId),
-    count: row.count,
-    hours: hoursOf(row.seconds),
-  });
-
-  return NextResponse.json({
-    days: (result?.days || []).map((row: any): DayBucket => ({
-      ...toBucket(row),
-      day: row._id.day,
-    })),
-    noDeadline: (result?.noDeadline || []).map(toBucket),
-    overdue: (result?.overdue || []).map(toBucket),
-  });
+  // Часы считаем в коде, а не в базе: оценку родителя нужно отбросить, если под ним есть
+  // оценённые подзадачи, а это обход дерева (см. src/lib/workload.ts).
+  return NextResponse.json(
+    bucketize(
+      (result as unknown as WorkloadTask[]).map((row) => ({
+        ...row,
+        deadline: row.deadline ? new Date(row.deadline) : null,
+      })),
+      { weekStart, weekEnd, today },
+    ),
+  );
 }

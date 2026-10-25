@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withMessenger } from '@/lib/messenger-api';
+import { portalDomain, withMessenger } from '@/lib/messenger-api';
 import { DIALOG_ID, DIALOGS_PAGE, normalizeDialogInfo, normalizeDialogs } from '@/lib/messenger';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export function GET(req: NextRequest) {
   // На следующих страницах me не запрашиваем, клиент присылает его сам: он нужен
   // для признака «звук отключён», который портал хранит списком пользователей.
   const knownMe = Number(req.nextUrl.searchParams.get('me')) || 0;
-  return withMessenger(req, async (call) => {
+  return withMessenger(req, async (call, memberId) => {
     // Открытые линии (чаты с клиентами из внешних каналов) в мессенджере команды не нужны.
     const [result, me] = await Promise.all([
       call('im.recent.list', {
@@ -40,6 +40,7 @@ export function GET(req: NextRequest) {
       hasMore: Boolean(result?.hasMore ?? result?.hasMorePages),
       nextOffset: offset + DIALOGS_PAGE,
       me: meId,
+      ...(offset === 0 ? { portal: await portalDomain(memberId) } : {}),
     });
   });
 }
