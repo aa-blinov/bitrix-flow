@@ -56,6 +56,7 @@ import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
 import { extractTaskTags } from '@/lib/task-tags';
 import { orderTasksAsTree } from '@/lib/task-tree';
 import { fetchProjectStages } from '@/lib/bitrix24';
+import { downloadCsv } from '@/lib/csv';
 import { cn, getBitrixTaskUrl, toLocalInputValue } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
@@ -1533,15 +1534,42 @@ export default function TaskGrid({
     );
   // Выгрузка того, что сейчас на экране: колонки берём видимые, значения —
   // человекочитаемые, чтобы файл можно было открыть и сразу отправить.
-  const exportCsv = () => {
-    const rows = selectedIds.size
+  const exportCsv = async () => {
+    const columns = orderedVisibleColumns;
+    let rows = selectedIds.size
       ? displayPageTasks.filter((task) => selectedIds.has(task.id))
       : displayPageTasks;
+    // Без выбора выгружаем всё, что подходит под фильтры, а не только открытую страницу:
+    // иначе файл из 50 строк выглядел бы полным списком. Потолок защищает портал и браузер.
+    const load = loadPageRef.current;
+    const total = effectiveTotal ?? rows.length;
+    if (!selectedIds.size && load && total > rows.length) {
+      const EXPORT_LIMIT = 2000;
+      try {
+        const collected = new Map<string, BxTask>();
+        const request = {
+          query,
+          limit: 100,
+          sorts,
+          filters: { ...filters, project: showProject ? filters.project : 'all' },
+          hierarchy: false,
+          groupBy: 'none',
+        };
+        for (let next = 1; collected.size < Math.min(total, EXPORT_LIMIT); next += 1) {
+          const result = await load({ ...request, page: next });
+          if (!result.tasks.length) break;
+          for (const task of result.tasks) collected.set(task.id, task);
+        }
+        rows = [...collected.values()];
+      } catch (error) {
+        gridToasts.failed('Не удалось выгрузить все задачи', error);
+        return;
+      }
+    }
     if (!rows.length) {
       gridToasts.failed('Нечего выгружать', new Error('В списке нет задач'));
       return;
     }
-    const columns = orderedVisibleColumns;
     const value = (task: BxTask, column: ColumnKey) => {
       if (column === 'title') return task.title;
       if (column === 'project') return projectById[task.projectId]?.name || '';
@@ -1559,20 +1587,10 @@ export default function TaskGrid({
       if (column === 'tags') return (task.tags || []).join(' ');
       return '';
     };
-    const escape = (text: string) => `"${text.replaceAll('"', '""').replaceAll('\n', ' ')}"`;
-    const csv = [
-      ['ID', ...columns.map((column) => COLUMN_LABELS[column])].map(escape).join(';'),
-      ...rows.map((task) =>
-        [task.id, ...columns.map((column) => value(task, column))].map(escape).join(';'),
-      ),
-    ].join('\r\n');
-    // BOM: иначе Excel открывает кириллицу кракозябрами.
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `tasks-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadCsv(`tasks-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['ID', ...columns.map((column) => COLUMN_LABELS[column])],
+      ...rows.map((task) => [task.id, ...columns.map((column) => value(task, column))]),
+    ]);
     gridToasts.saved(`Выгружено задач: ${rows.length}`);
   };
 
@@ -1791,8 +1809,8 @@ export default function TaskGrid({
               variant="secondary"
               size="sm"
               className={toolbarControl}
-              onClick={exportCsv}
-              title="Выгрузить в CSV то, что сейчас в списке"
+              onClick={() => void exportCsv()}
+              title="Выгрузить в CSV все задачи по текущим фильтрам"
               icon={<Download size={14} strokeWidth={1.7} />}
             >
               <span className="hidden sm:inline">CSV</span>
@@ -1909,7 +1927,7 @@ export default function TaskGrid({
                 variant="secondary"
                 size="sm"
                 className={toolbarControl}
-                onClick={exportCsv}
+                onClick={() => void exportCsv()}
                 icon={<Download size={14} strokeWidth={1.7} />}
               >
                 Выгрузить CSV

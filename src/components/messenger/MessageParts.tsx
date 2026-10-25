@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
-import { Check, CheckCheck, Download, FileText, Paperclip, PlayCircle } from 'lucide-react';
+import {
+  Check,
+  CheckCheck,
+  Download,
+  ExternalLink,
+  FileText,
+  Paperclip,
+  PlayCircle,
+} from 'lucide-react';
 import { Button } from '@/components/monos/Button';
 import { Popover } from '@/components/monos/Popover';
 import { Skeleton } from '@/components/monos/Skeleton';
@@ -203,17 +211,32 @@ export function FileView({
       </div>
     );
   }
+  // Что браузер показывает сам (pdf, текст), можно открыть в новой вкладке, а не только скачать.
+  const viewable = /\.(pdf|txt)$/i.test(file.name);
   return (
-    <a
-      href={fileUrl(dialogId, file, true)}
-      download={file.name}
-      className="mt-1 flex items-center gap-2 rounded-ui border border-line px-2 py-1.5 text-sm text-ink hover:bg-surface-2"
-    >
-      <FileText className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
-      <span className="min-w-0 flex-1 truncate">{file.name}</span>
-      <span className="shrink-0 text-xs text-ink-soft">{formatBytes(file.size)}</span>
-      <Download className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
-    </a>
+    <div className="mt-1 flex items-center gap-1">
+      <a
+        href={fileUrl(dialogId, file, true)}
+        download={file.name}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-ui border border-line px-2 py-1.5 text-sm text-ink hover:bg-surface-2"
+      >
+        <FileText className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
+        <span className="min-w-0 flex-1 truncate">{file.name}</span>
+        <span className="shrink-0 text-xs text-ink-soft">{formatBytes(file.size)}</span>
+        <Download className="size-4 shrink-0 text-ink-soft" strokeWidth={1.7} />
+      </a>
+      {viewable && (
+        <a
+          href={fileUrl(dialogId, file)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Открыть ${file.name} в новой вкладке`}
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-ui text-ink-soft hover:bg-surface-2 hover:text-ink max-sm:size-11"
+        >
+          <ExternalLink className="size-4" strokeWidth={1.7} />
+        </a>
+      )}
+    </div>
   );
 }
 

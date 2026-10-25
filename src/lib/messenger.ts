@@ -398,3 +398,31 @@ export function normalizeDialogInfo(result: any, id: string): Dialog | null {
     date: String(result.date_create || new Date().toISOString()),
   };
 }
+
+// Результат im.search.chat.list: чаты по названию, в том числе давно не писавшие.
+export function normalizeChatHits(result: any): Dialog[] {
+  const list: any[] = Array.isArray(result) ? result : [];
+  return list
+    .filter((chat) => chat?.id)
+    .map((chat): Dialog => {
+      const type = String(chat.type || '');
+      const entity = String(chat.entity_type || '');
+      const kind: DialogKind = /channel$/i.test(type)
+        ? 'channel'
+        : type === 'sonetGroup' || entity === 'SONET_GROUP'
+          ? 'group'
+          : /^TASKS/.test(entity)
+            ? 'task'
+            : 'chat';
+      return {
+        id: `chat${Number(chat.id)}`,
+        kind,
+        title: String(chat.name || 'Без названия'),
+        avatar: usableAvatar(chat.avatar),
+        chatId: Number(chat.id),
+        entityId: chat.entity_id ? String(chat.entity_id) : undefined,
+        unread: 0,
+        date: String(chat.date_create || '1970-01-01T00:00:00Z'),
+      };
+    });
+}
