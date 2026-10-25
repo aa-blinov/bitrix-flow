@@ -13,6 +13,14 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+### Added
+
+- Presence in the messenger shows the real state: online (green), do not disturb (red),
+  away or on a break (yellow), and for everyone else when they were last seen ("Был в
+  сети 12 минут назад", "вчера в 18:20"). The dot is on avatars in the dialog list and the
+  header, next to message authors in groups, in the mention list and when searching for
+  people for a new chat.
+
 ## 0.2.0 — 2026-10-24
 
 ### Added

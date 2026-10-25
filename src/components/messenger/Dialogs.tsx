@@ -8,7 +8,8 @@ import { Modal } from '@/components/monos/Modal';
 import { SearchField } from '@/components/monos/SearchField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { TextField } from '@/components/monos/TextField';
-import type { Dialog, UserHit } from '@/lib/messenger';
+import { PresenceDot } from '@/components/messenger/Presence';
+import { presenceText, type Dialog, type UserHit } from '@/lib/messenger';
 
 // Поиск людей по порталу: портал ищет от двух букв, поэтому короче не спрашиваем.
 // Запрос уходит после паузы в наборе, чтобы не слать по запросу на каждую букву.
@@ -65,13 +66,14 @@ function UserRow({
             <span className="block truncate text-xs text-ink-soft">{user.position}</span>
           )}
         </span>
-        {user.online && <span className="text-xs text-success-text">в сети</span>}
+        <PresenceDot presence={user.presence} />
+        <span className="shrink-0 text-xs text-ink-soft">{presenceText(user.presence)}</span>
       </button>
     </li>
   );
 }
 
-type Opened = Pick<Dialog, 'id' | 'kind' | 'title' | 'avatar'>;
+type Opened = Pick<Dialog, 'id' | 'kind' | 'title' | 'avatar' | 'presence'>;
 
 export function NewChatModal({
   open,
@@ -195,6 +197,7 @@ export function NewChatModal({
                           kind: 'user',
                           title: user.name,
                           avatar: user.avatar,
+                          presence: user.presence,
                         })
                       : toggle(user)
                   }

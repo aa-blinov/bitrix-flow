@@ -3,7 +3,8 @@ import {
   DIALOG_ID,
   mergeDialogs,
   mergeMessages,
-  isOnline,
+  presenceOf,
+  presenceText,
   normalizeDialogs,
   normalizeMessages,
   normalizeReaders,
@@ -180,26 +181,40 @@ describe('messenger', () => {
     expect(dialog.lastMessage?.text).toBe('Релиз завтра Дима');
   });
 
-  it('counts a person as online only with fresh activity, not by the chosen status alone', () => {
+  it('derives presence from fresh activity, status and away marks, not from status alone', () => {
     const now = Date.parse('2026-10-24T12:00:00Z');
     const base = { status: 'online', idle: false, absent: false };
-    expect(isOnline({ ...base, last_activity_date: '2026-10-24T11:58:00Z' }, now)).toBe(true);
-    expect(isOnline({ ...base, last_activity_date: '2026-10-24T07:00:00Z' }, now)).toBe(false);
+    const fresh = '2026-10-24T11:58:00Z';
+    expect(presenceOf({ ...base, last_activity_date: fresh }, now).state).toBe('online');
+    expect(presenceOf({ ...base, last_activity_date: '2026-10-24T07:00:00Z' }, now).state).toBe(
+      'offline',
+    );
     expect(
-      isOnline(
+      presenceOf(
         {
           ...base,
           last_activity_date: '2026-10-23T00:00:00Z',
           mobile_last_date: '2026-10-24T11:59:00Z',
         },
         now,
-      ),
-    ).toBe(true);
-    expect(isOnline({ ...base, idle: true, last_activity_date: '2026-10-24T11:59:00Z' }, now)).toBe(
-      false,
-    );
-    expect(isOnline({ status: 'dnd', last_activity_date: '2026-10-24T11:59:00Z' }, now)).toBe(
-      false,
-    );
+      ).state,
+    ).toBe('online');
+    expect(presenceOf({ ...base, idle: true, last_activity_date: fresh }, now).state).toBe('away');
+    expect(presenceOf({ status: 'break', last_activity_date: fresh }, now).state).toBe('away');
+    expect(presenceOf({ status: 'dnd', last_activity_date: fresh }, now).state).toBe('busy');
+    expect(presenceOf(null, now).state).toBe('offline');
+  });
+
+  it('says when a person was last seen, with the right gender', () => {
+    const now = Date.parse('2026-10-24T12:00:00Z');
+    const seen = (iso: string, gender = 'M') =>
+      presenceText(presenceOf({ status: 'online', gender, last_activity_date: iso }, now), now);
+    expect(seen('2026-10-24T11:58:00Z')).toBe('в сети');
+    expect(seen('2026-10-24T11:48:00Z')).toBe('Был в сети 12 минут назад');
+    expect(seen('2026-10-24T09:00:00Z', 'F')).toBe('Была в сети 3 часа назад');
+    expect(seen('2026-10-23T08:00:00Z')).toMatch(/^Был в сети вчера в /);
+    expect(seen('2026-10-10T08:00:00Z')).toMatch(/^Был в сети 10 окт/);
+    expect(presenceText({ state: 'busy' })).toBe('не беспокоить');
+    expect(presenceText({ state: 'away', female: true })).toBe('отошла');
   });
 });

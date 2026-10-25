@@ -606,8 +606,42 @@ const MOCK_DIALOGS = {
       user: {
         id: 3,
         name: 'Мария Орлова',
+        gender: 'F',
         status: 'online',
         last_activity_date: '2026-02-26T10:00:00+03:00',
+      },
+    },
+    {
+      id: '4',
+      type: 'user',
+      title: 'Иван Петров',
+      counter: 0,
+      date_last_activity: '2026-02-25T10:00:00+03:00',
+      message: { id: 16, text: 'Созвон?', author_id: 4, date: '2026-02-25T10:00:00+03:00' },
+      user: {
+        id: 4,
+        name: 'Иван Петров',
+        status: 'dnd',
+        get last_activity_date() {
+          return new Date().toISOString();
+        },
+      },
+    },
+    {
+      id: '6',
+      type: 'user',
+      title: 'Ольга Лис',
+      counter: 0,
+      date_last_activity: '2026-02-24T10:00:00+03:00',
+      message: { id: 17, text: 'Я на обеде', author_id: 6, date: '2026-02-24T10:00:00+03:00' },
+      user: {
+        id: 6,
+        name: 'Ольга Лис',
+        gender: 'F',
+        status: 'break',
+        get last_activity_date() {
+          return new Date().toISOString();
+        },
       },
     },
     {
@@ -846,13 +880,24 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
           work_position: 'Дизайнер',
           status: 'online',
           idle: false,
+          get last_activity_date() {
+            return new Date().toISOString();
+          },
         },
       };
 
     case 'im.dialog.users.list':
       return [
         { id: 1, name: 'Анна Кузнецова', active: true },
-        { id: 2, name: 'Дмитрий Соколов', active: true },
+        {
+          id: 2,
+          name: 'Дмитрий Соколов',
+          active: true,
+          status: 'online',
+          get last_activity_date() {
+            return new Date().toISOString();
+          },
+        },
       ];
 
     case 'im.dialog.messages.search':
@@ -875,6 +920,30 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'im.dialog.messages.get': {
       if (params.DIALOG_ID === '2') return mockMessagesPage(params);
+      // Группа: автор сообщения в сети, чтобы рядом с именем стояла точка присутствия.
+      if (params.DIALOG_ID === 'chat20')
+        return {
+          messages: [
+            {
+              id: 101,
+              author_id: 2,
+              text: 'Привет, команда',
+              date: '2026-03-01T09:00:00+03:00',
+              params: [],
+            },
+          ],
+          users: [
+            {
+              id: 2,
+              name: 'Дмитрий Соколов',
+              status: 'online',
+              get last_activity_date() {
+                return new Date().toISOString();
+              },
+            },
+          ],
+          files: [],
+        };
       if (params.DIALOG_ID) return { messages: [], users: [] };
       const comments = COMMENTS[params.taskId] || [];
       return { messages: comments };

@@ -20,6 +20,7 @@ import {
   useMessengerEvents,
   useRealtime,
 } from '@/components/messenger/realtime';
+import { PresenceDot } from '@/components/messenger/Presence';
 import { usePolling, when } from '@/components/messenger/util';
 import { DIALOG_ID, mergeDialogs, type Dialog, type DialogKind } from '@/lib/messenger';
 
@@ -197,15 +198,18 @@ export default function Messenger() {
 
   // Новый диалог с человеком или созданная группа появятся в списке портала
   // только после первого сообщения, поэтому до тех пор держим их заготовкой.
-  const openDialog = useCallback((dialog: Pick<Dialog, 'id' | 'kind' | 'title' | 'avatar'>) => {
-    setDialogs((current) =>
-      current?.some((item) => item.id === dialog.id)
-        ? current
-        : mergeDialogs(current || [], [{ ...dialog, unread: 0, date: new Date().toISOString() }]),
-    );
-    setActiveId(dialog.id);
-    setNewChatOpen(false);
-  }, []);
+  const openDialog = useCallback(
+    (dialog: Pick<Dialog, 'id' | 'kind' | 'title' | 'avatar' | 'presence'>) => {
+      setDialogs((current) =>
+        current?.some((item) => item.id === dialog.id)
+          ? current
+          : mergeDialogs(current || [], [{ ...dialog, unread: 0, date: new Date().toISOString() }]),
+      );
+      setActiveId(dialog.id);
+      setNewChatOpen(false);
+    },
+    [],
+  );
 
   return (
     // На телефоне внизу страницы 5rem под плавающую кнопку меню (pb-20 у main): отнимаем их,
@@ -291,13 +295,10 @@ export default function Messenger() {
                     >
                       <span className="relative shrink-0">
                         <Avatar name={dialog.title} src={dialog.avatar} size="md" />
-                        {dialog.online && (
-                          <span
-                            role="img"
-                            aria-label="В сети"
-                            className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-canvas bg-success"
-                          />
-                        )}
+                        <PresenceDot
+                          presence={dialog.presence}
+                          className="absolute -right-0.5 -bottom-0.5 border-2 border-canvas"
+                        />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline justify-between gap-2">
