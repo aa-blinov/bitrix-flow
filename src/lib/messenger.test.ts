@@ -3,6 +3,7 @@ import {
   DIALOG_ID,
   mergeDialogs,
   mergeMessages,
+  portalErrorHint,
   presenceOf,
   presenceText,
   normalizeDialogs,
@@ -216,5 +217,12 @@ describe('messenger', () => {
     expect(seen('2026-10-10T08:00:00Z')).toMatch(/^Был в сети 10 окт/);
     expect(presenceText({ state: 'busy' })).toBe('не беспокоить');
     expect(presenceText({ state: 'away', female: true })).toBe('отошла');
+  });
+
+  it('names portal failures that have a clear cause and leaves the rest generic', () => {
+    expect(portalErrorHint('Исчерпан выделенный дисковый ресурс.<br>')).toMatch(/место на диске/);
+    expect(portalErrorHint('expired_token')).toMatch(/истёк/);
+    expect(portalErrorHint('что-то непонятное')).toBeNull();
+    expect(portalErrorHint(undefined)).toBeNull();
   });
 });
