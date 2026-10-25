@@ -10,6 +10,8 @@ async function settle(page: Page) {
 }
 
 test('карточка задачи открывается по названию', async ({ page }) => {
+  // Селект фазы рисуется, только когда у клиента есть стадии проекта; здесь их нет ни из
+  // кэша (см. auth.setup.ts), ни от портала, поэтому снимок один и тот же.
   await page.route('**/api/bitrix/task.stages.get**', (route) =>
     route.fulfill({ json: { result: [] } }),
   );
@@ -19,14 +21,7 @@ test('карточка задачи открывается по названию
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('Перевести справочники на GraphQL');
-  // Селект фазы рисуется, когда подгрузились стадии проекта: в одних прогонах они успевают
-  // (на мобильном CI дважды успели), в других нет, и макет шапки чуть меняется. Причину
-  // гонки найти не удалось, поэтому допуск шире общего: оба вида проходят, а пропавшая или
-  // сломанная карточка (десятки процентов пикселей) нет.
-  await expect(page).toHaveScreenshot('task-modal.png', {
-    mask: [page.locator('time')],
-    maxDiffPixelRatio: 0.05,
-  });
+  await expect(page).toHaveScreenshot('task-modal.png', { mask: [page.locator('time')] });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
