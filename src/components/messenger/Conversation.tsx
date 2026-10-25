@@ -28,6 +28,7 @@ import FileViewer from '@/components/FileViewer';
 import LoadingState from '@/components/LoadingState';
 import { ForwardModal } from '@/components/messenger/Dialogs';
 import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
+import { PresenceDot } from '@/components/messenger/Presence';
 import { useMessengerEvents, useRealtime } from '@/components/messenger/realtime';
 import { usePolling, when } from '@/components/messenger/util';
 import {
@@ -38,11 +39,13 @@ import {
   fileUrl,
   formatBytes,
   mergeMessages,
+  presenceText,
   quoteBlock,
   readersOf,
   type Dialog,
   type Message,
   type Person,
+  type Presence,
   type Reader,
   type UserHit,
 } from '@/lib/messenger';
@@ -385,7 +388,9 @@ export default function Conversation({
   const suggestions = useMemo(() => {
     if (!mention) return [];
     const needle = mention.query.toLocaleLowerCase('ru');
-    const everyone: { id: number | 'all'; name: string }[] = [{ id: 'all', name: 'Все' }];
+    const everyone: { id: number | 'all'; name: string; presence?: Presence }[] = [
+      { id: 'all', name: 'Все' },
+    ];
     return [...everyone, ...(members || []).filter((user) => user.id !== me)]
       .filter((user) => user.name.toLocaleLowerCase('ru').includes(needle))
       .slice(0, 6);
@@ -640,10 +645,24 @@ export default function Conversation({
         >
           <ArrowLeft className="size-4" strokeWidth={1.7} />
         </Button>
-        <Avatar name={dialog.title} src={dialog.avatar} size="sm" />
+        <span className="relative shrink-0">
+          <Avatar name={dialog.title} src={dialog.avatar} size="sm" />
+          <PresenceDot
+            presence={dialog.presence}
+            className="absolute -right-0.5 -bottom-0.5 border-2 border-canvas"
+          />
+        </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-bold text-ink">{dialog.title}</h2>
-          {dialog.online && <p className="text-xs text-success-text">в сети</p>}
+          {presenceText(dialog.presence) && (
+            <p
+              className={`truncate text-xs ${
+                dialog.presence?.state === 'online' ? 'text-success-text' : 'text-ink-soft'
+              }`}
+            >
+              {presenceText(dialog.presence)}
+            </p>
+          )}
         </div>
         {link && (
           <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
@@ -825,7 +844,11 @@ export default function Conversation({
                     </div>
                   )}
                   {!mine && dialog.kind !== 'user' && (
-                    <p className="text-xs font-medium text-accent-text">
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-accent-text">
+                      <PresenceDot
+                        presence={people[String(message.authorId)]?.presence}
+                        className="size-2"
+                      />
                       {people[String(message.authorId)]?.name || `Пользователь ${message.authorId}`}
                     </p>
                   )}
@@ -977,7 +1000,12 @@ export default function Conversation({
                     index === mentionIndex ? 'bg-surface-2' : ''
                   }`}
                 >
-                  {user.name}
+                  <span className="flex items-center gap-2">
+                    {user.presence ? (
+                      <PresenceDot presence={user.presence} className="size-2" />
+                    ) : null}
+                    {user.name}
+                  </span>
                 </li>
               ))}
             </ul>

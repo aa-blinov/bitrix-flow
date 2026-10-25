@@ -749,23 +749,62 @@ test('мессенджер: после обновления страницы о�
   await expect(chat.getByRole('heading', { name: 'Старый чат' })).toBeVisible();
 });
 
-test('мессенджер: «в сети» только у тех, у кого свежая активность', async ({ page }) => {
+test('мессенджер: присутствие по свежей активности и статусу, а не по одному статусу', async ({
+  page,
+}) => {
   await page.goto('/messenger');
   const list = page.getByRole('region', { name: 'Диалоги' });
+  const row = (name: string) => list.getByRole('listitem').filter({ hasText: name });
+  await expect(row('Дмитрий Соколов').getByRole('img', { name: 'В сети' })).toBeVisible();
+  await expect(row('Иван Петров').getByRole('img', { name: 'Не беспокоить' })).toBeVisible();
+  await expect(row('Ольга Лис').getByRole('img', { name: 'Отошёл' })).toBeVisible();
+  // У Марии статус «online», как у всех в Битриксе, но активность давняя: точки нет.
+  await expect(row('Мария Орлова')).toBeVisible();
   await expect(
-    list
-      .getByRole('listitem')
-      .filter({ hasText: 'Дмитрий Соколов' })
-      .getByRole('img', { name: 'В сети' }),
-  ).toBeVisible();
-  // У Марии статус «online», как у всех в Битриксе, но активность давняя.
-  await expect(list.getByRole('listitem').filter({ hasText: 'Мария Орлова' })).toBeVisible();
-  await expect(
-    list
-      .getByRole('listitem')
-      .filter({ hasText: 'Мария Орлова' })
-      .getByRole('img', { name: 'В сети' }),
+    row('Мария Орлова').getByRole('img', { name: /В сети|Не беспокоить|Отошёл/ }),
   ).toHaveCount(0);
+});
+
+test('мессенджер: в шапке видно, где человек, или когда он был в сети', async ({ page }) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  const open = async (name: string) => {
+    const back = page.getByRole('button', { name: 'К списку диалогов' });
+    if (await back.isVisible()) await back.click();
+    await list
+      .getByRole('button', { name: new RegExp(name) })
+      .first()
+      .click();
+  };
+  await open('Дмитрий Соколов');
+  await expect(chat.getByText('в сети', { exact: true })).toBeVisible();
+  await open('Иван Петров');
+  await expect(chat.getByText('не беспокоить', { exact: true })).toBeVisible();
+  await open('Ольга Лис');
+  await expect(chat.getByText('отошла', { exact: true })).toBeVisible();
+  await open('Мария Орлова');
+  await expect(chat.getByText(/^Была в сети 26 февр/)).toBeVisible();
+});
+
+test('мессенджер: в группе рядом с автором и в списке упоминаний стоит точка присутствия', async ({
+  page,
+}) => {
+  await page.goto('/messenger');
+  await page
+    .getByRole('region', { name: 'Диалоги' })
+    .getByRole('button', { name: /Разработка API v2/ })
+    .click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  await expect(chat.getByText('Привет, команда')).toBeVisible();
+  await expect(chat.getByRole('img', { name: 'В сети' })).toBeVisible();
+
+  const field = chat.getByLabel('Сообщение', { exact: true });
+  await field.click();
+  await field.pressSequentially('@Дми');
+  await expect(
+    chat.getByRole('option', { name: /Дмитрий Соколов/ }).getByRole('img', { name: 'В сети' }),
+  ).toBeVisible();
 });
 
 test('мессенджер: диалог закрепляется кнопкой в шапке', async ({ page }) => {

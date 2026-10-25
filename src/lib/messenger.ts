@@ -5,17 +5,48 @@ import { usableAvatar } from '@/lib/utils';
 // Нормализация ответов im.* в то, что рисует мессенджер. Сырой ответ портала
 // несёт десятки полей чата и пользователя, которые клиенту не нужны.
 
-// status у пользователя Битрикса это выбранный им статус, а не присутствие: «online»
-// стоит у всех, кто его не менял. Реально в сети тот, у кого свежая активность
-// (веб, телефон или приложение) и нет метки «отошёл».
+// status у пользователя Битрикса это выбранный им статус (online, dnd, away, break), а не
+// присутствие: «online» стоит у всех, кто его не менял. Реально в сети тот, у кого свежая
+// активность (веб, телефон или приложение); статус и метки «отошёл» уточняют, чем он занят.
 const ONLINE_WINDOW_MS = 5 * 60_000;
 
-export function isOnline(user: any, now = Date.now()): boolean {
-  if (!user || user.status !== 'online' || user.idle || user.absent) return false;
-  const seen = [user.last_activity_date, user.mobile_last_date, user.desktop_last_date]
+export type PresenceState = 'online' | 'busy' | 'away' | 'offline';
+export type Presence = { state: PresenceState; lastSeen?: number; female?: boolean };
+
+export function presenceOf(user: any, now = Date.now()): Presence {
+  const seen = [user?.last_activity_date, user?.mobile_last_date, user?.desktop_last_date]
     .map((value) => (value ? Date.parse(String(value)) : 0))
-    .filter((time) => Number.isFinite(time));
-  return Math.max(0, ...seen) > now - ONLINE_WINDOW_MS;
+    .filter((time) => Number.isFinite(time) && time > 0);
+  const lastSeen = seen.length ? Math.max(...seen) : undefined;
+  const female = user?.gender === 'F';
+  if (!user || !lastSeen || lastSeen <= now - ONLINE_WINDOW_MS)
+    return { state: 'offline', lastSeen, female };
+  if (user.status === 'dnd') return { state: 'busy', lastSeen, female };
+  if (user.idle || user.absent || user.status !== 'online')
+    return { state: 'away', lastSeen, female };
+  return { state: 'online', lastSeen, female };
+}
+
+const AGO = new Intl.RelativeTimeFormat('ru-RU', { numeric: 'always' });
+const SEEN_DAY = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+const SEEN_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+/** Подпись под именем: «в сети», «не беспокоить», «отошёл» или когда был в последний раз. */
+export function presenceText(presence: Presence | undefined, now = Date.now()): string {
+  if (!presence) return '';
+  if (presence.state === 'online') return 'в сети';
+  if (presence.state === 'busy') return 'не беспокоить';
+  if (presence.state === 'away') return presence.female ? 'отошла' : 'отошёл';
+  if (!presence.lastSeen) return '';
+  const verb = presence.female ? 'Была' : 'Был';
+  const minutes = Math.max(1, Math.round((now - presence.lastSeen) / 60_000));
+  if (minutes < 60) return `${verb} в сети ${AGO.format(-minutes, 'minute')}`;
+  if (minutes < 24 * 60) return `${verb} в сети ${AGO.format(-Math.round(minutes / 60), 'hour')}`;
+  const seen = new Date(presence.lastSeen);
+  const yesterday = new Date(now - 24 * 3_600_000);
+  return seen.toDateString() === yesterday.toDateString()
+    ? `${verb} в сети вчера в ${SEEN_TIME.format(seen)}`
+    : `${verb} в сети ${SEEN_DAY.format(seen)}`;
 }
 
 export type DialogKind = 'user' | 'group' | 'task' | 'channel' | 'chat';
@@ -32,8 +63,8 @@ export type Dialog = {
   pinned?: boolean;
   /** Звук отключён: уведомления о сообщениях не показываем. */
   muted?: boolean;
-  /** Собеседник в сети (только личные диалоги). */
-  online?: boolean;
+  /** Присутствие собеседника (только личные диалоги). */
+  presence?: Presence;
   /** Задача или проект, к которым привязан чат, для ссылки из шапки. */
   entityId?: string;
   lastMessage?: { id: number; text: string; date: string; authorId: number };
@@ -73,7 +104,7 @@ export type Message = {
 /** Кто из участников прочитал диалог и до какого сообщения. */
 export type Reader = { id: number; name: string; messageId: number };
 
-export type Person = { id: number; name: string; avatar?: string };
+export type Person = { id: number; name: string; avatar?: string; presence?: Presence };
 
 // Допустимый DIALOG_ID: человек это голое число, чат это chat<число>. Всё
 // остальное (user12, sg5, произвольная строка) в портал не отправляем.
@@ -149,7 +180,7 @@ export function normalizeDialogs(result: any, me = 0): Dialog[] {
           (Array.isArray(item.chat?.mute_list)
             ? item.chat.mute_list.map(Number).includes(me)
             : Boolean(item.chat?.mute_list?.[me])),
-        online: kind === 'user' && isOnline(item.user),
+        presence: kind === 'user' ? presenceOf(item.user) : undefined,
         entityId: item.chat?.entity_id ? String(item.chat.entity_id) : undefined,
         lastMessage: message?.id
           ? {
@@ -218,6 +249,7 @@ export function normalizeMessages(result: any): {
       id: Number(user.id),
       name: String(user.name || ''),
       avatar: usableAvatar(user.avatar),
+      presence: presenceOf(user),
     };
   }
   const files = new Map<number, MessageFile>();
@@ -284,7 +316,7 @@ export type UserHit = {
   name: string;
   position?: string;
   avatar?: string;
-  online: boolean;
+  presence: Presence;
 };
 
 // im.search.user.list отдаёт объект по id, im.dialog.users.list массив: оба вида
@@ -298,7 +330,7 @@ export function normalizeUsers(result: any): UserHit[] {
       name: String(user.name || ''),
       position: user.work_position ? String(user.work_position) : undefined,
       avatar: usableAvatar(user.avatar),
-      online: isOnline(user),
+      presence: presenceOf(user),
     }));
 }
 
