@@ -71,6 +71,8 @@ type State = {
   subscribed: boolean;
   offset: number;
   lastActive: number;
+  lastOkAt: number;
+  lastError: string;
   me: number;
   mutedChats: Set<number>;
   mutedAt: number;
@@ -91,6 +93,8 @@ function getState(): State {
     subscribed: false,
     offset: 0,
     lastActive: 0,
+    lastOkAt: 0,
+    lastError: '',
     me: 0,
     mutedChats: new Set(),
     mutedAt: 0,
@@ -179,11 +183,24 @@ async function tick() {
       if (docs.length) await db.collection('events_stream').insertMany(docs);
       if (!result?.hasMore) break;
     }
+    state.lastOkAt = Date.now();
+    state.lastError = '';
   } catch (error) {
-    console.warn('[messenger-events]', error instanceof Error ? error.message : error);
+    state.lastError = error instanceof Error ? error.message : String(error);
+    console.warn('[messenger-events]', state.lastError);
   } finally {
     state.inFlight = false;
   }
+}
+
+// Для /api/health: опрос живой, если есть открытые вкладки и последний проход был недавно.
+export function getMessengerEventsHealth() {
+  const { lastOkAt, lastError, subscribed } = getState();
+  return {
+    active: subscribed && (globalThis.__sseSubscribers?.size ?? 0) > 0,
+    lastOkAt,
+    lastError,
+  };
 }
 
 export function startMessengerEvents() {

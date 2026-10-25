@@ -53,7 +53,10 @@ export default function Messenger() {
   const [activeId, setActiveId] = useState('');
   const [newChatOpen, setNewChatOpen] = useState(false);
   const lastActive = useRef('');
+  const moreRef = useRef<HTMLDivElement>(null);
   const [notifyOn, setNotifyOn] = useState(false);
+  // Чаты с портала по тому же запросу: список диалогов знает только последние.
+  const [found, setFound] = useState<Dialog[]>([]);
   const realtime = useRealtime();
 
   useEffect(() => {
@@ -120,6 +123,40 @@ export default function Messenger() {
       setLoadingMore(false);
     }
   }
+
+  // Подгрузка по прокрутке вместо кнопки «Показать ещё». Пока метка видна, страницы идут
+  // одна за другой; с поиском и вкладками она тоже работает: отфильтрованный список мог
+  // оказаться короче окна, и без этого пользователь не дотянулся бы до остального.
+  useEffect(() => {
+    const target = moreRef.current;
+    if (!target || !paging?.hasMore || loadingMore || typeof IntersectionObserver === 'undefined')
+      return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMoreDialogs();
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paging, loadingMore, dialogs]);
+
+  useEffect(() => {
+    const needle = query.trim();
+    if (needle.length < 2) {
+      setFound([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/messenger/find?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
+        .then((response) => (response.ok ? response.json() : { dialogs: [] }))
+        .then((data) => setFound(data.dialogs))
+        .catch(() => {});
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ru');
@@ -380,17 +417,36 @@ export default function Messenger() {
                 ))}
               </ul>
             )}
+            {found.filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id)).length >
+              0 && (
+              <div className="border-t border-line">
+                <p className="px-3 pt-3 pb-1 text-xs uppercase tracking-widest text-ink-soft">
+                  Найдено на портале
+                </p>
+                <ul aria-label="Найдено на портале">
+                  {found
+                    .filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id))
+                    .map((chat) => (
+                      <li key={chat.id}>
+                        <button
+                          type="button"
+                          onClick={() => openDialog(chat)}
+                          className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                        >
+                          <Avatar name={chat.title} src={chat.avatar} size="md" />
+                          <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                            {chat.title}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
             {paging?.hasMore && (
-              <div className="p-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => void loadMoreDialogs()}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? 'Загрузка' : 'Показать ещё'}
-                </Button>
+              // Метка конца списка: когда она попадает в окно, подгружается следующая страница.
+              <div ref={moreRef} className="p-3 text-center text-xs text-ink-soft" role="status">
+                {loadingMore ? 'Загрузка' : ''}
               </div>
             )}
           </div>
@@ -409,6 +465,19 @@ export default function Messenger() {
               onRead={markRead}
               onSent={loadDialogs}
               onPin={() => void dialogAction(active, active.pinned ? 'unpin' : 'pin')}
+              onRenamed={(title) =>
+                setDialogs((current) =>
+                  current
+                    ? current.map((d) => (d.id === active.id ? { ...d, title } : d))
+                    : current,
+                )
+              }
+              onLeft={() => {
+                setDialogs((current) =>
+                  current ? current.filter((d) => d.id !== active.id) : current,
+                );
+                setActiveId('');
+              }}
             />
           ) : (
             <p className="m-auto p-6 text-sm text-ink-soft">Выберите диалог слева</p>

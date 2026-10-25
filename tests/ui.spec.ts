@@ -11,6 +11,7 @@ const SCREENS = [
   { path: '/my-tasks', name: 'my-tasks', heading: 'Мои задачи' },
   { path: '/team-workload', name: 'workload', heading: 'Нагрузка команды' },
   { path: '/notifications', name: 'notifications', heading: 'Уведомления' },
+  { path: '/messenger', name: 'messenger', heading: 'Сообщения' },
   { path: '/search', name: 'search', heading: 'Поиск' },
   { path: '/projects/10', name: 'project-board', heading: 'Разработка API v2' },
   { path: '/projects/10?view=grid', name: 'project-grid', heading: 'Разработка API v2' },
@@ -124,4 +125,42 @@ for (const palette of PALETTES) {
       ).toHaveLength(0);
     });
   }
+}
+
+// Мессенджер богаче остальных экранов: панель действий, просмотрщик, окна. Доступность
+// проверяем и на открытом диалоге, и на каждом окне, в обеих темах.
+for (const mode of MODES) {
+  test(`gruvbox/${mode}: диалог, просмотрщик и настройки чата доступны`, async ({ page }) => {
+    await page.addInitScript((value) => {
+      localStorage.setItem('bitrix-flow-theme', `gruvbox:${value}`);
+    }, mode);
+    await page.goto('/messenger');
+    await settle(page);
+    const list = page.getByRole('region', { name: 'Диалоги' });
+    const chat = page.getByRole('region', { name: 'Переписка' });
+    const found: unknown[] = [];
+    const check = async (name: string) => {
+      const violations = await audit(page);
+      found.push(...violations.map((violation) => ({ screen: name, ...violation })));
+    };
+
+    await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+    await expect(chat).toContainText('Посмотришь ревью?');
+    await settle(page);
+    await check('диалог');
+
+    await chat.getByRole('img', { name: 'фото.jpg' }).click();
+    await expect(page.getByRole('dialog', { name: 'Просмотр: фото.jpg' })).toBeVisible();
+    await check('просмотрщик');
+    await page.keyboard.press('Escape');
+
+    const back = page.getByRole('button', { name: 'К списку диалогов' });
+    if (await back.isVisible()) await back.click();
+    await list.getByRole('button', { name: /Архивный чат/ }).click();
+    await chat.getByRole('button', { name: 'Настройки чата' }).click();
+    await expect(page.getByRole('dialog', { name: 'Настройки чата' })).toBeVisible();
+    await check('настройки чата');
+
+    expect(found, JSON.stringify(found, null, 2)).toHaveLength(0);
+  });
 }

@@ -15,6 +15,18 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ### Added
 
+- Messenger: the dialog list loads the next page by itself on scroll instead of a button;
+  chats are also searched across the whole portal; forwarding keeps files (the server
+  re-uploads them, up to 20 MB each, five at most); group owners and managers can delete
+  other people's messages; pdf and text files open in a new tab; plain group chats can be
+  renamed, get new members, remove members and be left from a settings window.
+- CSV: the task list exports every task matching the filters (up to 2000), not only the
+  open page; the project summary and the team workload export too. Cells that start with
+  `=`, `+`, `-` or `@` are escaped so a task title cannot run as a spreadsheet formula.
+- Operations: `/api/health` reports stale pollers in `warnings` and `health-watch.sh` raises
+  a Sentry alert for them; `scripts/deploy.sh` deploys with a health wait and rolls back to the
+  previous image if the new one does not come up; accessibility checks (axe) cover the
+  messenger dialog, the viewer and the chat settings in both themes.
 - Presence in the messenger shows the real state: online (green), do not disturb (red),
   away or on a break (yellow), and for everyone else when they were last seen ("Был в
   сети 12 минут назад", "вчера в 18:20"). The dot is on avatars in the dialog list and the

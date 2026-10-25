@@ -9,9 +9,11 @@ import {
   CalendarOff,
   ClipboardList,
   Clock3,
+  Download,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
+import { downloadCsv } from '@/lib/csv';
 import { cn, pluralRu } from '@/lib/utils';
 import { Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
@@ -305,11 +307,40 @@ export default function TeamWorkload() {
     [projects],
   );
 
+  // Длинный формат: строка на исполнителя и срок. В таком виде файл удобно сводить в Excel.
+  const exportCsv = () => {
+    const rows: unknown[][] = [['Сотрудник', 'Срок', 'Задач', 'План, ч']];
+    for (const user of assignees) {
+      for (const day of days) {
+        const key = calendarDayKey(day);
+        const bucket = bucketFor(user.id, key);
+        if (bucket.count) rows.push([user.name, key, bucket.count, bucket.hours]);
+      }
+      const noDeadline = bucketFor(user.id, null);
+      if (noDeadline.count) rows.push([user.name, 'Без срока', noDeadline.count, noDeadline.hours]);
+      const overdue = overdueBuckets.get(user.id);
+      if (overdue?.count) rows.push([user.name, 'Просрочено', overdue.count, overdue.hours]);
+    }
+    downloadCsv(`workload-${calendarDayKey(days[0])}.csv`, rows);
+  };
+
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title="Нагрузка команды"
         description="План по срокам: количество задач и часы на каждого исполнителя"
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={exportCsv}
+            disabled={!summary || !assignees.length}
+            title="Выгрузить в CSV нагрузку на выбранной неделе"
+            icon={<Download size={14} strokeWidth={1.7} />}
+          >
+            <span className="hidden sm:inline">CSV</span>
+          </Button>
+        }
       />
 
       <div className="space-y-4 p-4 lg:p-6">

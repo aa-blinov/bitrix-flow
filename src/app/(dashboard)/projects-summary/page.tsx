@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useKanbanStore } from '@/store/kanban';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Users } from 'lucide-react';
+import { Download, RefreshCw, Users } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
@@ -15,6 +15,7 @@ import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
 import { useSSE } from '@/hooks/useSSE';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
+import { downloadCsv } from '@/lib/csv';
 import { pluralRu } from '@/lib/utils';
 
 type ProjectSummary = {
@@ -238,21 +239,66 @@ export default function ProjectsSummaryPage() {
     },
   ];
 
+  // Выгружаем то, что видно в таблице: фильтр по названию и дате уже применён.
+  const exportCsv = () =>
+    downloadCsv(`projects-summary-${new Date().toISOString().slice(0, 10)}.csv`, [
+      [
+        'Проект',
+        'Участников',
+        'Задач',
+        'Выполнено',
+        'В работе',
+        'Просрочено',
+        'Без срока',
+        'Комментариев',
+        'План, ч',
+        'Факт, ч',
+        'Прогресс, %',
+        'Последнее изменение',
+      ],
+      ...shown.map((project) => [
+        project.name,
+        project.membersCount,
+        project.taskCount,
+        project.completed,
+        project.inProgress,
+        project.overdue,
+        project.noDeadline,
+        project.comments,
+        project.plannedHours,
+        project.actualHours,
+        project.progress,
+        project.changedAt || '',
+      ]),
+    ]);
+
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title="Сводка по проектам"
         description="План, факт и операционный статус по задачам проектов"
         actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void load(true)}
-            disabled={isLoading}
-          >
-            <RefreshCw className={isLoading ? 'animate-spin' : ''} size={14} strokeWidth={1.7} />{' '}
-            Обновить
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={exportCsv}
+              disabled={!shown.length}
+              title="Выгрузить в CSV проекты, которые сейчас в таблице"
+              icon={<Download size={14} strokeWidth={1.7} />}
+            >
+              <span className="hidden sm:inline">CSV</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void load(true)}
+              disabled={isLoading}
+            >
+              <RefreshCw className={isLoading ? 'animate-spin' : ''} size={14} strokeWidth={1.7} />{' '}
+              Обновить
+            </Button>
+          </div>
         }
       />
       <div className="space-y-3 px-4 py-4 lg:px-6">

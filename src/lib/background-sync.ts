@@ -23,6 +23,9 @@ interface SyncState {
   intervalId: NodeJS.Timeout | null;
   lastSyncAt: Date;
   lastReconcileAt: number;
+  /** Последний проход, в котором все участники синхронизировались без ошибок. */
+  lastOkAt: number;
+  lastError: string;
   inFlight: boolean;
   subscribers: Set<(event: SyncEvent) => void>;
 }
@@ -43,6 +46,8 @@ function getState(): SyncState {
       intervalId: null,
       lastSyncAt: new Date(Date.now() - LOOKBACK_MS),
       lastReconcileAt: 0,
+      lastOkAt: 0,
+      lastError: '',
       inFlight: false,
       subscribers: new Set(),
     };
@@ -70,6 +75,11 @@ export function startBackgroundSync(): void {
     void syncOnce().catch((e) => console.error('[task-sync] iteration failed', e));
   }, POLL_INTERVAL_MS);
   console.log(`[task-sync] поллер запущен, интервал ${POLL_INTERVAL_MS / 1000}с`);
+}
+
+export function getSyncHealth() {
+  const { lastOkAt, lastError } = getState();
+  return { lastOkAt, lastError };
 }
 
 export function getLastSyncAt(): Date {
@@ -111,15 +121,17 @@ async function syncOnce(): Promise<void> {
       .find({ access_token: { $exists: true } })
       .toArray();
 
+    let failure = '';
     for (const token of tokens) {
       try {
-        await syncMember(token.member_id as string, since);
+        if (!(await syncMember(token.member_id as string, since))) failure = 'fetch failed';
         if (Date.now() - state.lastReconcileAt > RECONCILE_EVERY_MS) {
           await reconcileDeleted(token.member_id as string);
           state.lastReconcileAt = Date.now();
         }
       } catch (e) {
         console.error('[task-sync] member failed', token.member_id, e);
+        failure = String(e);
         notify({
           type: 'sync-error',
           memberId: String(token.member_id),
@@ -128,12 +140,19 @@ async function syncOnce(): Promise<void> {
       }
     }
     state.lastSyncAt = startedAt;
+    // Проход, где участник не отдал изменения, успешным не считается: иначе молчащий
+    // портал выглядел бы здоровым, пока зеркало тихо стареет.
+    if (failure) state.lastError = failure;
+    else {
+      state.lastOkAt = Date.now();
+      state.lastError = '';
+    }
   } finally {
     state.inFlight = false;
   }
 }
 
-async function syncMember(memberId: string, since: Date): Promise<void> {
+async function syncMember(memberId: string, since: Date): Promise<boolean> {
   const db = await getDb();
   // Раньше проход шёл по списку проектов из локальной БД: 51 запрос за круг,
   // любая сетевая ошибка на первом же проекте обрывала весь круг (а этот
@@ -146,9 +165,9 @@ async function syncMember(memberId: string, since: Date): Promise<void> {
   } catch (e) {
     console.error('[task-sync] fetch failed', memberId, e);
     notify({ type: 'sync-error', memberId, error: String(e) });
-    return;
+    return false;
   }
-  if (updated.length === 0) return;
+  if (updated.length === 0) return true;
 
   await upsertTasks(memberId, updated);
   // Серверный кэш ответов Bitrix сбрасывается на мутациях через прокси, а
@@ -181,6 +200,7 @@ async function syncMember(memberId: string, since: Date): Promise<void> {
   }
 
   notify({ type: 'sync-complete', memberId, updatedTotal: updated.length });
+  return true;
 }
 
 // Фильтр CHANGED_DATE на портале работает не на всех узлах: один и тот же

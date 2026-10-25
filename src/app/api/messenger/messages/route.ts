@@ -37,7 +37,13 @@ export function GET(req: NextRequest) {
     ]);
     return NextResponse.json({
       ...normalizeMessages(result),
-      ...(dialog ? { readers: normalizeReaders(dialog, me), canPost: canPostIn(dialog) } : {}),
+      ...(dialog
+        ? {
+            readers: normalizeReaders(dialog, me),
+            canPost: canPostIn(dialog),
+            role: String(dialog.role || ''),
+          }
+        : {}),
     });
   });
 }

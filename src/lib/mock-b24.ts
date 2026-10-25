@@ -856,7 +856,8 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         ? { id: 30, role: 'member', permissions: { canPost: 'manager' }, readed_list: [] }
         : {
             id: 2,
-            role: 'owner',
+            // Администратор группы может удалять чужие сообщения, участник личного чата нет.
+            role: params.DIALOG_ID === 'chat20' ? 'owner' : 'member',
             permissions: { canPost: 'member' },
             readed_list: [{ user_id: 2, user_name: 'Дмитрий Соколов', message_id: 57, date: null }],
           };
@@ -871,6 +872,18 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'im.chat.add':
       return 77;
+
+    case 'im.chat.updateTitle':
+    case 'im.chat.user.add':
+    case 'im.chat.user.delete':
+    case 'im.chat.leave':
+      return true;
+
+    case 'im.search.chat.list':
+      return [{ id: 888, name: 'Старый архив', type: 'chat', avatar: '' }];
+
+    case 'im.v2.File.download':
+      return { downloadUrl: 'https://mock.invalid/file' };
 
     case 'im.search.user.list':
       return {

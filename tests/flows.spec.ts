@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { MongoClient } from 'mongodb';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -148,9 +149,8 @@ test('мессенджер: диалоги делятся по вкладкам,
   await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toBeVisible();
   await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
 
-  await list.getByRole('button', { name: 'Показать ещё' }).click();
+  // Вторая страница списка подгружается сама, когда конец списка в окне.
   await expect(list.getByRole('button', { name: /Архивный чат/ })).toBeVisible();
-  await expect(list.getByRole('button', { name: 'Показать ещё' })).toHaveCount(0);
 
   await list.getByRole('button', { name: 'Группы' }).click();
   await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
@@ -209,10 +209,15 @@ async function recordUploads(page: import('@playwright/test').Page) {
 
 async function openDmitry(page: import('@playwright/test').Page) {
   await page.goto('/messenger');
-  await page
+  // Приложение возвращает в последний открытый диалог, а на телефоне список за ним прячется.
+  // Ждём, что появится раньше: строка в списке или кнопка «назад» уже открытого диалога.
+  const back = page.getByRole('button', { name: 'К списку диалогов' });
+  const row = page
     .getByRole('region', { name: 'Диалоги' })
-    .getByRole('button', { name: /Дмитрий Соколов/ })
-    .click();
+    .getByRole('button', { name: /Дмитрий Соколов/ });
+  await expect(row.or(back)).toBeVisible();
+  if (await back.isVisible()) await back.click();
+  await row.click();
   const chat = page.getByRole('region', { name: 'Переписка' });
   await expect(chat).toContainText('Посмотришь ревью?');
   return chat;
@@ -360,7 +365,7 @@ test('мессенджер: фото открываются в просмотр�
   expect(popups).toBe(0);
 
   // Остальные форматы это ссылка на скачивание с именем файла.
-  const pdf = chat.getByRole('link', { name: /договор\.pdf/ });
+  const pdf = chat.getByRole('link', { name: 'договор.pdf 51 КБ' });
   await expect(pdf).toHaveAttribute('href', /fileId=504.*download=1/);
   await expect(pdf).toHaveAttribute('download', 'договор.pdf');
 });
@@ -814,4 +819,120 @@ test('мессенджер: диалог закрепляется кнопкой
   await expect(chat.getByRole('button', { name: 'Открепить диалог' })).toBeVisible();
   if (await back.isVisible()) await back.click();
   await expect(list.getByRole('listitem').first()).toContainText('Разработка API v2');
+});
+
+test('мессенджер: пересылка сообщения с файлами идёт через сервер', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const forwards: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/forward')) forwards.push(request.postDataJSON());
+  });
+  await (await bubble(chat, 'Сообщение 59')).getByRole('button', { name: 'Переслать' }).click();
+  await page
+    .getByRole('dialog', { name: 'Переслать в чат' })
+    .getByRole('button', { name: /Разработка API v2/ })
+    .click();
+  await expect(chat.getByRole('status').filter({ hasText: 'Переслано' })).toBeVisible();
+  expect(forwards).toHaveLength(1);
+  expect(forwards[0]).toMatchObject({
+    fromDialogId: '2',
+    toDialogId: 'chat20',
+    files: [{ id: 501, name: 'схема.png' }, { id: 502 }],
+  });
+});
+
+test('мессенджер: администратор группы удаляет чужие сообщения, pdf открывается в новой вкладке', async ({
+  page,
+}) => {
+  await page.goto('/messenger');
+  await page
+    .getByRole('region', { name: 'Диалоги' })
+    .getByRole('button', { name: /Разработка API v2/ })
+    .click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  // Привет, команда написал Дмитрий; роль в группе «владелец»: удалить можно.
+  await (await bubble(chat, 'Привет, команда')).getByRole('button', { name: 'Удалить' }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Отмена' }).click();
+
+  const dmitry = await openDmitry(page);
+  await expect(
+    dmitry.getByRole('link', { name: 'Открыть договор.pdf в новой вкладке' }),
+  ).toHaveAttribute('href', /fileId=504/);
+  await expect(
+    dmitry.getByRole('link', { name: 'Открыть договор.pdf в новой вкладке' }),
+  ).toHaveAttribute('target', '_blank');
+});
+
+test('мессенджер: чат из людей переименовывается, пополняется и покидается', async ({ page }) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  await list.getByRole('button', { name: /Архивный чат/ }).click();
+  const chat = page.getByRole('region', { name: 'Переписка' });
+  const calls: Record<string, unknown>[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/chat')) calls.push(request.postDataJSON());
+  });
+
+  await chat.getByRole('button', { name: 'Настройки чата' }).click();
+  const modal = page.getByRole('dialog', { name: 'Настройки чата' });
+  await expect(modal.getByRole('list', { name: 'Участники чата' })).toContainText(
+    'Дмитрий Соколов',
+  );
+
+  await modal.getByLabel('Название').fill('Новый архив');
+  await modal.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(chat.getByRole('heading', { name: 'Новый архив' })).toBeVisible();
+
+  await chat.getByRole('button', { name: 'Настройки чата' }).click();
+  await modal.getByLabel('Добавить участника').fill('Анн');
+  await modal
+    .getByRole('list', { name: 'Кого добавить' })
+    .getByRole('button', { name: /Анна Новикова/ })
+    .click();
+  await modal.getByRole('button', { name: 'Исключить Дмитрий Соколов' }).click();
+  await modal.getByRole('button', { name: 'Выйти из чата' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Выйти' }).click();
+  await expect(list.getByRole('button', { name: /Новый архив/ })).toHaveCount(0);
+
+  expect(calls).toEqual([
+    { dialogId: 'chat22', action: 'rename', title: 'Новый архив' },
+    { dialogId: 'chat22', action: 'add', userIds: [5] },
+    { dialogId: 'chat22', action: 'remove', userId: 2 },
+    { dialogId: 'chat22', action: 'leave' },
+  ]);
+});
+
+test('мессенджер: чат, которого нет в списке, находится по названию на портале', async ({
+  page,
+}) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  await list.getByLabel('Поиск по диалогам').fill('Старый');
+  await expect(list.getByRole('list', { name: 'Найдено на портале' })).toContainText(
+    'Старый архив',
+  );
+  await list.getByRole('list', { name: 'Найдено на портале' }).getByRole('button').click();
+  await expect(
+    page.getByRole('region', { name: 'Переписка' }).getByRole('heading', { name: 'Старый архив' }),
+  ).toBeVisible();
+});
+
+test('сводка по проектам и список задач выгружаются в CSV', async ({ page }) => {
+  await page.goto('/projects-summary');
+  await expect(page.getByRole('heading', { name: 'Сводка по проектам', level: 1 })).toBeVisible();
+  // Кнопка оживает, когда в таблице есть строки.
+  await expect(page.getByRole('button', { name: /CSV/ })).toBeEnabled();
+  const summary = page.waitForEvent('download');
+  await page.getByRole('button', { name: /CSV/ }).click();
+  const summaryFile = readFileSync((await (await summary).path())!, 'utf8');
+  expect(summaryFile.startsWith('\uFEFF"Проект";"Участников"')).toBe(true);
+  expect(summaryFile).toContain('"Разработка API v2"');
+
+  await page.goto('/all-tasks');
+  await settle(page);
+  const grid = page.waitForEvent('download');
+  await page.getByRole('button', { name: /CSV/ }).first().click();
+  const gridFile = readFileSync((await (await grid).path())!, 'utf8');
+  expect(gridFile).toContain('"Перевести справочники на GraphQL"');
 });

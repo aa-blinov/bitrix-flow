@@ -6,6 +6,7 @@ import {
   CornerUpLeft,
   FileText,
   Pin,
+  Users,
   Forward,
   Heart,
   Mic,
@@ -26,6 +27,7 @@ import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
 import FileViewer from '@/components/FileViewer';
 import LoadingState from '@/components/LoadingState';
+import { ChatSettingsModal } from '@/components/messenger/ChatSettings';
 import { ForwardModal } from '@/components/messenger/Dialogs';
 import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
 import { PresenceDot } from '@/components/messenger/Presence';
@@ -64,6 +66,8 @@ export default function Conversation({
   onRead,
   onSent,
   onPin,
+  onRenamed,
+  onLeft,
 }: {
   dialog: Dialog;
   dialogs: Dialog[];
@@ -72,6 +76,8 @@ export default function Conversation({
   onRead: (id: string) => void;
   onSent: () => void;
   onPin: () => void;
+  onRenamed: (title: string) => void;
+  onLeft: () => void;
 }) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [people, setPeople] = useState<Record<string, Person>>({});
@@ -83,6 +89,9 @@ export default function Conversation({
   // null пока портал не ответил: галочки без данных не рисуем.
   const [readers, setReaders] = useState<Reader[] | null>(null);
   const [canPost, setCanPost] = useState(true);
+  // Роль в чате: владелец и менеджер могут удалять чужие сообщения.
+  const [role, setRole] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [canRecord, setCanRecord] = useState(false);
@@ -135,6 +144,7 @@ export default function Conversation({
               people: Record<string, Person>;
               readers?: Reader[];
               canPost?: boolean;
+              role?: string;
             }>)
           : Promise.reject(new Error(String(response.status))),
       ),
@@ -155,6 +165,7 @@ export default function Conversation({
         setPeople((known) => ({ ...known, ...data.people }));
         if (data.readers) setReaders(data.readers);
         if (data.canPost !== undefined) setCanPost(data.canPost);
+        if (data.role !== undefined) setRole(data.role);
         if (!latest) setHasOlder(data.messages.length >= MESSAGES_PAGE);
         // Пришло чужое сообщение в открытом диалоге: сразу прочитано.
         if (latest && data.messages.some((m) => m.id > latest && m.authorId !== me))
@@ -333,14 +344,26 @@ export default function Conversation({
     const message = forwarding;
     setForwarding(null);
     if (!message) return;
-    const response = await fetch('/api/messenger/messages', {
-      method: 'POST',
-      headers: json,
-      body: JSON.stringify({
-        dialogId: target.id,
-        text: quoteBlock(nameOf(message), message, 'Переслано от '),
-      }),
-    }).catch(() => null);
+    const text = quoteBlock(nameOf(message), message, 'Переслано от ');
+    // С файлами пересылает сервер: он скачивает их из этого чата и загружает в целевой.
+    const response = await (
+      message.files.length
+        ? fetch('/api/messenger/forward', {
+            method: 'POST',
+            headers: json,
+            body: JSON.stringify({
+              fromDialogId: dialog.id,
+              toDialogId: target.id,
+              text,
+              files: message.files.map((file) => ({ id: file.id, name: file.name })),
+            }),
+          })
+        : fetch('/api/messenger/messages', {
+            method: 'POST',
+            headers: json,
+            body: JSON.stringify({ dialogId: target.id, text }),
+          })
+    ).catch(() => null);
     if (response?.ok) {
       setNotice(`Переслано в «${target.title}»`);
       onSent();
@@ -669,6 +692,11 @@ export default function Conversation({
             {dialog.kind === 'task' ? 'Открыть задачу' : 'Открыть проект'}
           </Link>
         )}
+        {dialog.kind === 'chat' && /^chat\d+$/.test(dialog.id) && (
+          <IconButton label="Настройки чата" variant="ghost" onClick={() => setSettingsOpen(true)}>
+            <Users className="size-4" strokeWidth={1.7} />
+          </IconButton>
+        )}
         <IconButton
           label={dialog.pinned ? 'Открепить диалог' : 'Закрепить диалог'}
           variant="ghost"
@@ -724,7 +752,9 @@ export default function Conversation({
       )}
       <div
         ref={scroller}
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4"
+        // Сверху запас под панель действий: она стоит над сообщением, и у самого первого
+        // иначе уходила бы под шапку диалога.
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pt-10 pb-4"
         aria-live="polite"
         onScroll={(event) => {
           const box = event.currentTarget;
@@ -830,7 +860,7 @@ export default function Conversation({
                           <Pencil className="size-3.5" strokeWidth={1.7} />
                         </IconButton>
                       )}
-                      {mine && (
+                      {(mine || role === 'owner' || role === 'manager') && (
                         <IconButton
                           label="Удалить"
                           variant="ghost"
@@ -1118,6 +1148,20 @@ export default function Conversation({
         title="Удалить сообщение?"
         description="Сообщение удалится у всех участников чата."
         confirmLabel="Удалить"
+      />
+      <ChatSettingsModal
+        open={settingsOpen}
+        dialog={dialog}
+        me={me}
+        onClose={() => setSettingsOpen(false)}
+        onRenamed={(title) => {
+          setSettingsOpen(false);
+          onRenamed(title);
+        }}
+        onLeft={() => {
+          setSettingsOpen(false);
+          onLeft();
+        }}
       />
       <ForwardModal
         open={forwarding !== null}
