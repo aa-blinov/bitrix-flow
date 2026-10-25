@@ -17,6 +17,7 @@ import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
 import { pluralRu } from '@/lib/utils';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 
 type ProjectSummary = {
   id: string;
@@ -38,11 +39,11 @@ type ProjectSummary = {
 
 const TASK_FORMS = ['задачи', 'задач', 'задач'] as const; // «из 1 задачи, из 5 задач»
 const messages = (count: number) =>
-  `${count} ${pluralRu(count, ['сообщение', 'сообщения', 'сообщений'])}`;
+  t('{0} {1}', count, pluralRu(count, ['сообщение', 'сообщения', 'сообщений']));
 
-const CHANGED_FORMAT = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
-const HOURS_FORMAT = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
-const hours = (value: number) => `${HOURS_FORMAT.format(value)} ч`;
+const CHANGED_FORMAT = dateFormat({ dateStyle: 'short', timeStyle: 'short' });
+const HOURS_FORMAT = numberFormat({ maximumFractionDigits: 1 });
+const hours = (value: number) => t('{0} ч', HOURS_FORMAT.format(value));
 
 export default function ProjectsSummaryPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -79,7 +80,7 @@ export default function ProjectsSummaryPage() {
           headers: { 'X-Member-Id': memberId },
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Не удалось получить сводку');
+        if (!response.ok) throw new Error(data.message || t('Не удалось получить сводку'));
         setProjects(data.projects || []);
         setCalculatedAt(data.calculatedAt || '');
         if (data.refreshing) {
@@ -89,7 +90,7 @@ export default function ProjectsSummaryPage() {
           }, 3000);
         }
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Не удалось получить сводку');
+        setError(reason instanceof Error ? reason.message : t('Не удалось получить сводку'));
       } finally {
         setIsLoading(false);
       }
@@ -122,17 +123,23 @@ export default function ProjectsSummaryPage() {
     <div className="flex flex-wrap gap-1">
       {project.overdue > 0 ? (
         <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
-          <Badge tone="danger">Просрочено: {project.overdue}</Badge>
+          <Badge tone="danger">
+            {t('Просрочено:')} {project.overdue}
+          </Badge>
         </Link>
       ) : null}
       {project.inProgress > 0 ? (
         <Link href={`/projects/${project.id}?view=grid&status=active`}>
-          <Badge tone="accent">{project.inProgress} в работе</Badge>
+          <Badge tone="accent">
+            {project.inProgress} {t('в работе')}
+          </Badge>
         </Link>
       ) : null}
       {project.noDeadline > 0 ? (
         <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
-          <Badge tone="neutral">{project.noDeadline} без срока</Badge>
+          <Badge tone="neutral">
+            {project.noDeadline} {t('без срока')}
+          </Badge>
         </Link>
       ) : null}
     </div>
@@ -141,7 +148,7 @@ export default function ProjectsSummaryPage() {
   const columns: TableColumn[] = [
     {
       key: 'name',
-      label: 'Проект',
+      label: t('Проект'),
       cell: (row) => {
         const project = row as unknown as ProjectSummary;
         return (
@@ -162,7 +169,7 @@ export default function ProjectsSummaryPage() {
     },
     {
       key: 'hours',
-      label: 'Часы',
+      label: t('Часы'),
       cell: (row) => {
         const project = row as unknown as ProjectSummary;
         return (
@@ -172,14 +179,14 @@ export default function ProjectsSummaryPage() {
               <span className="mx-1 text-ink-soft">/</span>
               <span className="font-medium">{hours(project.actualHours)}</span>
             </div>
-            <div className="text-xs text-ink-soft">план / факт</div>
+            <div className="text-xs text-ink-soft">{t('план / факт')}</div>
           </>
         );
       },
     },
     {
       key: 'progress',
-      label: 'Прогресс',
+      label: t('Прогресс'),
       cell: (row) => {
         const project = row as unknown as ProjectSummary;
         return (
@@ -187,14 +194,14 @@ export default function ProjectsSummaryPage() {
             <div className="flex items-center gap-2">
               <Progress
                 value={project.progress}
-                label={`Прогресс проекта «${project.name}»`}
+                label={t('Прогресс проекта «{0}»', project.name)}
                 tone={project.progress === 100 ? 'success' : 'accent'}
                 className="w-16"
               />
               <span className="text-xs font-medium tabular-nums">{project.progress}%</span>
             </div>
             <div className="text-xs text-ink-soft">
-              {project.completed} из {project.leafTaskCount} выполнено
+              {project.completed} {t('из')} {project.leafTaskCount} {t('выполнено')}
             </div>
           </>
         );
@@ -202,19 +209,21 @@ export default function ProjectsSummaryPage() {
     },
     {
       key: 'tasks',
-      label: 'Задачи',
+      label: t('Задачи'),
       cell: (row) => {
         const project = row as unknown as ProjectSummary;
         return (
           <>
             <div className="text-sm">
               <span className="font-medium tabular-nums">{project.taskCount}</span>
-              <span className="ml-1 text-ink-soft">всего</span>
+              <span className="ml-1 text-ink-soft">{t('всего')}</span>
             </div>
             {/* Тут стояло «N исполнителей», хотя выводилось число задач без
                 подзадач. Показываем то, что есть на самом деле. */}
             {project.parentTaskCount > 0 ? (
-              <div className="text-xs text-ink-soft">{project.parentTaskCount} с подзадачами</div>
+              <div className="text-xs text-ink-soft">
+                {project.parentTaskCount} {t('с подзадачами')}
+              </div>
             ) : null}
           </>
         );
@@ -222,17 +231,19 @@ export default function ProjectsSummaryPage() {
     },
     {
       key: 'status',
-      label: 'Статус',
+      label: t('Статус'),
       cell: (row) => statusBadges(row as unknown as ProjectSummary),
     },
     {
       key: 'changedAt',
-      label: 'Изменения',
+      label: t('Изменения'),
       cell: (row) => {
         const project = row as unknown as ProjectSummary;
         return (
           <span className="text-xs text-ink-soft">
-            {project.changedAt ? CHANGED_FORMAT.format(new Date(project.changedAt)) : 'Нет задач'}
+            {project.changedAt
+              ? CHANGED_FORMAT.format(new Date(project.changedAt))
+              : t('Нет задач')}
           </span>
         );
       },
@@ -243,18 +254,18 @@ export default function ProjectsSummaryPage() {
   const exportCsv = () =>
     downloadCsv(`projects-summary-${new Date().toISOString().slice(0, 10)}.csv`, [
       [
-        'Проект',
-        'Участников',
-        'Задач',
-        'Выполнено',
-        'В работе',
-        'Просрочено',
-        'Без срока',
-        'Комментариев',
-        'План, ч',
-        'Факт, ч',
-        'Прогресс, %',
-        'Последнее изменение',
+        t('Проект'),
+        t('Участников'),
+        t('Задач'),
+        t('Выполнено'),
+        t('В работе'),
+        t('Просрочено'),
+        t('Без срока'),
+        t('Комментариев'),
+        t('План, ч'),
+        t('Факт, ч'),
+        t('Прогресс, %'),
+        t('Последнее изменение'),
       ],
       ...shown.map((project) => [
         project.name,
@@ -275,8 +286,8 @@ export default function ProjectsSummaryPage() {
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
-        title="Сводка по проектам"
-        description="План, факт и операционный статус по задачам проектов"
+        title={t('Сводка по проектам')}
+        description={t('План, факт и операционный статус по задачам проектов')}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -284,7 +295,7 @@ export default function ProjectsSummaryPage() {
               size="sm"
               onClick={exportCsv}
               disabled={!shown.length}
-              title="Выгрузить в CSV проекты, которые сейчас в таблице"
+              title={t('Выгрузить в CSV проекты, которые сейчас в таблице')}
               icon={<Download size={14} strokeWidth={1.7} />}
             >
               <span className="hidden sm:inline">CSV</span>
@@ -296,7 +307,7 @@ export default function ProjectsSummaryPage() {
               disabled={isLoading}
             >
               <RefreshCw className={isLoading ? 'animate-spin' : ''} size={14} strokeWidth={1.7} />{' '}
-              Обновить
+              {t('Обновить')}
             </Button>
           </div>
         }
@@ -308,13 +319,13 @@ export default function ProjectsSummaryPage() {
               variant="boxed"
               size="sm"
               className={`${toolbarControl} w-full sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1`}
-              placeholder="Найти проект…"
-              aria-label="Найти проект"
+              placeholder={t('Найти проект…')}
+              aria-label={t('Найти проект')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
             <div className="flex items-center gap-1.5 text-sm">
-              <span className="shrink-0 text-ink-soft">По дате:</span>
+              <span className="shrink-0 text-ink-soft">{t('По дате:')}</span>
               <SelectField
                 size="sm"
                 variant="boxed"
@@ -322,17 +333,17 @@ export default function ProjectsSummaryPage() {
                 value={dateField}
                 onChange={(event) => setDateField(event.target.value as 'changed' | 'created')}
                 options={[
-                  { value: 'changed', label: 'изменения' },
-                  { value: 'created', label: 'создания' },
+                  { value: 'changed', label: t('изменения') },
+                  { value: 'created', label: t('создания') },
                 ]}
-                aria-label="Считать по дате"
+                aria-label={t('Считать по дате')}
               />
             </div>
             <div className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
-              <span className="shrink-0 text-ink-soft">Период:</span>
+              <span className="shrink-0 text-ink-soft">{t('Период:')}</span>
               <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:w-auto">
                 <label htmlFor="summary-date-from" className="text-ink-soft">
-                  с
+                  {t('с')}
                 </label>
                 <TextField
                   id="summary-date-from"
@@ -342,10 +353,10 @@ export default function ProjectsSummaryPage() {
                   value={fromDate}
                   onChange={(event) => setFromDate(event.target.value)}
                   className={`${toolbarControl} w-full min-w-0 sm:w-36`}
-                  aria-label="Начальная дата периода"
+                  aria-label={t('Начальная дата периода')}
                 />
                 <label htmlFor="summary-date-to" className="text-ink-soft">
-                  по
+                  {t('по')}
                 </label>
                 <TextField
                   id="summary-date-to"
@@ -355,7 +366,7 @@ export default function ProjectsSummaryPage() {
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}
                   className={`${toolbarControl} w-full min-w-0 sm:w-36`}
-                  aria-label="Конечная дата периода"
+                  aria-label={t('Конечная дата периода')}
                 />
               </div>
             </div>
@@ -366,7 +377,7 @@ export default function ProjectsSummaryPage() {
               onClick={() => void load(false)}
               disabled={isLoading}
             >
-              Применить
+              {t('Применить')}
             </Button>
             {/* Сброс периода ничего не удаляет — красный тут пугал зря. */}
             <Button
@@ -380,7 +391,7 @@ export default function ProjectsSummaryPage() {
                 setTimeout(() => void load(false), 0);
               }}
             >
-              Сбросить
+              {t('Сбросить')}
             </Button>
           </div>
           {error ? (
@@ -412,12 +423,15 @@ export default function ProjectsSummaryPage() {
                         <p className="font-medium">
                           {hours(project.plannedHours)} / {hours(project.actualHours)}
                         </p>
-                        <p className="text-xs text-ink-soft">план / факт</p>
+                        <p className="text-xs text-ink-soft">{t('план / факт')}</p>
                       </div>
                       <div>
-                        <p className="font-medium">{project.progress}% выполнено</p>
+                        <p className="font-medium">
+                          {project.progress}
+                          {t('% выполнено')}
+                        </p>
                         <p className="text-xs text-ink-soft">
-                          {project.completed} из {project.leafTaskCount}{' '}
+                          {project.completed} {t('из')} {project.leafTaskCount}{' '}
                           {pluralRu(project.leafTaskCount, TASK_FORMS)}
                         </p>
                       </div>
@@ -438,10 +452,7 @@ export default function ProjectsSummaryPage() {
         </Card>
         {calculatedAt ? (
           <p className="text-xs text-ink-soft">
-            Рассчитано:{' '}
-            {new Intl.DateTimeFormat('ru-RU', { timeStyle: 'medium' }).format(
-              new Date(calculatedAt),
-            )}
+            {t('Рассчитано:')} {dateFormat({ timeStyle: 'medium' }).format(new Date(calculatedAt))}
           </p>
         ) : null}
       </div>

@@ -5,6 +5,7 @@
 
 import { createContext, useCallback, useContext, useState } from 'react';
 import { AlertDialog } from './AlertDialog';
+import { t } from '@/lib/i18n';
 
 type ConfirmOptions = {
   title: string;
@@ -47,8 +48,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         onConfirm={() => close(true)}
         title={pending?.title}
         description={pending?.description}
-        confirmLabel={pending?.confirmLabel || 'Подтвердить'}
-        cancelLabel={pending?.cancelLabel || 'Отмена'}
+        confirmLabel={pending?.confirmLabel || t('Подтвердить')}
+        cancelLabel={pending?.cancelLabel || t('Отмена')}
         tone={pending?.destructive ? 'danger' : 'primary'}
       />
     </ConfirmContext.Provider>

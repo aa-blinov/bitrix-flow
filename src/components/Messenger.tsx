@@ -29,13 +29,39 @@ import {
   type Dialog,
   type DialogKind,
 } from '@/lib/messenger';
+import { t } from '@/lib/i18n';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
-  { value: 'all', label: 'Все' },
-  { value: 'user', label: 'Личные' },
-  { value: 'group', label: 'Группы' },
-  { value: 'task', label: 'Задачи' },
-  { value: 'channel', label: 'Каналы' },
+  {
+    value: 'all',
+    get label() {
+      return t('Все');
+    },
+  },
+  {
+    value: 'user',
+    get label() {
+      return t('Личные');
+    },
+  },
+  {
+    value: 'group',
+    get label() {
+      return t('Группы');
+    },
+  },
+  {
+    value: 'task',
+    get label() {
+      return t('Задачи');
+    },
+  },
+  {
+    value: 'channel',
+    get label() {
+      return t('Каналы');
+    },
+  },
 ];
 
 // Портал не присылает событий о сообщениях обычному приложению (они есть
@@ -117,7 +143,7 @@ export default function Messenger() {
       .catch((failure: Error) =>
         setError(
           /^\d+$/.test(failure.message)
-            ? 'Не удалось загрузить диалоги. Обновите страницу.'
+            ? t('Не удалось загрузить диалоги. Обновите страницу.')
             : failure.message,
         ),
       );
@@ -135,7 +161,7 @@ export default function Messenger() {
       setDialogs((current) => mergeDialogs(current || [], data.dialogs));
       setPaging({ hasMore: data.hasMore, nextOffset: data.nextOffset });
     } catch {
-      setError('Не удалось загрузить ещё диалоги.');
+      setError(t('Не удалось загрузить ещё диалоги.'));
     } finally {
       setLoadingMore(false);
     }
@@ -238,7 +264,7 @@ export default function Messenger() {
       body: JSON.stringify({ dialogId: dialog.id, action }),
     }).catch(() => null);
     if (!response?.ok) {
-      setError('Не удалось изменить настройки диалога.');
+      setError(t('Не удалось изменить настройки диалога.'));
       loadDialogs();
     }
   }
@@ -247,7 +273,7 @@ export default function Messenger() {
     const next = await setChatNotify(!notifyOn);
     setNotifyOn(next);
     if (!next && !notifyOn)
-      setError('Браузер не разрешил уведомления: включите их в настройках сайта.');
+      setError(t('Браузер не разрешил уведомления: включите их в настройках сайта.'));
   }
 
   // Новый диалог с человеком или созданная группа появятся в списке портала
@@ -270,8 +296,8 @@ export default function Messenger() {
     // чтобы страница не прокручивалась и кнопка не лежала на поле ввода.
     <div className="flex h-[calc(100dvh-5rem)] flex-col bg-canvas lg:h-dvh">
       <PageHeader
-        title="Сообщения"
-        description="Личные чаты, группы и обсуждения задач из Битрикс24"
+        title={t('Сообщения')}
+        description={t('Личные чаты, группы и обсуждения задач из Битрикс24')}
       />
       {error && (
         <p role="alert" className="px-4 pt-3 text-sm text-danger-text lg:px-6">
@@ -280,21 +306,21 @@ export default function Messenger() {
       )}
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[22rem_1fr]">
         <section
-          aria-label="Диалоги"
+          aria-label={t('Диалоги')}
           className={`${activeId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col border-r border-line`}
         >
           <div className="space-y-2 border-b border-line p-3">
             <div className="flex items-center gap-2">
               <SearchField
-                label="Поиск по диалогам"
-                placeholder="Поиск по диалогам"
+                label={t('Поиск по диалогам')}
+                placeholder={t('Поиск по диалогам')}
                 size="sm"
                 value={query}
                 onChange={setQuery}
                 className="min-w-0 flex-1"
               />
               <IconButton
-                label={notifyOn ? 'Отключить уведомления' : 'Включить уведомления'}
+                label={notifyOn ? t('Отключить уведомления') : t('Включить уведомления')}
                 variant="outline"
                 size="md"
                 pressed={notifyOn}
@@ -307,7 +333,7 @@ export default function Messenger() {
                 )}
               </IconButton>
               <IconButton
-                label="Новый чат"
+                label={t('Новый чат')}
                 variant="outline"
                 size="md"
                 onClick={() => setNewChatOpen(true)}
@@ -316,7 +342,7 @@ export default function Messenger() {
               </IconButton>
             </div>
             <SegmentedControl
-              label="Тип диалога"
+              label={t('Тип диалога')}
               size="sm"
               // Пять вкладок в узкой колонке: сжимаем поля и разрядку, иначе последняя уходит под переписку.
               className="w-full [&_button]:flex-1 [&_button]:px-1.5 [&_button]:tracking-wide"
@@ -331,7 +357,7 @@ export default function Messenger() {
                 <LoadingState className="min-h-40 bg-transparent" />
               )
             ) : visible.length === 0 ? (
-              <p className="p-4 text-sm text-ink-soft">Ничего не найдено</p>
+              <p className="p-4 text-sm text-ink-soft">{t('Ничего не найдено')}</p>
             ) : (
               <ul>
                 {visible.map((dialog) => (
@@ -361,7 +387,7 @@ export default function Messenger() {
                               <Pin
                                 className="size-3 shrink-0 text-ink-soft"
                                 strokeWidth={1.7}
-                                aria-label="Закреплён"
+                                aria-label={t('Закреплён')}
                               />
                             )}
                             <span className="truncate text-sm font-medium text-ink">
@@ -381,14 +407,14 @@ export default function Messenger() {
                               <BellOff
                                 className="size-3 text-ink-soft"
                                 strokeWidth={1.7}
-                                aria-label="Звук отключён"
+                                aria-label={t('Звук отключён')}
                               />
                             )}
                             {dialog.unread > 0 && (
                               <Badge
                                 tone={dialog.muted ? 'neutral' : 'accent'}
                                 dot
-                                aria-label={`Непрочитанных: ${dialog.unread}`}
+                                aria-label={t('Непрочитанных: {0}', dialog.unread)}
                               >
                                 {dialog.unread}
                               </Badge>
@@ -399,12 +425,12 @@ export default function Messenger() {
                     </button>
                     <div className="absolute top-1 right-1 hidden group-focus-within:block group-hover:block max-sm:block">
                       <Menu
-                        label="Действия с диалогом"
+                        label={t('Действия с диалогом')}
                         align="end"
                         width="auto"
                         trigger={
                           <IconButton
-                            label="Действия с диалогом"
+                            label={t('Действия с диалогом')}
                             variant="ghost"
                             size="sm"
                             tooltipText=""
@@ -414,16 +440,16 @@ export default function Messenger() {
                         }
                         items={[
                           {
-                            label: dialog.pinned ? 'Открепить' : 'Закрепить',
+                            label: dialog.pinned ? t('Открепить') : t('Закрепить'),
                             onSelect: () =>
                               void dialogAction(dialog, dialog.pinned ? 'unpin' : 'pin'),
                           },
                           {
-                            label: 'Пометить непрочитанным',
+                            label: t('Пометить непрочитанным'),
                             onSelect: () => void dialogAction(dialog, 'unread'),
                           },
                           {
-                            label: dialog.muted ? 'Включить звук' : 'Отключить звук',
+                            label: dialog.muted ? t('Включить звук') : t('Отключить звук'),
                             onSelect: () =>
                               void dialogAction(dialog, dialog.muted ? 'unmute' : 'mute'),
                           },
@@ -438,9 +464,9 @@ export default function Messenger() {
               0 && (
               <div className="border-t border-line">
                 <p className="px-3 pt-3 pb-1 text-xs uppercase tracking-widest text-ink-soft">
-                  Найдено на портале
+                  {t('Найдено на портале')}
                 </p>
-                <ul aria-label="Найдено на портале">
+                <ul aria-label={t('Найдено на портале')}>
                   {found
                     .filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id))
                     .map((chat) => (
@@ -463,13 +489,13 @@ export default function Messenger() {
             {paging?.hasMore && (
               // Метка конца списка: когда она попадает в окно, подгружается следующая страница.
               <div ref={moreRef} className="p-3 text-center text-xs text-ink-soft" role="status">
-                {loadingMore ? 'Загрузка' : ''}
+                {loadingMore ? t('Загрузка') : ''}
               </div>
             )}
           </div>
         </section>
         <section
-          aria-label="Переписка"
+          aria-label={t('Переписка')}
           className={`${activeId ? 'flex' : 'hidden md:flex'} min-h-0 flex-col`}
         >
           {active ? (
@@ -498,7 +524,7 @@ export default function Messenger() {
               }}
             />
           ) : (
-            <p className="m-auto p-6 text-sm text-ink-soft">Выберите диалог слева</p>
+            <p className="m-auto p-6 text-sm text-ink-soft">{t('Выберите диалог слева')}</p>
           )}
         </section>
       </div>

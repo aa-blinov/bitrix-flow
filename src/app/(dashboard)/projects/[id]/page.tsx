@@ -20,12 +20,23 @@ import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
 import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
+import { t } from '@/lib/i18n';
 
 // Переключатель вида живёт в панели над доской и над списком, поэтому список
 // вкладок набора рисуется без панели: содержимое панели — это сам вид.
 const VIEW_TABS = [
-  { id: 'kanban', label: 'Канбан' },
-  { id: 'grid', label: 'Список' },
+  {
+    id: 'kanban',
+    get label() {
+      return t('Канбан');
+    },
+  },
+  {
+    id: 'grid',
+    get label() {
+      return t('Список');
+    },
+  },
 ];
 
 export default function ProjectPage() {
@@ -90,8 +101,8 @@ export default function ProjectPage() {
   const currentProject = isNoProject
     ? ({
         id: NO_PROJECT_ID,
-        name: NO_PROJECT_NAME,
-        description: 'Задачи, не привязанные ни к одному проекту',
+        name: t(NO_PROJECT_NAME),
+        description: t('Задачи, не привязанные ни к одному проекту'),
         membersCount: 0,
         isArchived: false,
       } as (typeof projects)[number])
@@ -201,9 +212,9 @@ export default function ProjectPage() {
   async function removeMember(userId: string) {
     if (!currentProject) return;
     const agreed = await confirm({
-      title: 'Удалить участника из проекта?',
-      description: 'Он потеряет доступ к задачам проекта в Битрикс24.',
-      confirmLabel: 'Удалить',
+      title: t('Удалить участника из проекта?'),
+      description: t('Он потеряет доступ к задачам проекта в Битрикс24.'),
+      confirmLabel: t('Удалить'),
       destructive: true,
     });
     if (!agreed) return;
@@ -221,11 +232,11 @@ export default function ProjectPage() {
   async function toggleArchive() {
     if (!currentProject) return;
     const agreed = await confirm({
-      title: currentProject.isArchived ? 'Вернуть проект из архива?' : 'Архивировать проект?',
+      title: currentProject.isArchived ? t('Вернуть проект из архива?') : t('Архивировать проект?'),
       description: currentProject.isArchived
-        ? 'Проект снова появится в активных списках.'
-        : 'Проект уедет в архив: он останется доступен, но пропадёт из основных списков.',
-      confirmLabel: currentProject.isArchived ? 'Вернуть' : 'Архивировать',
+        ? t('Проект снова появится в активных списках.')
+        : t('Проект уедет в архив: он останется доступен, но пропадёт из основных списков.'),
+      confirmLabel: currentProject.isArchived ? t('Вернуть') : t('Архивировать'),
     });
     if (!agreed) return;
     await updateProject(currentProject.id, { archived: !currentProject.isArchived });
@@ -240,8 +251,8 @@ export default function ProjectPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="text-center">
-          <p className="mb-4 text-ink-soft">Проект не найден</p>
-          <Button onClick={() => router.push('/')}>На главную</Button>
+          <p className="mb-4 text-ink-soft">{t('Проект не найден')}</p>
+          <Button onClick={() => router.push('/')}>{t('На главную')}</Button>
         </div>
       </div>
     );
@@ -252,7 +263,7 @@ export default function ProjectPage() {
       items={VIEW_TABS}
       value={effectiveView}
       onChange={setView}
-      label="Вид проекта"
+      label={t('Вид проекта')}
       variant="pill"
     />
   );
@@ -269,7 +280,7 @@ export default function ProjectPage() {
               onClick={() => router.push('/')}
               className="h-auto min-h-0 max-sm:min-h-0 px-0 py-0 text-xs"
             >
-              Главная
+              {t('Главная')}
             </Button>
             <ChevronRight size={12} strokeWidth={1.7} />
             <span className="font-medium text-ink">{currentProject.name}</span>
@@ -284,7 +295,7 @@ export default function ProjectPage() {
                   <FolderKanban size={20} strokeWidth={1.7} />
                 </span>
                 {currentProject.name}
-                {currentProject.isArchived && <Badge tone="neutral">Архив</Badge>}
+                {currentProject.isArchived && <Badge tone="neutral">{t('Архив')}</Badge>}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
                 <Button
@@ -296,36 +307,50 @@ export default function ProjectPage() {
                 >
                   {currentProject.membersCount || 0}{' '}
                   {pluralRu(currentProject.membersCount || 0, [
-                    'участник',
-                    'участника',
-                    'участников',
+                    t('участник'),
+                    t('участника'),
+                    t('участников'),
                   ])}
                 </Button>
-                <span>Задач: {stats.total}</span>
-                <span className="text-success-text">Завершено: {completedTasks}</span>
+                <span>
+                  {t('Задач:')} {stats.total}
+                </span>
+                <span className="text-success-text">
+                  {t('Завершено:')} {completedTasks}
+                </span>
                 {/* Сигналы — в той же строке, что и счётчики: отдельной строкой
                     мелким шрифтом просрочка читалась как сноска. */}
                 {overdueTasks > 0 && (
-                  <span className="font-medium text-danger-text">Просрочено: {overdueTasks}</span>
+                  <span className="font-medium text-danger-text">
+                    {t('Просрочено:')} {overdueTasks}
+                  </span>
                 )}
-                {unassignedTasks > 0 && <span>Без исполнителя: {unassignedTasks}</span>}
+                {unassignedTasks > 0 && (
+                  <span>
+                    {t('Без исполнителя:')} {unassignedTasks}
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-4">
               <div className="hidden gap-4 text-sm md:flex">
                 <div className="text-center">
-                  <p className="text-xs text-ink-faint">План</p>
-                  <p className="font-bold">{totalEstimate.toFixed(1)} ч</p>
+                  <p className="text-xs text-ink-faint">{t('План')}</p>
+                  <p className="font-bold">
+                    {totalEstimate.toFixed(1)} {t('ч')}
+                  </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-ink-faint">Факт</p>
-                  <p className="font-bold">{totalActual.toFixed(1)} ч</p>
+                  <p className="text-xs text-ink-faint">{t('Факт')}</p>
+                  <p className="font-bold">
+                    {totalActual.toFixed(1)} {t('ч')}
+                  </p>
                 </div>
               </div>
               {/* У псевдо-проекта нечего настраивать: это не сущность Bitrix */}
               <IconButton
-                label="Настройки проекта"
+                label={t('Настройки проекта')}
                 variant="ghost"
                 size="md"
                 className={isNoProject ? 'hidden' : undefined}
@@ -345,7 +370,7 @@ export default function ProjectPage() {
       <Modal
         open={membersOpen}
         onClose={() => setMembersOpen(false)}
-        title="Участники проекта"
+        title={t('Участники проекта')}
         size="md"
       >
         <SelectField
@@ -356,10 +381,10 @@ export default function ProjectPage() {
             void addMember(value);
           }}
           options={memberOptions}
-          placeholder="Добавить участника"
+          placeholder={t('Добавить участника')}
           variant="boxed"
           size="md"
-          aria-label="Добавить участника"
+          aria-label={t('Добавить участника')}
         />
         <div className="mt-4 max-h-64 space-y-1 overflow-y-auto">
           {memberIds.map((id) => {
@@ -369,9 +394,9 @@ export default function ProjectPage() {
                 key={id}
                 className="flex items-center justify-between rounded-ui px-2 py-2 text-sm"
               >
-                <span>{user?.name || `Пользователь #${id}`}</span>
+                <span>{user?.name || t('Пользователь #{0}', id)}</span>
                 <IconButton
-                  label="Удалить участника"
+                  label={t('Удалить участника')}
                   variant="ghost"
                   size="sm"
                   onClick={() => void removeMember(id)}
@@ -387,31 +412,31 @@ export default function ProjectPage() {
       <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        title="Настройки проекта"
+        title={t('Настройки проекта')}
         size="md"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <Button variant="secondary" onClick={() => void toggleArchive()}>
-              {currentProject.isArchived ? 'Разархивировать' : 'Архивировать'}
+              {currentProject.isArchived ? t('Разархивировать') : t('Архивировать')}
             </Button>
             <Button onClick={() => void saveProject()} disabled={!name.trim()}>
-              Сохранить
+              {t('Сохранить')}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <TextField
-            label="Название"
+            label={t('Название')}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Название проекта"
+            placeholder={t('Название проекта')}
           />
           <TextArea
-            label="Описание"
+            label={t('Описание')}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Описание"
+            placeholder={t('Описание')}
           />
         </div>
       </Modal>

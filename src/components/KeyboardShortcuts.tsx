@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/monos/toast';
+import { t } from '@/lib/i18n';
 
 /** Пока пользователь печатает, клавиши приложению не принадлежат. */
 function isTyping(target: EventTarget | null) {
@@ -33,9 +34,9 @@ export default function KeyboardShortcuts() {
         // Сначала поиск по задачам на самой странице, и только потом — поиск
         // проектов в панели: иначе «/» уводил фокус не туда.
         const field =
-          document.querySelector<HTMLInputElement>('input[placeholder^="Поиск задач"]') ||
+          document.querySelector<HTMLInputElement>(`input[placeholder^="${t('Поиск задач')}"]`) ||
           document.querySelector<HTMLInputElement>('input[type="search"]') ||
-          document.querySelector<HTMLInputElement>('input[placeholder^="Поиск"]');
+          document.querySelector<HTMLInputElement>(`input[placeholder^="${t('Поиск')}"]`);
         if (field) field.focus();
         else router.push('/search');
         return;
@@ -53,8 +54,10 @@ export default function KeyboardShortcuts() {
       if (event.key === '?') {
         event.preventDefault();
         toast({
-          title: 'Горячие клавиши',
-          description: '/ — поиск, n — новая задача, g затем h/t/m/c — переходы, ? — эта подсказка',
+          title: t('Горячие клавиши'),
+          description: t(
+            '/ — поиск, n — новая задача, g затем h/t/m/c — переходы, ? — эта подсказка',
+          ),
           durationMs: 7000,
         });
         return;

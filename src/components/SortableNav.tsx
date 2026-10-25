@@ -32,18 +32,67 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/monos/Badge';
+import { t } from '@/lib/i18n';
 
 // Строка навигации остаётся кодом приложения: это продуктовый паттерн, а не
 // примитив набора. Вид как у NavItem из @monos/ui.
 export const NAV_ITEMS = [
-  { href: '/', icon: LayoutDashboard, label: 'Главная' },
-  { href: '/projects-summary', icon: TableProperties, label: 'Сводка проектов' },
-  { href: '/search', icon: Search, label: 'Поиск' },
-  { href: '/all-tasks', icon: ListChecks, label: 'Все задачи' },
-  { href: '/my-tasks', icon: UserCheck, label: 'Мои задачи' },
-  { href: '/team-workload', icon: CalendarDays, label: 'Нагрузка команды' },
-  { href: '/messenger', icon: MessagesSquare, label: 'Сообщения' },
-  { href: '/notifications', icon: Bell, label: 'Уведомления' },
+  {
+    href: '/',
+    icon: LayoutDashboard,
+    get label() {
+      return t('Главная');
+    },
+  },
+  {
+    href: '/projects-summary',
+    icon: TableProperties,
+    get label() {
+      return t('Сводка проектов');
+    },
+  },
+  {
+    href: '/search',
+    icon: Search,
+    get label() {
+      return t('Поиск');
+    },
+  },
+  {
+    href: '/all-tasks',
+    icon: ListChecks,
+    get label() {
+      return t('Все задачи');
+    },
+  },
+  {
+    href: '/my-tasks',
+    icon: UserCheck,
+    get label() {
+      return t('Мои задачи');
+    },
+  },
+  {
+    href: '/team-workload',
+    icon: CalendarDays,
+    get label() {
+      return t('Нагрузка команды');
+    },
+  },
+  {
+    href: '/messenger',
+    icon: MessagesSquare,
+    get label() {
+      return t('Сообщения');
+    },
+  },
+  {
+    href: '/notifications',
+    icon: Bell,
+    get label() {
+      return t('Уведомления');
+    },
+  },
 ] as const;
 
 const DEFAULT_ORDER: string[] = NAV_ITEMS.map((item) => item.href);
@@ -170,18 +219,25 @@ export default function SortableNav({
       onDragEnd={onDragEnd}
       accessibility={{
         screenReaderInstructions: {
-          draggable:
+          draggable: t(
             'Чтобы переставить пункт меню, нажмите пробел, выберите место стрелками и нажмите пробел ещё раз. Escape отменяет.',
+          ),
         },
         announcements: {
-          onDragStart: ({ active }) => `Пункт «${ANNOUNCE_LABEL(active.id)}» поднят.`,
+          onDragStart: ({ active }) => t('Пункт «{0}» поднят.', ANNOUNCE_LABEL(active.id)),
           onDragOver: ({ active, over }) =>
-            over ? `«${ANNOUNCE_LABEL(active.id)}» над «${ANNOUNCE_LABEL(over.id)}».` : undefined,
+            over
+              ? t('«{0}» над «{1}».', ANNOUNCE_LABEL(active.id), ANNOUNCE_LABEL(over.id))
+              : undefined,
           onDragEnd: ({ active, over }) =>
             over
-              ? `«${ANNOUNCE_LABEL(active.id)}» перенесён на место «${ANNOUNCE_LABEL(over.id)}».`
-              : `«${ANNOUNCE_LABEL(active.id)}» оставлен на месте.`,
-          onDragCancel: ({ active }) => `Перенос «${ANNOUNCE_LABEL(active.id)}» отменён.`,
+              ? t(
+                  '«{0}» перенесён на место «{1}».',
+                  ANNOUNCE_LABEL(active.id),
+                  ANNOUNCE_LABEL(over.id),
+                )
+              : t('«{0}» оставлен на месте.', ANNOUNCE_LABEL(active.id)),
+          onDragCancel: ({ active }) => t('Перенос «{0}» отменён.', ANNOUNCE_LABEL(active.id)),
         },
       }}
     >

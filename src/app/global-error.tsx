@@ -3,6 +3,7 @@
 // Последний рубеж: падение в корневом layout, когда своя разметка уже недоступна.
 import { useEffect } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { t } from '@/lib/i18n';
 
 export default function GlobalError({
   error,
@@ -30,11 +31,15 @@ export default function GlobalError({
         }}
       >
         <div style={{ textAlign: 'center', padding: 24 }}>
-          <h1 style={{ fontSize: 20, margin: 0 }}>Приложение не запустилось</h1>
+          <h1 style={{ fontSize: 20, margin: 0 }}>{t('Приложение не запустилось')}</h1>
           <p style={{ fontSize: 14, color: '#525252' }}>
-            Перезагрузите страницу. Если не помогает, проверьте подключение к Битрикс24.
+            {t('Перезагрузите страницу. Если не помогает, проверьте подключение к Битрикс24.')}
           </p>
-          {error.digest && <p style={{ fontSize: 12, color: '#737373' }}>Код: {error.digest}</p>}
+          {error.digest && (
+            <p style={{ fontSize: 12, color: '#737373' }}>
+              {t('Код:')} {error.digest}
+            </p>
+          )}
           <button
             onClick={reset}
             style={{
@@ -48,7 +53,7 @@ export default function GlobalError({
               fontSize: 14,
             }}
           >
-            Повторить
+            {t('Повторить')}
           </button>
         </div>
       </body>

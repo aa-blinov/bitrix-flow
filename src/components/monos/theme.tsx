@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { t } from '@/lib/i18n';
 
 /**
  * Палитры и режимы из @monos/ui. Набор различает их атрибутами на <html>:
@@ -152,7 +153,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme работает только внутри ThemeProvider');
+    throw new Error(t('useTheme работает только внутри ThemeProvider'));
   }
   return context;
 }

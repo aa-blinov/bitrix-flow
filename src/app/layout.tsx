@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { ToastProvider } from '@/components/monos/toast';
 import { ConfirmProvider } from '@/components/monos/confirm-dialog';
 import { ThemeProvider } from '@/components/monos/theme';
+import LocaleProvider from '@/components/LocaleProvider';
 
 // JetBrains Mono — единственная гарнитура в наборе @monos/ui. Подгружается
 // с кириллицей, потому что весь интерфейс приложения русский.
@@ -57,11 +58,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             } catch {} })()`,
           }}
         />
-        <ThemeProvider>
-          <ToastProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
-          </ToastProvider>
-        </ThemeProvider>
+        {/* Английский включается после монтирования (LocaleProvider), а до этого страница
+            спрятана, чтобы не мелькал русский. Если скрипт не отработает, через три секунды
+            страница откроется как есть. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { try {
+              if (/(?:^|; )bitrix-flow-locale=en/.test(document.cookie)) {
+                const el = document.documentElement;
+                el.setAttribute('data-locale-pending', '');
+                setTimeout(() => el.removeAttribute('data-locale-pending'), 3000);
+              }
+            } catch {} })()`,
+          }}
+        />
+        <LocaleProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <ConfirmProvider>{children}</ConfirmProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

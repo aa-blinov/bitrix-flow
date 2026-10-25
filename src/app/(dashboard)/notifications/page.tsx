@@ -12,6 +12,7 @@ import { toolbarSelect } from '@/components/monos/toolbar';
 import { SelectField } from '@/components/monos/SelectField';
 import { useConfirm } from '@/components/monos/confirm-dialog';
 import { useKanbanStore } from '@/store/kanban';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 
 type Notice = {
   id: string;
@@ -35,21 +36,46 @@ function noticeIcon(type: string) {
 }
 
 function noticeLabel(type: string) {
-  if (type === 'comment_added') return 'Комментарий';
-  if (type === 'task_added') return 'Новая задача';
-  if (type === 'task_deleted') return 'Удаление задачи';
-  return 'Изменение задачи';
+  if (type === 'comment_added') return t('Комментарий');
+  if (type === 'task_added') return t('Новая задача');
+  if (type === 'task_deleted') return t('Удаление задачи');
+  return t('Изменение задачи');
 }
 
-const NOTICE_DATE = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
+const NOTICE_DATE = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
 const PAGE_SIZE = 50;
 
 const TYPE_OPTIONS = [
-  { value: 'all', label: 'Все события' },
-  { value: 'comment_added', label: 'Комментарии' },
-  { value: 'task_updated', label: 'Изменения задач' },
-  { value: 'task_added', label: 'Новые задачи' },
-  { value: 'task_deleted', label: 'Удаления' },
+  {
+    value: 'all',
+    get label() {
+      return t('Все события');
+    },
+  },
+  {
+    value: 'comment_added',
+    get label() {
+      return t('Комментарии');
+    },
+  },
+  {
+    value: 'task_updated',
+    get label() {
+      return t('Изменения задач');
+    },
+  },
+  {
+    value: 'task_added',
+    get label() {
+      return t('Новые задачи');
+    },
+  },
+  {
+    value: 'task_deleted',
+    get label() {
+      return t('Удаления');
+    },
+  },
 ];
 
 async function fetchPage(
@@ -112,7 +138,7 @@ export default function NotificationsPage() {
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setError('Не удалось загрузить уведомления. Обновите страницу.');
+          setError(t('Не удалось загрузить уведомления. Обновите страницу.'));
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -126,9 +152,9 @@ export default function NotificationsPage() {
   async function clearHistory() {
     if (!items.length) return;
     const agreed = await confirm({
-      title: 'Очистить историю уведомлений?',
-      description: 'Записи удалятся безвозвратно, сами задачи в Битриксе не изменятся.',
-      confirmLabel: 'Очистить',
+      title: t('Очистить историю уведомлений?'),
+      description: t('Записи удалятся безвозвратно, сами задачи в Битриксе не изменятся.'),
+      confirmLabel: t('Очистить'),
       destructive: true,
     });
     if (!agreed) return;
@@ -139,7 +165,7 @@ export default function NotificationsPage() {
         setItems([]);
         setTotal(0);
         goToPage(1);
-      } else setError('Не удалось очистить историю. Попробуйте ещё раз.');
+      } else setError(t('Не удалось очистить историю. Попробуйте ещё раз.'));
     } finally {
       setClearing(false);
     }
@@ -148,8 +174,8 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-canvas">
       <PageHeader
-        title="Уведомления"
-        description="Последние изменения в задачах Битрикс24"
+        title={t('Уведомления')}
+        description={t('Последние изменения в задачах Битрикс24')}
         actions={
           <Button
             variant="secondary"
@@ -157,7 +183,7 @@ export default function NotificationsPage() {
             onClick={() => void clearHistory()}
             disabled={!items.length || clearing}
           >
-            Очистить
+            {t('Очистить')}
           </Button>
         }
       />
@@ -168,11 +194,11 @@ export default function NotificationsPage() {
             size="sm"
             variant="boxed"
             className={`${toolbarSelect} w-56`}
-            aria-label="Проект"
+            aria-label={t('Проект')}
             value={projectFilter}
             onChange={(event) => changeFilter(() => setProjectFilter(event.target.value))}
             options={[
-              { value: 'all', label: 'Все проекты' },
+              { value: 'all', label: t('Все проекты') },
               ...projectNames
                 .filter((project) => !project.isArchived)
                 .map((project) => ({ value: project.id, label: project.name })),
@@ -182,7 +208,7 @@ export default function NotificationsPage() {
             size="sm"
             variant="boxed"
             className={`${toolbarSelect} w-44`}
-            aria-label="Тип события"
+            aria-label={t('Тип события')}
             value={typeFilter}
             onChange={(event) => changeFilter(() => setTypeFilter(event.target.value))}
             options={TYPE_OPTIONS}
@@ -229,7 +255,12 @@ export default function NotificationsPage() {
                         <BitrixText text={item.message} />
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
-                        {item.taskId && <span>Задача #{item.taskId}</span>}
+                        {item.taskId && (
+                          <span>
+                            {t('Задача #')}
+                            {item.taskId}
+                          </span>
+                        )}
                         {/* Номер проекта ничего не говорит: показываем название, а пока
                             список проектов не пришёл — молчим. */}
                         {item.projectId && projectName(item.projectId) && (
@@ -256,12 +287,12 @@ export default function NotificationsPage() {
             {pageCount > 1 && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <p className="text-sm text-ink-soft">
-                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} из {total},
-                  страница {page} из {pageCount}
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} {t('из')} {total}
+                  {t(', страница')} {page} {t('из')} {pageCount}
                 </p>
                 <div
                   className="flex flex-wrap items-center justify-end gap-1"
-                  aria-label="Пагинация"
+                  aria-label={t('Пагинация')}
                 >
                   <Button
                     variant="secondary"
@@ -270,7 +301,7 @@ export default function NotificationsPage() {
                     onClick={() => goToPage(1)}
                     disabled={pageLoading || page === 1}
                   >
-                    Первая
+                    {t('Первая')}
                   </Button>
                   <Button
                     variant="secondary"
@@ -278,7 +309,7 @@ export default function NotificationsPage() {
                     onClick={() => goToPage(page - 1)}
                     disabled={pageLoading || page === 1}
                   >
-                    Назад
+                    {t('Назад')}
                   </Button>
                   {pageNumbers(page, pageCount).map((number) => (
                     <Button
@@ -298,7 +329,7 @@ export default function NotificationsPage() {
                     onClick={() => goToPage(page + 1)}
                     disabled={pageLoading || page >= pageCount}
                   >
-                    Вперёд
+                    {t('Вперёд')}
                   </Button>
                   <Button
                     variant="secondary"
@@ -307,7 +338,7 @@ export default function NotificationsPage() {
                     onClick={() => goToPage(pageCount)}
                     disabled={pageLoading || page >= pageCount}
                   >
-                    Последняя
+                    {t('Последняя')}
                   </Button>
                 </div>
               </div>
@@ -315,9 +346,9 @@ export default function NotificationsPage() {
           </div>
         ) : error ? null : (
           <Card padding="md">
-            <p className="text-sm font-bold text-ink">Пока нет уведомлений</p>
+            <p className="text-sm font-bold text-ink">{t('Пока нет уведомлений')}</p>
             <p className="mt-1 text-sm text-ink-soft">
-              Изменения задач и комментарии из Битрикс24 появятся здесь.
+              {t('Изменения задач и комментарии из Битрикс24 появятся здесь.')}
             </p>
           </Card>
         )}

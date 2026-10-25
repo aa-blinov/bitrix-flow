@@ -54,6 +54,7 @@ import {
 } from '@/lib/messenger';
 import { bitrixPlainText } from '@/lib/bitrix-markup';
 import { parseMessageNodes } from '@/lib/message-markdown';
+import { t } from '@/lib/i18n';
 
 // Пока жив SSE, обновление приходит событием, и опрос только подстраховывает.
 const MESSAGES_POLL_MS = 5_000;
@@ -175,7 +176,7 @@ export default function Conversation({
           onRead(dialogId);
         newestRef.current = Math.max(latest, ...data.messages.map((m) => m.id));
       })
-      .catch(() => setError('Не удалось загрузить сообщения.'));
+      .catch(() => setError(t('Не удалось загрузить сообщения.')));
   }, [request, dialogId, me, onRead]);
   const realtime = useRealtime();
   usePolling(load, realtime ? MESSAGES_POLL_REALTIME_MS : MESSAGES_POLL_MS);
@@ -200,7 +201,7 @@ export default function Conversation({
       // Портал может вернуть больше LIMIT, но не меньше, пока история не кончилась.
       setHasOlder(data.messages.length >= MESSAGES_PAGE);
     } catch {
-      setError('Не удалось загрузить более ранние сообщения.');
+      setError(t('Не удалось загрузить более ранние сообщения.'));
     } finally {
       setLoadingOlder(false);
     }
@@ -231,7 +232,7 @@ export default function Conversation({
 
   const nameOf = (message: Message) =>
     people[String(message.authorId)]?.name ||
-    (message.authorId === me ? 'Я' : `Пользователь ${message.authorId}`);
+    (message.authorId === me ? t('Я') : t('Пользователь {0}', message.authorId));
 
   const json = { 'Content-Type': 'application/json' };
 
@@ -279,8 +280,8 @@ export default function Conversation({
       // Черновик остаётся в поле: текст не теряется, можно отправить ещё раз.
       setError(
         editing
-          ? 'Не удалось изменить сообщение: править можно только свои и недолго после отправки.'
-          : 'Сообщение не отправилось. Попробуйте ещё раз.',
+          ? t('Не удалось изменить сообщение: править можно только свои и недолго после отправки.')
+          : t('Сообщение не отправилось. Попробуйте ещё раз.'),
       );
     } finally {
       setSending(false);
@@ -326,7 +327,9 @@ export default function Conversation({
       body: JSON.stringify({ messageId: target.id }),
     }).catch(() => null);
     if (!response?.ok) {
-      setError('Не удалось удалить сообщение: удалять можно только свои и недолго после отправки.');
+      setError(
+        t('Не удалось удалить сообщение: удалять можно только свои и недолго после отправки.'),
+      );
       return;
     }
     // Как в самом Битриксе: на месте сообщения остаётся пометка об удалении.
@@ -335,7 +338,7 @@ export default function Conversation({
         current &&
         current.map((m) =>
           m.id === target.id
-            ? { ...m, text: 'Это сообщение было удалено.', files: [], attach: [], likes: [] }
+            ? { ...m, text: t('Это сообщение было удалено.'), files: [], attach: [], likes: [] }
             : m,
         ),
     );
@@ -347,7 +350,9 @@ export default function Conversation({
     const message = forwarding;
     setForwarding(null);
     if (!message) return;
-    const text = quoteBlock(nameOf(message), message, 'Переслано от ');
+    const text = // Цитата уходит коллегам в чат: она всегда русская, как и остальные
+      // тексты, которые приложение пишет в Битрикс от вашего имени.
+      quoteBlock(nameOf(message), message, 'Переслано от ');
     // С файлами пересылает сервер: он скачивает их из этого чата и загружает в целевой.
     const response = await (
       message.files.length
@@ -368,9 +373,9 @@ export default function Conversation({
           })
     ).catch(() => null);
     if (response?.ok) {
-      setNotice(`Переслано в «${target.title}»`);
+      setNotice(t('Переслано в «{0}»', target.title));
       onSent();
-    } else setError('Не удалось переслать сообщение.');
+    } else setError(t('Не удалось переслать сообщение.'));
   }
 
   useEffect(() => {
@@ -478,7 +483,7 @@ export default function Conversation({
       setHighlightId(id);
       setSearchOpen(false);
     } catch {
-      setError('Не удалось открыть найденное сообщение.');
+      setError(t('Не удалось открыть найденное сообщение.'));
     }
   }
 
@@ -519,7 +524,7 @@ export default function Conversation({
 
   function addFiles(files: File[]) {
     const tooBig = files.find((file) => file.size > MAX_FILE_SIZE);
-    if (tooBig) setError(`Файл «${tooBig.name}» больше ${formatBytes(MAX_FILE_SIZE)}.`);
+    if (tooBig) setError(t('Файл «{0}» больше {1}.', tooBig.name, formatBytes(MAX_FILE_SIZE)));
     const fits = files.filter((file) => file.size <= MAX_FILE_SIZE);
     if (fits.length) setPending((current) => [...current, ...fits]);
   }
@@ -534,7 +539,7 @@ export default function Conversation({
       load();
       onSent();
     } catch {
-      setError(`Не удалось отправить «${file.name}». Попробуйте ещё раз.`);
+      setError(t('Не удалось отправить «{0}». Попробуйте ещё раз.', file.name));
     } finally {
       setProgress(null);
       setSending(false);
@@ -596,7 +601,7 @@ export default function Conversation({
       setSeconds(0);
       setRecording(true);
     } catch {
-      setError('Нет доступа к микрофону. Разрешите его в настройках браузера.');
+      setError(t('Нет доступа к микрофону. Разрешите его в настройках браузера.'));
     }
   }
 
@@ -658,7 +663,7 @@ export default function Conversation({
     >
       {dragging && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-2 border-dashed border-ink-soft bg-canvas/80 text-sm text-ink">
-          Отпустите файлы, чтобы прикрепить
+          {t('Отпустите файлы, чтобы прикрепить')}
         </div>
       )}
       <div className="flex min-h-14 items-center gap-3 border-b border-line px-3">
@@ -667,7 +672,7 @@ export default function Conversation({
           size="sm"
           className="md:hidden"
           onClick={onBack}
-          aria-label="К списку диалогов"
+          aria-label={t('К списку диалогов')}
         >
           <ArrowLeft className="size-4" strokeWidth={1.7} />
         </Button>
@@ -692,7 +697,7 @@ export default function Conversation({
         </div>
         {link && (
           <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
-            {dialog.kind === 'task' ? 'Открыть задачу' : 'Открыть проект'}
+            {dialog.kind === 'task' ? t('Открыть задачу') : t('Открыть проект')}
           </Link>
         )}
         {portal && (
@@ -701,20 +706,24 @@ export default function Conversation({
             href={`https://${portal}/online/?IM_DIALOG=${encodeURIComponent(dialog.id)}`}
             target="_blank"
             rel="noreferrer"
-            aria-label="Открыть диалог в Битриксе (там есть звонки)"
-            title="Открыть в Битриксе: там есть звонки и видеоконференции"
+            aria-label={t('Открыть диалог в Битриксе (там есть звонки)')}
+            title={t('Открыть в Битриксе: там есть звонки и видеоконференции')}
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-ui text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:size-11"
           >
             <Video className="size-4" strokeWidth={1.7} />
           </a>
         )}
         {dialog.kind === 'chat' && /^chat\d+$/.test(dialog.id) && (
-          <IconButton label="Настройки чата" variant="ghost" onClick={() => setSettingsOpen(true)}>
+          <IconButton
+            label={t('Настройки чата')}
+            variant="ghost"
+            onClick={() => setSettingsOpen(true)}
+          >
             <Users className="size-4" strokeWidth={1.7} />
           </IconButton>
         )}
         <IconButton
-          label={dialog.pinned ? 'Открепить диалог' : 'Закрепить диалог'}
+          label={dialog.pinned ? t('Открепить диалог') : t('Закрепить диалог')}
           variant="ghost"
           pressed={Boolean(dialog.pinned)}
           onClick={onPin}
@@ -722,7 +731,7 @@ export default function Conversation({
           <Pin className={`size-4 ${dialog.pinned ? 'fill-current' : ''}`} strokeWidth={1.7} />
         </IconButton>
         <IconButton
-          label="Поиск по сообщениям"
+          label={t('Поиск по сообщениям')}
           variant="ghost"
           pressed={searchOpen}
           onClick={() => setSearchOpen((value) => !value)}
@@ -734,14 +743,14 @@ export default function Conversation({
         <div className="space-y-2 border-b border-line p-3">
           <SearchField
             id="message-search"
-            label="Поиск по сообщениям"
-            placeholder="Поиск по сообщениям (от двух букв)"
+            label={t('Поиск по сообщениям')}
+            placeholder={t('Поиск по сообщениям (от двух букв)')}
             size="sm"
             value={searchQuery}
             onChange={setSearchQuery}
           />
           {results !== null && (
-            <ul className="max-h-56 overflow-y-auto" aria-label="Найденные сообщения">
+            <ul className="max-h-56 overflow-y-auto" aria-label={t('Найденные сообщения')}>
               {results.map((message) => (
                 <li key={message.id}>
                   <button
@@ -754,13 +763,13 @@ export default function Conversation({
                       <time dateTime={message.date}>{when(message.date)}</time>
                     </span>
                     <span className="line-clamp-2 text-sm text-ink">
-                      {bitrixPlainText(message.text, parseMessageNodes) || 'Вложение'}
+                      {bitrixPlainText(message.text, parseMessageNodes) || t('Вложение')}
                     </span>
                   </button>
                 </li>
               ))}
               {results.length === 0 && (
-                <li className="p-2 text-xs text-ink-soft">Ничего не найдено</li>
+                <li className="p-2 text-xs text-ink-soft">{t('Ничего не найдено')}</li>
               )}
             </ul>
           )}
@@ -780,7 +789,7 @@ export default function Conversation({
         {jumped && (
           <div className="sticky top-0 z-10 flex justify-center">
             <Button variant="secondary" size="sm" onClick={showLatest}>
-              К последним сообщениям
+              {t('К последним сообщениям')}
             </Button>
           </div>
         )}
@@ -792,7 +801,7 @@ export default function Conversation({
               onClick={() => void loadOlder()}
               disabled={loadingOlder}
             >
-              {loadingOlder ? 'Загрузка' : 'Показать более ранние'}
+              {loadingOlder ? t('Загрузка') : t('Показать более ранние')}
             </Button>
           </div>
         )}
@@ -824,7 +833,11 @@ export default function Conversation({
                   // фокусу (group-focus-within), а Enter или пробел держат её открытой.
                   tabIndex={0}
                   role="group"
-                  aria-label={`Сообщение ${message.authorId === me ? 'от вас' : `от ${nameOf(message)}`}, ${when(message.date)}`}
+                  aria-label={t(
+                    'Сообщение {0}, {1}',
+                    message.authorId === me ? 'от вас' : `от ${nameOf(message)}`,
+                    when(message.date),
+                  )}
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return;
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -847,7 +860,7 @@ export default function Conversation({
                       onClick={(event) => event.stopPropagation()}
                     >
                       <IconButton
-                        label="Ответить"
+                        label={t('Ответить')}
                         variant="ghost"
                         size="sm"
                         className="max-sm:h-9 max-sm:w-9"
@@ -856,7 +869,7 @@ export default function Conversation({
                         <CornerUpLeft className="size-3.5" strokeWidth={1.7} />
                       </IconButton>
                       <IconButton
-                        label={liked ? 'Убрать лайк' : 'Нравится'}
+                        label={liked ? t('Убрать лайк') : t('Нравится')}
                         variant="ghost"
                         size="sm"
                         className="max-sm:h-9 max-sm:w-9"
@@ -869,7 +882,7 @@ export default function Conversation({
                         />
                       </IconButton>
                       <IconButton
-                        label="Переслать"
+                        label={t('Переслать')}
                         variant="ghost"
                         size="sm"
                         className="max-sm:h-9 max-sm:w-9"
@@ -879,7 +892,7 @@ export default function Conversation({
                       </IconButton>
                       {mine && message.text && (
                         <IconButton
-                          label="Изменить"
+                          label={t('Изменить')}
                           variant="ghost"
                           size="sm"
                           className="max-sm:h-9 max-sm:w-9"
@@ -890,7 +903,7 @@ export default function Conversation({
                       )}
                       {(mine || role === 'owner' || role === 'manager') && (
                         <IconButton
-                          label="Удалить"
+                          label={t('Удалить')}
                           variant="ghost"
                           size="sm"
                           className="max-sm:h-9 max-sm:w-9"
@@ -907,7 +920,8 @@ export default function Conversation({
                         presence={people[String(message.authorId)]?.presence}
                         className="size-2"
                       />
-                      {people[String(message.authorId)]?.name || `Пользователь ${message.authorId}`}
+                      {people[String(message.authorId)]?.name ||
+                        t('Пользователь {0}', message.authorId)}
                     </p>
                   )}
                   {message.text && (
@@ -927,7 +941,7 @@ export default function Conversation({
                     <AttachView key={index} attach={attach} />
                   ))}
                   {!message.text && !message.files.length && !message.attach.length && (
-                    <p className="text-sm text-ink-soft">Сообщение без текста</p>
+                    <p className="text-sm text-ink-soft">{t('Сообщение без текста')}</p>
                   )}
                   <div className="mt-1 flex items-center justify-end gap-1.5 text-xs text-ink-soft">
                     {message.likes.length > 0 && (
@@ -938,7 +952,7 @@ export default function Conversation({
                           void toggleLike(message);
                         }}
                         aria-pressed={liked}
-                        aria-label={`Нравится: ${message.likes.length}`}
+                        aria-label={t('Нравится: {0}', message.likes.length)}
                         className="mr-auto inline-flex items-center gap-1 rounded-ui border border-line px-1.5 py-0.5"
                       >
                         <Heart
@@ -948,7 +962,7 @@ export default function Conversation({
                         {message.likes.length}
                       </button>
                     )}
-                    {message.edited && <span>изменено</span>}
+                    {message.edited && <span>{t('изменено')}</span>}
                     <time dateTime={message.date}>{when(message.date)}</time>
                     {mine && readers && dialog.kind !== 'channel' && (
                       <ReadMark
@@ -972,22 +986,22 @@ export default function Conversation({
       )}
       {!canPost ? (
         <p className="border-t border-line p-3 text-center text-sm text-ink-soft">
-          В этом канале писать могут только администраторы
+          {t('В этом канале писать могут только администраторы')}
         </p>
       ) : recording ? (
         <div className="flex items-center gap-3 border-t border-line p-3">
           <Mic className="size-4 animate-pulse text-danger-text" strokeWidth={1.7} />
           <span className="flex-1 text-sm text-ink" role="timer">
-            Запись {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+            {t('Запись')} {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
           </span>
           <Button
             variant="quiet"
             onClick={() => finishRecording(false)}
-            aria-label="Отменить запись"
+            aria-label={t('Отменить запись')}
           >
             <X className="size-4" strokeWidth={1.7} />
           </Button>
-          <Button onClick={() => finishRecording(true)} aria-label="Отправить голосовое">
+          <Button onClick={() => finishRecording(true)} aria-label={t('Отправить голосовое')}>
             <Send className="size-4" strokeWidth={1.7} />
           </Button>
         </div>
@@ -997,11 +1011,15 @@ export default function Conversation({
             <div className="flex items-center gap-2 border-b border-line px-3 py-1.5 text-xs text-ink-soft">
               <span className="min-w-0 flex-1 truncate">
                 {editing
-                  ? 'Редактирование сообщения'
-                  : `Ответ для ${nameOf(replyTo!)}: ${bitrixPlainText(replyTo!.text, parseMessageNodes) || 'вложение'}`}
+                  ? t('Редактирование сообщения')
+                  : t(
+                      'Ответ для {0}: {1}',
+                      nameOf(replyTo!),
+                      bitrixPlainText(replyTo!.text, parseMessageNodes) || 'вложение',
+                    )}
               </span>
               <IconButton
-                label="Отменить"
+                label={t('Отменить')}
                 variant="ghost"
                 size="sm"
                 onClick={() => {
@@ -1017,7 +1035,7 @@ export default function Conversation({
           {pending.length > 0 && (
             <ul
               className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
-              aria-label="Прикреплённые файлы"
+              aria-label={t('Прикреплённые файлы')}
             >
               {pending.map((file, index) => (
                 <PendingFile
@@ -1032,7 +1050,7 @@ export default function Conversation({
           {progress !== null && (
             <div
               role="progressbar"
-              aria-label="Отправка файла"
+              aria-label={t('Отправка файла')}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progress}
@@ -1044,7 +1062,7 @@ export default function Conversation({
           {mention && suggestions.length > 0 && (
             <ul
               role="listbox"
-              aria-label="Упомянуть"
+              aria-label={t('Упомянуть')}
               className="absolute bottom-full left-3 z-10 mb-1 w-64 rounded-ui border border-line bg-canvas p-1 shadow-overlay"
             >
               {suggestions.map((user, index) => (
@@ -1080,7 +1098,7 @@ export default function Conversation({
               type="file"
               multiple
               hidden
-              aria-label="Файлы"
+              aria-label={t('Файлы')}
               onChange={(event) => {
                 const files = [...(event.target.files || [])];
                 event.target.value = '';
@@ -1091,13 +1109,13 @@ export default function Conversation({
               variant="quiet"
               disabled={sending}
               onClick={() => picker.current?.click()}
-              aria-label="Прикрепить файл"
+              aria-label={t('Прикрепить файл')}
             >
               <Paperclip className="size-4" strokeWidth={1.7} />
             </Button>
             <TextArea
-              aria-label="Сообщение"
-              placeholder="Сообщение"
+              aria-label={t('Сообщение')}
+              placeholder={t('Сообщение')}
               variant="boxed"
               rows={1}
               // textarea по умолчанию строчный: под ним остаётся зазор в 7 px, обёртка выше
@@ -1148,7 +1166,7 @@ export default function Conversation({
               <Button
                 disabled={sending}
                 onClick={() => void startRecording()}
-                aria-label="Записать голосовое"
+                aria-label={t('Записать голосовое')}
               >
                 <Mic className="size-4" strokeWidth={1.7} />
               </Button>
@@ -1156,7 +1174,7 @@ export default function Conversation({
               <Button
                 type="submit"
                 disabled={(!draft.trim() && !pending.length) || sending}
-                aria-label="Отправить"
+                aria-label={t('Отправить')}
               >
                 <Send className="size-4" strokeWidth={1.7} />
               </Button>
@@ -1173,9 +1191,9 @@ export default function Conversation({
         open={deleting !== null}
         onCancel={() => setDeleting(null)}
         onConfirm={() => void confirmDelete()}
-        title="Удалить сообщение?"
-        description="Сообщение удалится у всех участников чата."
-        confirmLabel="Удалить"
+        title={t('Удалить сообщение?')}
+        description={t('Сообщение удалится у всех участников чата.')}
+        confirmLabel={t('Удалить')}
       />
       <ChatSettingsModal
         open={settingsOpen}
@@ -1247,7 +1265,7 @@ function PendingFile({
         type="button"
         onClick={onRemove}
         disabled={disabled}
-        aria-label={`Убрать ${file.name}`}
+        aria-label={t('Убрать {0}', file.name)}
         className="shrink-0 text-ink-soft hover:text-ink disabled:opacity-30"
       >
         <X className="size-3.5" strokeWidth={1.7} />

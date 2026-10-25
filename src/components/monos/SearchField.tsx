@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export type SearchFieldProps = {
   value?: string;
@@ -32,8 +33,8 @@ export function SearchField({
   value,
   onChange,
   onClear,
-  placeholder = 'Поиск',
-  label = 'Поиск',
+  placeholder = t('Поиск'),
+  label = t('Поиск'),
   size = 'md',
   disabled = false,
   id,
@@ -85,7 +86,7 @@ export function SearchField({
       {current ? (
         <button
           type="button"
-          aria-label="Очистить"
+          aria-label={t('Очистить')}
           onClick={clear}
           className="absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-ui text-ink-soft transition-colors duration-fast hover:text-ink"
         >

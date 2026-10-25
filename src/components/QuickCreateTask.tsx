@@ -12,6 +12,7 @@ import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
 import { useTaskToasts } from '@/components/monos/toast';
+import { t } from '@/lib/i18n';
 
 export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId?: string }) {
   const projects = useKanbanStore((state) => state.projects);
@@ -48,14 +49,14 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
         deadline: deadline || undefined,
         projectId,
       });
-      toasts.saved('Задача создана');
+      toasts.saved(t('Задача создана'));
       setTitle('');
       setDescription('');
       setDeadline('');
       setOpen(false);
       void loadAllTasks();
     } catch (error) {
-      toasts.failed('Задачу не создали', error);
+      toasts.failed(t('Задачу не создали'), error);
     } finally {
       setSaving(false);
     }
@@ -69,25 +70,25 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
         icon={<Plus size={14} strokeWidth={1.7} />}
         onClick={() => setOpen(true)}
       >
-        Новая задача
+        {t('Новая задача')}
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Новая задача"
+        title={t('Новая задача')}
         size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              Отмена
+              {t('Отмена')}
             </Button>
             <Button
               onClick={() => void submit()}
               disabled={!title.trim() || !projectId || !assigneeId || saving}
               loading={saving}
             >
-              Создать
+              {t('Создать')}
             </Button>
           </>
         }
@@ -98,8 +99,8 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
             autoFocus
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Что нужно сделать"
-            aria-label="Название задачи"
+            placeholder={t('Что нужно сделать')}
+            aria-label={t('Название задачи')}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && title.trim() && projectId && assigneeId) void submit();
             }}
@@ -108,21 +109,21 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
             variant="boxed"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Описание (необязательно)"
-            aria-label="Описание задачи"
+            placeholder={t('Описание (необязательно)')}
+            aria-label={t('Описание задачи')}
             rows={3}
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <SelectField
               variant="boxed"
-              aria-label="Проект"
+              aria-label={t('Проект')}
               value={projectId}
               onChange={(event) => setProjectId(event.target.value)}
               options={projects.map((project) => ({ value: project.id, label: project.name }))}
             />
             <SelectField
               variant="boxed"
-              aria-label="Исполнитель"
+              aria-label={t('Исполнитель')}
               value={assigneeId}
               onChange={(event) => setAssigneeId(event.target.value)}
               options={users.map((user) => ({ value: user.id, label: user.name }))}
@@ -133,7 +134,7 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
             type="date"
             value={deadline}
             onChange={(event) => setDeadline(event.target.value)}
-            aria-label="Дедлайн"
+            aria-label={t('Дедлайн')}
           />
         </div>
       </Modal>

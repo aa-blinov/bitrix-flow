@@ -53,6 +53,7 @@ import {
   type FilterFieldKey,
   type FilterValues,
 } from '@/lib/task-filters';
+import { t } from '@/lib/i18n';
 
 // Битрикс принимает одного исполнителя, поэтому мультивыбор сужаем до первого:
 // остальное отфильтрует /api/tasks/all, откуда доска и список и берут данные.
@@ -75,10 +76,10 @@ function normalizeComments(
       taskId,
       isSystem,
       authorName: isSystem
-        ? 'Система'
+        ? t('Система')
         : comment.authorName ||
           users.find((user) => user.id === comment.authorId)?.name ||
-          'Пользователь',
+          t('Пользователь'),
     };
   });
 }
@@ -302,7 +303,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   stages: [],
   selectedProjectId: null,
   selectedTaskId: null,
-  currentUser: { id: '', name: 'Не определён' },
+  currentUser: { id: '', name: t('Не определён') },
   stagesLoadedFor: null,
   memberId: '',
   allTasks: [],
@@ -800,7 +801,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       set({
         searchResults: [],
         isSearching: false,
-        searchError: 'Поиск не удался. Попробуйте ещё раз.',
+        searchError: t('Поиск не удался. Попробуйте ещё раз.'),
       });
     }
   },
@@ -820,7 +821,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       );
       const requested = field === 'assigneeId' ? (value ? [value] : []) : value;
       if (requested.some((id: string) => !memberIds.has(String(id))))
-        throw new Error('Можно назначать только участников проекта');
+        throw new Error(t('Можно назначать только участников проекта'));
     }
 
     // Optimistic update
@@ -828,7 +829,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     if (field === 'assigneeId') {
       const user = users.find((item) => item.id === value);
       update.assigneeId = value;
-      update.assigneeName = user?.name || 'Не назначен';
+      update.assigneeName = user?.name || t('Не назначен');
     } else if (field === 'priority') update.priority = value;
     else if (field === 'deadline') update.dueDate = value;
     else if (field === 'estimate') update.estimate = value;
@@ -913,7 +914,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       : await fetchProjectStages(projectId)
           .then((stages) => stages.find((stage) => stage.systemType === 'NEW')?.id || stages[0]?.id)
           .catch(() => undefined);
-    if (!stageId) throw new Error('В проекте нет этапов для переноса задачи');
+    if (!stageId) throw new Error(t('В проекте нет этапов для переноса задачи'));
 
     set((state) => ({
       tasks:

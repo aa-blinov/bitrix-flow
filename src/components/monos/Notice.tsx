@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
 
@@ -25,7 +26,7 @@ export function Notice({
   tone = 'info',
   title = '',
   dismissible = false,
-  dismissLabel = 'Закрыть',
+  dismissLabel = t('Закрыть'),
   onDismiss,
   children,
   ...props

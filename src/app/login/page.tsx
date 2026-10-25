@@ -7,6 +7,7 @@ import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { TextField } from '@/components/monos/TextField';
+import { t } from '@/lib/i18n';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,15 +35,15 @@ export default function LoginPage() {
       if (!response.ok) {
         setError(
           data.error === 'TOO_MANY_ATTEMPTS'
-            ? 'Слишком много попыток. Повторите через 15 минут.'
-            : 'Неверный логин или пароль.',
+            ? t('Слишком много попыток. Повторите через 15 минут.')
+            : t('Неверный логин или пароль.'),
         );
         return;
       }
       router.replace(data.next || '/');
       router.refresh();
     } catch {
-      setError('Не удалось подключиться к серверу.');
+      setError(t('Не удалось подключиться к серверу.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -58,13 +59,15 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-ink">BitrixFlow</h1>
-              <p className="text-xs uppercase tracking-widest text-ink-soft">Защищённый доступ</p>
+              <p className="text-xs uppercase tracking-widest text-ink-soft">
+                {t('Защищённый доступ')}
+              </p>
             </div>
           </div>
 
           <div className="flex flex-col gap-4">
             <TextField
-              label="Логин"
+              label={t('Логин')}
               variant="boxed"
               autoComplete="username"
               required
@@ -72,7 +75,7 @@ export default function LoginPage() {
               onChange={(event) => setUsername(event.target.value)}
             />
             <TextField
-              label="Пароль"
+              label={t('Пароль')}
               type="password"
               variant="boxed"
               autoComplete="current-password"
@@ -82,7 +85,7 @@ export default function LoginPage() {
             />
             {error ? <Notice tone="danger">{error}</Notice> : null}
             <Button full size="lg" loading={isSubmitting} type="submit">
-              {isSubmitting ? 'Входим…' : 'Войти'}
+              {isSubmitting ? t('Входим…') : t('Войти')}
             </Button>
           </div>
         </form>

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { t } from '@/lib/i18n';
 
 /**
  * Подтверждение того, что нельзя отменить. Это alertdialog: без крестика и
@@ -32,8 +33,8 @@ export function AlertDialog({
   onConfirm,
   title = '',
   description = '',
-  confirmLabel = 'Подтвердить',
-  cancelLabel = 'Отмена',
+  confirmLabel = t('Подтвердить'),
+  cancelLabel = t('Отмена'),
   tone = 'danger',
   loading = false,
   closeOnConfirm = true,

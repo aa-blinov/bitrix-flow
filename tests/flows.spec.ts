@@ -987,3 +987,22 @@ test('мессенджер: просмотрщик держит фокус вн�
   await expect(viewer).toHaveCount(0);
   await expect(photo).toBeFocused();
 });
+
+test('английский включается переключателем и переживает перезагрузку', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  const english = page.getByRole('button', { name: 'EN', exact: true });
+  // На мобильном боковая панель спрятана за кнопкой меню.
+  if (!(await english.isVisible()))
+    await page.getByRole('button', { name: 'Открыть меню' }).click();
+  await english.click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
+  await context.clearCookies({ name: 'bitrix-flow-locale' });
+});

@@ -1,8 +1,9 @@
 // Общие мелочи мессенджера: форматирование времени и опрос.
 import { useEffect } from 'react';
+import { dateFormat } from '@/lib/i18n';
 
-const TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
-const DAY = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+const TIME = dateFormat({ hour: '2-digit', minute: '2-digit' });
+const DAY = dateFormat({ day: 'numeric', month: 'short' });
 
 export function when(date: string) {
   const parsed = new Date(date);

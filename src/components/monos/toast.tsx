@@ -5,6 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 type ToastTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -54,7 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         className="pointer-events-none fixed inset-x-0 bottom-0 z-tooltip flex flex-col items-center gap-2 p-4 sm:inset-x-auto sm:right-4 sm:items-end"
         role="region"
-        aria-label="Сообщения приложения"
+        aria-label={t('Сообщения приложения')}
       >
         {items.map((item) => (
           <Toast key={item.id} item={item} onDismiss={() => dismiss(item.id)} />
@@ -104,7 +105,7 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
       ) : null}
       <button
         type="button"
-        aria-label="Закрыть уведомление"
+        aria-label={t('Закрыть уведомление')}
         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-ui text-ink-soft transition-colors duration-fast hover:text-ink max-sm:h-11 max-sm:w-11"
         onClick={onDismiss}
       >
@@ -131,11 +132,11 @@ export function useTaskToasts() {
         toast({
           title: what,
           description:
-            error instanceof Error ? error.message.slice(0, 160) : 'Изменение не сохранилось',
+            error instanceof Error ? error.message.slice(0, 160) : t('Изменение не сохранилось'),
           tone: 'danger',
         }),
       undoable: (title: string, undo: () => void | Promise<void>) =>
-        toast({ title, tone: 'success', action: { label: 'Отменить', onClick: undo } }),
+        toast({ title, tone: 'success', action: { label: t('Отменить'), onClick: undo } }),
     }),
     [toast],
   );

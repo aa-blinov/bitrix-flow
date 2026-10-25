@@ -33,6 +33,7 @@ export type {
   FilterPreset,
   FilterValues,
 } from '@/lib/task-filters';
+import { t } from '@/lib/i18n';
 export { splitValues } from '@/lib/task-filters';
 
 function optionLabel(field: FilterField, value: string): string {
@@ -133,7 +134,7 @@ export default function TaskFilterBar({
           tone="accent"
           size="md"
           removable
-          removeLabel={`Убрать фильтр «${field.label}»`}
+          removeLabel={t('Убрать фильтр «{0}»', field.label)}
           onRemove={() => onChange(field.key, field.empty)}
         >
           {field.toggle ? field.label : `${field.label}: ${optionLabel(field, values[field.key])}`}
@@ -151,7 +152,7 @@ export default function TaskFilterBar({
             className={`${toolbarControl} ${stacked ? 'w-full justify-center' : ''}`}
             icon={<Plus size={14} strokeWidth={1.7} />}
           >
-            Фильтр
+            {t('Фильтр')}
           </Button>
         }
       >
@@ -172,7 +173,7 @@ export default function TaskFilterBar({
           ) : (
             <>
               <p className="px-1 py-1 text-xs font-bold uppercase tracking-widest text-ink-faint">
-                Фильтровать по полю
+                {t('Фильтровать по полю')}
               </p>
               <Separator className="my-1" />
               <div className="flex flex-col gap-0.5">
@@ -212,7 +213,7 @@ export default function TaskFilterBar({
           icon={<Filter size={14} strokeWidth={1.7} />}
           trailing={<Badge tone="neutral">{active.length}</Badge>}
         >
-          Сбросить
+          {t('Сбросить')}
         </Button>
       ) : null}
     </div>

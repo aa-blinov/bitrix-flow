@@ -27,6 +27,7 @@ import {
 } from '@/lib/messenger';
 import { internalHref } from '@/lib/portal-links';
 import { safeHref } from '@/lib/safe-url';
+import { t } from '@/lib/i18n';
 
 export function ReadMark({
   readers,
@@ -39,7 +40,9 @@ export function ReadMark({
   group: boolean;
 }) {
   const seen = readers.length > 0;
-  const label = seen ? `Прочитано: ${readers.map((r) => r.name).join(', ')}` : 'Не прочитано';
+  const label = seen
+    ? t('Прочитано: {0}', readers.map((r) => r.name).join(', '))
+    : t('Не прочитано');
   const icon = (
     <>
       {seen ? (
@@ -74,12 +77,14 @@ export function ReadMark({
     >
       <div className="w-56 space-y-2 text-xs text-ink">
         <div>
-          <p className="font-medium">Прочитали</p>
-          <p className="text-ink-soft">{readers.map((r) => r.name).join(', ') || 'Пока никто'}</p>
+          <p className="font-medium">{t('Прочитали')}</p>
+          <p className="text-ink-soft">
+            {readers.map((r) => r.name).join(', ') || t('Пока никто')}
+          </p>
         </div>
         {unread.length > 0 && (
           <div>
-            <p className="font-medium">Не прочитали</p>
+            <p className="font-medium">{t('Не прочитали')}</p>
             <p className="text-ink-soft">{unread.map((r) => r.name).join(', ')}</p>
           </div>
         )}
@@ -122,14 +127,14 @@ export function FileView({
         <button
           type="button"
           onClick={() => onOpen(file.id)}
-          aria-label={file.kind === 'video' ? `Открыть видео ${file.name}` : undefined}
+          aria-label={file.kind === 'video' ? t('Открыть видео {0}', file.name) : undefined}
           className={`relative block ${file.kind === 'image' ? 'cursor-zoom-in' : ''}`}
         >
           {loading && (
             <span className="relative block h-40 w-56 max-w-full">
               <Skeleton width="100%" height="100%" />
               <Spinner
-                label="Загрузка файла"
+                label={t('Загрузка файла')}
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-ink-soft"
               />
             </span>
@@ -173,7 +178,7 @@ export function FileView({
     if (media.status === 'error') return <MediaError name={file.name} onRetry={media.retry} />;
     return (
       <div className="mt-1">
-        <Caption>{isVoice ? 'Голосовое сообщение' : file.name}</Caption>
+        <Caption>{isVoice ? t('Голосовое сообщение') : file.name}</Caption>
         <div className="mt-0.5 flex items-center gap-2">
           <audio
             ref={audio}
@@ -193,11 +198,11 @@ export function FileView({
             className="w-64 max-w-full"
           />
           {media.status === 'loading' && (
-            <Spinner label="Загрузка файла" size="sm" className="text-ink-soft" />
+            <Spinner label={t('Загрузка файла')} size="sm" className="text-ink-soft" />
           )}
           <button
             type="button"
-            aria-label={`Скорость воспроизведения ${rate}×`}
+            aria-label={t('Скорость воспроизведения {0}×', rate)}
             onClick={() => {
               const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
               setRate(next);
@@ -230,7 +235,7 @@ export function FileView({
           href={fileUrl(dialogId, file)}
           target="_blank"
           rel="noreferrer"
-          aria-label={`Открыть ${file.name} в новой вкладке`}
+          aria-label={t('Открыть {0} в новой вкладке', file.name)}
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-ui text-ink-soft hover:bg-surface-2 hover:text-ink max-sm:size-11"
         >
           <ExternalLink className="size-4" strokeWidth={1.7} />

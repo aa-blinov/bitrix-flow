@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader';
 import QuickCreateTask from '@/components/QuickCreateTask';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid from '@/components/TaskGrid';
+import { t } from '@/lib/i18n';
 
 function MyTasksInner() {
   const projects = useKanbanStore((state) => state.projects);
@@ -37,8 +38,8 @@ function MyTasksInner() {
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
-        title="Мои задачи"
-        description="Задачи, где вы указаны исполнителем"
+        title={t('Мои задачи')}
+        description={t('Задачи, где вы указаны исполнителем')}
         actions={<QuickCreateTask />}
       />
 

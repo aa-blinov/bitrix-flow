@@ -12,8 +12,9 @@ import { IconButton } from '@/components/monos/IconButton';
 import { SearchField } from '@/components/monos/SearchField';
 import { Skeleton } from '@/components/monos/Skeleton';
 import PageHeader from '@/components/PageHeader';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 
-const DUE_DATE = new Intl.DateTimeFormat('ru-RU');
+const DUE_DATE = dateFormat();
 
 // Точка статуса: цвет здесь — сигнал, поэтому у каждого состояния своя роль
 // набора, а не «какой-нибудь синий».
@@ -92,7 +93,7 @@ function SearchPageContent() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <PageHeader title="Поиск" description="Задачи во всех доступных проектах" />
+      <PageHeader title={t('Поиск')} description={t('Задачи во всех доступных проектах')} />
 
       {/* Search Input */}
       <div className="border-b border-line bg-canvas p-4 lg:p-6">
@@ -101,8 +102,8 @@ function SearchPageContent() {
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Поиск задач по названию…"
-            label="Поиск задач по названию"
+            placeholder={t('Поиск задач по названию…')}
+            label={t('Поиск задач по названию')}
             size="lg"
             autoFocus
           />
@@ -119,9 +120,9 @@ function SearchPageContent() {
         ) : searchResults.length > 0 ? (
           <div className="max-w-2xl space-y-3">
             <p className="text-sm text-ink-soft">
-              Найдено: {searchTotal}
+              {t('Найдено:')} {searchTotal}
               {searchTotal > searchResults.length &&
-                `, показаны первые ${searchResults.length} — уточните запрос`}
+                t(', показаны первые {0} — уточните запрос', searchResults.length)}
             </p>
             {searchResults.map((task) => (
               <Card
@@ -188,11 +189,13 @@ function SearchPageContent() {
           </p>
         ) : query ? (
           <p className="max-w-2xl py-8 text-center text-ink-soft">
-            Задачи по запросу «{query}» не найдены
+            {t('Задачи по запросу «')}
+            {query}
+            {t('» не найдены')}
           </p>
         ) : (
           <p className="max-w-2xl py-8 text-center text-ink-soft">
-            Начните вводить текст для поиска
+            {t('Начните вводить текст для поиска')}
           </p>
         )}
       </div>

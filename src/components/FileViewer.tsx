@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MediaError, useMediaLoad } from '@/components/MediaState';
 import { IconButton } from '@/components/monos/IconButton';
 import { Spinner } from '@/components/monos/Spinner';
+import { t } from '@/lib/i18n';
 
 export type ViewerItem = {
   id: number;
@@ -79,7 +80,7 @@ export default function FileViewer({
       ref={panel}
       role="dialog"
       aria-modal="true"
-      aria-label={`Просмотр: ${item.name}`}
+      aria-label={t('Просмотр: {0}', item.name)}
       tabIndex={-1}
       className="fixed inset-0 z-modal flex flex-col bg-canvas text-ink outline-none"
     >
@@ -87,18 +88,18 @@ export default function FileViewer({
         <p className="min-w-0 flex-1 truncate text-sm font-medium">{item.name}</p>
         {items.length > 1 && (
           <span className="shrink-0 text-xs text-ink-soft" aria-live="polite">
-            {index + 1} из {items.length}
+            {index + 1} {t('из')} {items.length}
           </span>
         )}
         <a
           href={item.downloadSrc}
           download={item.name}
-          aria-label="Скачать"
+          aria-label={t('Скачать')}
           className="inline-flex size-9 items-center justify-center rounded-ui text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:size-11"
         >
           <Download className="size-4" strokeWidth={1.7} />
         </a>
-        <IconButton label="Закрыть" variant="ghost" tooltipText="" onClick={onClose}>
+        <IconButton label={t('Закрыть')} variant="ghost" tooltipText="" onClick={onClose}>
           <X className="size-4" strokeWidth={1.7} />
         </IconButton>
       </div>
@@ -111,7 +112,7 @@ export default function FileViewer({
         <ViewerMedia key={item.id} item={item} />
         {hasPrev && (
           <IconButton
-            label="Предыдущий файл"
+            label={t('Предыдущий файл')}
             tooltipText=""
             className="absolute left-3 top-1/2 -translate-y-1/2 bg-canvas"
             onClick={() => onIndex(index - 1)}
@@ -121,7 +122,7 @@ export default function FileViewer({
         )}
         {hasNext && (
           <IconButton
-            label="Следующий файл"
+            label={t('Следующий файл')}
             tooltipText=""
             className="absolute right-3 top-1/2 -translate-y-1/2 bg-canvas"
             onClick={() => onIndex(index + 1)}
@@ -149,12 +150,12 @@ function ViewerMedia({ item }: { item: ViewerItem }) {
   const hidden = 'sr-only';
   return (
     <>
-      {loading && <Spinner size="xl" label="Загрузка файла" className="text-ink-soft" />}
+      {loading && <Spinner size="xl" label={t('Загрузка файла')} className="text-ink-soft" />}
       {item.kind === 'image' ? (
         <button
           type="button"
           onClick={() => setZoomed((value) => !value)}
-          aria-label={zoomed ? 'Уменьшить' : 'Увеличить'}
+          aria-label={zoomed ? t('Уменьшить') : t('Увеличить')}
           className={`${zoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'} ${loading ? hidden : ''}`}
         >
           <img

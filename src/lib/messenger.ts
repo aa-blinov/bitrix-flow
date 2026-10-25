@@ -1,6 +1,7 @@
 import { bitrixPlainText } from '@/lib/bitrix-markup';
 import { parseMessageNodes } from '@/lib/message-markdown';
 import { usableAvatar } from '@/lib/utils';
+import { dateFormat, relativeFormat, t } from '@/lib/i18n';
 
 // Нормализация ответов im.* в то, что рисует мессенджер. Сырой ответ портала
 // несёт десятки полей чата и пользователя, которые клиенту не нужны.
@@ -27,26 +28,27 @@ export function presenceOf(user: any, now = Date.now()): Presence {
   return { state: 'online', lastSeen, female };
 }
 
-const AGO = new Intl.RelativeTimeFormat('ru-RU', { numeric: 'always' });
-const SEEN_DAY = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
-const SEEN_TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const AGO = relativeFormat({ numeric: 'always' });
+const SEEN_DAY = dateFormat({ day: 'numeric', month: 'short' });
+const SEEN_TIME = dateFormat({ hour: '2-digit', minute: '2-digit' });
 
 /** Подпись под именем: «в сети», «не беспокоить», «отошёл» или когда был в последний раз. */
 export function presenceText(presence: Presence | undefined, now = Date.now()): string {
   if (!presence) return '';
-  if (presence.state === 'online') return 'в сети';
-  if (presence.state === 'busy') return 'не беспокоить';
-  if (presence.state === 'away') return presence.female ? 'отошла' : 'отошёл';
+  if (presence.state === 'online') return t('в сети');
+  if (presence.state === 'busy') return t('не беспокоить');
+  if (presence.state === 'away') return presence.female ? t('отошла') : t('отошёл');
   if (!presence.lastSeen) return '';
-  const verb = presence.female ? 'Была' : 'Был';
+  const verb = presence.female ? t('Была') : t('Был');
   const minutes = Math.max(1, Math.round((now - presence.lastSeen) / 60_000));
-  if (minutes < 60) return `${verb} в сети ${AGO.format(-minutes, 'minute')}`;
-  if (minutes < 24 * 60) return `${verb} в сети ${AGO.format(-Math.round(minutes / 60), 'hour')}`;
+  if (minutes < 60) return t('{0} в сети {1}', verb, AGO.format(-minutes, 'minute'));
+  if (minutes < 24 * 60)
+    return t('{0} в сети {1}', verb, AGO.format(-Math.round(minutes / 60), 'hour'));
   const seen = new Date(presence.lastSeen);
   const yesterday = new Date(now - 24 * 3_600_000);
   return seen.toDateString() === yesterday.toDateString()
-    ? `${verb} в сети вчера в ${SEEN_TIME.format(seen)}`
-    : `${verb} в сети ${SEEN_DAY.format(seen)}`;
+    ? t('{0} в сети вчера в {1}', verb, SEEN_TIME.format(seen))
+    : t('{0} в сети {1}', verb, SEEN_DAY.format(seen));
 }
 
 export type DialogKind = 'user' | 'group' | 'task' | 'channel' | 'chat';
@@ -167,7 +169,7 @@ export function normalizeDialogs(result: any, me = 0): Dialog[] {
       return {
         id: String(item.id),
         kind,
-        title: String(item.title || item.user?.name || item.chat?.name || 'Без названия'),
+        title: String(item.title || item.user?.name || item.chat?.name || t('Без названия')),
         avatar: usableAvatar(kind === 'user' ? item.user?.avatar : item.avatar?.url),
         color: item.avatar?.color || item.user?.color,
         // unread без счётчика значит «отмечен непрочитанным вручную».
@@ -187,7 +189,7 @@ export function normalizeDialogs(result: any, me = 0): Dialog[] {
               id: Number(message.id),
               text:
                 bitrixPlainText(String(message.text || ''), parseMessageNodes) ||
-                (message.file ? 'Файл' : message.attach ? 'Вложение' : ''),
+                (message.file ? t('Файл') : message.attach ? t('Вложение') : ''),
               date: String(message.date || ''),
               authorId: Number(message.author_id) || 0,
             }
@@ -256,7 +258,7 @@ export function normalizeMessages(result: any): {
   for (const file of Array.isArray(result?.files) ? result.files : []) {
     files.set(Number(file.id), {
       id: Number(file.id),
-      name: String(file.name || 'Файл'),
+      name: String(file.name || t('Файл')),
       size: Number(file.size) || 0,
       kind: fileKind(file),
     });
@@ -306,9 +308,9 @@ export function fileUrl(dialogId: string, file: MessageFile, download = false): 
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  if (bytes < 1024) return t('{0} Б', bytes);
+  if (bytes < 1024 * 1024) return t('{0} КБ', Math.round(bytes / 1024));
+  return t('{0} МБ', (bytes / 1024 / 1024).toFixed(1));
 }
 
 export type UserHit = {
@@ -390,7 +392,7 @@ export function normalizeDialogInfo(result: any, id: string): Dialog | null {
   return {
     id,
     kind,
-    title: String(result.name || 'Без названия'),
+    title: String(result.name || t('Без названия')),
     avatar: usableAvatar(result.avatar),
     chatId: Number(result.id) || undefined,
     entityId: result.entity_id ? String(result.entity_id) : undefined,
@@ -417,7 +419,7 @@ export function normalizeChatHits(result: any): Dialog[] {
       return {
         id: `chat${Number(chat.id)}`,
         kind,
-        title: String(chat.name || 'Без названия'),
+        title: String(chat.name || t('Без названия')),
         avatar: usableAvatar(chat.avatar),
         chatId: Number(chat.id),
         entityId: chat.entity_id ? String(chat.entity_id) : undefined,
@@ -432,8 +434,10 @@ export function normalizeChatHits(result: any): Dialog[] {
 export function portalErrorHint(message: unknown): string | null {
   const text = String(message || '');
   if (/дисковый ресурс|disk (space|quota)/i.test(text))
-    return 'Портал Битрикс24 отклоняет все запросы: на нём закончилось место на диске. Нужно освободить место или расширить тариф.';
+    return t(
+      'Портал Битрикс24 отклоняет все запросы: на нём закончилось место на диске. Нужно освободить место или расширить тариф.',
+    );
   if (/expired_token|invalid_token|NO_AUTH/i.test(text))
-    return 'Доступ приложения к порталу истёк. Откройте приложение из Битрикс24 заново.';
+    return t('Доступ приложения к порталу истёк. Откройте приложение из Битрикс24 заново.');
   return null;
 }

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { IconButton } from './IconButton';
+import { t } from '@/lib/i18n';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -73,7 +74,7 @@ export function Modal({
   title = '',
   description = '',
   size = 'md',
-  closeLabel = 'Закрыть',
+  closeLabel = t('Закрыть'),
   closeOnBackdrop = true,
   closeOnEscape = true,
   showClose = true,

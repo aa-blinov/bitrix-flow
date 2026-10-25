@@ -10,6 +10,7 @@ import { Modal } from '@/components/monos/Modal';
 import { SearchField } from '@/components/monos/SearchField';
 import { TextField } from '@/components/monos/TextField';
 import type { Dialog, UserHit } from '@/lib/messenger';
+import { t } from '@/lib/i18n';
 
 const post = (body: Record<string, unknown>) =>
   fetch('/api/messenger/chat', {
@@ -96,7 +97,7 @@ export function ChatSettingsModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="Настройки чата" size="md">
+      <Modal open={open} onClose={onClose} title={t('Настройки чата')} size="md">
         <div className="space-y-4">
           <form
             className="flex items-end gap-2"
@@ -107,12 +108,12 @@ export function ChatSettingsModal({
               void run(async () => {
                 await post({ dialogId: dialog.id, action: 'rename', title: next });
                 onRenamed(next);
-              }, 'Не удалось переименовать: менять название может владелец чата.');
+              }, t('Не удалось переименовать: менять название может владелец чата.'));
             }}
           >
             <TextField
               id="chat-settings-title"
-              label="Название"
+              label={t('Название')}
               variant="boxed"
               size="sm"
               className="flex-1"
@@ -121,15 +122,16 @@ export function ChatSettingsModal({
               onChange={(event) => setTitle(event.target.value)}
             />
             <Button type="submit" disabled={busy || !title.trim() || title.trim() === dialog.title}>
-              Сохранить
+              {t('Сохранить')}
             </Button>
           </form>
 
           <div>
             <p className="mb-1.5 text-xs uppercase tracking-widest text-ink-soft">
-              Участники{members ? ` (${members.length})` : ''}
+              {t('Участники')}
+              {members ? ` (${members.length})` : ''}
             </p>
-            <ul className="max-h-48 overflow-y-auto" aria-label="Участники чата">
+            <ul className="max-h-48 overflow-y-auto" aria-label={t('Участники чата')}>
               {(members || []).map((member) => (
                 <li key={member.id} className="flex min-h-11 items-center gap-3 px-1">
                   <Avatar name={member.name} src={member.avatar} size="sm" />
@@ -139,12 +141,12 @@ export function ChatSettingsModal({
                     <button
                       type="button"
                       disabled={busy}
-                      aria-label={`Исключить ${member.name}`}
+                      aria-label={t('Исключить {0}', member.name)}
                       onClick={() =>
                         void run(async () => {
                           await post({ dialogId: dialog.id, action: 'remove', userId: member.id });
                           loadMembers();
-                        }, 'Не удалось исключить: на это нужны права в чате.')
+                        }, t('Не удалось исключить: на это нужны права в чате.'))
                       }
                       className="shrink-0 text-ink-soft hover:text-ink disabled:opacity-30"
                     >
@@ -159,14 +161,14 @@ export function ChatSettingsModal({
           <div className="space-y-2">
             <SearchField
               id="chat-settings-add"
-              label="Добавить участника"
-              placeholder="Добавить участника (от двух букв)"
+              label={t('Добавить участника')}
+              placeholder={t('Добавить участника (от двух букв)')}
               size="sm"
               value={query}
               onChange={setQuery}
             />
             {candidates.length > 0 && (
-              <ul className="max-h-40 overflow-y-auto" aria-label="Кого добавить">
+              <ul className="max-h-40 overflow-y-auto" aria-label={t('Кого добавить')}>
                 {candidates.map((user) => (
                   <li key={user.id}>
                     <button
@@ -177,13 +179,13 @@ export function ChatSettingsModal({
                           await post({ dialogId: dialog.id, action: 'add', userIds: [user.id] });
                           setQuery('');
                           loadMembers();
-                        }, 'Не удалось добавить: на это нужны права в чате.')
+                        }, t('Не удалось добавить: на это нужны права в чате.'))
                       }
                       className="flex min-h-11 w-full items-center gap-3 rounded-ui px-2 py-1.5 text-left hover:bg-surface-2"
                     >
                       <Avatar name={user.name} src={user.avatar} size="sm" />
                       <span className="min-w-0 flex-1 truncate text-sm text-ink">{user.name}</span>
-                      <span className="text-xs text-ink-soft">Добавить</span>
+                      <span className="text-xs text-ink-soft">{t('Добавить')}</span>
                     </button>
                   </li>
                 ))}
@@ -198,7 +200,7 @@ export function ChatSettingsModal({
           )}
           <div className="flex justify-end">
             <Button variant="secondary" disabled={busy} onClick={() => setConfirmLeave(true)}>
-              Выйти из чата
+              {t('Выйти из чата')}
             </Button>
           </div>
         </div>
@@ -211,11 +213,13 @@ export function ChatSettingsModal({
           void run(async () => {
             await post({ dialogId: dialog.id, action: 'leave' });
             onLeft();
-          }, 'Не удалось выйти из чата.');
+          }, t('Не удалось выйти из чата.'));
         }}
-        title="Выйти из чата?"
-        description="Чат пропадёт из списка, историю вы больше не увидите, пока вас не добавят снова."
-        confirmLabel="Выйти"
+        title={t('Выйти из чата?')}
+        description={t(
+          'Чат пропадёт из списка, историю вы больше не увидите, пока вас не добавят снова.',
+        )}
+        confirmLabel={t('Выйти')}
       />
     </>
   );

@@ -4,6 +4,7 @@ import { Plug, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
+import { t } from '@/lib/i18n';
 
 export default function ConnectPage() {
   const [status, setStatus] = useState<'loading' | 'connected' | 'error'>('loading');
@@ -63,9 +64,11 @@ export default function ConnectPage() {
   return (
     <div className="min-h-screen bg-canvas p-4 lg:p-8">
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-2 text-xl font-bold tracking-tight text-ink">Подключение к Битрикс24</h1>
+        <h1 className="mb-2 text-xl font-bold tracking-tight text-ink">
+          {t('Подключение к Битрикс24')}
+        </h1>
         <p className="mb-8 text-sm text-ink-soft">
-          Подключите свой аккаунт Битрикс24 для управления задачами
+          {t('Подключите свой аккаунт Битрикс24 для управления задачами')}
         </p>
 
         <Card padding="none">
@@ -82,10 +85,10 @@ export default function ConnectPage() {
             <div>
               <p className="text-sm font-bold text-ink">
                 {status === 'connected'
-                  ? 'Подключено'
+                  ? t('Подключено')
                   : status === 'loading'
-                    ? 'Загрузка…'
-                    : 'Не подключено'}
+                    ? t('Загрузка…')
+                    : t('Не подключено')}
               </p>
               {domain ? <p className="mt-0.5 text-xs text-ink-soft">{domain}</p> : null}
               {memberId ? (
@@ -102,21 +105,21 @@ export default function ConnectPage() {
               onClick={handleConnect}
               trailing={<ArrowRight size={16} strokeWidth={1.7} />}
             >
-              {status === 'connected' ? 'Переподключить' : 'Подключить Битрикс24'}
+              {status === 'connected' ? t('Переподключить') : t('Подключить Битрикс24')}
             </Button>
           </div>
         </Card>
 
         <Card padding="none" className="mt-6">
           <div className="border-b border-line p-4">
-            <p className="text-sm font-bold text-ink">Как это работает</p>
+            <p className="text-sm font-bold text-ink">{t('Как это работает')}</p>
           </div>
           <ul className="flex flex-col gap-1 p-4 text-sm text-ink-soft">
-            <li>Запросы от вашего имени (нет лимитов)</li>
-            <li>Real-time обновления через webhook</li>
-            <li>Автоматический refresh токена</li>
-            <li>Безопасное хранение в MongoDB</li>
-            <li>Webhook больше НЕ используется</li>
+            <li>{t('Запросы от вашего имени (нет лимитов)')}</li>
+            <li>{t('Real-time обновления через webhook')}</li>
+            <li>{t('Автоматический refresh токена')}</li>
+            <li>{t('Безопасное хранение в MongoDB')}</li>
+            <li>{t('Webhook больше НЕ используется')}</li>
           </ul>
         </Card>
       </div>

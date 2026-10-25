@@ -1,8 +1,9 @@
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export default function LoadingState({
-  label = 'Загрузка…',
+  label = t('Загрузка…'),
   className,
 }: {
   label?: string;

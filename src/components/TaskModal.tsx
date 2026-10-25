@@ -55,6 +55,7 @@ import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { extractTaskTags, tagKey } from '@/lib/task-tags';
 import { fetchProjectMembers, fetchTaskById, searchProjectTasks } from '@/lib/bitrix24';
 import type { Bx24Task } from '@/lib/bitrix24';
+import { dateLocale, t } from '@/lib/i18n';
 
 function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boolean }) {
   if (!files?.length) return null;
@@ -100,10 +101,10 @@ function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boo
 
 function formatFileSize(bytes: number) {
   if (!bytes) return '';
-  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  const units = [t('Б'), t('КБ'), t('МБ'), t('ГБ')];
   const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   const value = bytes / 1024 ** index;
-  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 })} ${units[index]}`;
+  return `${value.toLocaleString(dateLocale(), { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 })} ${units[index]}`;
 }
 
 // Слово-статус задачи: цвет здесь — состояние, а не украшение.
@@ -364,7 +365,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await updateTaskField(task.id, field, value);
       setEditingField(null);
     } catch (error) {
-      setFieldError(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+      setFieldError(error instanceof Error ? error.message : t('Не удалось сохранить изменения'));
     } finally {
       if (field === 'status') setActionsVersion((version) => version + 1);
     }
@@ -408,7 +409,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       setFocusConflict(null);
       setActionsVersion((version) => version + 1);
     } catch (error) {
-      setFieldError(error instanceof Error ? error.message : 'Не удалось изменить статус');
+      setFieldError(error instanceof Error ? error.message : t('Не удалось изменить статус'));
     }
   };
 
@@ -428,20 +429,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     // Псевдо-проект «Без проекта» — это GROUP_ID = 0, отдельной сущности нет.
     const isNoProject = projectId === 'none' || projectId === NO_PROJECT_ID;
     const projectName = isNoProject
-      ? NO_PROJECT_NAME
-      : projects.find((project) => project.id === projectId)?.name || 'проект';
+      ? t(NO_PROJECT_NAME)
+      : projects.find((project) => project.id === projectId)?.name || t('проект');
     const targetId = isNoProject ? NO_PROJECT_ID : projectId;
     try {
       await moveTaskToProject(task.id, projectId);
     } catch (error) {
-      setFieldError(error instanceof Error ? error.message : 'Не удалось перенести задачу');
+      setFieldError(error instanceof Error ? error.message : t('Не удалось перенести задачу'));
       return;
     }
     toast({
-      title: `Задача перенесена в «${projectName}»`,
+      title: t('Задача перенесена в «{0}»', projectName),
       tone: 'success',
       action: {
-        label: 'Открыть проект',
+        label: t('Открыть проект'),
         onClick: () => {
           onClose();
           router.push(`/projects/${targetId}?task=${encodeURIComponent(task.id)}`);
@@ -461,7 +462,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await addComment(task.id, text);
     } catch {
       setComment((current) => current || text);
-      setCommentError('Не удалось отправить комментарий. Попробуйте ещё раз.');
+      setCommentError(t('Не удалось отправить комментарий. Попробуйте ещё раз.'));
     } finally {
       setIsSendingComment(false);
     }
@@ -478,7 +479,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await addTaskResult(task.id, text);
     } catch {
       setTaskResultText((current) => current || text);
-      setResultError('Не удалось сохранить результат. Попробуйте ещё раз.');
+      setResultError(t('Не удалось сохранить результат. Попробуйте ещё раз.'));
     } finally {
       setIsSendingResult(false);
     }
@@ -491,7 +492,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     try {
       await updateTaskResult(task.id, resultId, text);
     } catch {
-      toast({ title: 'Не удалось изменить результат', tone: 'danger' });
+      toast({ title: t('Не удалось изменить результат'), tone: 'danger' });
     }
   };
 
@@ -499,7 +500,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     try {
       await deleteTaskResult(task.id, resultId);
     } catch {
-      toast({ title: 'Не удалось удалить результат', tone: 'danger' });
+      toast({ title: t('Не удалось удалить результат'), tone: 'danger' });
     }
   };
 
@@ -518,8 +519,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     } catch (error) {
       toast({
         title: editingTimeEntryId
-          ? 'Не удалось изменить запись времени'
-          : 'Не удалось записать время',
+          ? t('Не удалось изменить запись времени')
+          : t('Не удалось записать время'),
         description: error instanceof Error ? error.message : undefined,
         tone: 'danger',
       });
@@ -531,7 +532,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await deleteTimeEntry(task.id, entryId);
     } catch (error) {
       toast({
-        title: 'Не удалось удалить запись времени',
+        title: t('Не удалось удалить запись времени'),
         description: error instanceof Error ? error.message : undefined,
         tone: 'danger',
       });
@@ -545,7 +546,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await attachFile(task.id, file);
     } catch (error) {
       toast({
-        title: 'Не удалось прикрепить файл',
+        title: t('Не удалось прикрепить файл'),
         description: error instanceof Error ? error.message : undefined,
         tone: 'danger',
       });
@@ -563,7 +564,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       await updateChecklistItem(task.id, itemId, title);
     } catch (error) {
       toast({
-        title: 'Не удалось переименовать пункт',
+        title: t('Не удалось переименовать пункт'),
         description: error instanceof Error ? error.message : undefined,
         tone: 'danger',
       });
@@ -588,7 +589,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
           responsibleId: task.assigneeId || currentUser.id,
         });
       } catch (error) {
-        setFieldError(error instanceof Error ? error.message : 'Не удалось создать подзадачу');
+        setFieldError(error instanceof Error ? error.message : t('Не удалось создать подзадачу'));
         return;
       }
       setNewSubtaskTitle('');
@@ -607,15 +608,15 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const formatDate = (dateStr: string) => (dateStr ? formatBitrixDateTime(dateStr) : '');
 
   const priorityOptions = [
-    { value: 'low', label: 'Низкий' },
-    { value: 'medium', label: 'Обычный' },
-    { value: 'high', label: 'Высокий' },
+    { value: 'low', label: t('Низкий') },
+    { value: 'medium', label: t('Обычный') },
+    { value: 'high', label: t('Высокий') },
   ];
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
 
   const projectOptions = [
-    { value: 'none', label: 'Без проекта' },
+    { value: 'none', label: t('Без проекта') },
     ...projects
       // Архивный проект в список переноса не предлагаем, но текущий
       // оставляем: иначе у задачи архивного проекта поле пустое.
@@ -624,7 +625,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   ];
 
   const assigneeOptions = [
-    { value: 'unassigned', label: 'Не назначен' },
+    { value: 'unassigned', label: t('Не назначен') },
     ...users.map((user) => ({ value: user.id, label: userLabel(user) })),
   ];
 
@@ -661,7 +662,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               <>
                 {can('renew') && (
                   <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
-                    Возобновить
+                    {t('Возобновить')}
                   </Button>
                 )}
                 {can('complete') && (
@@ -670,7 +671,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     size="sm"
                     onClick={() => void handleUpdateField('status', 'done')}
                   >
-                    Завершить
+                    {t('Завершить')}
                   </Button>
                 )}
               </>
@@ -679,7 +680,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               <>
                 {can('start') && (
                   <Button size="sm" onClick={() => void handleStartTask()}>
-                    Начать
+                    {t('Начать')}
                   </Button>
                 )}
                 {task.status === 'new' && can('defer') && (
@@ -688,7 +689,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     size="sm"
                     onClick={() => void handleUpdateField('status', 'deferred')}
                   >
-                    Отложить
+                    {t('Отложить')}
                   </Button>
                 )}
               </>
@@ -701,7 +702,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     size="sm"
                     onClick={() => void handleUpdateField('status', 'new')}
                   >
-                    Приостановить
+                    {t('Приостановить')}
                   </Button>
                 )}
                 {can('defer') && (
@@ -710,12 +711,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     size="sm"
                     onClick={() => void handleUpdateField('status', 'deferred')}
                   >
-                    Отложить
+                    {t('Отложить')}
                   </Button>
                 )}
                 {can('complete') && (
                   <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                    Завершить
+                    {t('Завершить')}
                   </Button>
                 )}
               </>
@@ -728,25 +729,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     size="sm"
                     onClick={() => void handleUpdateField('status', 'deferred')}
                   >
-                    Отложить
+                    {t('Отложить')}
                   </Button>
                 )}
                 {can('complete') && (
                   <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
-                    Завершить
+                    {t('Завершить')}
                   </Button>
                 )}
               </>
             )}
             {task.status === 'done' && can('renew') && (
               <Button size="sm" onClick={() => void handleUpdateField('status', 'new')}>
-                Возобновить
+                {t('Возобновить')}
               </Button>
             )}
           </div>
           {projectStages.length > 0 && (
             <SelectField
-              aria-label="Фаза задачи"
+              aria-label={t('Фаза задачи')}
               variant="boxed"
               size="sm"
               className="w-40"
@@ -761,7 +762,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             {/* Заголовок окна — имя задачи: править его можно только здесь,
                 поэтому кнопка-карандаш стоит рядом с ним. */}
             <IconButton
-              label="Изменить название"
+              label={t('Изменить название')}
               variant="ghost"
               size="sm"
               onClick={() => {
@@ -771,7 +772,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             >
               <Pencil size={14} strokeWidth={1.7} />
             </IconButton>
-            <IconButton label="Закрыть задачу" variant="ghost" size="sm" onClick={onClose}>
+            <IconButton label={t('Закрыть задачу')} variant="ghost" size="sm" onClick={onClose}>
               <X size={16} strokeWidth={1.7} />
             </IconButton>
           </div>
@@ -789,7 +790,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void handleUpdateField('title', editValue);
               }}
-              aria-label="Название задачи"
+              aria-label={t('Название задачи')}
             />
           </div>
         )}
@@ -800,7 +801,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             {/* Description */}
             <div>
               <h3 className="mb-2 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                Описание
+                {t('Описание')}
               </h3>
               {editingField === 'description' ? (
                 <TextArea
@@ -822,7 +823,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {task.description ? (
                     <BitrixText text={task.description} />
                   ) : (
-                    <span className="text-ink-faint">Добавить описание…</span>
+                    <span className="text-ink-faint">{t('Добавить описание…')}</span>
                   )}
                 </div>
               )}
@@ -835,11 +836,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   }`}
                 >
                   <Paperclip size={14} strokeWidth={1.7} className="text-ink-faint" />
-                  {isAttaching ? 'Прикрепляем…' : 'Прикрепить файл'}
+                  {isAttaching ? t('Прикрепляем…') : t('Прикрепить файл')}
                   <input
                     type="file"
                     className="hidden"
-                    aria-label="Прикрепить файл к задаче"
+                    aria-label={t('Прикрепить файл к задаче')}
                     onChange={(event) => {
                       void handleAttachFile(event.target.files?.[0]);
                       event.target.value = '';
@@ -851,7 +852,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
             <div>
               <h3 className="mb-2 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                Теги
+                {t('Теги')}
               </h3>
               <div className="flex flex-wrap items-center gap-1.5">
                 {ownTags.map((tag) =>
@@ -859,7 +860,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     <Chip
                       key={tag}
                       size="md"
-                      title="Из названия или описания: убирается правкой текста"
+                      title={t('Из названия или описания: убирается правкой текста')}
                     >
                       {tag}
                     </Chip>
@@ -868,7 +869,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       key={tag}
                       size="md"
                       removable
-                      removeLabel={`Убрать тег ${tag}`}
+                      removeLabel={t('Убрать тег {0}', tag)}
                       onRemove={() => void removeTag(tag)}
                     >
                       {tag}
@@ -879,7 +880,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   <Chip
                     key={tag}
                     size="md"
-                    title="Хэштег из названия или описания: убирается правкой текста"
+                    title={t('Хэштег из названия или описания: убирается правкой текста')}
                   >
                     {tag}
                   </Chip>
@@ -902,8 +903,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   }}
                   onBlur={() => tagDraft.trim() && addTag(tagDraft)}
                   list={`task-tags-${task.id}`}
-                  placeholder="Добавить тег…"
-                  aria-label="Добавить тег"
+                  placeholder={t('Добавить тег…')}
+                  aria-label={t('Добавить тег')}
                 />
                 <datalist id={`task-tags-${task.id}`}>
                   {(tagSuggestions || [])
@@ -931,7 +932,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   )
                 }
               >
-                Подзадачи ({taskSubtasks.length})
+                {t('Подзадачи (')}
+                {taskSubtasks.length})
               </Button>
 
               {showSubtasks && (
@@ -949,8 +951,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         }
                         ariaLabel={
                           sub.status === 'done'
-                            ? 'Вернуть подзадачу в работу'
-                            : 'Завершить подзадачу'
+                            ? t('Вернуть подзадачу в работу')
+                            : t('Завершить подзадачу')
                         }
                       />
                       <span
@@ -973,13 +975,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className="flex-1"
                         value={newSubtaskTitle}
                         onChange={(event) => setNewSubtaskTitle(event.target.value)}
-                        placeholder="Название подзадачи…"
-                        aria-label="Название подзадачи"
+                        placeholder={t('Название подзадачи…')}
+                        aria-label={t('Название подзадачи')}
                         autoFocus
                         onKeyDown={(event) => event.key === 'Enter' && void handleAddSubtask()}
                       />
                       <IconButton
-                        label="Добавить подзадачу"
+                        label={t('Добавить подзадачу')}
                         variant="ghost"
                         size="sm"
                         onClick={() => void handleAddSubtask()}
@@ -987,7 +989,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         <Plus size={14} strokeWidth={1.7} />
                       </IconButton>
                       <IconButton
-                        label="Отменить"
+                        label={t('Отменить')}
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowSubtaskAdd(false)}
@@ -1002,8 +1004,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         size="sm"
                         value={existingSubtaskQuery}
                         onChange={(event) => setExistingSubtaskQuery(event.target.value)}
-                        placeholder="Найти существующую задачу…"
-                        aria-label="Найти существующую задачу"
+                        placeholder={t('Найти существующую задачу…')}
+                        aria-label={t('Найти существующую задачу')}
                         autoFocus
                       />
                       {existingSubtaskQuery && (
@@ -1038,7 +1040,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         size="sm"
                         className="mt-1 h-auto w-full justify-start text-xs"
                       >
-                        Отмена
+                        {t('Отмена')}
                       </Button>
                     </div>
                   ) : (
@@ -1050,7 +1052,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className="flex-1"
                         icon={<Plus size={14} strokeWidth={1.7} />}
                       >
-                        Выбрать существующую
+                        {t('Выбрать существующую')}
                       </Button>
                       <Button
                         onClick={() => setShowSubtaskAdd(true)}
@@ -1059,7 +1061,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className="flex-1"
                         icon={<Plus size={14} strokeWidth={1.7} />}
                       >
-                        Создать новую
+                        {t('Создать новую')}
                       </Button>
                     </div>
                   )}
@@ -1071,7 +1073,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
                   <CheckSquare size={14} strokeWidth={1.7} className="text-ink-faint" />
-                  Чек-лист ({task.checklist?.filter((item) => item.completed).length || 0}/
+                  {t('Чек-лист (')}
+                  {task.checklist?.filter((item) => item.completed).length || 0}/
                   {task.checklist?.length || 0})
                 </h3>
               </div>
@@ -1091,7 +1094,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             <Checkbox
                               checked={item.completed}
                               ariaLabel={
-                                item.completed ? 'Отметить незавершённым' : 'Отметить выполненным'
+                                item.completed
+                                  ? t('Отметить незавершённым')
+                                  : t('Отметить выполненным')
                               }
                               onChange={() =>
                                 void setChecklistItemCompleted(task.id, item.id, !item.completed)
@@ -1104,7 +1109,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                                 autoFocus
                                 className="min-w-0 flex-1"
                                 value={checklistItemDraft}
-                                aria-label="Название пункта чек-листа"
+                                aria-label={t('Название пункта чек-листа')}
                                 onChange={(event) => setChecklistItemDraft(event.target.value)}
                                 onBlur={() => void commitChecklistItemRename(item.id)}
                                 onKeyDown={(event) => {
@@ -1119,7 +1124,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             ) : (
                               <button
                                 type="button"
-                                title="Переименовать пункт"
+                                title={t('Переименовать пункт')}
                                 className={`min-w-0 flex-1 text-left text-sm ${
                                   item.completed ? 'text-ink-faint line-through' : 'text-ink'
                                 }`}
@@ -1132,7 +1137,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                               </button>
                             )}
                             <IconButton
-                              label="Удалить пункт"
+                              label={t('Удалить пункт')}
                               variant="ghost"
                               size="sm"
                               onClick={() => void deleteChecklistItem(task.id, item.id)}
@@ -1151,8 +1156,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             setActiveChecklistId(list.id);
                             setNewChecklistItem(event.target.value);
                           }}
-                          placeholder="Добавить пункт…"
-                          aria-label="Добавить пункт чек-листа"
+                          placeholder={t('Добавить пункт…')}
+                          aria-label={t('Добавить пункт чек-листа')}
                           onKeyDown={(event) =>
                             event.key === 'Enter' && void handleAddChecklistItem()
                           }
@@ -1162,7 +1167,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           onClick={() => void handleAddChecklistItem(list.id)}
                           disabled={activeChecklistId !== list.id || !newChecklistItem.trim()}
                         >
-                          Добавить
+                          {t('Добавить')}
                         </Button>
                       </div>
                     </div>
@@ -1177,8 +1182,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       setActiveChecklistId(null);
                       setNewChecklistItem(event.target.value);
                     }}
-                    placeholder="Название нового чек-листа…"
-                    aria-label="Название нового чек-листа"
+                    placeholder={t('Название нового чек-листа…')}
+                    aria-label={t('Название нового чек-листа')}
                     onKeyDown={(event) => event.key === 'Enter' && void handleAddChecklistItem()}
                   />
                   <Button
@@ -1186,7 +1191,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     onClick={() => void handleAddChecklistItem(null)}
                     disabled={activeChecklistId !== null || !newChecklistItem.trim()}
                   >
-                    Создать
+                    {t('Создать')}
                   </Button>
                 </div>
               </div>
@@ -1211,18 +1216,18 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   )
                 }
               >
-                Детали
+                {t('Детали')}
               </Button>
 
               {showDetails && (
                 <div className="space-y-4 p-4">
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Layers size={12} strokeWidth={1.7} /> Проект
+                      <Layers size={12} strokeWidth={1.7} /> {t('Проект')}
                     </p>
                     <SelectField
                       variant="boxed"
-                      aria-label="Проект"
+                      aria-label={t('Проект')}
                       value={task.projectId || 'none'}
                       onChange={(event) => {
                         void handleMoveProject(event.target.value);
@@ -1234,12 +1239,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {/* Assignee */}
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <User size={12} strokeWidth={1.7} /> Исполнитель
+                      <User size={12} strokeWidth={1.7} /> {t('Исполнитель')}
                     </p>
                     {editingField === 'assigneeId' ? (
                       <SelectField
                         variant="boxed"
-                        aria-label="Исполнитель"
+                        aria-label={t('Исполнитель')}
                         value={task.assigneeId || 'unassigned'}
                         onChange={(event) =>
                           void handleUpdateField(
@@ -1254,14 +1259,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className="-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium text-ink hover:bg-surface-2"
                         onClick={() => setEditingField('assigneeId')}
                       >
-                        {task.assigneeName || 'Не назначен'}
+                        {task.assigneeName || t('Не назначен')}
                       </p>
                     )}
                   </div>
 
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Users size={12} strokeWidth={1.7} /> Соисполнители
+                      <Users size={12} strokeWidth={1.7} /> {t('Соисполнители')}
                     </p>
                     <div className="mb-2 flex flex-wrap gap-1">
                       {(task.accompliceIds || []).map((id) => (
@@ -1269,7 +1274,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           key={id}
                           size="md"
                           removable
-                          removeLabel="Удалить соисполнителя"
+                          removeLabel={t('Удалить соисполнителя')}
                           onRemove={() =>
                             void handleUpdateField(
                               'accompliceIds',
@@ -1286,7 +1291,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       className="w-full"
                       trigger={
                         <Button variant="secondary" size="sm" className="w-full justify-start">
-                          Выбрать соисполнителей…
+                          {t('Выбрать соисполнителей…')}
                         </Button>
                       }
                     >
@@ -1313,7 +1318,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Eye size={12} strokeWidth={1.7} /> Наблюдатели
+                      <Eye size={12} strokeWidth={1.7} /> {t('Наблюдатели')}
                     </p>
                     <div className="mb-2 flex flex-wrap gap-1">
                       {(task.auditorIds || []).map((id) => (
@@ -1321,7 +1326,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           key={id}
                           size="md"
                           removable
-                          removeLabel="Удалить наблюдателя"
+                          removeLabel={t('Удалить наблюдателя')}
                           onRemove={() =>
                             void handleUpdateField(
                               'auditorIds',
@@ -1338,7 +1343,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       className="w-full"
                       trigger={
                         <Button variant="secondary" size="sm" className="w-full justify-start">
-                          Выбрать наблюдателей…
+                          {t('Выбрать наблюдателей…')}
                         </Button>
                       }
                     >
@@ -1366,12 +1371,12 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {/* Priority */}
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Flag size={12} strokeWidth={1.7} /> Приоритет
+                      <Flag size={12} strokeWidth={1.7} /> {t('Приоритет')}
                     </p>
                     {editingField === 'priority' ? (
                       <SelectField
                         variant="boxed"
-                        aria-label="Приоритет"
+                        aria-label={t('Приоритет')}
                         value={task.priority}
                         onChange={(event) => void handleUpdateField('priority', event.target.value)}
                         options={priorityOptions}
@@ -1389,7 +1394,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {/* Deadline */}
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Calendar size={12} strokeWidth={1.7} /> Дедлайн
+                      <Calendar size={12} strokeWidth={1.7} /> {t('Дедлайн')}
                     </p>
                     {editingField === 'deadline' ? (
                       <TextField
@@ -1403,7 +1408,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           )
                         }
                         onBlur={() => setEditingField(null)}
-                        aria-label="Дедлайн"
+                        aria-label={t('Дедлайн')}
                         autoFocus
                       />
                     ) : (
@@ -1411,7 +1416,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         className={`-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium hover:bg-surface-2 ${isOverdue ? 'text-danger-text' : 'text-ink'}`}
                         onClick={() => setEditingField('deadline')}
                       >
-                        {task.dueDate ? formatDate(task.dueDate) : 'Без дедлайна'}
+                        {task.dueDate ? formatDate(task.dueDate) : t('Без дедлайна')}
                         {isOverdue && (
                           <AlertTriangle size={12} strokeWidth={1.7} className="ml-1 inline" />
                         )}
@@ -1422,7 +1427,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {/* Parent task */}
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <Layers size={12} strokeWidth={1.7} /> Родительская задача
+                      <Layers size={12} strokeWidth={1.7} /> {t('Родительская задача')}
                     </p>
                     {task.parentId && (
                       <div className="mb-2 flex items-center justify-between rounded-ui border border-line bg-surface-2 px-2 py-1 text-sm">
@@ -1431,7 +1436,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             `#${task.parentId}`}
                         </span>
                         <IconButton
-                          label="Убрать родительскую задачу"
+                          label={t('Убрать родительскую задачу')}
                           variant="ghost"
                           size="sm"
                           onClick={() => void handleUpdateField('parentId', '')}
@@ -1445,8 +1450,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         variant="underline"
                         value={parentQuery}
                         onChange={(event) => setParentQuery(event.target.value)}
-                        placeholder="Найти задачу по названию или ID…"
-                        aria-label="Найти задачу по названию или ID"
+                        placeholder={t('Найти задачу по названию или ID…')}
+                        aria-label={t('Найти задачу по названию или ID')}
                       />
                       {parentQuery && (
                         <div className="absolute z-menu mt-1 max-h-48 w-full overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay">
@@ -1495,7 +1500,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   )
                 }
               >
-                Время
+                {t('Время')}
               </Button>
 
               {showTimeEntry && (
@@ -1505,21 +1510,21 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     type="number"
                     step="0.5"
                     min="0.5"
-                    placeholder="Часы (ч)"
-                    aria-label="Часы (ч)"
+                    placeholder={t('Часы (ч)')}
+                    aria-label={t('Часы (ч)')}
                     value={timeHours}
                     onChange={(event) => setTimeHours(Number(event.target.value))}
                   />
                   <TextField
                     variant="underline"
                     type="text"
-                    placeholder="Что вы сделали?"
-                    aria-label="Что вы сделали?"
+                    placeholder={t('Что вы сделали?')}
+                    aria-label={t('Что вы сделали?')}
                     value={timeDesc}
                     onChange={(event) => setTimeDesc(event.target.value)}
                   />
                   <Button full onClick={() => void handleAddTime()}>
-                    {editingTimeEntryId ? 'Сохранить время' : 'Записать время'}
+                    {editingTimeEntryId ? t('Сохранить время') : t('Записать время')}
                   </Button>
                   {editingTimeEntryId && (
                     <Button
@@ -1532,7 +1537,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         setShowTimeEntry(false);
                       }}
                     >
-                      Отмена
+                      {t('Отмена')}
                     </Button>
                   )}
                 </div>
@@ -1542,11 +1547,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 {task.timeEntries.map((entry) => (
                   <div key={entry.id} className="rounded-ui bg-surface-2 p-2 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-info-text">{entry.hours} ч</span>
+                      <span className="font-medium text-info-text">
+                        {entry.hours} {t('ч')}
+                      </span>
                       <span className="text-whisper text-ink-faint">{entry.date}</span>
                       <span className="flex items-center gap-1">
                         <IconButton
-                          label="Изменить запись времени"
+                          label={t('Изменить запись времени')}
                           variant="ghost"
                           size="sm"
                           onClick={() => {
@@ -1559,7 +1566,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           <Pencil size={13} strokeWidth={1.7} />
                         </IconButton>
                         <IconButton
-                          label="Удалить запись времени"
+                          label={t('Удалить запись времени')}
                           variant="ghost"
                           size="sm"
                           onClick={() => void handleDeleteTime(entry.id)}
@@ -1576,7 +1583,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
 
                 <div className="space-y-1 border-t border-line pt-2">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-ink-soft">План, ч:</span>
+                    <span className="text-ink-soft">{t('План, ч:')}</span>
                     {editingField === 'estimate' ? (
                       <TextField
                         variant="underline"
@@ -1585,7 +1592,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         min="0"
                         step="0.5"
                         className="w-24 [&_input]:text-right"
-                        aria-label="План, ч"
+                        aria-label={t('План, ч')}
                         value={editValue}
                         onChange={(event) => setEditValue(event.target.value)}
                         onBlur={() =>
@@ -1606,18 +1613,18 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           setEditingField('estimate');
                         }}
                       >
-                        {task.estimate} ч
+                        {task.estimate} {t('ч')}
                       </button>
                     )}
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-ink-soft">Факт, ч:</span>
+                    <span className="text-ink-soft">{t('Факт, ч:')}</span>
                     <span
                       className={`font-medium ${
                         task.actualTime > task.estimate ? 'text-danger-text' : 'text-success-text'
                       }`}
                     >
-                      {task.actualTime} ч
+                      {task.actualTime} {t('ч')}
                     </span>
                   </div>
                 </div>
@@ -1629,7 +1636,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <Card padding="none" className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
             <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <ClipboardCheck size={14} strokeWidth={1.7} className="text-ink-faint" /> Результаты
+              <ClipboardCheck size={14} strokeWidth={1.7} className="text-ink-faint" />{' '}
+              {t('Результаты')}
             </h3>
             <Badge tone="neutral" className="tabular-nums">
               {(task.results || []).length}
@@ -1638,9 +1646,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
           <div className="max-h-80 space-y-3 overflow-y-auto bg-surface-2/40 p-3 sm:p-4">
             {(task.results || []).length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-soft">
-                Результатов пока нет в этой вкладке.
+                {t('Результатов пока нет в этой вкладке.')}
                 <br />
-                Полную историю смотрите в Битриксе — список из приложения не читается.
+                {t('Полную историю смотрите в Битриксе — список из приложения не читается.')}
               </p>
             ) : (
               (task.results || []).map((resultItem) => (
@@ -1669,14 +1677,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         />
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => void handleUpdateResult(resultItem.id)}>
-                            Сохранить
+                            {t('Сохранить')}
                           </Button>
                           <Button
                             size="sm"
                             variant="quiet"
                             onClick={() => setEditingResultId(null)}
                           >
-                            Отмена
+                            {t('Отмена')}
                           </Button>
                         </div>
                       </div>
@@ -1689,7 +1697,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   {resultItem.authorId === currentUser.id && editingResultId !== resultItem.id && (
                     <div className="flex shrink-0 gap-1">
                       <IconButton
-                        label="Изменить результат"
+                        label={t('Изменить результат')}
                         variant="ghost"
                         size="sm"
                         onClick={() => {
@@ -1700,7 +1708,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         <Pencil size={14} strokeWidth={1.7} />
                       </IconButton>
                       <IconButton
-                        label="Удалить результат"
+                        label={t('Удалить результат')}
                         variant="ghost"
                         size="sm"
                         onClick={() => void handleDeleteResult(resultItem.id)}
@@ -1725,8 +1733,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     void handleAddResult();
                   }
                 }}
-                placeholder="Что сделано… Shift+Enter — сохранить"
-                aria-label="Новый результат"
+                placeholder={t('Что сделано… Shift+Enter — сохранить')}
+                aria-label={t('Новый результат')}
                 rows={3}
                 className="min-h-24 flex-1"
               />
@@ -1735,9 +1743,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 disabled={!taskResultText.trim() || isSendingResult}
                 className="h-9 shrink-0 gap-2"
                 icon={<ClipboardCheck size={16} strokeWidth={1.7} />}
-                aria-label="Сохранить результат"
+                aria-label={t('Сохранить результат')}
               >
-                <span className="hidden sm:inline">Сохранить</span>
+                <span className="hidden sm:inline">{t('Сохранить')}</span>
               </Button>
             </div>
             {resultError && <p className="mt-2 text-sm text-danger-text">{resultError}</p>}
@@ -1747,7 +1755,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <Card padding="none" className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2">
             <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <MessageSquare size={14} strokeWidth={1.7} className="text-ink-faint" /> Комментарии
+              <MessageSquare size={14} strokeWidth={1.7} className="text-ink-faint" />{' '}
+              {t('Комментарии')}
             </h3>
             <Badge tone="neutral" className="tabular-nums">
               {task.comments.length}
@@ -1760,7 +1769,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             {isLoadingTask && task.comments.length === 0 ? (
               <LoadingState className="min-h-24 bg-transparent" />
             ) : task.comments.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-soft">Комментариев пока нет</p>
+              <p className="py-6 text-center text-sm text-ink-soft">{t('Комментариев пока нет')}</p>
             ) : (
               task.comments.map((commentItem) =>
                 commentItem.isSystem ? (
@@ -1769,8 +1778,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     className="rounded-ui border border-dashed border-line bg-canvas px-3 py-2 text-sm text-ink-soft"
                   >
                     <div className="mb-1 flex items-center gap-1.5 text-whisper font-bold text-ink-faint">
-                      <Settings2 size={13} strokeWidth={1.7} /> Система
-                      <span className="font-normal">от {formatDate(commentItem.createdDate)}</span>
+                      <Settings2 size={13} strokeWidth={1.7} /> {t('Система')}
+                      <span className="font-normal">
+                        {t('от')} {formatDate(commentItem.createdDate)}
+                      </span>
                     </div>
                     <div className="leading-relaxed text-ink-soft">
                       <BitrixText text={commentItem.text} />
@@ -1813,8 +1824,8 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       void handleAddComment();
                     }
                   }}
-                  placeholder="Написать комментарий… Shift+Enter — отправить, @ — упомянуть"
-                  aria-label="Комментарий"
+                  placeholder={t('Написать комментарий… Shift+Enter — отправить, @ — упомянуть')}
+                  aria-label={t('Комментарий')}
                   rows={3}
                   className="min-h-24"
                 />
@@ -1844,9 +1855,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 className="h-9 shrink-0 gap-2"
                 icon={<Send size={16} strokeWidth={1.7} />}
                 // На узком экране остаётся одна иконка — подпись нужна вслух.
-                aria-label="Отправить комментарий"
+                aria-label={t('Отправить комментарий')}
               >
-                <span className="hidden sm:inline">Отправить</span>
+                <span className="hidden sm:inline">{t('Отправить')}</span>
               </Button>
             </div>
             {commentError && <p className="mt-2 text-sm text-danger-text">{commentError}</p>}
@@ -1856,23 +1867,25 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <Modal
           open={Boolean(focusConflict)}
           onClose={() => setFocusConflict(null)}
-          title="Уже есть задача в работе"
+          title={t('Уже есть задача в работе')}
           description={focusConflict ? `«${focusConflict.title}»` : ''}
           size="md"
           footer={
             <>
               <Button variant="secondary" onClick={openFocusConflict}>
-                Открыть задачу
+                {t('Открыть задачу')}
               </Button>
-              <Button onClick={() => void confirmFocusChange()}>Приостановить и начать</Button>
+              <Button onClick={() => void confirmFocusChange()}>
+                {t('Приостановить и начать')}
+              </Button>
             </>
           }
         >
           {focusConflict && (
             <p className="text-sm text-ink-soft">
-              Проект:{' '}
+              {t('Проект:')}{' '}
               {projects.find((project) => project.id === focusConflict.projectId)?.name ||
-                'Без проекта'}
+                t('Без проекта')}
             </p>
           )}
         </Modal>

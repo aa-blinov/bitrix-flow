@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/monos/Button';
+import { t } from '@/lib/i18n';
 
 export type MediaStatus = 'loading' | 'ready' | 'error';
 
@@ -40,9 +41,11 @@ export function MediaError({
       role="status"
       className={`${className} flex items-center gap-2 rounded-ui border border-line px-2 py-1.5 text-sm text-ink-soft`}
     >
-      <span className="min-w-0 flex-1 truncate">Не удалось загрузить {name}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {t('Не удалось загрузить')} {name}
+      </span>
       <Button size="sm" variant="secondary" onClick={onRetry}>
-        Повторить
+        {t('Повторить')}
       </Button>
     </div>
   );

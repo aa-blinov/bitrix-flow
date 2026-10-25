@@ -9,6 +9,7 @@ import { Separator } from '@/components/monos/Separator';
 import Link from 'next/link';
 import { useSSE } from '@/hooks/useSSE';
 import { useKanbanStore } from '@/store/kanban';
+import { t } from '@/lib/i18n';
 
 type Notice = {
   id: string;
@@ -107,7 +108,7 @@ export default function Notifications() {
       }}
       placement="bottom"
       trigger={
-        <IconButton label="Уведомления" variant="ghost" size="sm" className="relative">
+        <IconButton label={t('Уведомления')} variant="ghost" size="sm" className="relative">
           <Bell size={16} strokeWidth={1.7} />
           {unreadCount > 0 ? (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-canvas">
@@ -119,7 +120,7 @@ export default function Notifications() {
     >
       <div className="w-80">
         <p className="px-3 py-2.5 text-xs uppercase tracking-widest text-ink-faint">
-          История изменений
+          {t('История изменений')}
         </p>
         <Separator />
         <div className="max-h-96 overflow-y-auto p-1">
@@ -160,7 +161,9 @@ export default function Notifications() {
               );
             })
           ) : (
-            <p className="px-3 py-8 text-center text-xs text-ink-faint">Изменений пока нет</p>
+            <p className="px-3 py-8 text-center text-xs text-ink-faint">
+              {t('Изменений пока нет')}
+            </p>
           )}
         </div>
         <Separator />
@@ -169,7 +172,7 @@ export default function Notifications() {
           onClick={() => setOpen(false)}
           className="block px-3 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-ink transition-opacity duration-fast hover:opacity-60"
         >
-          Открыть все уведомления
+          {t('Открыть все уведомления')}
         </Link>
       </div>
     </Popover>

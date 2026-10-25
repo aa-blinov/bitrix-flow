@@ -13,6 +13,7 @@ import TaskGrid from '@/components/TaskGrid';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import QuickCreateTask from '@/components/QuickCreateTask';
+import { t } from '@/lib/i18n';
 
 function AllTasksInner() {
   const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore(
@@ -53,8 +54,8 @@ function AllTasksInner() {
     [requestedAssignee, workload],
   );
   const workloadDescription = workload
-    ? 'Задачи, открытые из календаря нагрузки. Фильтры списка можно уточнить ниже.'
-    : 'Задачи по всем доступным проектам';
+    ? t('Задачи, открытые из календаря нагрузки. Фильтры списка можно уточнить ниже.')
+    : t('Задачи по всем доступным проектам');
 
   useEffect(() => {
     // Список задач грид грузит сам постранично; полный loadAllTasks здесь
@@ -73,7 +74,7 @@ function AllTasksInner() {
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
-        title="Все задачи"
+        title={t('Все задачи')}
         description={workloadDescription}
         actions={
           <div className="flex items-center gap-2">
@@ -82,7 +83,8 @@ function AllTasksInner() {
                 href="/team-workload"
                 className="inline-flex h-11 items-center gap-2 rounded-ui px-3 text-xs font-normal uppercase tracking-widest text-ink-soft transition-colors duration-fast hover:text-ink sm:h-9"
               >
-                <ArrowLeft size={14} strokeWidth={1.7} />К нагрузке
+                <ArrowLeft size={14} strokeWidth={1.7} />
+                {t('К нагрузке')}
               </Link>
             )}
             <QuickCreateTask />

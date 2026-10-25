@@ -1,3 +1,4 @@
+import { dateFormat } from './i18n';
 import { getBitrixUserUrl } from './utils';
 
 export type BitrixMarkupPart = { text: string; href?: string };
@@ -24,13 +25,13 @@ function normalizeTimestamps(text: string) {
     const date = new Date(Number(seconds) * 1000);
     if (!Number.isFinite(date.getTime())) return tag;
     if (format.toUpperCase() === 'LONG_DATE_FORMAT')
-      return new Intl.DateTimeFormat('ru-RU', {
+      return dateFormat({
         day: 'numeric',
         month: 'long',
         year: 'numeric',
       }).format(date);
     if (format.toUpperCase() === 'SHORT_TIME_FORMAT')
-      return new Intl.DateTimeFormat('ru-RU', {
+      return dateFormat({
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
@@ -149,12 +150,12 @@ export function parseBitrixMarkup(text: string): BitrixMarkupPart[] {
 // Форматтеры создаются один раз: new Intl.DateTimeFormat дорогой, а функция
 // зовётся на каждую ячейку дедлайна. Профиль открытия карточки показывал
 // здесь ~40% CPU — грид перерисовывал строки и строил форматтеры заново.
-const TIME_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+const TIME_FORMAT = dateFormat({
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
 });
-const DATE_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+const DATE_FORMAT = dateFormat({
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',

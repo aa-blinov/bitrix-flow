@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n';
 // Словарь фильтров списка задач: типы, пустые значения и перевод в параметры
 // /api/tasks/all. Живёт отдельно от UI, потому что одни и те же значения
 // собирают и строка фильтров, и три страницы, которые ходят за страницей задач.
@@ -115,41 +116,47 @@ export function taskFilterFields({
   return [
     {
       key: 'status',
-      label: 'Статус',
+      label: t('Статус'),
       empty: 'all',
       options: [
-        { value: 'active', label: 'Активные' },
+        { value: 'active', label: t('Активные') },
         ...Object.entries(statusLabels).map(([value, label]) => ({ value, label })),
       ],
     },
     {
       // Срок отдельно от статуса: так можно спросить «в работе и просрочено».
       key: 'deadline',
-      label: 'Срок',
+      label: t('Срок'),
       empty: 'all',
       options: [
-        { value: 'overdue', label: 'Просрочено' },
-        { value: 'attention', label: 'Сегодня и завтра' },
-        { value: 'week', label: 'На неделе' },
-        { value: 'has', label: 'Есть срок' },
-        { value: 'none', label: 'Без срока' },
+        { value: 'overdue', label: t('Просрочено') },
+        { value: 'attention', label: t('Сегодня и завтра') },
+        { value: 'week', label: t('На неделе') },
+        { value: 'has', label: t('Есть срок') },
+        { value: 'none', label: t('Без срока') },
       ],
     },
     {
       key: 'assignee',
-      label: 'Исполнитель',
+      label: t('Исполнитель'),
       empty: 'all',
       multi: true,
-      options: [{ value: 'none', label: 'Не назначен' }, ...userOptions],
+      options: [{ value: 'none', label: t('Не назначен') }, ...userOptions],
     },
-    { key: 'creator', label: 'Постановщик', empty: 'all', multi: true, options: userOptions },
-    { key: 'accomplice', label: 'Соисполнитель', empty: 'all', multi: true, options: userOptions },
-    { key: 'auditor', label: 'Наблюдатель', empty: 'all', multi: true, options: userOptions },
+    { key: 'creator', label: t('Постановщик'), empty: 'all', multi: true, options: userOptions },
+    {
+      key: 'accomplice',
+      label: t('Соисполнитель'),
+      empty: 'all',
+      multi: true,
+      options: userOptions,
+    },
+    { key: 'auditor', label: t('Наблюдатель'), empty: 'all', multi: true, options: userOptions },
     ...(projects
       ? [
           {
             key: 'project' as const,
-            label: 'Проект',
+            label: t('Проект'),
             empty: 'all',
             multi: true,
             options: projects.map((project) => ({ value: project.id, label: project.name })),
@@ -158,7 +165,7 @@ export function taskFilterFields({
       : []),
     {
       key: 'tag',
-      label: 'Тег',
+      label: t('Тег'),
       empty: 'all',
       multi: true,
       options: tags.map((item) => ({
@@ -171,7 +178,7 @@ export function taskFilterFields({
       ? [
           {
             key: 'stage' as const,
-            label: 'Стадия',
+            label: t('Стадия'),
             empty: 'all',
             multi: true,
             options: stages.map((stage) => ({ value: stage.id, label: stage.name })),
@@ -180,72 +187,72 @@ export function taskFilterFields({
       : []),
     {
       key: 'priority',
-      label: 'Приоритет',
+      label: t('Приоритет'),
       empty: 'all',
       options: [
-        { value: 'high', label: 'Высокий' },
-        { value: 'normal', label: 'Обычный' },
-        { value: 'low', label: 'Низкий' },
+        { value: 'high', label: t('Высокий') },
+        { value: 'normal', label: t('Обычный') },
+        { value: 'low', label: t('Низкий') },
       ],
     },
     {
       key: 'created',
-      label: 'Создана',
+      label: t('Создана'),
       empty: 'all',
       options: [
-        { value: 'today', label: 'Сегодня' },
-        { value: 'week', label: 'За неделю' },
-        { value: 'month', label: 'За месяц' },
+        { value: 'today', label: t('Сегодня') },
+        { value: 'week', label: t('За неделю') },
+        { value: 'month', label: t('За месяц') },
       ],
     },
     {
       key: 'changed',
-      label: 'Изменена',
+      label: t('Изменена'),
       empty: 'all',
       options: [
-        { value: 'today', label: 'Сегодня' },
-        { value: 'week', label: 'За неделю' },
-        { value: 'month', label: 'За месяц' },
+        { value: 'today', label: t('Сегодня') },
+        { value: 'week', label: t('За неделю') },
+        { value: 'month', label: t('За месяц') },
       ],
     },
     {
       key: 'kind',
-      label: 'Тип задачи',
+      label: t('Тип задачи'),
       empty: 'all',
       options: [
-        { value: 'root', label: 'Только корневые' },
-        { value: 'subtask', label: 'Только подзадачи' },
+        { value: 'root', label: t('Только корневые') },
+        { value: 'subtask', label: t('Только подзадачи') },
       ],
     },
     {
       // Факт больше плана: где оценка не сошлась с реальностью.
       key: 'overrun',
-      label: 'Переработка',
+      label: t('Переработка'),
       empty: 'off',
       toggle: true,
-      options: [{ value: 'on', label: 'Переработка' }],
+      options: [{ value: 'on', label: t('Переработка') }],
     },
     {
       key: 'hideDone',
-      label: 'Скрыть закрытые',
+      label: t('Скрыть закрытые'),
       empty: 'off',
       toggle: true,
-      options: [{ value: 'on', label: 'Скрыть закрытые' }],
+      options: [{ value: 'on', label: t('Скрыть закрытые') }],
     },
   ];
 }
 
 export function taskFilterPresets(currentUserId?: string): FilterPreset[] {
   return [
-    { id: 'mine', label: 'Мои', values: { assignee: currentUserId || 'all' } },
+    { id: 'mine', label: t('Мои'), values: { assignee: currentUserId || 'all' } },
     {
       id: 'created_by_me',
-      label: 'Поставленные мной',
+      label: t('Поставленные мной'),
       values: { creator: currentUserId || 'all' },
     },
-    { id: 'overdue', label: 'Просроченные', values: { deadline: 'overdue' } },
-    { id: 'week', label: 'На неделе', values: { deadline: 'week' } },
-    { id: 'no_deadline', label: 'Без срока', values: { deadline: 'none' } },
+    { id: 'overdue', label: t('Просроченные'), values: { deadline: 'overdue' } },
+    { id: 'week', label: t('На неделе'), values: { deadline: 'week' } },
+    { id: 'no_deadline', label: t('Без срока'), values: { deadline: 'none' } },
   ];
 }
 
