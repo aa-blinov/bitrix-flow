@@ -13,6 +13,22 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## 0.4.0 — 2026-10-25
+
+### Added
+
+- The weekly digest can also go to Telegram, any https webhook (Slack, Mattermost, n8n, mail
+  gateways) and by email over SMTP, each channel on its own keys and off by default; one
+  failing channel does not stop the others. `POST /api/digest` sends to every enabled channel
+  and reports each result.
+- Messenger messages can be focused with the keyboard: the actions panel opens on focus,
+  Enter or Space keep it open, Tab walks through the buttons; the viewer keeps focus inside
+  and gives it back to the photo on Escape. Covered by keyboard tests, not only by axe.
+
+### Changed
+
+- New dependency `nodemailer` (SMTP delivery of the digest; hand-written SMTP would be worse).
+
 ## 0.3.0 — 2026-10-25
 
 ### Added

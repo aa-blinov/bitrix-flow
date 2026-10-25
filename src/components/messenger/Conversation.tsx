@@ -820,6 +820,18 @@ export default function Conversation({
                 className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
               >
                 <div
+                  // Сообщение получает фокус с клавиатуры: панель действий открывается по
+                  // фокусу (group-focus-within), а Enter или пробел держат её открытой.
+                  tabIndex={0}
+                  role="group"
+                  aria-label={`Сообщение ${message.authorId === me ? 'от вас' : `от ${nameOf(message)}`}, ${when(message.date)}`}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setActionsFor((current) => (current === message.id ? null : message.id));
+                    }
+                  }}
                   onClick={() =>
                     setActionsFor((current) => (current === message.id ? null : message.id))
                   }

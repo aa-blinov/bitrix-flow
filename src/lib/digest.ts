@@ -3,6 +3,7 @@
 // портал от имени владельца токена. Выключено, пока не задан DIGEST_DIALOG_ID.
 
 import { getProtectedMemberId } from './authorized-member';
+import { deliverDigest, digestChannels } from './digest-delivery';
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
 import { taskMirrorStages } from './task-mirror-query';
@@ -94,12 +95,27 @@ export async function collectDigest(memberId: string, now = new Date()) {
   };
 }
 
-export async function sendDigest(dialogId: string): Promise<string> {
+// Сводка уходит во все включённые каналы (см. digest-delivery.ts). Чат Битрикса единственный
+// канал, которому нужен токен портала, поэтому он замыкает memberId.
+export function configuredChannels(memberId: string) {
+  return digestChannels(process.env, async (text) => {
+    await bx24OAuth(memberId, 'im.message.add', {
+      DIALOG_ID: process.env.DIGEST_DIALOG_ID,
+      MESSAGE: text,
+    });
+  });
+}
+
+export function digestEnabled() {
+  return configuredChannels('').length > 0;
+}
+
+export async function sendDigest() {
   const memberId = await getProtectedMemberId();
   if (!memberId) throw new Error('NO_TOKEN');
   const text = buildDigest(await collectDigest(memberId));
-  await bx24OAuth(memberId, 'im.message.add', { DIALOG_ID: dialogId, MESSAGE: text });
-  return text;
+  const results = await deliverDigest(configuredChannels(memberId), text);
+  return { text, results };
 }
 
 // Ключ «год-неделя по понедельнику»: одна сводка в неделю, даже если сервер перезапустится
@@ -116,8 +132,7 @@ export function shouldSendDigest(now: Date, weekday: number, hour: number) {
 }
 
 export function startDigest() {
-  const dialogId = process.env.DIGEST_DIALOG_ID || '';
-  if (!dialogId || process.env.MOCK_B24 === '1') return;
+  if (!digestEnabled() || process.env.MOCK_B24 === '1') return;
   // 1 = понедельник. Час и день по часовому поясу сервера (TZ в окружении контейнера).
   const weekday = Number(process.env.DIGEST_WEEKDAY ?? 1);
   const hour = Number(process.env.DIGEST_HOUR ?? 9);
@@ -132,13 +147,17 @@ export function startDigest() {
       .updateOne({ key }, { $setOnInsert: { key, at: now } }, { upsert: true });
     if (!claimed.upsertedCount) return;
     try {
-      await sendDigest(dialogId);
-      console.log(`[digest] сводка за неделю ${key} отправлена`);
+      const { results } = await sendDigest();
+      // Если не дошла ни в один канал, неделю не закрываем: повтор через десять минут.
+      if (!results.some((result) => result.ok)) throw new Error(JSON.stringify(results));
+      console.log(`[digest] сводка за неделю ${key}:`, JSON.stringify(results));
     } catch (error) {
       await db.collection('digest_log').deleteOne({ key });
       console.warn('[digest] не отправилась, повтор через 10 минут', error);
     }
   };
   setInterval(() => void tick().catch(() => {}), 10 * 60_000);
-  console.log(`[digest] включена: ${dialogId}, день ${weekday}, час ${hour}`);
+  console.log(
+    `[digest] включена: каналов ${configuredChannels('').length}, день ${weekday}, час ${hour}`,
+  );
 }

@@ -944,3 +944,46 @@ test('мессенджер: кнопка открывает диалог в са
     'https://mock.bitrix24.ru/online/?IM_DIALOG=2',
   );
 });
+
+test('мессенджер: действия над сообщением достижимы с клавиатуры', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'на телефоне клавиатуры нет');
+  const chat = await openDmitry(page);
+  const message = chat
+    .getByText('Сообщение 54', { exact: true })
+    .locator('xpath=ancestor::div[contains(@class,"group")][1]');
+  await message.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  // На сообщение можно встать клавишей Tab: панель действий показывается по фокусу,
+  // а не только по наведению мыши.
+  await message.focus();
+  await expect(message.getByRole('button', { name: 'Ответить' })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(message.getByRole('button', { name: 'Ответить' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(chat.getByText(/^Ответ для Дмитрий Соколов/)).toBeVisible();
+  // Escape в поле отменяет ответ и не уводит фокус из переписки.
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(chat.getByText(/^Ответ для/)).toHaveCount(0);
+});
+
+test('мессенджер: просмотрщик держит фокус внутри и возвращает его при закрытии', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'на телефоне клавиатуры нет');
+  const chat = await openDmitry(page);
+  const photo = chat
+    .getByRole('button')
+    .filter({ has: page.getByRole('img', { name: 'фото.jpg' }) });
+  await photo.focus();
+  await page.keyboard.press('Enter');
+  const viewer = page.getByRole('dialog', { name: 'Просмотр: фото.jpg' });
+  await expect(viewer).toBeVisible();
+  // Серия Tab не выводит фокус за пределы просмотрщика.
+  for (let step = 0; step < 8; step++) {
+    await page.keyboard.press('Tab');
+    expect(await viewer.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+  await expect(photo).toBeFocused();
+});
