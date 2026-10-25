@@ -105,10 +105,7 @@ function WorkloadValue({
   hours: number;
   actualHours?: number;
 }) {
-  // TODO: when hierarchy-aware planning is introduced, calculate an effective
-  // estimate per task branch: use the recursive sum of estimated descendants;
-  // if every descendant estimate is zero, fall back to the parent's estimate.
-  // Sum only root branches so parent and subtasks are never counted twice.
+  // Часы в ячейке уже посчитаны без двойного учёта родителя и подзадач (src/lib/workload.ts).
   if (count === 0 && actualHours === undefined) return <span className="text-ink-faint">—</span>;
   return (
     <span className="flex flex-col items-center gap-0.5 leading-tight">

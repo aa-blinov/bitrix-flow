@@ -13,6 +13,8 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## 0.3.0 — 2026-10-25
+
 ### Added
 
 - Messenger: the dialog list loads the next page by itself on scroll instead of a button;
@@ -23,6 +25,13 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 - CSV: the task list exports every task matching the filters (up to 2000), not only the
   open page; the project summary and the team workload export too. Cells that start with
   `=`, `+`, `-` or `@` are escaped so a task title cannot run as a spreadsheet formula.
+- Workload: the plan hours no longer count a parent's estimate on top of its estimated
+  subtasks (the parent's own estimate is used only when no subtask has one); the task
+  count in a cell is unchanged.
+- A weekly digest of overdue tasks by project and person can be posted to a Bitrix chat
+  (`DIGEST_DIALOG_ID`, off by default); `POST /api/digest` sends it on demand.
+- Messenger: a button opens the dialog in Bitrix itself, where calls and video conferences
+  live (REST cannot create them).
 - Operations: `/api/health` reports stale pollers in `warnings` and `health-watch.sh` raises
   a Sentry alert for them; `scripts/deploy.sh` deploys with a health wait and rolls back to the
   previous image if the new one does not come up; accessibility checks (axe) cover the

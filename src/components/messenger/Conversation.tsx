@@ -7,6 +7,7 @@ import {
   FileText,
   Pin,
   Users,
+  Video,
   Forward,
   Heart,
   Mic,
@@ -62,6 +63,7 @@ export default function Conversation({
   dialog,
   dialogs,
   me,
+  portal,
   onBack,
   onRead,
   onSent,
@@ -72,6 +74,7 @@ export default function Conversation({
   dialog: Dialog;
   dialogs: Dialog[];
   me: number;
+  portal: string;
   onBack: () => void;
   onRead: (id: string) => void;
   onSent: () => void;
@@ -691,6 +694,19 @@ export default function Conversation({
           <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
             {dialog.kind === 'task' ? 'Открыть задачу' : 'Открыть проект'}
           </Link>
+        )}
+        {portal && (
+          // Звонки и видеоконференции REST создавать не умеет: они живут в самом Битриксе.
+          <a
+            href={`https://${portal}/online/?IM_DIALOG=${encodeURIComponent(dialog.id)}`}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Открыть диалог в Битриксе (там есть звонки)"
+            title="Открыть в Битриксе: там есть звонки и видеоконференции"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-ui text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:size-11"
+          >
+            <Video className="size-4" strokeWidth={1.7} />
+          </a>
         )}
         {dialog.kind === 'chat' && /^chat\d+$/.test(dialog.id) && (
           <IconButton label="Настройки чата" variant="ghost" onClick={() => setSettingsOpen(true)}>

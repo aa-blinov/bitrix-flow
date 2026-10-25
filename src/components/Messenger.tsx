@@ -47,6 +47,7 @@ const fetchDialogs = (offset: number, me: number) =>
 export default function Messenger() {
   const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
   const [me, setMe] = useState(0);
+  const [portal, setPortal] = useState('');
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'all' | DialogKind>('all');
   const [query, setQuery] = useState('');
@@ -100,6 +101,7 @@ export default function Messenger() {
       .then((data) => {
         setDialogs((current) => mergeDialogs(current || [], data.dialogs));
         setMe(data.me);
+        if (data.portal) setPortal(data.portal);
         setPaging((current) => current || { hasMore: data.hasMore, nextOffset: data.nextOffset });
         setError('');
       })
@@ -461,6 +463,7 @@ export default function Messenger() {
               dialog={active}
               dialogs={dialogs || []}
               me={me}
+              portal={portal}
               onBack={() => setActiveId('')}
               onRead={markRead}
               onSent={loadDialogs}

@@ -936,3 +936,11 @@ test('сводка по проектам и список задач выгруж
   const gridFile = readFileSync((await (await grid).path())!, 'utf8');
   expect(gridFile).toContain('"Перевести справочники на GraphQL"');
 });
+
+test('мессенджер: кнопка открывает диалог в самом Битриксе, где есть звонки', async ({ page }) => {
+  const chat = await openDmitry(page);
+  await expect(chat.getByRole('link', { name: /Открыть диалог в Битриксе/ })).toHaveAttribute(
+    'href',
+    'https://mock.bitrix24.ru/online/?IM_DIALOG=2',
+  );
+});

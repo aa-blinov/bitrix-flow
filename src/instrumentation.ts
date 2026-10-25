@@ -15,6 +15,8 @@ export async function register() {
   startBackgroundSync();
   const { startMessengerEvents } = await import('./lib/messenger-events');
   startMessengerEvents();
+  const { startDigest } = await import('./lib/digest');
+  startDigest();
 }
 
 // Next вызывает этот хук на каждую необработанную ошибку серверного рендера и
