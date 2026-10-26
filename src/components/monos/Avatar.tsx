@@ -52,7 +52,8 @@ export function Avatar({ name, src, alt, size = 'md', status, className }: Avata
     String(name || alt || '')
       .trim()
       .split(/\s+/)
-      .filter(Boolean)
+      // Разделители вроде «|» в названиях чатов не годятся в инициалы.
+      .filter((part) => /[\p{L}\p{N}]/u.test(part))
       .slice(0, 2)
       .map((part) => part[0])
       .join('')

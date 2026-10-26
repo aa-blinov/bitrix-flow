@@ -120,7 +120,7 @@ export default function ProjectsSummaryPage() {
   );
 
   const statusBadges = (project: ProjectSummary) => (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-x-3 gap-y-1">
       {project.overdue > 0 ? (
         <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
           <Badge tone="danger">
@@ -156,8 +156,8 @@ export default function ProjectsSummaryPage() {
             <Link className="font-medium hover:underline" href={`/projects/${project.id}`}>
               {project.name}
             </Link>
-            <div className="mt-1 flex gap-2 text-xs text-ink-soft">
-              <span className="inline-flex items-center gap-1">
+            <div className="mt-1 flex gap-3 text-xs text-ink-soft">
+              <span className="inline-flex items-center gap-1" title={t('Участников')}>
                 <Users size={12} strokeWidth={1.7} />
                 {project.membersCount}
               </span>

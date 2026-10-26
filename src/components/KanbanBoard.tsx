@@ -658,7 +658,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               icon={<Filter size={14} strokeWidth={1.7} />}
             >
               {t('Фильтры')}
-              {activeFiltersCount > 0 && <Badge tone="accent">{activeFiltersCount}</Badge>}
+              {activeFiltersCount > 0 && (
+                <Badge tone="accent" className="ml-2">
+                  {activeFiltersCount}
+                </Badge>
+              )}
             </Button>
 
             <Button

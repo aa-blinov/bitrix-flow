@@ -385,7 +385,7 @@ export default function Sidebar() {
             </IconButton>
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 space-y-2">
           <ThemeSwitcher />
           <LanguageSwitcher />
         </div>
