@@ -1,8 +1,8 @@
-import type { Metadata } from 'next';
+import { titled } from '@/lib/i18n-server';
 
 // Страница клиентская, поэтому заголовок вкладки задаём серверным
 // слоем: иначе во всех вкладках висит одно «BitrixFlow».
-export const metadata: Metadata = { title: 'Сводка проектов' };
+export const generateMetadata = () => titled('Сводка проектов');
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
