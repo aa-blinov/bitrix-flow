@@ -13,6 +13,15 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-26
+
+### Fixed
+
+- The language switch no longer sticks out of the sidebar: it sits under the theme switch.
+- The filter count is spaced from the "Фильтры" label, status chips in the projects summary no longer
+  run together, and the member count has a tooltip.
+- Chat avatars without a picture take initials from letters only, not from separators such as "|".
+
 ## [0.5.1] - 2026-10-26
 
 ### Changed

@@ -1980,7 +1980,11 @@ export default function TaskGrid({
               icon={<Filter size={14} strokeWidth={1.7} />}
             >
               {t('Фильтры')}
-              {activeFilterCount > 0 && <Badge tone="neutral">{activeFilterCount}</Badge>}
+              {activeFilterCount > 0 && (
+                <Badge tone="neutral" className="ml-2">
+                  {activeFilterCount}
+                </Badge>
+              )}
             </Button>
             {showFilters && (
               <div className={`hidden md:flex ${toolbarPanel}`}>{filterControls}</div>
