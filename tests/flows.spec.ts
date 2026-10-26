@@ -1002,6 +1002,7 @@ test('английский включается переключателем и 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
   await page.reload();
+  await expect(page).toHaveTitle('All tasks — BitrixFlow');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
   await context.clearCookies({ name: 'bitrix-flow-locale' });

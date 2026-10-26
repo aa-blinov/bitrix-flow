@@ -13,6 +13,13 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-26
+
+### Changed
+
+- Tab titles follow the interface language (read from the `bitrix-flow-locale` cookie on the server).
+  The weekly digest stays Russian: it goes to colleagues, not to one reader.
+
 ## [0.5.0] - 2026-10-25
 
 ### Added
