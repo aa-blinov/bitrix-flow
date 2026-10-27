@@ -788,7 +788,12 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     // исполнитель. Раньше здесь был запрос в Битрикс только по названию, а
     // ошибка сети выглядела как «ничего не найдено».
     try {
-      const params = new URLSearchParams({ query, limit: '50', sorts: 'updated:desc' });
+      const params = new URLSearchParams({
+        query,
+        limit: '50',
+        sorts: 'updated:desc',
+        rank: 'true',
+      });
       const response = await fetch(`/api/tasks/all?${params}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();

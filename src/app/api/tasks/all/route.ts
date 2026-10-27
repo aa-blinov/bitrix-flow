@@ -10,6 +10,7 @@ import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
 import { taskMirrorStages } from '@/lib/task-mirror-query';
 import { escapeRegex, mongoHashtagMatch } from '@/lib/task-tags';
+import { rankTasks, searchTokens } from '@/lib/task-search';
 import { postBitrixJson } from '@/lib/bitrix-request';
 export const dynamic = 'force-dynamic';
 
@@ -190,7 +191,23 @@ export async function GET(req: NextRequest) {
   weekEnd.setDate(weekEnd.getDate() + 8);
 
   const filter: Record<string, any> = {};
-  if (query) {
+  // Поиск с ранжированием (страница поиска): Mongo отбирает кандидатов широко, каждое слово
+  // запроса должно встретиться хоть где-то, а строгое совпадение и порядок считает rankTasks.
+  const rank = req.nextUrl.searchParams.get('rank') === 'true' && searchTokens(query).length > 0;
+  if (query && rank) {
+    filter.$and = searchTokens(query).map((token) => {
+      const pattern = { $regex: token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+      return {
+        $or: [
+          { taskId: pattern },
+          { title: pattern },
+          { description: pattern },
+          { groupName: pattern },
+          { responsibleName: pattern },
+        ],
+      };
+    });
+  } else if (query) {
     filter.$or = [
       { taskId: { $regex: escapedQuery, $options: 'i' } },
       { title: { $regex: escapedQuery, $options: 'i' } },
@@ -412,6 +429,30 @@ export async function GET(req: NextRequest) {
   // странице».
   const groupBy = req.nextUrl.searchParams.get('groupBy') || 'none';
   const grouping = groupingStages(groupBy, today);
+  if (query && rank) {
+    // Кандидатов берём с запасом и свежими вперёд: при равном весе выше остаётся более свежая.
+    const candidates = await db
+      .collection('task_mirror')
+      .aggregate(
+        [
+          ...stages,
+          { $match: filter },
+          { $sort: sort },
+          { $limit: 600 },
+          { $replaceWith: '$data' },
+        ],
+        { allowDiskUse: true },
+      )
+      .toArray();
+    const ranked = rankTasks(candidates.map(toTaskListItem), query);
+    return NextResponse.json({
+      tasks: ranked.slice(offset, offset + limit),
+      ancestors: [],
+      total: ranked.length,
+      nextOffset: offset + limit < ranked.length ? offset + limit : null,
+      page: requestedPage,
+    });
+  }
   const page = await db
     .collection('task_mirror')
     .aggregate(

@@ -13,6 +13,16 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-27
+
+### Changed
+
+- Search is ranked by relevance instead of by date: every word of the query must be found, a word has to
+  start with the query (inside a word only the title matches), an exact or leading title match comes first
+  and a task number matches exactly. Matches in the title are highlighted.
+- The search page uses the same centred column as the other screens instead of a narrow strip with its
+  own border.
+
 ## [0.6.0] - 2026-10-27
 
 ### Added
