@@ -1,6 +1,48 @@
 // Английский перевод интерфейса: ключ это русская строка из t('…'). Порядок слов в {0}-подстановках
 // свободный. Строки, уходящие коллегам в Битрикс, не переводятся и сюда не попадают.
 export const EN: Record<string, string> = {
+  'Логин: от 2 до 64 символов, латиница, цифры и . _ @ -, начинается с буквы или цифры.':
+    'Login: 2 to 64 characters, Latin letters, digits and . _ @ -, starting with a letter or digit.',
+  'Пароль короче 12 символов.': 'The password is shorter than 12 characters.',
+  'Пароль не подходит.': 'The password is not acceptable.',
+  'Такой логин уже есть.': 'This login already exists.',
+  'Себя заблокировать, удалить или лишить прав нельзя.':
+    'You cannot block, delete or demote yourself.',
+  'Это последний активный администратор.': 'This is the last active administrator.',
+  'Учётной записи уже нет.': 'The account no longer exists.',
+  'Не удалось выполнить действие.': 'The action failed.',
+  'Учётная запись создана': 'Account created',
+  'Пароль сброшен, открытые сессии закрыты': 'Password reset, open sessions closed',
+  'Удалить учётную запись {0}?': 'Delete the account {0}?',
+  'Человек потеряет доступ сразу, его открытые сессии закроются.':
+    'The person loses access immediately and their open sessions are closed.',
+  'Учётные записи': 'Accounts',
+  'Личные логины для входа в приложение: доступ к порталу остаётся на сервере':
+    'Personal logins for the app: access to the portal stays on the server',
+  'Раздел доступен только администраторам.': 'This section is available to administrators only.',
+  Администратор: 'Administrator',
+  Заблокирован: 'Blocked',
+  'Вход: {0}': 'Last sign-in: {0}',
+  'Ещё не входил': 'Has not signed in yet',
+  'Учётная запись разблокирована': 'Account unblocked',
+  'Учётная запись заблокирована': 'Account blocked',
+  Разблокировать: 'Unblock',
+  Заблокировать: 'Block',
+  'Сбросить пароль': 'Reset password',
+  'Роль изменена': 'Role changed',
+  'Снять права': 'Remove admin rights',
+  'Сделать администратором': 'Make administrator',
+  'Новая учётная запись': 'New account',
+  'Пароль виден только сейчас: скопируйте его и передайте человеку.':
+    'The password is shown only now: copy it and give it to the person.',
+  Роль: 'Role',
+  'Сбросить пароль: {0}': 'Reset password: {0}',
+  'Учётная запись заблокирована. Обратитесь к администратору.':
+    'The account is blocked. Contact an administrator.',
+  Сотрудник: 'Employee',
+
+  'Вас упомянули:': 'You were mentioned:',
+  'Задача из чата': 'Task from chat',
   '% выполнено': '% done',
   '+ Добавить задачу': '+ Add task',
   ', задача #': ', task #',
@@ -575,7 +617,6 @@ export const EN: Record<string, string> = {
   'Сортировать. Shift+клик — добавить вторым уровнем': 'Sort. Shift+click to add as a second level',
   Сортировка: 'Sorting',
   'Сортировка задач': 'Task sorting',
-  Сотрудник: 'Employee',
   Сохранить: 'Save',
   'Сохранить время': 'Save time',
   'Сохранить представление': 'Save the view',

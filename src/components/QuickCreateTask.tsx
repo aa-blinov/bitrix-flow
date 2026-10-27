@@ -14,7 +14,14 @@ import { toolbarControl } from '@/components/monos/toolbar';
 import { useTaskToasts } from '@/components/monos/toast';
 import { t } from '@/lib/i18n';
 
-export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId?: string }) {
+type Props = {
+  defaultProjectId?: string;
+  /** Диалог открывается снаружи (задача из сообщения чата), кнопка тогда не нужна. */
+  initial?: { title: string; description: string };
+  onClose?: () => void;
+};
+
+export default function QuickCreateTask({ defaultProjectId, initial, onClose }: Props) {
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
   const currentUser = useKanbanStore((state) => state.currentUser);
@@ -22,10 +29,16 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
   const loadAllTasks = useKanbanStore((state) => state.loadAllTasks);
   const toasts = useTaskToasts();
 
-  const [open, setOpen] = useState(false);
+  const external = Boolean(initial);
+  const [opened, setOpen] = useState(false);
+  const open = external || opened;
+  const close = () => {
+    setOpen(false);
+    onClose?.();
+  };
   const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
   const [projectId, setProjectId] = useState(defaultProjectId || '');
   const [assigneeId, setAssigneeId] = useState(currentUser.id || '');
   const [deadline, setDeadline] = useState('');
@@ -53,7 +66,7 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
       setTitle('');
       setDescription('');
       setDeadline('');
-      setOpen(false);
+      close();
       void loadAllTasks();
     } catch (error) {
       toasts.failed(t('Задачу не создали'), error);
@@ -64,23 +77,25 @@ export default function QuickCreateTask({ defaultProjectId }: { defaultProjectId
 
   return (
     <>
-      <Button
-        size="sm"
-        className={toolbarControl}
-        icon={<Plus size={14} strokeWidth={1.7} />}
-        onClick={() => setOpen(true)}
-      >
-        {t('Новая задача')}
-      </Button>
+      {!external && (
+        <Button
+          size="sm"
+          className={toolbarControl}
+          icon={<Plus size={14} strokeWidth={1.7} />}
+          onClick={() => setOpen(true)}
+        >
+          {t('Новая задача')}
+        </Button>
+      )}
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={t('Новая задача')}
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
+            <Button variant="secondary" onClick={close}>
               {t('Отмена')}
             </Button>
             <Button

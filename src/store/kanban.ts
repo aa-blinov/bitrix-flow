@@ -46,6 +46,7 @@ import {
   getMemberId,
 } from '@/lib/bitrix24';
 import { mapBitrixTaskStatus } from '@/lib/task-status';
+import { bitrixPlainText } from '@/lib/bitrix-markup';
 import { NO_PROJECT_ID } from '@/lib/no-project';
 import {
   EMPTY_FILTERS,
@@ -254,7 +255,8 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
   return {
     id: bxTask.id,
     projectId: bxTask.groupId,
-    title: bxTask.title,
+    // Задачи из реплик чата приходят с обрывками BB-тегов ([USER=83]Имя…).
+    title: bitrixPlainText(bxTask.title || ''),
     description: bxTask.description,
     status: mapBitrixTaskStatus(bxTask.status),
     priority: mapBxPriority(bxTask.priority),

@@ -36,7 +36,9 @@ export default function LoginPage() {
         setError(
           data.error === 'TOO_MANY_ATTEMPTS'
             ? t('Слишком много попыток. Повторите через 15 минут.')
-            : t('Неверный логин или пароль.'),
+            : data.error === 'ACCOUNT_BLOCKED'
+              ? t('Учётная запись заблокирована. Обратитесь к администратору.')
+              : t('Неверный логин или пароль.'),
         );
         return;
       }

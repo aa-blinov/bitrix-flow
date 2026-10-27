@@ -8,6 +8,8 @@ import { getProtectedMemberId } from './authorized-member';
 import { parseMessageNodes } from './message-markdown';
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
+import { mentionsUser, pingText } from './ping';
+import { hasSubscriptions, pushConfigured, sendPush } from './push';
 
 export type MessengerEvent = {
   type: 'messenger';
@@ -21,6 +23,8 @@ export type MessengerEvent = {
   text: string;
   /** Звук в чате отключён: уведомление показывать не нужно. */
   muted: boolean;
+  /** Меня упомянули тегом [USER=…]: пинг приходит даже из чата с отключённым звуком. */
+  mentioned: boolean;
   at: string;
 };
 
@@ -32,7 +36,11 @@ const KINDS: Record<string, MessengerEvent['kind']> = {
   ONIMV2JOINCHAT: 'join',
 };
 
-export function mapEvent(raw: any, mutedChats: Set<number> = new Set()): MessengerEvent | null {
+export function mapEvent(
+  raw: any,
+  mutedChats: Set<number> = new Set(),
+  me = 0,
+): MessengerEvent | null {
   const kind = KINDS[String(raw?.type)];
   const data = raw?.data;
   if (!kind || !data?.chat) return null;
@@ -53,6 +61,7 @@ export function mapEvent(raw: any, mutedChats: Set<number> = new Set()): Messeng
       bitrixPlainText(String(message.text || ''), parseMessageNodes).slice(0, 200) ||
       (hasFile ? 'Файл' : ''),
     muted: mutedChats.has(chatId),
+    mentioned: mentionsUser(String(message.text || ''), me),
     at: String(raw.date || new Date().toISOString()),
   };
 }
@@ -77,6 +86,9 @@ type State = {
   mutedChats: Set<number>;
   mutedAt: number;
   seen: string[];
+  /** Есть подписки на пуши: очередь читаем и без открытых вкладок. */
+  pushWanted: boolean;
+  pushCheckedAt: number;
 };
 
 declare global {
@@ -99,6 +111,8 @@ function getState(): State {
     mutedChats: new Set(),
     mutedAt: 0,
     seen: [],
+    pushWanted: false,
+    pushCheckedAt: 0,
   });
 }
 
@@ -136,11 +150,21 @@ async function refreshMuted(memberId: string, state: State) {
   }
 }
 
+const PUSH_CHECK_MS = 60_000;
+
+async function refreshPushWanted(state: State) {
+  if (!pushConfigured() || Date.now() - state.pushCheckedAt < PUSH_CHECK_MS) return;
+  state.pushCheckedAt = Date.now();
+  const memberId = await getProtectedMemberId().catch(() => null);
+  state.pushWanted = memberId ? await hasSubscriptions(memberId).catch(() => false) : false;
+}
+
 async function tick() {
   const state = getState();
   if (state.inFlight) return;
   const clients = globalThis.__sseSubscribers?.size ?? 0;
-  if (!clients) {
+  await refreshPushWanted(state);
+  if (!clients && !state.pushWanted) {
     if (state.subscribed && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) {
       state.subscribed = false;
       state.offset = 0;
@@ -175,10 +199,13 @@ async function tick() {
       if (Number(result?.nextOffset)) state.offset = Number(result.nextOffset);
       const docs = [];
       for (const raw of result?.events || []) {
-        const event = mapEvent(raw, state.mutedChats);
+        const event = mapEvent(raw, state.mutedChats, state.me);
         if (!event || isDuplicate(state, event)) continue;
         if (Date.now() - Date.parse(event.at) > MAX_AGE_MS) continue;
         docs.push({ member_id: memberId, event, created_at: new Date() });
+        // Открытая вкладка сама покажет уведомление; пуш нужен, когда вкладок нет.
+        if (!clients && event.kind === 'add' && event.authorId !== state.me)
+          if (!event.muted || event.mentioned) void pushEvent(memberId, event);
       }
       if (docs.length) await db.collection('events_stream').insertMany(docs);
       if (!result?.hasMore) break;
@@ -193,11 +220,22 @@ async function tick() {
   }
 }
 
+function pushEvent(memberId: string, event: MessengerEvent) {
+  const { title, body } = pingText(event, { mention: 'Вас упомянули:', message: 'Сообщение' });
+  return sendPush(memberId, {
+    title,
+    body,
+    tag: `chat-${event.dialogId}`,
+    url: `/messenger?dialog=${encodeURIComponent(event.dialogId)}`,
+    urgent: event.mentioned,
+  });
+}
+
 // Для /api/health: опрос живой, если есть открытые вкладки и последний проход был недавно.
 export function getMessengerEventsHealth() {
   const { lastOkAt, lastError, subscribed } = getState();
   return {
-    active: subscribed && (globalThis.__sseSubscribers?.size ?? 0) > 0,
+    active: subscribed && ((globalThis.__sseSubscribers?.size ?? 0) > 0 || getState().pushWanted),
     lastOkAt,
     lastError,
   };

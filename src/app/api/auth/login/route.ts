@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'node:crypto';
 import { createSession, sessionCookie } from '@/lib/session';
 import { createStoredSession } from '@/lib/session-store';
+import { verifyPassword } from '@/lib/password';
+import { bootstrapAdmin, findUserByName, markLogin, normalizeUsername } from '@/lib/users';
 
 const MAX_ATTEMPTS = 5;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
@@ -37,23 +38,36 @@ export async function POST(request: NextRequest) {
     password?: unknown;
     next?: unknown;
   } | null;
-  const username = typeof body?.username === 'string' ? body.username : '';
+  const username = normalizeUsername(body?.username);
   const password = typeof body?.password === 'string' ? body.password : '';
-  const expectedUsername = process.env.AUTH_USERNAME;
-  const expectedPassword = process.env.AUTH_PASSWORD;
 
-  if (!expectedUsername || !expectedPassword) {
+  // Подбор идёт и по одному адресу, и по одному логину с разных адресов: лимит на оба.
+  const byName = getAttempt(`user:${username}`);
+  if (byName.count >= MAX_ATTEMPTS) {
+    return NextResponse.json({ error: 'TOO_MANY_ATTEMPTS' }, { status: 429 });
+  }
+
+  await bootstrapAdmin();
+  if (!process.env.AUTH_SESSION_SECRET) {
     return NextResponse.json({ error: 'AUTH_NOT_CONFIGURED' }, { status: 503 });
   }
-
-  if (!matches(username, expectedUsername) || !matches(password, expectedPassword)) {
+  const user = username ? await findUserByName(username) : null;
+  // Пароль проверяется и для несуществующего логина (см. verifyPassword), чтобы ответ не
+  // выдавал, есть ли такая запись.
+  const passwordOk = await verifyPassword(password, user?.password_hash);
+  if (!user || !passwordOk) {
     attempt.count += 1;
+    byName.count += 1;
     return NextResponse.json({ error: 'INVALID_CREDENTIALS' }, { status: 401 });
   }
+  // О блокировке говорим только тому, кто знает пароль: иначе это способ перебирать логины.
+  if (user.blocked) return NextResponse.json({ error: 'ACCOUNT_BLOCKED' }, { status: 403 });
 
   attempts.delete(ip);
+  attempts.delete(`user:${username}`);
+  await markLogin(user._id);
   const session = await createSession();
-  await createStoredSession(session, request.headers.get('user-agent'));
+  await createStoredSession(session, request.headers.get('user-agent'), String(user._id));
   const response = NextResponse.json({ ok: true, next: safeNext(body?.next) });
   response.cookies.set({
     ...sessionCookie,
@@ -74,18 +88,6 @@ function isSecureOrigin(): boolean {
   if (appUrl.startsWith('https://')) return true;
   if (/^https?:\/\/(127\.0\.0\.1|localhost)/.test(appUrl)) return false;
   return process.env.NODE_ENV === 'production';
-}
-
-/** Сравнение за постоянное время: длина пароля не должна утекать по таймингу. */
-function matches(received: string, expected: string): boolean {
-  const receivedBytes = Buffer.from(received);
-  const expectedBytes = Buffer.from(expected);
-  if (receivedBytes.length !== expectedBytes.length) {
-    // Всё равно тратим сравнение, чтобы ветка не отличалась по времени.
-    timingSafeEqual(expectedBytes, expectedBytes);
-    return false;
-  }
-  return timingSafeEqual(receivedBytes, expectedBytes);
 }
 
 function safeNext(value: unknown): string {

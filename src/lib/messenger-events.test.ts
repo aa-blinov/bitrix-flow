@@ -44,4 +44,20 @@ describe('mapEvent', () => {
     expect(mapEvent({ type: 'SOMETHING', data: { chat } })).toBeNull();
     expect(mapEvent({ type: 'ONIMV2MESSAGEADD', data: {} })).toBeNull();
   });
+
+  it('flags a mention of me, also in a muted chat, but not of someone else', () => {
+    const raw = (text: string) => ({
+      type: 'ONIMV2MESSAGEADD',
+      data: { chat, user: { name: 'Анна' }, message: { id: 6, authorId: 2, text, params: [] } },
+    });
+    expect(mapEvent(raw('[USER=9]Саша[/USER] глянь'), new Set([351]), 9)).toMatchObject({
+      mentioned: true,
+      muted: true,
+    });
+    expect(mapEvent(raw('[USER=91]Другой[/USER] глянь'), new Set(), 9)?.mentioned).toBe(false);
+    expect(mapEvent(raw('[USER=9 REPLACE]Саша[/USER] назначен'), new Set(), 9)?.mentioned).toBe(
+      true,
+    );
+    expect(mapEvent(raw('[USER=9]Саша[/USER]'))?.mentioned).toBe(false);
+  });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatBitrixDateTime, parseBitrixMarkup, parseBitrixNodes } from './bitrix-markup';
+import {
+  bitrixPlainText,
+  formatBitrixDateTime,
+  parseBitrixMarkup,
+  parseBitrixNodes,
+} from './bitrix-markup';
 
 describe('Bitrix markup', () => {
   it('turns URL BBCode into a safe link', () => {
@@ -44,5 +49,13 @@ describe('Bitrix markup', () => {
 
   it('uses HH:MM DD.MM.YYYY dates', () => {
     expect(formatBitrixDateTime('2025-12-31T14:05:00+03:00')).toMatch(/^\d{2}:\d{2} 31\.12\.2025$/);
+  });
+
+  it('shows only the caption of a CONTEXT tag and drops a truncated USER tag', () => {
+    expect(
+      bitrixPlainText('создал задачу на основании [CONTEXT=1:9/293259]сообщения[/CONTEXT]'),
+    ).toBe('создал задачу на основании сообщения');
+    expect(bitrixPlainText('[USER=83]Александра Царьк')).toBe('Александра Царьк');
+    expect(bitrixPlainText('[kanban] правка [b]важно[/b]')).toBe('[kanban] правка важно');
   });
 });
