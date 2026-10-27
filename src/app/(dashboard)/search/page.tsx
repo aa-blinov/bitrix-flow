@@ -13,8 +13,29 @@ import { SearchField } from '@/components/monos/SearchField';
 import { Skeleton } from '@/components/monos/Skeleton';
 import PageHeader from '@/components/PageHeader';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { searchTokens } from '@/lib/task-search';
 
 const DUE_DATE = dateFormat();
+
+// Совпадения в названии выделяются, чтобы было видно, почему задача нашлась.
+function Highlight({ text, query }: { text: string; query: string }) {
+  const tokens = searchTokens(query).map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!tokens.length) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${tokens.join('|')})`, 'giu'));
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 ? (
+          <mark key={index} className="rounded-ui bg-surface-2 px-0.5 font-bold text-ink">
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
 
 // Точка статуса: цвет здесь — сигнал, поэтому у каждого состояния своя роль
 // набора, а не «какой-нибудь синий».
@@ -95,30 +116,24 @@ function SearchPageContent() {
     <div className="min-h-screen bg-canvas">
       <PageHeader title={t('Поиск')} description={t('Задачи во всех доступных проектах')} />
 
-      {/* Search Input */}
-      <div className="border-b border-line bg-canvas p-4 lg:p-6">
-        <div className="max-w-2xl">
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            onClear={() => setQuery('')}
-            placeholder={t('Поиск задач по названию…')}
-            label={t('Поиск задач по названию')}
-            size="lg"
-            autoFocus
-          />
-        </div>
-      </div>
+      <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          onClear={() => setQuery('')}
+          placeholder={t('Поиск задач по названию…')}
+          label={t('Поиск задач по названию')}
+          size="lg"
+          autoFocus
+        />
 
-      {/* Results */}
-      <div className="p-4 lg:p-6">
         {isSearching ? (
-          <div className="mx-auto max-w-2xl space-y-3 py-2">
+          <div className="space-y-3 py-2">
             <Skeleton height="6rem" />
             <Skeleton height="6rem" />
           </div>
         ) : searchResults.length > 0 ? (
-          <div className="max-w-2xl space-y-3">
+          <div className="space-y-3">
             <p className="text-sm text-ink-soft">
               {t('Найдено:')} {searchTotal}
               {searchTotal > searchResults.length &&
@@ -140,7 +155,9 @@ function SearchPageContent() {
                     }`}
                   />
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-medium text-ink">{task.title}</h2>
+                    <h2 className="font-medium text-ink">
+                      <Highlight text={task.title} query={query} />
+                    </h2>
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-soft">
                       <span className="tabular-nums">#{task.id}</span>
                       {/* Цвет точки — не единственный носитель статуса: подписываем. */}
@@ -184,19 +201,17 @@ function SearchPageContent() {
             ))}
           </div>
         ) : searchError ? (
-          <p role="alert" className="max-w-2xl py-8 text-center text-danger-text">
+          <p role="alert" className="py-8 text-center text-danger-text">
             {searchError}
           </p>
         ) : query ? (
-          <p className="max-w-2xl py-8 text-center text-ink-soft">
+          <p className="py-8 text-center text-ink-soft">
             {t('Задачи по запросу «')}
             {query}
             {t('» не найдены')}
           </p>
         ) : (
-          <p className="max-w-2xl py-8 text-center text-ink-soft">
-            {t('Начните вводить текст для поиска')}
-          </p>
+          <p className="py-8 text-center text-ink-soft">{t('Начните вводить текст для поиска')}</p>
         )}
       </div>
 

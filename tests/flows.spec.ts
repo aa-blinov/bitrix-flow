@@ -1071,3 +1071,13 @@ test('учётные записи: создать, заблокировать, �
   await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
   await expect(row).toHaveCount(0);
 });
+
+test('поиск: слово в названии выделяется, лишнее слово ничего не находит', async ({ page }) => {
+  await page.goto('/search?q=graphql');
+  const first = page.getByRole('heading', { level: 2 }).first();
+  await expect(first).toContainText('GraphQL');
+  await expect(first.locator('mark').first()).toHaveText(/graphql/i);
+  // Слова из запроса, которых нет ни в одном поле, ничего не находят.
+  await page.getByLabel('Поиск задач по названию').fill('zzzqx');
+  await expect(page.getByText('не найдены')).toBeVisible();
+});
