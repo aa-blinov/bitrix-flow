@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import { Menu, LogOut, ChevronDown, Plus } from 'lucide-react';
+import { Menu, LogOut, ChevronDown, Plus, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -151,6 +151,15 @@ export default function Sidebar() {
       setCreating(false);
     }
   }
+
+  // Раздел учётных записей виден только администраторам; сервер всё равно проверяет роль.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    void fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setIsAdmin(data?.role === 'admin'))
+      .catch(() => {});
+  }, []);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -385,6 +394,15 @@ export default function Sidebar() {
             </IconButton>
           </div>
         </div>
+        {isAdmin && (
+          <Link
+            href="/accounts"
+            className="mt-2 flex min-h-9 items-center gap-2 rounded-ui px-2.5 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
+          >
+            <Users size={16} strokeWidth={1.7} />
+            {t('Учётные записи')}
+          </Link>
+        )}
         <div className="mt-2 space-y-2">
           <ThemeSwitcher />
           <LanguageSwitcher />
@@ -422,7 +440,8 @@ export default function Sidebar() {
 
       {/* Desktop sidebar */}
       {/* Постоянное меню — с 1024px: на планшете в портрете 256px съедали доску. */}
-      <aside className="fixed inset-y-0 left-0 hidden h-screen w-64 border-r border-line bg-canvas lg:flex">
+      {/* Выше шапки страниц (z-menu): панель уведомлений выходит за край сайдбара и иначе пряталась под ними. */}
+      <aside className="fixed inset-y-0 left-0 z-[45] hidden h-screen w-64 border-r border-line bg-canvas lg:flex">
         {SidebarContent()}
       </aside>
 

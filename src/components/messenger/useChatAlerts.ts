@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  chatNotifyEnabled,
   showChatNotification,
+  syncPush,
   useDebounced,
   useMessengerEvents,
 } from '@/components/messenger/realtime';
@@ -29,6 +31,12 @@ export function useChatAlerts(pathname: string) {
   }, []);
   const refresh = useDebounced(fetchCounters, 1000);
 
+  // Подписку на пуш подтверждаем при каждой загрузке: браузер мог её сбросить, а сервер
+  // удалить как мёртвую.
+  useEffect(() => {
+    if (chatNotifyEnabled()) void syncPush(true);
+  }, []);
+
   useEffect(() => {
     fetchCounters();
     // Подстраховка на случай, если событие потерялось: раз в минуту, пока вкладка видна.
@@ -40,7 +48,8 @@ export function useChatAlerts(pathname: string) {
 
   useMessengerEvents((event) => {
     refresh();
-    if (event.kind !== 'add' || event.muted || event.authorId === me.current) return;
+    if (event.kind !== 'add' || (event.muted && !event.mentioned) || event.authorId === me.current)
+      return;
     // Страница чата уже перед глазами: сообщение видно в списке и значком.
     if (document.visibilityState === 'visible' && pathname === '/messenger') return;
     showChatNotification(event, () =>

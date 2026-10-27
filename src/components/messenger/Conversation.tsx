@@ -9,6 +9,7 @@ import {
   Users,
   Video,
   Forward,
+  ListPlus,
   Heart,
   Mic,
   Paperclip,
@@ -28,6 +29,7 @@ import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
 import FileViewer from '@/components/FileViewer';
 import LoadingState from '@/components/LoadingState';
+import QuickCreateTask from '@/components/QuickCreateTask';
 import { ChatSettingsModal } from '@/components/messenger/ChatSettings';
 import { ForwardModal } from '@/components/messenger/Dialogs';
 import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
@@ -54,7 +56,7 @@ import {
 } from '@/lib/messenger';
 import { bitrixPlainText } from '@/lib/bitrix-markup';
 import { parseMessageNodes } from '@/lib/message-markdown';
-import { t } from '@/lib/i18n';
+import { dateLocale, t } from '@/lib/i18n';
 
 // Пока жив SSE, обновление приходит событием, и опрос только подстраховывает.
 const MESSAGES_POLL_MS = 5_000;
@@ -114,6 +116,7 @@ export default function Conversation({
   const [editing, setEditing] = useState<Message | null>(null);
   const [deleting, setDeleting] = useState<Message | null>(null);
   const [forwarding, setForwarding] = useState<Message | null>(null);
+  const [taskFrom, setTaskFrom] = useState<Message | null>(null);
   const [notice, setNotice] = useState('');
   // Сообщение, у которого открыта панель действий (на телефоне вместо наведения).
   const [actionsFor, setActionsFor] = useState<number | null>(null);
@@ -233,6 +236,25 @@ export default function Conversation({
   const nameOf = (message: Message) =>
     people[String(message.authorId)]?.name ||
     (message.authorId === me ? t('Я') : t('Пользователь {0}', message.authorId));
+
+  // Заготовка задачи из реплики: название из первой строки, а в описание уходит вся
+  // цитата и ссылка на сообщение, чтобы в Битриксе было видно, откуда задача.
+  function taskDraft(message: Message) {
+    // Построчно, чтобы абзацы реплики не слипались в одну строку.
+    const lines = message.text
+      .split('\n')
+      .map((line) => bitrixPlainText(line, parseMessageNodes))
+      .filter(Boolean);
+    const plain = lines.join('\n');
+    const title = (lines[0] || message.files[0]?.name || t('Задача из чата')).slice(0, 120);
+    const link = portal
+      ? `\nhttps://${portal}/online/?IM_DIALOG=${encodeURIComponent(dialog.id)}&IM_MESSAGE=${message.id}`
+      : '';
+    return {
+      title,
+      description: `${nameOf(message)}, ${new Date(message.date).toLocaleString(dateLocale())}:\n${plain}${link}`,
+    };
+  }
 
   const json = { 'Content-Type': 'application/json' };
 
@@ -882,6 +904,15 @@ export default function Conversation({
                         />
                       </IconButton>
                       <IconButton
+                        label={t('Создать задачу')}
+                        variant="ghost"
+                        size="sm"
+                        className="max-sm:h-9 max-sm:w-9"
+                        onClick={() => setTaskFrom(message)}
+                      >
+                        <ListPlus className="size-3.5" strokeWidth={1.7} />
+                      </IconButton>
+                      <IconButton
                         label={t('Переслать')}
                         variant="ghost"
                         size="sm"
@@ -1195,6 +1226,9 @@ export default function Conversation({
         description={t('Сообщение удалится у всех участников чата.')}
         confirmLabel={t('Удалить')}
       />
+      {taskFrom && (
+        <QuickCreateTask initial={taskDraft(taskFrom)} onClose={() => setTaskFrom(null)} />
+      )}
       <ChatSettingsModal
         open={settingsOpen}
         dialog={dialog}

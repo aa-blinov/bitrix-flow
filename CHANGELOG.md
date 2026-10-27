@@ -13,6 +13,26 @@ All notable changes to bitrix-flow. Versions are ordered newest first.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-27
+
+### Added
+
+- Personal accounts instead of one shared login: a new "Accounts" section (admins only) creates,
+  blocks, unblocks, resets the password of and deletes accounts. Blocking and password resets close
+  open sessions at once. The first admin is created from `AUTH_USERNAME` and `AUTH_PASSWORD`.
+  Old sessions from the shared login stop working, everyone signs in once more.
+- Pings: a mention of you (`[USER=you]`) in a chat now notifies even when the chat is muted and stays
+  on screen until dismissed. With VAPID keys set, mentions and messages arrive as push notifications
+  while the tab is closed; a mention in a task comment pings too.
+- "Create task" on a chat message: opens the new task dialog with the title from the first line and
+  the quote plus a link to the message in the description.
+
+### Fixed
+
+- The notification panel next to the user name opened under the page header and the chat; the
+  sidebar now sits above them.
+- Tasks created from chat messages no longer show raw `[CONTEXT=...]` and half-cut `[USER=...]` tags.
+
 ## [0.5.2] - 2026-10-26
 
 ### Fixed

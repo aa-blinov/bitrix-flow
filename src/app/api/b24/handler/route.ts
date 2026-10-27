@@ -3,6 +3,7 @@ import { getDb } from '@/lib/mongo';
 import { invalidateByPrefix } from '@/lib/server-cache';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { enqueueTaskMirrorSync, processTaskMirrorJobs } from '@/lib/task-mirror';
+import { pingTaskMention } from '@/lib/push';
 import { timingSafeEqual } from 'node:crypto';
 
 // Bitrix may follow the install callback with a browser-side GET after the
@@ -226,6 +227,9 @@ export async function POST(req: NextRequest) {
     // Bitrix receives an acknowledgement immediately. The precise task mirror is
     // updated afterwards, so one event never triggers a portal-wide task scan.
     after(async () => {
+      await pingTaskMention(memberId, details as any).catch((pushError) =>
+        console.warn('[push] task mention failed', pushError),
+      );
       try {
         await processTaskMirrorJobs(memberId);
       } catch (syncError) {

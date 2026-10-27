@@ -42,7 +42,20 @@ function normalizeTimestamps(text: string) {
 
 // Теги, у которых нечего показать кроме содержимого: размер, цвет и ссылки на
 // чат или команды работают только внутри самого Битрикса.
-const TRANSPARENT_TAGS = new Set(['chat', 'size', 'color', 'font', 'send', 'put', 'call']);
+// context это «сообщения» в «создал задачу на основании сообщения»: ссылка на реплику
+// ведёт внутрь Битрикса, поэтому остаётся только подпись.
+const TRANSPARENT_TAGS = new Set([
+  'chat',
+  'size',
+  'color',
+  'font',
+  'send',
+  'put',
+  'call',
+  'context',
+]);
+// Незакрытый тег такого вида остаётся в обрезанных названиях задач и ломал бы строку.
+const DROP_WHEN_UNCLOSED = new Set([...TRANSPARENT_TAGS, 'user', 'url']);
 
 function closingIndex(text: string, tag: string, from: number) {
   const pattern = new RegExp(`\\[(/?)${tag}(?:=[^\\]]+)?\\]`, 'gi');
@@ -58,7 +71,7 @@ function closingIndex(text: string, tag: string, from: number) {
 function parseNodes(text: string): BitrixNode[] {
   const nodes: BitrixNode[] = [];
   const opener =
-    /\[(b|i|u|s|strike|quote|code|url|user|img|list|chat|size|color|font|send|put|call)(?:=([^\]]+))?\]/gi;
+    /\[(b|i|u|s|strike|quote|code|url|user|img|list|chat|size|color|font|send|put|call|context)(?:=([^\]]+))?\]/gi;
   let position = 0;
 
   for (const match of text.matchAll(opener)) {
@@ -68,7 +81,7 @@ function parseNodes(text: string): BitrixNode[] {
     const tag = match[1].toLowerCase();
     const close = closingIndex(text, tag, match.index! + match[0].length);
     if (!close) {
-      nodes.push({ type: 'text', text: match[0] });
+      if (!DROP_WHEN_UNCLOSED.has(tag)) nodes.push({ type: 'text', text: match[0] });
       position = match.index! + match[0].length;
       continue;
     }

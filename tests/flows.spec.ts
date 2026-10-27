@@ -1007,3 +1007,67 @@ test('английский включается переключателем и 
   await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
   await context.clearCookies({ name: 'bitrix-flow-locale' });
 });
+
+test('мессенджер: задача создаётся из реплики с цитатой и названием из первой строки', async ({
+  page,
+}) => {
+  const chat = await openDmitry(page);
+  await (
+    await bubble(chat, 'Сообщение 54')
+  )
+    .getByRole('button', { name: 'Создать задачу' })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Новая задача' });
+  await expect(dialog.getByLabel('Название задачи')).toHaveValue('Сообщение 54');
+  await expect(dialog.getByLabel('Описание задачи')).toHaveValue(
+    /Дмитрий Соколов, .*:\nСообщение 54/,
+  );
+  await dialog.getByRole('button', { name: 'Отмена' }).click();
+  await expect(page.getByRole('dialog', { name: 'Новая задача' })).toHaveCount(0);
+});
+
+test('учётные записи: создать, заблокировать, войти нельзя, удалить', async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  await page.goto('/accounts');
+  await expect(page.getByRole('heading', { name: 'Учётные записи' })).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новая учётная запись' });
+  await dialog.getByLabel('Логин').fill('ivan.test');
+  const password = await dialog.getByLabel('Пароль').inputValue();
+  expect(password).toHaveLength(16);
+  await dialog.getByRole('button', { name: 'Создать' }).click();
+  const row = page.getByRole('listitem').filter({ hasText: 'ivan.test' });
+  await expect(row).toBeVisible();
+
+  // Новый человек входит своим паролем.
+  const login = async (pass: string) => {
+    const context = await browser.newContext({ baseURL, storageState: undefined });
+    const response = await context.request.post('/api/auth/login', {
+      data: { username: 'ivan.test', password: pass },
+    });
+    await context.close();
+    return response.status();
+  };
+  expect(await login(password)).toBe(200);
+  expect(await login('wrong-password-123')).toBe(401);
+
+  // После блокировки пароль верный, но вход закрыт.
+  await row.getByRole('button', { name: 'Заблокировать' }).click();
+  await expect(row.getByText('Заблокирован')).toBeVisible();
+  expect(await login(password)).toBe(403);
+
+  // Себя заблокировать нельзя.
+  const me = page.getByRole('listitem').filter({ hasText: 'tester' });
+  await me.getByRole('button', { name: 'Заблокировать' }).click();
+  await expect(page.getByText('Себя заблокировать, удалить или лишить прав нельзя.')).toHaveCount(
+    0,
+  );
+  await expect(me.getByText('Заблокирован')).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Удалить' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect(row).toHaveCount(0);
+});
