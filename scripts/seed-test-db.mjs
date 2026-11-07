@@ -85,6 +85,8 @@ for (const name of [
   'notifications',
   'events_stream',
   'cache',
+  'workload_time_task',
+  'project_hour_class',
 ]) {
   await db.collection(name).deleteMany({});
 }
@@ -143,6 +145,37 @@ await db.collection('notifications').insertMany([
     projectId: '10',
     created_at: new Date(notifyDay(-2)),
   },
+]);
+
+// Списания для аналитики часов: две недели вокруг BASE. Проект 12 без класса, чтобы
+// в снимке была видна корзина «нераспределено».
+const LOGS = [
+  ['2026-02-23', '101', '1', '2026-02-24', 6],
+  ['2026-02-23', '102', '2', '2026-02-25', 3],
+  ['2026-02-23', '104', '1', '2026-02-26', 4],
+  ['2026-03-02', '101', '2', '2026-03-02', 5],
+  ['2026-03-02', '103', '3', '2026-03-03', 2],
+  ['2026-03-02', '105', '2', '2026-03-04', 3.5],
+  ['2026-03-02', '106', '3', '2026-03-05', 1.5],
+  ['2026-03-02', '107', '1', '2026-03-06', 2],
+];
+await db.collection('workload_time_task').insertMany(
+  ['2026-02-23', '2026-03-02'].map((start) => ({
+    member_id: MEMBER_ID,
+    start,
+    task_id: '__global__',
+    entries: LOGS.filter((log) => log[0] === start).map(([, taskId, userId, dayKey, hours]) => ({
+      userId,
+      day: dayKey,
+      seconds: hours * 3600,
+      taskId,
+    })),
+    updated_at: new Date(),
+  })),
+);
+await db.collection('project_hour_class').insertMany([
+  { member_id: MEMBER_ID, project_id: '10', hour_class: 'commercial' },
+  { member_id: MEMBER_ID, project_id: '11', hour_class: 'presale' },
 ]);
 
 console.log(`[seed] база ${dbName}: задач ${TASKS.length}, проектов ${PROJECTS.length}`);

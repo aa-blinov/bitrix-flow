@@ -22,7 +22,7 @@ function moscowNow() {
   };
 }
 
-function mondayFor(date: string) {
+export function mondayFor(date: string) {
   const value = new Date(`${date}T12:00:00Z`);
   const day = value.getUTCDay() || 7;
   value.setUTCDate(value.getUTCDate() - day + 1);

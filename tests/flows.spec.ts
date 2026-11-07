@@ -315,10 +315,13 @@ test('мессенджер: слишком большой файл не уход
   page.on('request', (request) => {
     if (request.url().endsWith('/api/messenger/files')) called = true;
   });
-  await chat.getByLabel('Файлы').setInputFiles({
-    name: 'big.bin',
-    mimeType: 'application/octet-stream',
-    buffer: Buffer.alloc(21 * 1024 * 1024),
+  // Файл собирается в самой странице: setInputFiles гонит 21 МБ через протокол браузера,
+  // и на нагруженной машине тест падал по таймауту, не дойдя до проверки.
+  await chat.getByLabel('Файлы').evaluate((input: HTMLInputElement) => {
+    const files = new DataTransfer();
+    files.items.add(new File([new Uint8Array(21 * 1024 * 1024)], 'big.bin'));
+    input.files = files.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(chat.getByRole('alert')).toContainText('больше');
   expect(called).toBe(false);
@@ -412,7 +415,7 @@ test('меню: пункты переставляются перетаскива
         .allInnerTexts()
         .catch(() => [])
     ).slice(0, 3);
-  await expect.poll(order).toEqual(['Главная', 'Сводка проектов', 'Поиск']);
+  await expect.poll(order).toEqual(['Главная', 'Сводка проектов', 'Аналитика часов']);
 
   const from = (await nav.getByRole('link', { name: 'Поиск' }).boundingBox())!;
   const to = (await nav.getByRole('link', { name: 'Главная' }).boundingBox())!;
@@ -1080,4 +1083,23 @@ test('поиск: слово в названии выделяется, лишн�
   // Слова из запроса, которых нет ни в одном поле, ничего не находят.
   await page.getByLabel('Поиск задач по названию').fill('zzzqx');
   await expect(page.getByText('не найдены')).toBeVisible();
+});
+
+test('аналитика часов делит часы по классам и фильтрует по клику на плитку', async ({ page }) => {
+  // Период из URL: сид кладёт списания на две недели вокруг 2026-03-02.
+  await page.goto('/analytics?from=2026-02-23&to=2026-03-08');
+  await expect(page.getByRole('heading', { name: 'Аналитика часов', level: 1 })).toBeVisible();
+  const unassigned = page.getByRole('button', { name: /Нераспределено/ }).first();
+  await expect(unassigned).toContainText('3,5 ч');
+  await expect(page.getByRole('button', { name: /Коммерческие/ }).first()).toContainText('16 ч');
+
+  // План API v2: подзадача 103 (2 ч) заменяет оценку родителя 101, плюс 102 (4 ч).
+  const pivot = page.getByRole('table', { name: 'Проекты по классам' });
+  await expect(pivot.getByRole('row', { name: /Разработка API v2/ })).toContainText('+10');
+
+  await unassigned.click();
+  await expect(page).toHaveURL(/class=unassigned/);
+  const detail = page.getByRole('table', { name: 'Детализация часов' });
+  await expect(detail).toContainText('Внутренний бэклог');
+  await expect(detail).not.toContainText('Разработка API v2');
 });

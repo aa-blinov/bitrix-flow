@@ -3,6 +3,7 @@
 import {
   Bell,
   CalendarDays,
+  ChartNoAxesColumn,
   LayoutDashboard,
   ListChecks,
   MessagesSquare,
@@ -49,6 +50,13 @@ export const NAV_ITEMS = [
     icon: TableProperties,
     get label() {
       return t('Сводка проектов');
+    },
+  },
+  {
+    href: '/analytics',
+    icon: ChartNoAxesColumn,
+    get label() {
+      return t('Аналитика часов');
     },
   },
   {

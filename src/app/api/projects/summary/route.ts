@@ -5,6 +5,7 @@ import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
+import { rollupPlan } from '@/lib/planned-hours';
 
 type RawTask = {
   id?: string;
@@ -75,42 +76,17 @@ function toHours(seconds: number) {
 }
 
 function calculatePlannedHours(tasks: RawTask[]) {
-  const byId = new Map(tasks.map((task) => [String(value(task, 'id', 'ID')), task]));
-  const children = new Map<string, RawTask[]>();
-  for (const task of tasks) {
-    const parentId = String(value(task, 'parentId', 'parent_id', 'PARENT_ID') || '');
-    if (parentId && byId.has(parentId)) {
-      const siblings = children.get(parentId) || [];
-      siblings.push(task);
-      children.set(parentId, siblings);
-    }
-  }
-
-  let warnings = 0;
-  let varianceSeconds = 0;
-  const resolve = (task: RawTask): number => {
-    const id = String(value(task, 'id', 'ID'));
-    const own = asNumber(value(task, 'timeEstimate', 'TIME_ESTIMATE'));
-    const descendants = children.get(id) || [];
-    if (descendants.length === 0) return own;
-    const childrenPlan = descendants.reduce((sum, child) => sum + resolve(child), 0);
-    // A parent without estimated descendants remains a valid planning item.
-    // Once children have estimates, they become the authoritative decomposition.
-    if (childrenPlan === 0) return own;
-    if (own > 0 && own !== childrenPlan) {
-      warnings += 1;
-      varianceSeconds += Math.abs(own - childrenPlan);
-    }
-    return childrenPlan;
-  };
-
-  const roots = tasks.filter(
-    (task) => !byId.has(String(value(task, 'parentId', 'parent_id', 'PARENT_ID') || '')),
+  const plan = rollupPlan(
+    tasks.map((task) => ({
+      id: String(value(task, 'id', 'ID')),
+      parentId: String(value(task, 'parentId', 'parent_id', 'PARENT_ID') || ''),
+      estimate: asNumber(value(task, 'timeEstimate', 'TIME_ESTIMATE')),
+    })),
   );
   return {
-    plannedSeconds: roots.reduce((sum, task) => sum + resolve(task), 0),
-    warnings,
-    varianceHours: toHours(varianceSeconds),
+    plannedSeconds: plan.plannedSeconds,
+    warnings: plan.warnings,
+    varianceHours: toHours(plan.varianceSeconds),
   };
 }
 
