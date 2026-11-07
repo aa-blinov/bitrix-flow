@@ -29,6 +29,12 @@ export function mondayFor(date: string) {
   return value.toISOString().slice(0, 10);
 }
 
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
 async function runNightlyRefresh() {
   if (schedulerRunning) return;
   const now = moscowNow();
@@ -52,12 +58,14 @@ async function runNightlyRefresh() {
     if (!claim.upsertedCount) return;
 
     const { refreshWorkloadTime } = await import('./workload-time');
-    const start = mondayFor(now.date);
-    const end = new Date(`${start}T12:00:00Z`);
-    end.setUTCDate(end.getUTCDate() + 6);
+    // Прошлая неделя перечитывается тоже: иначе её последний сбор приходится на ночь
+    // на воскресенье, и воскресные списания и списания задним числом теряются навсегда.
+    const weeks = [addDays(mondayFor(now.date), -7), mondayFor(now.date)];
     const members = await db.collection('user_tokens').distinct('member_id');
     for (const memberId of members) {
-      await refreshWorkloadTime(String(memberId), start, end.toISOString().slice(0, 10));
+      for (const start of weeks) {
+        await refreshWorkloadTime(String(memberId), start, addDays(start, 6));
+      }
     }
     await db
       .collection<any>('workload_time_scheduler')
