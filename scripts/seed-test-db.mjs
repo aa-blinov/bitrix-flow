@@ -70,6 +70,8 @@ const task = ([
   auditors: [],
   commentsCount: '0',
   parentId: id === '103' ? '101' : '0',
+  // Классы часов для аналитики; у проекта 12 тегов нет, его часы нераспределены.
+  tags: { 10: ['часы-коммерция'], 11: ['часы-пресейл'] }[groupId] || [],
 });
 
 const client = new MongoClient(url);
@@ -86,7 +88,6 @@ for (const name of [
   'events_stream',
   'cache',
   'workload_time_task',
-  'project_hour_class',
 ]) {
   await db.collection(name).deleteMany({});
 }
@@ -147,8 +148,8 @@ await db.collection('notifications').insertMany([
   },
 ]);
 
-// Списания для аналитики часов: две недели вокруг BASE. Проект 12 без класса, чтобы
-// в снимке была видна корзина «нераспределено».
+// Списания для аналитики часов: две недели вокруг BASE. Задачи проекта 12 без тега
+// класса, чтобы была видна корзина «нераспределено».
 const LOGS = [
   ['2026-02-23', '101', '1', '2026-02-24', 6],
   ['2026-02-23', '102', '2', '2026-02-25', 3],
@@ -174,10 +175,6 @@ await db.collection('workload_time_task').insertMany(
     updated_at: new Date('2026-03-08T23:00:00Z'),
   })),
 );
-await db.collection('project_hour_class').insertMany([
-  { member_id: MEMBER_ID, project_id: '10', hour_class: 'commercial' },
-  { member_id: MEMBER_ID, project_id: '11', hour_class: 'presale' },
-]);
 
 console.log(`[seed] база ${dbName}: задач ${TASKS.length}, проектов ${PROJECTS.length}`);
 await client.close();

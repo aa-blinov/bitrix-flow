@@ -9,14 +9,18 @@ import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
-import { SelectField } from '@/components/monos/SelectField';
 import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
 import { DataTable, type DataTableFeatures } from '@/components/DataTable';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
-import { HOUR_CLASSES, UNASSIGNED, type HourClassOrUnassigned } from '@/lib/hour-class';
+import {
+  HOUR_CLASS_TAG,
+  HOUR_CLASSES,
+  UNASSIGNED,
+  type HourClassOrUnassigned,
+} from '@/lib/hour-class';
 import type { HourRow, HoursReport } from '@/lib/hours';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
@@ -40,7 +44,7 @@ const CLASS_INFO: Record<HourClassOrUnassigned, { label: () => string; hint: () 
   other: { label: () => t('Прочие'), hint: () => t('Аккаунтинг, отчётность, оргвопросы') },
   unassigned: {
     label: () => t('Нераспределено'),
-    hint: () => t('Класс не проставлен. Чем ближе к нулю, тем честнее картина'),
+    hint: () => t('У задачи нет тега класса. Чем ближе к нулю, тем честнее картина'),
   },
 };
 
@@ -125,14 +129,6 @@ function HoursAnalyticsView() {
   const [report, setReport] = useState<HoursReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    void fetch('/api/auth/me')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setIsAdmin(data?.role === 'admin'))
-      .catch(() => {});
-  }, []);
 
   const load = useCallback(async () => {
     if (!memberId) {
@@ -224,19 +220,6 @@ function HoursAnalyticsView() {
     return [...byProject.values()];
   }, [rows, visible, classFilter, projectName, plans]);
 
-  const setProjectClass = useCallback(
-    async (projectId: string, hourClass: string) => {
-      const response = await fetch('/api/analytics/project-class', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, hourClass: hourClass || null }),
-      });
-      if (response.ok) void load();
-      else setError(t('Не удалось сохранить класс проекта'));
-    },
-    [load],
-  );
-
   const pivotColumns = useMemo(
     () => [
       pivotHelper.accessor('project', {
@@ -293,32 +276,8 @@ function HoursAnalyticsView() {
           footer: () => fmt(pivot.reduce((sum, row) => sum + row[cls], 0)),
         }),
       ),
-      ...(isAdmin
-        ? [
-            pivotHelper.display({
-              id: 'projectClass',
-              header: () => t('Класс проекта'),
-              cell: (info) => (
-                <SelectField
-                  size="sm"
-                  variant="boxed"
-                  className="w-44"
-                  aria-label={t('Класс проекта по умолчанию')}
-                  value={report?.projectClasses[info.row.original.projectId] || ''}
-                  onChange={(event) =>
-                    void setProjectClass(info.row.original.projectId, event.target.value)
-                  }
-                  options={[
-                    { value: '', label: t('Не задан') },
-                    ...HOUR_CLASSES.map((cls) => ({ value: cls, label: CLASS_INFO[cls].label() })),
-                  ]}
-                />
-              ),
-            }),
-          ]
-        : []),
     ],
-    [pivot, isAdmin, report, setProjectClass, setProjectFilter, classFilter],
+    [pivot, setProjectFilter, classFilter],
   );
 
   const detailColumns = useMemo(
@@ -486,6 +445,9 @@ function HoursAnalyticsView() {
                       )}
                     >
                       {PERCENT.format(share)}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-ink-faint">
+                      {cls === UNASSIGNED ? t('без тега') : `#${HOUR_CLASS_TAG[cls]}`}
                     </p>
                   </Card>
                 );

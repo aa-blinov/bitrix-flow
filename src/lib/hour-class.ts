@@ -5,35 +5,33 @@ export type HourClass = (typeof HOUR_CLASSES)[number];
 export const UNASSIGNED = 'unassigned';
 export type HourClassOrUnassigned = HourClass | typeof UNASSIGNED;
 
-// Тег задачи в портале -> класс. Сравнение по tagKey (без # и регистра), поэтому
-// «#Брак», «брак» и штатный тег «Брак» дают одно и то же.
-const TAG_CLASS: Record<string, HourClass> = {
-  коммерческие: 'commercial',
-  'коммерческие подтверждённые': 'commercial',
-  'коммерческие подтвержденные': 'commercial',
-  брак: 'defect',
-  'внутренняя разработка': 'internal',
-  внутр: 'internal',
-  пресейл: 'presale',
-  прочие: 'other',
+// Класс часа ставится тегом задачи, и в одном проекте бывают разные классы. Префикс
+// «часы-» отделяет эти теги от рабочих: «прочее», «ошибка» и «баг» в портале уже
+// заняты в другом смысле. Одно слово без пробелов нужно, чтобы тег работал и как
+// #хэштег в описании: портал сам превращает его в штатный тег.
+export const HOUR_CLASS_TAG: Record<HourClass, string> = {
+  commercial: 'часы-коммерция',
+  defect: 'часы-брак',
+  internal: 'часы-внутреннее',
+  presale: 'часы-пресейл',
+  other: 'часы-прочее',
 };
 
-export const isHourClass = (value: unknown): value is HourClass =>
-  HOUR_CLASSES.includes(value as HourClass);
+const TAG_CLASS = new Map(
+  HOUR_CLASSES.map((hourClass) => [tagKey(HOUR_CLASS_TAG[hourClass]), hourClass]),
+);
 
 /**
- * Класс часа: тег задачи сильнее класса проекта. Два разных классовых тега на
- * одной задаче не угадываем, а отдаём в «нераспределено» с флагом конфликта:
- * молча выбранный первый тег спрятал бы ошибку разметки.
+ * Класс часа по тегам задачи; без тега часы идут в «нераспределено». Два разных
+ * классовых тега на одной задаче не угадываем, а отдаём в «нераспределено» с флагом
+ * конфликта: молча выбранный первый тег спрятал бы ошибку разметки.
  */
-export function resolveHourClass(
-  tags: string[],
-  projectClass?: string | null,
-): { hourClass: HourClassOrUnassigned; conflict: boolean } {
-  const found = new Set(tags.map((tag) => TAG_CLASS[tagKey(tag)]).filter(Boolean));
+export function resolveHourClass(tags: string[]): {
+  hourClass: HourClassOrUnassigned;
+  conflict: boolean;
+} {
+  const found = new Set(tags.map((tag) => TAG_CLASS.get(tagKey(tag))).filter(Boolean));
+  const [only] = found;
   if (found.size > 1) return { hourClass: UNASSIGNED, conflict: true };
-  const [fromTag] = found;
-  if (fromTag) return { hourClass: fromTag, conflict: false };
-  if (isHourClass(projectClass)) return { hourClass: projectClass, conflict: false };
-  return { hourClass: UNASSIGNED, conflict: false };
+  return { hourClass: only ?? UNASSIGNED, conflict: false };
 }

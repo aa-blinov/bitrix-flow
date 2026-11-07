@@ -22,7 +22,6 @@ export type HoursReport = {
   rows: HourRow[];
   /** Понедельники недель периода, за которые списаний в базе нет совсем. */
   missingWeeks: string[];
-  projectClasses: Record<string, string>;
   /** План за период по проектам, часы: то же правило, что у сводки проектов. */
   projectPlans: Record<string, number>;
   /** Когда шедулер последний раз забирал списания из портала за этот период. */
@@ -81,7 +80,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     .filter((e) => e.day >= from && e.day <= to && !excluded.has(String(e.userId)));
 
   const taskIds = [...new Set(entries.map((e) => String(e.taskId)))];
-  const [mirror, classDocs, planDocs] = await Promise.all([
+  const [mirror, planDocs] = await Promise.all([
     db
       .collection('task_mirror')
       .find(
@@ -102,7 +101,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         },
       )
       .toArray(),
-    db.collection('project_hour_class').find({ member_id: memberId }).toArray(),
     // План нужен по всем задачам проекта, а не только по тем, где есть списания:
     // задача без факта как раз и показывает, сколько ещё не сделано.
     db
@@ -149,9 +147,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     if (seconds > 0) projectPlans[projectId] = seconds / 3600;
   }
 
-  const projectClasses: Record<string, string> = {};
-  for (const doc of classDocs) projectClasses[String(doc.project_id)] = String(doc.hour_class);
-
   const tasks = new Map<string, { projectId: string; title: string; tags: string[] }>();
   for (const t of mirror) {
     const data = t.data || {};
@@ -171,7 +166,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     const taskId = String(e.taskId);
     const task = tasks.get(taskId);
     const projectId = task?.projectId || '0';
-    const { hourClass, conflict } = resolveHourClass(task?.tags || [], projectClasses[projectId]);
+    const { hourClass, conflict } = resolveHourClass(task?.tags || []);
     const month = e.day.slice(0, 7);
     const key = `${month}|${taskId}|${e.userId}`;
     const row = byKey.get(key);
@@ -195,7 +190,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     rows: [...byKey.values()],
     // Будущие недели ещё не могли быть собраны, дырой их не считаем.
     missingWeeks: weeks.filter((week) => !seen.has(week) && week <= today()),
-    projectClasses,
     projectPlans,
     collectedAt: collected.length ? new Date(Math.max(...collected)).toISOString() : null,
   };
