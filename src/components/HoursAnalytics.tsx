@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, RefreshCw, X } from 'lucide-react';
 import { createColumnHelper } from '@tanstack/react-table';
@@ -121,6 +121,18 @@ function HoursAnalyticsView() {
     (value: string | null) => setParams({ project: value }),
     [setParams],
   );
+  // Клик по проекту или числу в сводной ведёт к задачам за этим числом: фильтр плюс
+  // прокрутка к раскрытой детализации, иначе ответ оставался свёрнутым ниже экрана.
+  const detailRef = useRef<HTMLElement>(null);
+  const drill = useCallback(
+    (projectId: string, hourClass?: HourClassOrUnassigned) => {
+      setParams(hourClass ? { project: projectId, class: hourClass } : { project: projectId });
+      requestAnimationFrame(() =>
+        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      );
+    },
+    [setParams],
+  );
 
   const memberId = useKanbanStore((state) => state.memberId);
   const projects = useKanbanStore((state) => state.projects);
@@ -228,7 +240,7 @@ function HoursAnalyticsView() {
           <button
             type="button"
             className="min-w-40 text-left text-ink hover:underline"
-            onClick={() => setProjectFilter(info.row.original.projectId)}
+            onClick={() => drill(info.row.original.projectId)}
           >
             {info.getValue()}
           </button>
@@ -237,7 +249,15 @@ function HoursAnalyticsView() {
       }),
       pivotHelper.accessor('total', {
         header: () => t('Всего'),
-        cell: (info) => <span className="text-ink">{fmt(info.getValue())}</span>,
+        cell: (info) => (
+          <button
+            type="button"
+            className="text-ink hover:underline"
+            onClick={() => drill(info.row.original.projectId)}
+          >
+            {fmt(info.getValue())}
+          </button>
+        ),
         footer: () => fmt(pivot.reduce((sum, row) => sum + row.total, 0)),
       }),
       // План проектный, а факт с фильтром класса это лишь часть часов проекта:
@@ -272,12 +292,23 @@ function HoursAnalyticsView() {
       ...ALL_CLASSES.map((cls) =>
         pivotHelper.accessor(cls, {
           header: () => CLASS_INFO[cls].label(),
-          cell: (info) => (info.getValue() ? fmt(info.getValue()) : ''),
+          cell: (info) =>
+            info.getValue() ? (
+              <button
+                type="button"
+                className="hover:text-ink hover:underline"
+                onClick={() => drill(info.row.original.projectId, cls)}
+              >
+                {fmt(info.getValue())}
+              </button>
+            ) : (
+              ''
+            ),
           footer: () => fmt(pivot.reduce((sum, row) => sum + row[cls], 0)),
         }),
       ),
     ],
-    [pivot, setProjectFilter, classFilter],
+    [pivot, drill, classFilter],
   );
 
   const detailColumns = useMemo(
@@ -343,8 +374,19 @@ function HoursAnalyticsView() {
             >
               <span className="hidden sm:inline">CSV</span>
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => void load()} disabled={isLoading}>
-              <RefreshCw className={isLoading ? 'animate-spin' : ''} size={14} strokeWidth={1.7} />{' '}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void load()}
+              disabled={isLoading}
+              icon={
+                <RefreshCw
+                  className={isLoading ? 'animate-spin' : ''}
+                  size={14}
+                  strokeWidth={1.7}
+                />
+              }
+            >
               {t('Обновить')}
             </Button>
           </div>
@@ -471,7 +513,7 @@ function HoursAnalyticsView() {
               />
             </section>
 
-            <section className="space-y-2">
+            <section ref={detailRef} className="scroll-mt-4 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-ink">{t('Детализация')}</h2>
                 <SegmentedControl
@@ -486,9 +528,10 @@ function HoursAnalyticsView() {
                   ]}
                 />
               </div>
-              {/* key пересоздаёт таблицу при смене разреза: раскрытые группы прошлого разреза к новому не подходят. */}
+              {/* key пересоздаёт таблицу при смене разреза и фильтров: раскрытые группы прошлого разреза к новому не подходят, а выбранный проект раскрывается целиком. */}
               <DataTable
-                key={groupingKey}
+                key={`${groupingKey}|${projectFilter}|${classFilter}`}
+                expandAll={Boolean(projectFilter)}
                 caption={t('Детализация часов')}
                 columns={detailColumns}
                 data={detail}

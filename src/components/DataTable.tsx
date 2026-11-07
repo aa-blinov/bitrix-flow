@@ -49,6 +49,8 @@ type Props<T extends RowData> = {
   caption: string;
   /** Колонки, которые прижимаются вправо: числа читаются столбиком. */
   numeric?: string[];
+  /** Открыть все группы сразу: при выбранном проекте детализация и есть ответ. */
+  expandAll?: boolean;
 };
 
 export function DataTable<T extends RowData>({
@@ -59,9 +61,10 @@ export function DataTable<T extends RowData>({
   emptyLabel,
   caption,
   numeric = [],
+  expandAll = false,
 }: Props<T>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
-  const [expanded, setExpanded] = useState<ExpandedState>({});
+  const [expanded, setExpanded] = useState<ExpandedState>(expandAll ? true : {});
 
   const table = useTable({
     features: dataTableFeatures,
@@ -152,8 +155,7 @@ export function DataTable<T extends RowData>({
                         type="button"
                         onClick={row.getToggleExpandedHandler()}
                         aria-expanded={row.getIsExpanded()}
-                        className="inline-flex items-center gap-1.5 text-left text-ink max-sm:min-h-11"
-                        style={{ paddingLeft: `${row.depth * 1.25}rem` }}
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap text-left text-ink max-sm:min-h-11"
                       >
                         <ChevronRight
                           aria-hidden="true"

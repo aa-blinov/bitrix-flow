@@ -1,6 +1,12 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 import { getLocale, t } from './i18n';
+
+// Свои размеры шрифта из globals.css tailwind-merge не знает и считает text-whisper
+// цветом: рядом с text-ink он молча выкидывал размер, и мелкие подписи становились 16px.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['whisper', 'whisper-lg'] }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

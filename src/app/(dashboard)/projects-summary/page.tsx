@@ -305,8 +305,14 @@ export default function ProjectsSummaryPage() {
               size="sm"
               onClick={() => void load(true)}
               disabled={isLoading}
+              icon={
+                <RefreshCw
+                  className={isLoading ? 'animate-spin' : ''}
+                  size={14}
+                  strokeWidth={1.7}
+                />
+              }
             >
-              <RefreshCw className={isLoading ? 'animate-spin' : ''} size={14} strokeWidth={1.7} />{' '}
               {t('Обновить')}
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getProjectInitials, pluralRu, toLocalInputValue, usableAvatar } from './utils';
+import { cn, getProjectInitials, pluralRu, toLocalInputValue, usableAvatar } from './utils';
 
 describe('getProjectInitials', () => {
   it('uses only words made of letters', () => {
@@ -40,5 +40,12 @@ describe('toLocalInputValue', () => {
     expect(toLocalInputValue('2026-09-29T02:30:00+05:00', 'date')).toBe('2026-09-28');
     expect(toLocalInputValue('', 'date')).toBe('');
     expect(toLocalInputValue('не дата', 'datetime')).toBe('');
+  });
+});
+
+describe('cn', () => {
+  it('keeps the custom font size next to a text color', () => {
+    expect(cn('text-whisper', 'text-ink')).toBe('text-whisper text-ink');
+    expect(cn('text-xs', 'text-whisper')).toBe('text-whisper');
   });
 });
