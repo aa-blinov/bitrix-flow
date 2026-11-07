@@ -170,7 +170,8 @@ await db.collection('workload_time_task').insertMany(
       seconds: hours * 3600,
       taskId,
     })),
-    updated_at: new Date(),
+    // Сбор в 02:00 по Москве, как у ночного шедулера: экран показывает это время.
+    updated_at: new Date('2026-03-08T23:00:00Z'),
   })),
 );
 await db.collection('project_hour_class').insertMany([

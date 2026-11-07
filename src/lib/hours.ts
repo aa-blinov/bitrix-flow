@@ -25,6 +25,8 @@ export type HoursReport = {
   projectClasses: Record<string, string>;
   /** План за период по проектам, часы: то же правило, что у сводки проектов. */
   projectPlans: Record<string, number>;
+  /** Когда шедулер последний раз забирал списания из портала за этот период. */
+  collectedAt: string | null;
 };
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны
@@ -64,7 +66,10 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
   const weeks = weekStarts(from, to);
   const docs = await db
     .collection('workload_time_task')
-    .find({ member_id: memberId, start: { $in: weeks } }, { projection: { start: 1, entries: 1 } })
+    .find(
+      { member_id: memberId, start: { $in: weeks } },
+      { projection: { start: 1, entries: 1, updated_at: 1 } },
+    )
     .toArray();
 
   const excluded = excludedUsers();
@@ -185,11 +190,13 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
   }
 
   const seen = new Set(docs.map((doc) => String(doc.start)));
+  const collected = docs.map((doc) => new Date(doc.updated_at).getTime()).filter(Boolean);
   return {
     rows: [...byKey.values()],
     // Будущие недели ещё не могли быть собраны, дырой их не считаем.
     missingWeeks: weeks.filter((week) => !seen.has(week) && week <= today()),
     projectClasses,
     projectPlans,
+    collectedAt: collected.length ? new Date(Math.max(...collected)).toISOString() : null,
   };
 }

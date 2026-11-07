@@ -1096,6 +1096,7 @@ test('аналитика часов делит часы по классам и �
   // План API v2: подзадача 103 (2 ч) заменяет оценку родителя 101, плюс 102 (4 ч).
   const pivot = page.getByRole('table', { name: 'Проекты по классам' });
   await expect(pivot.getByRole('row', { name: /Разработка API v2/ })).toContainText('+10');
+  await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
 
   await unassigned.click();
   await expect(page).toHaveURL(/class=unassigned/);

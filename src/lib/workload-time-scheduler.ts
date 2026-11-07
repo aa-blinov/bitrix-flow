@@ -58,9 +58,11 @@ async function runNightlyRefresh() {
     if (!claim.upsertedCount) return;
 
     const { refreshWorkloadTime } = await import('./workload-time');
-    // Прошлая неделя перечитывается тоже: иначе её последний сбор приходится на ночь
-    // на воскресенье, и воскресные списания и списания задним числом теряются навсегда.
-    const weeks = [addDays(mondayFor(now.date), -7), mondayFor(now.date)];
+    // Перечитываются пять последних недель, а не только текущая: иначе последний сбор
+    // недели приходится на ночь на воскресенье, и воскресные списания и списания задним
+    // числом (их дописывают к закрытию месяца) теряются навсегда. Запрос к порталу идёт
+    // с фильтром по дате, поэтому пять недель стоят меньше секунды на каждую.
+    const weeks = [-28, -21, -14, -7, 0].map((days) => addDays(mondayFor(now.date), days));
     const members = await db.collection('user_tokens').distinct('member_id');
     for (const memberId of members) {
       for (const start of weeks) {

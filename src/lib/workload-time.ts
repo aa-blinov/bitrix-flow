@@ -39,12 +39,22 @@ async function taskEntries(memberId: string, taskId: string, start: string, end:
     .filter((entry): entry is TimeEntry => entry !== null && Boolean(entry.userId));
 }
 
-async function globalEntries(memberId: string, start: string, end: string) {
+function shiftDay(day: string, days: number) {
+  const value = new Date(`${day}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+export async function globalEntries(memberId: string, start: string, end: string) {
   const entries: TimeEntry[] = [];
+  // Без фильтра портал отдаёт всю историю списаний, и сбор одной недели листал её целиком.
+  // Запас в день с каждой стороны покрывает разницу часовых поясов портала и сервера,
+  // точная граница периода всё равно проверяется ниже по dayKey.
+  const filter = { '>=CREATED_DATE': shiftDay(start, -1), '<CREATED_DATE': shiftDay(end, 2) };
   for (let page = 1; ; page += 1) {
     const result = await bx24OAuth(memberId, 'task.elapseditem.getlist', [
       { ID: 'asc' },
-      {},
+      filter,
       ['ID', 'TASK_ID', 'USER_ID', 'SECONDS', 'CREATED_DATE'],
       { NAV_PARAMS: { nPageSize: 50, iNumPage: page } },
     ]);

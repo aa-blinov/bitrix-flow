@@ -18,7 +18,7 @@ import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
 import { HOUR_CLASSES, UNASSIGNED, type HourClassOrUnassigned } from '@/lib/hour-class';
 import type { HourRow, HoursReport } from '@/lib/hours';
-import { numberFormat, t } from '@/lib/i18n';
+import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
@@ -46,6 +46,13 @@ const CLASS_INFO: Record<HourClassOrUnassigned, { label: () => string; hint: () 
 
 const HOURS = numberFormat({ maximumFractionDigits: 1 });
 const PERCENT = numberFormat({ style: 'percent', maximumFractionDigits: 0 });
+const COLLECTED = dateFormat({
+  day: '2-digit',
+  month: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Moscow',
+});
 const fmt = (value: number) => HOURS.format(value);
 
 type DetailRow = HourRow & { project: string; user: string; classLabel: string };
@@ -427,6 +434,11 @@ function HoursAnalyticsView() {
               >
                 {CLASS_INFO[classFilter].label()}
               </Button>
+            ) : null}
+            {report?.collectedAt ? (
+              <span className="text-xs text-ink-faint sm:ml-auto">
+                {t('Данные на {0}', COLLECTED.format(new Date(report.collectedAt)))}
+              </span>
             ) : null}
           </div>
         </Card>

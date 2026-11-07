@@ -796,6 +796,7 @@ export const EN: Record<string, string> = {
   'Списаний за период нет': 'No time logged in this period',
   Детализация: 'Breakdown',
   Люди: 'People',
+  'Данные на {0}': 'Data as of {0}',
   Месяцы: 'Months',
   Классы: 'Classes',
   'Детализация часов': 'Hours breakdown',
