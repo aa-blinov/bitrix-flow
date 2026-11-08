@@ -808,4 +808,11 @@ export const EN: Record<string, string> = {
   'Два тега, выбрать': 'Two tags, pick one',
   'Выбрать класс': 'Pick a class',
   '{0}, от родителя': '{0}, from parent',
+  '{0}, от проекта': '{0}, from project',
+  'Класс взят у проекта': 'Class taken from the project',
+  'Не удалось поставить класс проекту': 'Could not set the project class',
+  'Класс проекта {0}': 'Class of project {0}',
+  'Задачи проекта без своего тега получают этот класс':
+    'Project tasks without their own tag get this class',
+  'Класс не выбран': 'No class',
 };

@@ -213,9 +213,11 @@ function HoursAnalyticsView() {
         title={
           row.conflict
             ? t('На задаче два разных классовых тега')
-            : row.inherited
+            : row.source === 'parent'
               ? t('Класс взят с родительской задачи')
-              : undefined
+              : row.source === 'project'
+                ? t('Класс взят у проекта')
+                : undefined
         }
         disabled={savingTask === row.taskId}
         value={row.hourClass === UNASSIGNED ? '' : row.hourClass}
@@ -223,9 +225,11 @@ function HoursAnalyticsView() {
         options={HOUR_CLASSES.map((cls) => ({
           value: cls,
           label:
-            row.inherited && cls === row.hourClass
-              ? t('{0}, от родителя', CLASS_INFO[cls].label())
-              : CLASS_INFO[cls].label(),
+            cls !== row.hourClass || row.source === 'task' || !row.source
+              ? CLASS_INFO[cls].label()
+              : row.source === 'parent'
+                ? t('{0}, от родителя', CLASS_INFO[cls].label())
+                : t('{0}, от проекта', CLASS_INFO[cls].label()),
         }))}
         onChange={(event) =>
           event.target.value && void assignClass(row.taskId, event.target.value as HourClass)
@@ -233,6 +237,51 @@ function HoursAnalyticsView() {
       />
     ),
     [assignClass, savingTask],
+  );
+
+  // Класс проекта закрывает все его задачи без своего тега: размечать остаётся только
+  // исключения. «Не выбран» возвращает проект к ручной разметке задач.
+  const assignProjectClass = useCallback(
+    async (projectId: string, cls: HourClass | null) => {
+      setSavingTask(`project:${projectId}`);
+      setClassError('');
+      try {
+        const response = await fetch('/api/analytics/project-class', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, hourClass: cls }),
+        });
+        if (!response.ok) throw new Error();
+        await load();
+      } catch {
+        setClassError(t('Не удалось поставить класс проекту'));
+      } finally {
+        setSavingTask('');
+      }
+    },
+    [load],
+  );
+  const projectClassSelect = useCallback(
+    (projectId: string, project: string) =>
+      projectId === NO_PROJECT_ID ? null : (
+        <SelectField
+          size="sm"
+          variant="boxed"
+          className="w-full"
+          aria-label={t('Класс проекта {0}', project)}
+          title={t('Задачи проекта без своего тега получают этот класс')}
+          disabled={savingTask === `project:${projectId}`}
+          value={report?.projectClasses?.[projectId] || ''}
+          options={[
+            { value: '', label: t('Класс не выбран') },
+            ...HOUR_CLASSES.map((cls) => ({ value: cls, label: CLASS_INFO[cls].label() })),
+          ]}
+          onChange={(event) =>
+            void assignProjectClass(projectId, (event.target.value as HourClass) || null)
+          }
+        />
+      ),
+    [assignProjectClass, savingTask, report],
   );
 
   const projectName = useCallback(
@@ -312,6 +361,7 @@ function HoursAnalyticsView() {
     ): MobilePivotRow => ({
       projectId,
       project,
+      action: projectId ? projectClassSelect(projectId, project) : undefined,
       total: row.total,
       plan: row.plan,
       variance: row.variance,
@@ -338,20 +388,25 @@ function HoursAnalyticsView() {
         .map((row) => toCard(row, row.projectId, row.project)),
       totals: toCard(totals, '', t('Итого')),
     };
-  }, [pivot]);
+  }, [pivot, projectClassSelect]);
 
   const pivotColumns = useMemo(
     () => [
       pivotHelper.accessor('project', {
         header: () => t('Проект'),
+        // Класс проекта под названием, а не своей колонкой: лишняя колонка выталкивала
+        // «Нераспределено» за правый край на обычном ноутбучном экране.
         cell: (info) => (
-          <button
-            type="button"
-            className="min-w-40 text-left text-ink hover:underline"
-            onClick={() => drill(info.row.original.projectId)}
-          >
-            {info.getValue()}
-          </button>
+          <div className="flex min-w-40 flex-col items-start gap-1 py-0.5">
+            <button
+              type="button"
+              className="text-left text-ink hover:underline"
+              onClick={() => drill(info.row.original.projectId)}
+            >
+              {info.getValue()}
+            </button>
+            {projectClassSelect(info.row.original.projectId, info.row.original.project)}
+          </div>
         ),
         footer: () => t('Итого'),
       }),
@@ -426,7 +481,7 @@ function HoursAnalyticsView() {
         }),
       ),
     ],
-    [pivot, drill, classFilter, showClassTotal],
+    [pivot, drill, classFilter, showClassTotal, projectClassSelect],
   );
 
   const detailColumns = useMemo(

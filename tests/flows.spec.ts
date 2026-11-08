@@ -1108,6 +1108,16 @@ test('аналитика часов делит часы по классам и �
   await expect(apiRow).toContainText('+10');
   await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
 
+  // Класс проекта закрывает задачи без своего тега, «Класс не выбран» возвращает ручную разметку.
+  const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
+  const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
+  await backlogClass.selectOption('internal');
+  await expect(internal).toContainText('3,5 ч');
+  await expect(unassigned).toContainText('0 ч');
+  await backlogClass.selectOption('');
+  await expect(unassigned).toContainText('3,5 ч');
+  await expect(internal).toContainText('0 ч');
+
   await unassigned.click();
   await expect(page).toHaveURL(/class=unassigned/);
   await expect(detail).toContainText('Внутренний бэклог');

@@ -36,21 +36,47 @@ export function resolveHourClass(tags: string[]): {
   return { hourClass: only ?? UNASSIGNED, conflict: false };
 }
 
+export type HourClassSource = 'task' | 'parent' | 'project' | '';
+
 /**
- * Класс с учётом предков: часы часто списывают в подзадачи, а тег ставят на родителя.
- * Свой тег задачи важнее родительского, конфликт на задаче тоже не перекрывается.
+ * Класс с учётом предков и проекта. Часы часто списывают в подзадачи, а тег ставят на
+ * родителя; у клиентского проекта почти всё одного класса, и размечать нужно только
+ * исключения. Поэтому порядок: свой тег, тег ближайшего предка, класс проекта. Конфликт
+ * на задаче или предке классом проекта не закрываем: его надо исправить разметкой.
  */
 export function resolveWithParents(
   taskId: string,
   tagsOf: (id: string) => string[] | undefined,
   parentOf: (id: string) => string,
-): { hourClass: HourClassOrUnassigned; conflict: boolean; inherited: boolean } {
+  projectClass?: HourClass | null,
+): { hourClass: HourClassOrUnassigned; conflict: boolean; source: HourClassSource } {
   const seen = new Set<string>();
   for (let id = taskId; id && id !== '0' && !seen.has(id); id = parentOf(id)) {
     seen.add(id);
     const result = resolveHourClass(tagsOf(id) || []);
-    if (result.hourClass !== UNASSIGNED || result.conflict)
-      return { ...result, inherited: id !== taskId };
+    if (result.conflict) return { ...result, source: '' };
+    if (result.hourClass !== UNASSIGNED)
+      return { ...result, source: id === taskId ? 'task' : 'parent' };
   }
-  return { hourClass: UNASSIGNED, conflict: false, inherited: false };
+  return projectClass
+    ? { hourClass: projectClass, conflict: false, source: 'project' }
+    : { hourClass: UNASSIGNED, conflict: false, source: '' };
+}
+
+/** Класс проекта по ключевым словам группы: тот же тег часы-*, что и у задач. */
+export function projectHourClass(keywords: unknown): HourClass | null {
+  const words = String(keywords || '')
+    .split(',')
+    .map((word) => word.trim());
+  const { hourClass } = resolveHourClass(words);
+  return hourClass === UNASSIGNED ? null : hourClass;
+}
+
+/** Ключевые слова проекта с новым классом: остальные слова сохраняются. */
+export function withProjectClass(keywords: unknown, hourClass: HourClass | null): string {
+  const keep = String(keywords || '')
+    .split(',')
+    .map((word) => word.trim())
+    .filter((word) => word && !TAG_CLASS.has(tagKey(word)));
+  return [...keep, ...(hourClass ? [HOUR_CLASS_TAG[hourClass]] : [])].join(',');
 }

@@ -144,6 +144,8 @@ export interface Bx24Project {
   membersCount: number;
   image?: string;
   isArchived?: boolean;
+  /** Ключевые слова группы: в них живёт класс часов проекта. */
+  keywords?: string;
 }
 
 export interface Bx24User {

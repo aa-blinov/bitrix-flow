@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
         membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
         image: g.IMAGE || undefined,
         isArchived: g.CLOSED === 'Y',
+        keywords: g.KEYWORDS || '',
       })),
       users: (rawUsers || []).map((u: any) => ({
         id: u.ID,
@@ -96,6 +97,7 @@ export async function GET(req: NextRequest) {
       membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
       image: g.IMAGE || undefined,
       isArchived: g.CLOSED === 'Y',
+      keywords: g.KEYWORDS || '',
     }));
 
     const users = (rawUsers || []).map((u: any) => ({

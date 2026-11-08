@@ -2,7 +2,13 @@
 // проект и теги из task_mirror. Портал не трогаем: списания уже собраны шедулером,
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
 import { getDb } from './mongo';
-import { resolveWithParents, type HourClassOrUnassigned } from './hour-class';
+import {
+  projectHourClass,
+  resolveWithParents,
+  type HourClass,
+  type HourClassOrUnassigned,
+  type HourClassSource,
+} from './hour-class';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from './task-tags';
 import { planForPeriod, type PlanTask } from './planned-hours';
 import { mondayFor } from './workload-time-scheduler';
@@ -15,8 +21,8 @@ export type HourRow = {
   task: string;
   hourClass: HourClassOrUnassigned;
   conflict: boolean;
-  /** Класс взят с родительской задачи: своего тега у задачи нет. */
-  inherited: boolean;
+  /** Откуда класс: свой тег, тег предка, класс проекта или ниоткуда. */
+  source: HourClassSource;
   hours: number;
 };
 
@@ -30,6 +36,8 @@ export type HoursReport = {
   collectedAt: string | null;
   /** Штатные теги задач из строк: выбор класса в аналитике переписывает их целиком. */
   taskTags: Record<string, string[]>;
+  /** Класс по умолчанию у проектов, где он выбран: тег часы-* в ключевых словах группы. */
+  projectClasses: Record<string, HourClass>;
 };
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны
@@ -84,7 +92,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     .filter((e) => e.day >= from && e.day <= to && !excluded.has(String(e.userId)));
 
   const taskIds = [...new Set(entries.map((e) => String(e.taskId)))];
-  const [mirror, planDocs] = await Promise.all([
+  const [mirror, planDocs, projectDocs] = await Promise.all([
     db
       .collection('task_mirror')
       .find(
@@ -134,7 +142,19 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         },
       )
       .toArray(),
+    // Ключевые слова кладёт в projects /api/dashboard и роут класса проекта: читать
+    // их из портала на каждый рендер аналитики значило бы упереться в лимиты.
+    db
+      .collection('projects')
+      .find({ member_id: memberId }, { projection: { id: 1, keywords: 1 } })
+      .toArray(),
   ]);
+
+  const projectClasses: Record<string, HourClass> = {};
+  for (const project of projectDocs) {
+    const hourClass = projectHourClass(project.keywords);
+    if (hourClass) projectClasses[String(project.id)] = hourClass;
+  }
 
   const planTasks = new Map<string, PlanTask[]>();
   const parents = new Map<string, string>();
@@ -189,10 +209,11 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     const taskId = String(e.taskId);
     const task = tasks.get(taskId);
     const projectId = task?.projectId || '0';
-    const { hourClass, conflict, inherited } = resolveWithParents(
+    const { hourClass, conflict, source } = resolveWithParents(
       taskId,
       (id) => tasks.get(id)?.tags ?? ancestorTags.get(id),
       (id) => parents.get(id) || '',
+      projectClasses[projectId],
     );
     const month = e.day.slice(0, 7);
     const key = `${month}|${taskId}|${e.userId}`;
@@ -207,7 +228,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         task: task?.title || `#${taskId}`,
         hourClass,
         conflict,
-        inherited,
+        source,
         hours: e.seconds / 3600,
       });
   }
@@ -221,5 +242,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     projectPlans,
     collectedAt: collected.length ? new Date(Math.max(...collected)).toISOString() : null,
     taskTags: Object.fromEntries([...tasks].map(([id, task]) => [id, task.ownTags])),
+    projectClasses,
   };
 }

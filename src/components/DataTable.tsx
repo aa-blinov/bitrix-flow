@@ -98,9 +98,12 @@ export function DataTable<T extends RowData>({
                     aria-sort={
                       sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'
                     }
+                    // Заголовок переносится: «Внутренняя разработка» в одну строку делала
+                    // таблицу шире экрана, хотя числа под ним короткие.
                     className={cn(
-                      'whitespace-nowrap px-3 py-2 text-whisper font-bold uppercase tracking-widest text-ink-faint',
+                      'px-3 py-2 align-bottom text-whisper font-bold uppercase tracking-widest text-ink-faint',
                       align(header.column.id),
+                      'whitespace-normal',
                     )}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (

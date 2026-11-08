@@ -16,6 +16,8 @@ export type MobilePivotRow = {
   plan: number;
   variance?: number;
   classes: { key: string; label: string; hours: number }[];
+  /** Выбор класса проекта: вне кнопки проекта, иначе тап по селекту открывал бы проект. */
+  action?: ReactNode;
 };
 
 const signed = (value: number, fmt: (v: number) => string) =>
@@ -82,6 +84,7 @@ export function PivotCards({
           ) : null}
         </p>
       ) : null}
+      {row.action ? <div className="mt-2">{row.action}</div> : null}
       {row.classes.some((cls) => cls.hours) ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {row.classes
