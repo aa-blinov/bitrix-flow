@@ -1113,6 +1113,27 @@ test('аналитика часов делит часы по классам и �
   await expect(detail).toContainText('Внутренний бэклог');
   await expect(detail).not.toContainText('Разработка API v2');
 
+  // Класс ставится прямо из детализации: селект пишет тег задачи в Битрикс.
+  await detail
+    .getByRole('button', { name: /Внутренний бэклог/ })
+    .first()
+    .click();
+  await detail
+    .getByRole('button', { name: /Обновить зависимости/ })
+    .first()
+    .click();
+  const pick = detail.getByRole('combobox').first();
+  await expect(pick).toHaveValue('');
+  const update = page.waitForRequest(
+    (request) =>
+      request.url().includes('tasks.task.update') &&
+      (request.postData() || '').includes(encodeURIComponent('часы-внутреннее')),
+  );
+  await pick.selectOption('internal');
+  await update;
+  await expect(pick).toBeEnabled();
+  await expect(page.getByText(/Не удалось поставить класс/)).toHaveCount(0);
+
   // Число класса в сводной ведёт к раскрытым задачам за ним.
   await unassigned.click();
   await expect(page).not.toHaveURL(/class=/);

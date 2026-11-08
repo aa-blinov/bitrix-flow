@@ -5,7 +5,7 @@
 // стоит справа в той же строке, что и подпись, а вложенность видна отступом.
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -115,6 +115,8 @@ export type MobileDetailRow = {
   hours: number;
   conflict: boolean;
   fields: Record<string, string>;
+  /** Элемент под строкой задачи, вне ссылки: селект внутри ссылки открывал бы задачу. */
+  action?: ReactNode;
 };
 
 type Group = {
@@ -211,7 +213,10 @@ export function DetailTree({
                 <Link
                   href={`/all-tasks?task=${row.taskId}`}
                   title={row.conflict ? t('На задаче два разных классовых тега') : undefined}
-                  className="flex min-h-11 items-center gap-3 border-b border-line py-1.5 pr-3 text-ink-soft hover:bg-surface hover:text-ink"
+                  className={cn(
+                    'flex min-h-11 items-center gap-3 py-1.5 pr-3 text-ink-soft hover:bg-surface hover:text-ink',
+                    row.action ? '' : 'border-b border-line',
+                  )}
                   style={{ paddingLeft: `${0.75 + (depth + 1) * 1 + 1}rem` }}
                 >
                   <span className="min-w-0 flex-1">
@@ -227,6 +232,14 @@ export function DetailTree({
                   </span>
                   <span className="shrink-0 tabular-nums">{fmt(row.hours)}</span>
                 </Link>
+                {row.action ? (
+                  <div
+                    className="border-b border-line pb-2 pr-3"
+                    style={{ paddingLeft: `${0.75 + (depth + 1) * 1 + 1}rem` }}
+                  >
+                    {row.action}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

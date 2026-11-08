@@ -8,6 +8,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
+import { SelectField } from '@/components/monos/SelectField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
@@ -21,8 +22,11 @@ import {
   HOUR_CLASS_TAG,
   HOUR_CLASSES,
   UNASSIGNED,
+  type HourClass,
   type HourClassOrUnassigned,
 } from '@/lib/hour-class';
+import { updateTaskFull } from '@/lib/bitrix24';
+import { tagKey } from '@/lib/task-tags';
 import type { HourRow, HoursReport } from '@/lib/hours';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
@@ -60,6 +64,7 @@ const COLLECTED = dateFormat({
   timeZone: 'Europe/Moscow',
 });
 const fmt = (value: number) => HOURS.format(value);
+const CLASS_TAG_KEYS = new Set(HOUR_CLASSES.map((cls) => tagKey(HOUR_CLASS_TAG[cls])));
 
 type DetailRow = HourRow & { project: string; user: string; classLabel: string };
 type PivotRow = {
@@ -175,6 +180,60 @@ function HoursAnalyticsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Класс ставится тегом в самом Битриксе: аналитика своей разметки не хранит. Прокси
+  // обновляет зеркало до ответа, поэтому сразу после записи отчёт уже видит тег, а с ним
+  // и подзадачи, которые наследуют класс.
+  const [savingTask, setSavingTask] = useState('');
+  const [classError, setClassError] = useState('');
+  const assignClass = useCallback(
+    async (taskId: string, cls: HourClass) => {
+      const own = report?.taskTags?.[taskId] || [];
+      const tags = [...own.filter((tag) => !CLASS_TAG_KEYS.has(tagKey(tag))), HOUR_CLASS_TAG[cls]];
+      setSavingTask(taskId);
+      setClassError('');
+      try {
+        await updateTaskFull(taskId, { tags });
+        await load();
+      } catch {
+        setClassError(t('Не удалось поставить класс задаче #{0}', taskId));
+      } finally {
+        setSavingTask('');
+      }
+    },
+    [report, load],
+  );
+  const classSelect = useCallback(
+    (row: HourRow) => (
+      <SelectField
+        size="sm"
+        variant="boxed"
+        className="min-w-36"
+        aria-label={t('Класс задачи {0}', row.task)}
+        title={
+          row.conflict
+            ? t('На задаче два разных классовых тега')
+            : row.inherited
+              ? t('Класс взят с родительской задачи')
+              : undefined
+        }
+        disabled={savingTask === row.taskId}
+        value={row.hourClass === UNASSIGNED ? '' : row.hourClass}
+        placeholder={row.conflict ? t('Два тега, выбрать') : t('Выбрать класс')}
+        options={HOUR_CLASSES.map((cls) => ({
+          value: cls,
+          label:
+            row.inherited && cls === row.hourClass
+              ? t('{0}, от родителя', CLASS_INFO[cls].label())
+              : CLASS_INFO[cls].label(),
+        }))}
+        onChange={(event) =>
+          event.target.value && void assignClass(row.taskId, event.target.value as HourClass)
+        }
+      />
+    ),
+    [assignClass, savingTask],
+  );
 
   const projectName = useCallback(
     (id: string) =>
@@ -375,7 +434,11 @@ function HoursAnalyticsView() {
       detailHelper.accessor('project', { header: () => t('Проект') }),
       detailHelper.accessor('user', { header: () => t('Специалист') }),
       detailHelper.accessor('month', { header: () => t('Месяц') }),
-      detailHelper.accessor('classLabel', { header: () => t('Класс') }),
+      detailHelper.accessor('classLabel', {
+        header: () => t('Класс'),
+        cell: (info) =>
+          info.row.getIsGrouped() ? info.getValue() : classSelect(info.row.original),
+      }),
       detailHelper.accessor('task', {
         header: () => t('Задача'),
         cell: (info) =>
@@ -403,7 +466,7 @@ function HoursAnalyticsView() {
         aggregatedCell: (info) => fmt(Number(info.getValue()) || 0),
       }),
     ],
-    [],
+    [classSelect],
   );
 
   const exportCsv = () =>
@@ -518,6 +581,8 @@ function HoursAnalyticsView() {
           </Notice>
         ) : null}
 
+        {classError ? <Notice tone="danger">{classError}</Notice> : null}
+
         {error ? (
           <Notice tone="danger">{error}</Notice>
         ) : isLoading && !report ? (
@@ -564,7 +629,8 @@ function HoursAnalyticsView() {
               <p className="text-xs text-ink-soft">
                 {t(
                   'Факт: списания за период. План: оценки корневых задач, у которых срок от создания до дедлайна задевает период.',
-                )}
+                )}{' '}
+                {t('Отклонение в итоге складывается только по проектам с планом.')}
               </p>
               {isMobile ? (
                 <PivotCards
@@ -613,6 +679,10 @@ function HoursAnalyticsView() {
                     task: row.task,
                     hours: row.hours,
                     conflict: row.conflict,
+                    // На телефоне выбор класса только там, где его нет: менять разметку
+                    // удобнее на большом экране, а пробелы закрывать можно с телефона.
+                    action:
+                      row.hourClass === UNASSIGNED || row.conflict ? classSelect(row) : undefined,
                     fields: Object.fromEntries(DETAIL_FIELDS.map((field) => [field, row[field]])),
                   }))}
                   levels={[...GROUPINGS[groupingKey]]}

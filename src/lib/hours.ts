@@ -2,7 +2,7 @@
 // проект и теги из task_mirror. Портал не трогаем: списания уже собраны шедулером,
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
 import { getDb } from './mongo';
-import { resolveHourClass, type HourClassOrUnassigned } from './hour-class';
+import { resolveWithParents, type HourClassOrUnassigned } from './hour-class';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from './task-tags';
 import { planForPeriod, type PlanTask } from './planned-hours';
 import { mondayFor } from './workload-time-scheduler';
@@ -15,6 +15,8 @@ export type HourRow = {
   task: string;
   hourClass: HourClassOrUnassigned;
   conflict: boolean;
+  /** Класс взят с родительской задачи: своего тега у задачи нет. */
+  inherited: boolean;
   hours: number;
 };
 
@@ -26,6 +28,8 @@ export type HoursReport = {
   projectPlans: Record<string, number>;
   /** Когда шедулер последний раз забирал списания из портала за этот период. */
   collectedAt: string | null;
+  /** Штатные теги задач из строк: выбор класса в аналитике переписывает их целиком. */
+  taskTags: Record<string, string[]>;
 };
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны
@@ -112,6 +116,11 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
             id: 1,
             'data.parentId': 1,
             'data.PARENT_ID': 1,
+            // Теги и название нужны предкам: класс подзадачи наследуется от родителя.
+            'data.title': 1,
+            'data.TITLE': 1,
+            'data.tags': 1,
+            'data.TAGS': 1,
             'data.timeEstimate': 1,
             'data.TIME_ESTIMATE': 1,
             'data.createdDate': 1,
@@ -128,8 +137,18 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
   ]);
 
   const planTasks = new Map<string, PlanTask[]>();
+  const parents = new Map<string, string>();
+  const ancestorTags = new Map<string, string[]>();
   for (const t of planDocs) {
     const data = t.data || {};
+    parents.set(String(t.id), String(data.parentId ?? data.PARENT_ID ?? ''));
+    ancestorTags.set(
+      String(t.id),
+      mergeTaskTags(
+        bitrixTaskTags(data.tags ?? data.TAGS),
+        extractTaskTags(String(data.title ?? data.TITLE ?? ''), ''),
+      ),
+    );
     const projectId = mirrorProjectId(data);
     const list = planTasks.get(projectId) || [];
     list.push({
@@ -147,13 +166,17 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     if (seconds > 0) projectPlans[projectId] = seconds / 3600;
   }
 
-  const tasks = new Map<string, { projectId: string; title: string; tags: string[] }>();
+  const tasks = new Map<
+    string,
+    { projectId: string; title: string; tags: string[]; ownTags: string[] }
+  >();
   for (const t of mirror) {
     const data = t.data || {};
     const title = String(data.title ?? data.TITLE ?? '');
     tasks.set(String(t.id), {
       projectId: mirrorProjectId(data),
       title,
+      ownTags: bitrixTaskTags(data.tags ?? data.TAGS),
       tags: mergeTaskTags(
         bitrixTaskTags(data.tags ?? data.TAGS),
         extractTaskTags(title, data.description ?? data.DESCRIPTION),
@@ -166,7 +189,11 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     const taskId = String(e.taskId);
     const task = tasks.get(taskId);
     const projectId = task?.projectId || '0';
-    const { hourClass, conflict } = resolveHourClass(task?.tags || []);
+    const { hourClass, conflict, inherited } = resolveWithParents(
+      taskId,
+      (id) => tasks.get(id)?.tags ?? ancestorTags.get(id),
+      (id) => parents.get(id) || '',
+    );
     const month = e.day.slice(0, 7);
     const key = `${month}|${taskId}|${e.userId}`;
     const row = byKey.get(key);
@@ -180,6 +207,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         task: task?.title || `#${taskId}`,
         hourClass,
         conflict,
+        inherited,
         hours: e.seconds / 3600,
       });
   }
@@ -192,5 +220,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     missingWeeks: weeks.filter((week) => !seen.has(week) && week <= today()),
     projectPlans,
     collectedAt: collected.length ? new Date(Math.max(...collected)).toISOString() : null,
+    taskTags: Object.fromEntries([...tasks].map(([id, task]) => [id, task.ownTags])),
   };
 }

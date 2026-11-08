@@ -800,4 +800,12 @@ export const EN: Record<string, string> = {
   Отклонение: 'Variance',
   'Факт: списания за период. План: оценки корневых задач, у которых срок от создания до дедлайна задевает период.':
     'Actual: time logged in the period. Plan: estimates of root tasks whose span from creation to deadline touches the period.',
+  'Отклонение в итоге складывается только по проектам с планом.':
+    'The total variance only adds up projects that have a plan.',
+  'Не удалось поставить класс задаче #{0}': 'Could not set the class on task #{0}',
+  'Класс задачи {0}': 'Class of task {0}',
+  'Класс взят с родительской задачи': 'Class taken from the parent task',
+  'Два тега, выбрать': 'Two tags, pick one',
+  'Выбрать класс': 'Pick a class',
+  '{0}, от родителя': '{0}, from parent',
 };

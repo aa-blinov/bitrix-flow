@@ -35,3 +35,22 @@ export function resolveHourClass(tags: string[]): {
   if (found.size > 1) return { hourClass: UNASSIGNED, conflict: true };
   return { hourClass: only ?? UNASSIGNED, conflict: false };
 }
+
+/**
+ * Класс с учётом предков: часы часто списывают в подзадачи, а тег ставят на родителя.
+ * Свой тег задачи важнее родительского, конфликт на задаче тоже не перекрывается.
+ */
+export function resolveWithParents(
+  taskId: string,
+  tagsOf: (id: string) => string[] | undefined,
+  parentOf: (id: string) => string,
+): { hourClass: HourClassOrUnassigned; conflict: boolean; inherited: boolean } {
+  const seen = new Set<string>();
+  for (let id = taskId; id && id !== '0' && !seen.has(id); id = parentOf(id)) {
+    seen.add(id);
+    const result = resolveHourClass(tagsOf(id) || []);
+    if (result.hourClass !== UNASSIGNED || result.conflict)
+      return { ...result, inherited: id !== taskId };
+  }
+  return { hourClass: UNASSIGNED, conflict: false, inherited: false };
+}
