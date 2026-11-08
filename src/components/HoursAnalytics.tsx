@@ -220,7 +220,9 @@ function HoursAnalyticsView() {
       }
       return entry;
     };
-    for (const row of classFilter ? visible : rows) {
+    // Сводная не сужается фильтром проекта: после перехода из ячейки остальные проекты
+    // должны остаться на месте, иначе вернуться к сравнению можно только сбросом фильтра.
+    for (const row of classFilter ? rows.filter((r) => r.hourClass === classFilter) : rows) {
       const entry = entryFor(row.projectId);
       entry[row.hourClass] += row.hours;
       entry.total += row.hours;
@@ -230,7 +232,7 @@ function HoursAnalyticsView() {
     for (const entry of byProject.values())
       entry.variance = entry.plan > 0 ? entry.total - entry.plan : undefined;
     return [...byProject.values()];
-  }, [rows, visible, classFilter, projectName, plans]);
+  }, [rows, classFilter, projectName, plans]);
 
   const pivotColumns = useMemo(
     () => [
@@ -304,11 +306,27 @@ function HoursAnalyticsView() {
             ) : (
               ''
             ),
-          footer: () => fmt(pivot.reduce((sum, row) => sum + row[cls], 0)),
+          // Ноль в подвале не кнопка: фильтр по пустому классу показал бы пустые таблицы.
+          footer: () => {
+            const value = pivot.reduce((sum, row) => sum + row[cls], 0);
+            return value ? (
+              <button
+                type="button"
+                className="hover:underline"
+                onClick={() =>
+                  setParams({ class: classFilter === cls ? null : cls, project: null })
+                }
+              >
+                {fmt(value)}
+              </button>
+            ) : (
+              ''
+            );
+          },
         }),
       ),
     ],
-    [pivot, drill, classFilter],
+    [pivot, drill, classFilter, setParams],
   );
 
   const detailColumns = useMemo(
@@ -336,7 +354,11 @@ function HoursAnalyticsView() {
       detailHelper.accessor('hours', {
         header: () => t('Часы'),
         aggregationFn: 'sum',
-        cell: (info) => fmt(info.getValue()),
+        cell: (info) => (
+          <Link className="hover:underline" href={`/all-tasks?task=${info.row.original.taskId}`}>
+            {fmt(info.getValue())}
+          </Link>
+        ),
         aggregatedCell: (info) => fmt(Number(info.getValue()) || 0),
       }),
     ],

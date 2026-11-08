@@ -169,7 +169,14 @@ export function DataTable<T extends RowData>({
                         <span className="text-xs text-ink-faint">{row.subRows.length}</span>
                       </button>
                     ) : cell.getIsPlaceholder() ? null : cell.getIsAggregated() ? (
-                      <table.FlexRender cell={cell} />
+                      // Сумма группы раскрывает ту же группу: по числу кликают чаще, чем по стрелке.
+                      <button
+                        type="button"
+                        onClick={row.getToggleExpandedHandler()}
+                        className="whitespace-nowrap hover:text-ink hover:underline"
+                      >
+                        <table.FlexRender cell={cell} />
+                      </button>
                     ) : row.getIsGrouped() ? null : (
                       <table.FlexRender cell={cell} />
                     )}

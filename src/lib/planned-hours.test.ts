@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planForPeriod, rollupPlan, type PlanTask } from './planned-hours';
+import { planForPeriod, portalDay, rollupPlan, type PlanTask } from './planned-hours';
 
 const task = (id: string, parentId: string, hours: number, extra: Partial<PlanTask> = {}) => ({
   id,
@@ -47,5 +47,14 @@ describe('planForPeriod', () => {
     expect(planForPeriod(tasks, '2026-04-01', '2026-04-30')).toBe(4 * 3600);
     expect(planForPeriod(tasks, '2026-01-01', '2026-12-31')).toBe(12 * 3600);
     expect(planForPeriod(tasks, '2026-06-01', '2026-06-30')).toBe(0);
+  });
+});
+
+describe('portalDay', () => {
+  it('keeps the portal date even when the server runs in UTC', () => {
+    expect(portalDay('2026-11-02T01:30:00+03:00')).toBe('2026-11-02');
+    expect(portalDay('2026-10-31T23:30:00+03:00')).toBe('2026-10-31');
+    expect(portalDay('')).toBe('');
+    expect(portalDay('garbage')).toBe('');
   });
 });

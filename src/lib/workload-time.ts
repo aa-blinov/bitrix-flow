@@ -1,15 +1,12 @@
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
+import { portalDay } from './planned-hours';
 
 const MAX_CONCURRENT_REQUESTS = 2;
 
 type TimeEntry = { userId: string; day: string; seconds: number; taskId: string };
 
-function dayKey(value: unknown) {
-  const date = new Date(String(value || ''));
-  if (Number.isNaN(date.getTime())) return null;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
+const dayKey = (value: unknown) => portalDay(value) || null;
 
 async function taskEntries(memberId: string, taskId: string, start: string, end: string) {
   let result: unknown;

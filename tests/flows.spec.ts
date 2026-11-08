@@ -1103,4 +1103,24 @@ test('аналитика часов делит часы по классам и �
   const detail = page.getByRole('table', { name: 'Детализация часов' });
   await expect(detail).toContainText('Внутренний бэклог');
   await expect(detail).not.toContainText('Разработка API v2');
+
+  // Число класса в сводной ведёт к раскрытым задачам за ним, остальные проекты не пропадают.
+  await unassigned.click();
+  await expect(page).not.toHaveURL(/class=/);
+  await pivot
+    .getByRole('row', { name: /Разработка API v2/ })
+    .getByRole('button', { name: '16', exact: true })
+    .last()
+    .click();
+  await expect(page).toHaveURL(/project=10&class=commercial|class=commercial&project=10/);
+  const taskLink = detail.getByRole('link').first();
+  await expect(taskLink).toHaveAttribute('href', /\/all-tasks\?task=/);
+
+  // Сумма группы в детализации сворачивает и раскрывает группу, как стрелка.
+  await detail.getByRole('row').nth(1).getByRole('button').last().click();
+  await expect(detail.getByRole('link')).toHaveCount(0);
+
+  // Итог класса в подвале сводной включает фильтр класса по всем проектам.
+  await pivot.locator('tfoot').getByRole('button').first().click();
+  await expect(page).not.toHaveURL(/project=/);
 });

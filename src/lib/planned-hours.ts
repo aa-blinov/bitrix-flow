@@ -52,11 +52,21 @@ export function rollupPlan(tasks: PlanTask[]) {
   return { plannedSeconds, warnings, varianceSeconds, roots, effective };
 }
 
-const day = (value?: string) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-CA');
-};
+/**
+ * День по часам портала. Портал отдаёт даты в своём поясе (+03:00), а контейнер живёт
+ * в UTC: через Date списание в 01:30 по Москве уезжало в предыдущий день, а на стыке
+ * месяцев и в предыдущий месяц. Поэтому дата берётся из строки как есть.
+ */
+export function portalDay(value: unknown): string {
+  const text = String(value || '');
+  const prefix = /^\d{4}-\d{2}-\d{2}/.exec(text);
+  if (prefix) return prefix[0];
+  const date = new Date(text);
+  return text && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' })
+    : '';
+}
+const day = portalDay;
 
 /**
  * План за период по правилу старого PM-дашборда, чтобы цифры сходились при сверке:
