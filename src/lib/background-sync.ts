@@ -11,6 +11,7 @@
 import { bx24OAuth } from './oauth-client';
 import { getDb } from './mongo';
 import { invalidateByPrefix } from './server-cache';
+import { enqueueTaskMirrorSync } from './task-mirror';
 
 const POLL_INTERVAL_MS = 60_000; // 60 сек между полными проходами
 const FIRST_RUN_DELAY_MS = 15_000; // первый проход после старта сервера
@@ -278,6 +279,11 @@ async function reconcileDeleted(memberId: string): Promise<void> {
   if (alive.size === 0) return;
 
   const localIds = await db.collection('task_mirror').distinct('id', { member_id: memberId });
+  // Сверка в обратную сторону: задача, событие о которой потерялось, в зеркало не
+  // попадала никогда, и её часы в аналитике уходили в «без проекта» (10 таких из 2586).
+  const local = new Set(localIds.map(String));
+  for (const id of alive)
+    if (!local.has(id)) await enqueueTaskMirrorSync(memberId, id, 'reconcile');
   const stale = localIds.filter((id: string) => !alive.has(String(id)));
   if (stale.length === 0) return;
 
