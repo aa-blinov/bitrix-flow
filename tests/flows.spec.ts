@@ -1085,7 +1085,10 @@ test('поиск: слово в названии выделяется, лишн�
   await expect(page.getByText('не найдены')).toBeVisible();
 });
 
-test('аналитика часов делит часы по классам и фильтрует по клику на плитку', async ({ page }) => {
+test('аналитика часов делит часы по классам и фильтрует по клику на плитку', async ({
+  page,
+  isMobile,
+}) => {
   // Период из URL: сид кладёт списания на две недели вокруг 2026-03-02.
   await page.goto('/analytics?from=2026-02-23&to=2026-03-08');
   await expect(page.getByRole('heading', { name: 'Аналитика часов', level: 1 })).toBeVisible();
@@ -1093,34 +1096,44 @@ test('аналитика часов делит часы по классам и �
   await expect(unassigned).toContainText('3,5 ч');
   await expect(page.getByRole('button', { name: /Коммерческие/ }).first()).toContainText('16 ч');
 
+  // На телефоне вместо таблиц карточки и список: в таблице часы уезжали за правый край.
+  const role = isMobile ? 'list' : 'table';
+  const pivot = page.getByRole(role, { name: 'Проекты по классам' }).first();
+  const detail = page.getByRole(role, { name: 'Детализация часов' }).first();
+  const apiRow = isMobile
+    ? pivot.getByRole('listitem', { name: 'Разработка API v2' })
+    : pivot.getByRole('row', { name: /Разработка API v2/ });
+
   // План API v2: подзадача 103 (2 ч) заменяет оценку родителя 101, плюс 102 (4 ч).
-  const pivot = page.getByRole('table', { name: 'Проекты по классам' });
-  await expect(pivot.getByRole('row', { name: /Разработка API v2/ })).toContainText('+10');
+  await expect(apiRow).toContainText('+10');
   await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
 
   await unassigned.click();
   await expect(page).toHaveURL(/class=unassigned/);
-  const detail = page.getByRole('table', { name: 'Детализация часов' });
   await expect(detail).toContainText('Внутренний бэклог');
   await expect(detail).not.toContainText('Разработка API v2');
 
-  // Число класса в сводной ведёт к раскрытым задачам за ним, остальные проекты не пропадают.
+  // Число класса в сводной ведёт к раскрытым задачам за ним.
   await unassigned.click();
   await expect(page).not.toHaveURL(/class=/);
-  await pivot
-    .getByRole('row', { name: /Разработка API v2/ })
-    .getByRole('button', { name: '16', exact: true })
+  await apiRow
+    .getByRole('button', { name: isMobile ? /Коммерческие\s*16/ : '16', exact: !isMobile })
     .last()
     .click();
   await expect(page).toHaveURL(/project=10&class=commercial|class=commercial&project=10/);
   const taskLink = detail.getByRole('link').first();
   await expect(taskLink).toHaveAttribute('href', /\/all-tasks\?task=/);
+  await expect(detail.getByRole('link')).toHaveCount(4);
 
-  // Сумма группы в детализации сворачивает и раскрывает группу, как стрелка.
-  await detail.getByRole('row').nth(1).getByRole('button').last().click();
+  // Сумма группы сворачивает группу так же, как стрелка.
+  if (isMobile) await detail.getByRole('button', { name: /Разработка API v2/ }).click();
+  else await detail.getByRole('row').nth(1).getByRole('button').last().click();
   await expect(detail.getByRole('link')).toHaveCount(0);
 
-  // Итог класса в подвале сводной включает фильтр класса по всем проектам.
-  await pivot.locator('tfoot').getByRole('button').first().click();
+  // Итог класса включает фильтр класса по всем проектам.
+  if (isMobile)
+    await pivot.getByRole('listitem', { name: 'Итого' }).getByRole('button').first().click();
+  else await pivot.locator('tfoot').getByRole('button').first().click();
   await expect(page).not.toHaveURL(/project=/);
+  await expect(page).toHaveURL(/class=commercial/);
 });

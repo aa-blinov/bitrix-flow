@@ -12,6 +12,8 @@ import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
 import { DataTable, type DataTableFeatures } from '@/components/DataTable';
+import { DetailTree, PivotCards, type MobilePivotRow } from '@/components/HoursMobile';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
@@ -69,6 +71,7 @@ type PivotRow = {
   variance?: number;
 } & Record<HourClassOrUnassigned, number>;
 
+const DETAIL_FIELDS = ['project', 'user', 'month', 'classLabel', 'task'] as const;
 const GROUPINGS = {
   project: ['project', 'task'],
   user: ['user', 'project'],
@@ -121,6 +124,13 @@ function HoursAnalyticsView() {
     (value: string | null) => setParams({ project: value }),
     [setParams],
   );
+  // Итог класса показывает класс по всем проектам. Снимает фильтр класса только повторное
+  // нажатие без проекта: иначе из разреза «проект плюс класс» он выключал бы класс.
+  const showClassTotal = useCallback(
+    (cls: string) =>
+      setParams({ class: classFilter === cls && !projectFilter ? null : cls, project: null }),
+    [setParams, classFilter, projectFilter],
+  );
   // Клик по проекту или числу в сводной ведёт к задачам за этим числом: фильтр плюс
   // прокрутка к раскрытой детализации, иначе ответ оставался свёрнутым ниже экрана.
   const detailRef = useRef<HTMLElement>(null);
@@ -134,6 +144,7 @@ function HoursAnalyticsView() {
     [setParams],
   );
 
+  const isMobile = useIsMobile();
   const memberId = useKanbanStore((state) => state.memberId);
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -234,6 +245,42 @@ function HoursAnalyticsView() {
     return [...byProject.values()];
   }, [rows, classFilter, projectName, plans]);
 
+  const mobilePivot = useMemo(() => {
+    const toCard = (
+      row: Omit<PivotRow, 'projectId' | 'project'>,
+      projectId: string,
+      project: string,
+    ): MobilePivotRow => ({
+      projectId,
+      project,
+      total: row.total,
+      plan: row.plan,
+      variance: row.variance,
+      classes: ALL_CLASSES.map((cls) => ({
+        key: cls,
+        label: CLASS_INFO[cls].label(),
+        hours: row[cls],
+      })),
+    });
+    const sum = (pick: (row: PivotRow) => number) =>
+      pivot.reduce((total, row) => total + pick(row), 0);
+    const totals = {
+      total: sum((row) => row.total),
+      plan: sum((row) => row.plan),
+      variance: sum((row) => row.variance ?? 0),
+      ...(Object.fromEntries(ALL_CLASSES.map((cls) => [cls, sum((row) => row[cls])])) as Record<
+        HourClassOrUnassigned,
+        number
+      >),
+    };
+    return {
+      rows: [...pivot]
+        .sort((a, b) => b.total - a.total)
+        .map((row) => toCard(row, row.projectId, row.project)),
+      totals: toCard(totals, '', t('Итого')),
+    };
+  }, [pivot]);
+
   const pivotColumns = useMemo(
     () => [
       pivotHelper.accessor('project', {
@@ -310,13 +357,7 @@ function HoursAnalyticsView() {
           footer: () => {
             const value = pivot.reduce((sum, row) => sum + row[cls], 0);
             return value ? (
-              <button
-                type="button"
-                className="hover:underline"
-                onClick={() =>
-                  setParams({ class: classFilter === cls ? null : cls, project: null })
-                }
-              >
+              <button type="button" className="hover:underline" onClick={() => showClassTotal(cls)}>
                 {fmt(value)}
               </button>
             ) : (
@@ -326,7 +367,7 @@ function HoursAnalyticsView() {
         }),
       ),
     ],
-    [pivot, drill, classFilter, setParams],
+    [pivot, drill, classFilter, showClassTotal],
   );
 
   const detailColumns = useMemo(
@@ -525,14 +566,27 @@ function HoursAnalyticsView() {
                   'Факт: списания за период. План: оценки корневых задач, у которых срок от создания до дедлайна задевает период.',
                 )}
               </p>
-              <DataTable
-                caption={t('Проекты по классам')}
-                columns={pivotColumns}
-                data={pivot}
-                initialSorting={[{ id: 'total', desc: true }]}
-                numeric={[...ALL_CLASSES, 'total', 'plan', 'variance']}
-                emptyLabel={t('Списаний за период нет')}
-              />
+              {isMobile ? (
+                <PivotCards
+                  rows={mobilePivot.rows}
+                  totals={mobilePivot.totals}
+                  showPlan={!classFilter}
+                  fmt={fmt}
+                  onProject={(projectId) => drill(projectId)}
+                  onCell={(projectId, cls) => drill(projectId, cls as HourClassOrUnassigned)}
+                  onClassTotal={(cls) => showClassTotal(cls)}
+                  emptyLabel={t('Списаний за период нет')}
+                />
+              ) : (
+                <DataTable
+                  caption={t('Проекты по классам')}
+                  columns={pivotColumns}
+                  data={pivot}
+                  initialSorting={[{ id: 'total', desc: true }]}
+                  numeric={[...ALL_CLASSES, 'total', 'plan', 'variance']}
+                  emptyLabel={t('Списаний за период нет')}
+                />
+              )}
             </section>
 
             <section ref={detailRef} className="scroll-mt-4 space-y-2">
@@ -551,17 +605,39 @@ function HoursAnalyticsView() {
                 />
               </div>
               {/* key пересоздаёт таблицу при смене разреза и фильтров: раскрытые группы прошлого разреза к новому не подходят, а выбранный проект раскрывается целиком. */}
-              <DataTable
-                key={`${groupingKey}|${projectFilter}|${classFilter}`}
-                expandAll={Boolean(projectFilter)}
-                caption={t('Детализация часов')}
-                columns={detailColumns}
-                data={detail}
-                grouping={[...GROUPINGS[groupingKey]]}
-                initialSorting={[{ id: 'hours', desc: true }]}
-                numeric={['hours']}
-                emptyLabel={t('Списаний за период нет')}
-              />
+              {isMobile ? (
+                <DetailTree
+                  key={`${groupingKey}|${projectFilter}|${classFilter}`}
+                  rows={detail.map((row) => ({
+                    taskId: row.taskId,
+                    task: row.task,
+                    hours: row.hours,
+                    conflict: row.conflict,
+                    fields: Object.fromEntries(DETAIL_FIELDS.map((field) => [field, row[field]])),
+                  }))}
+                  levels={[...GROUPINGS[groupingKey]]}
+                  leafFields={DETAIL_FIELDS.filter(
+                    (field) =>
+                      field !== 'task' &&
+                      !(GROUPINGS[groupingKey] as readonly string[]).includes(field),
+                  )}
+                  expandAll={Boolean(projectFilter)}
+                  fmt={fmt}
+                  emptyLabel={t('Списаний за период нет')}
+                />
+              ) : (
+                <DataTable
+                  key={`${groupingKey}|${projectFilter}|${classFilter}`}
+                  expandAll={Boolean(projectFilter)}
+                  caption={t('Детализация часов')}
+                  columns={detailColumns}
+                  data={detail}
+                  grouping={[...GROUPINGS[groupingKey]]}
+                  initialSorting={[{ id: 'hours', desc: true }]}
+                  numeric={['hours']}
+                  emptyLabel={t('Списаний за период нет')}
+                />
+              )}
             </section>
           </>
         )}
