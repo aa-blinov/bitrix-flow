@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { MongoClient } from 'mongodb';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 // Состояния, которые не видно на голом экране: модалка, фильтры, диалоги,
 // тосты, тёмная тема. Для каждого — снимок и проверка поведения.
@@ -10,7 +10,7 @@ async function settle(page: Page) {
   await page.waitForTimeout(600);
 }
 
-test('карточка задачи открывается по названию', async ({ page }) => {
+test('карточка задачи открывается по названию', { tag: '@mobile' }, async ({ page }) => {
   // Селект фазы рисуется, только когда у клиента есть стадии проекта; здесь их нет ни из
   // кэша (см. auth.setup.ts), ни от портала, поэтому снимок один и тот же.
   await page.route('**/api/bitrix/task.stages.get**', (route) =>
@@ -71,7 +71,7 @@ test('перенос в другой проект не закрывает кар
   await expect(page).toHaveURL(/\/all-tasks/);
 });
 
-test('фильтр по исполнителю сужает список и ставит чип', async ({ page }) => {
+test('фильтр по исполнителю сужает список и ставит чип', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
   // Панель фильтров: кнопка «Фильтры» открывает её, дальше — «Фильтр» со
@@ -97,7 +97,7 @@ test('фильтр по исполнителю сужает список и ст
   await expect(page).toHaveScreenshot('filtered-list.png', { mask: [page.locator('time')] });
 });
 
-test('пустой результат предлагает сбросить фильтры', async ({ page }) => {
+test('пустой результат предлагает сбросить фильтры', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
   await page.getByPlaceholder('Поиск задач…').fill('такого-текста-нет-нигде');
@@ -107,7 +107,7 @@ test('пустой результат предлагает сбросить фи
   await expect(page).toHaveScreenshot('empty-state.png');
 });
 
-test('диалог создания задачи заполнен и готов к отправке', async ({ page }) => {
+test('диалог создания задачи заполнен и готов к отправке', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/my-tasks');
   await settle(page);
   await page.getByRole('button', { name: 'Новая задача' }).first().click();
@@ -118,7 +118,7 @@ test('диалог создания задачи заполнен и готов 
   await page.keyboard.press('Escape');
 });
 
-test('тёмная тема рисует список целиком', async ({ page }) => {
+test('тёмная тема рисует список целиком', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);
   // Палитра и режим в наборе @monos/ui живут атрибутами на <html>:
@@ -132,7 +132,7 @@ test('тёмная тема рисует список целиком', async ({ 
   await expect(page).toHaveScreenshot('all-tasks-dark.png', { mask: [page.locator('time')] });
 });
 
-test('доска проекта раскладывает задачи по колонкам', async ({ page }) => {
+test('доска проекта раскладывает задачи по колонкам', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/projects/10');
   await settle(page);
   await expect(page.getByRole('heading', { name: 'Разработка API v2', level: 1 })).toBeVisible();
@@ -143,38 +143,42 @@ test('доска проекта раскладывает задачи по ко�
   await expect(page).toHaveScreenshot('board.png', { mask: [page.locator('time')] });
 });
 
-test('мессенджер: диалоги делятся по вкладкам, сообщение уходит', async ({ page }) => {
-  await page.goto('/messenger');
-  const list = page.getByRole('region', { name: 'Диалоги' });
-  await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toBeVisible();
-  await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
+test(
+  'мессенджер: диалоги делятся по вкладкам, сообщение уходит',
+  { tag: '@mobile' },
+  async ({ page }) => {
+    await page.goto('/messenger');
+    const list = page.getByRole('region', { name: 'Диалоги' });
+    await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toBeVisible();
+    await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
 
-  // Вторая страница списка подгружается сама, когда конец списка в окне.
-  await expect(list.getByRole('button', { name: /Архивный чат/ })).toBeVisible();
+    // Вторая страница списка подгружается сама, когда конец списка в окне.
+    await expect(list.getByRole('button', { name: /Архивный чат/ })).toBeVisible();
 
-  await list.getByRole('button', { name: 'Группы' }).click();
-  await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
-  await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
+    await list.getByRole('button', { name: 'Группы' }).click();
+    await expect(list.getByRole('button', { name: /Дмитрий Соколов/ })).toHaveCount(0);
+    await expect(list.getByRole('button', { name: /Разработка API v2/ })).toBeVisible();
 
-  await list.getByRole('button', { name: 'Личные' }).click();
-  await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
-  const chat = page.getByRole('region', { name: 'Переписка' });
-  await expect(chat).toContainText('Посмотришь ревью?');
+    await list.getByRole('button', { name: 'Личные' }).click();
+    await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+    const chat = page.getByRole('region', { name: 'Переписка' });
+    await expect(chat).toContainText('Посмотришь ревью?');
 
-  // Страница истории: в мок-диалоге 60 сообщений, первая пачка берёт последние 50.
-  await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(0);
-  await chat.getByRole('button', { name: 'Показать более ранние' }).click();
-  await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(1);
-  await expect(chat.getByRole('button', { name: 'Показать более ранние' })).toHaveCount(0);
+    // Страница истории: в мок-диалоге 60 сообщений, первая пачка берёт последние 50.
+    await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(0);
+    await chat.getByRole('button', { name: 'Показать более ранние' }).click();
+    await expect(chat.getByText('Сообщение 1', { exact: true })).toHaveCount(1);
+    await expect(chat.getByRole('button', { name: 'Показать более ранние' })).toHaveCount(0);
 
-  const send = page.waitForRequest(
-    (request) => request.method() === 'POST' && request.url().includes('/api/messenger/messages'),
-  );
-  await chat.getByLabel('Сообщение', { exact: true }).fill('Да, смотрю');
-  await chat.getByRole('button', { name: 'Отправить' }).click();
-  expect((await send).postDataJSON()).toEqual({ dialogId: '2', text: 'Да, смотрю' });
-  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('');
-});
+    const send = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().includes('/api/messenger/messages'),
+    );
+    await chat.getByLabel('Сообщение', { exact: true }).fill('Да, смотрю');
+    await chat.getByRole('button', { name: 'Отправить' }).click();
+    expect((await send).postDataJSON()).toEqual({ dialogId: '2', text: 'Да, смотрю' });
+    await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('');
+  },
+);
 
 test('мессенджер: чужой формат DIALOG_ID не уходит в портал', async ({ page }) => {
   const response = await page.request.get('/api/messenger/messages?dialogId=user2');
@@ -346,58 +350,64 @@ test.describe('мессенджер: голосовые', () => {
   });
 });
 
-test('мессенджер: фото открываются в просмотрщике, а не в новой вкладке, файлы скачиваются', async ({
-  page,
-}) => {
-  let popups = 0;
-  page.on('popup', () => popups++);
-  const chat = await openDmitry(page);
+test(
+  'мессенджер: фото открываются в просмотрщике, а не в новой вкладке, файлы скачиваются',
+  { tag: '@mobile' },
+  async ({ page }) => {
+    let popups = 0;
+    page.on('popup', () => popups++);
+    const chat = await openDmitry(page);
 
-  await chat.getByRole('img', { name: 'фото.jpg' }).click();
-  const viewer = page.getByRole('dialog', { name: 'Просмотр: фото.jpg' });
-  await expect(viewer).toBeVisible();
-  await expect(viewer).toContainText('1 из 2');
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('dialog', { name: 'Просмотр: схема.png' })).toContainText('2 из 2');
-  await expect(page.getByRole('link', { name: 'Скачать' })).toHaveAttribute(
-    'href',
-    /fileId=501.*download=1/,
-  );
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  expect(popups).toBe(0);
+    await chat.getByRole('img', { name: 'фото.jpg' }).click();
+    const viewer = page.getByRole('dialog', { name: 'Просмотр: фото.jpg' });
+    await expect(viewer).toBeVisible();
+    await expect(viewer).toContainText('1 из 2');
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('dialog', { name: 'Просмотр: схема.png' })).toContainText('2 из 2');
+    await expect(page.getByRole('link', { name: 'Скачать' })).toHaveAttribute(
+      'href',
+      /fileId=501.*download=1/,
+    );
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(popups).toBe(0);
 
-  // Остальные форматы это ссылка на скачивание с именем файла.
-  const pdf = chat.getByRole('link', { name: 'договор.pdf 51 КБ' });
-  await expect(pdf).toHaveAttribute('href', /fileId=504.*download=1/);
-  await expect(pdf).toHaveAttribute('download', 'договор.pdf');
-});
+    // Остальные форматы это ссылка на скачивание с именем файла.
+    const pdf = chat.getByRole('link', { name: 'договор.pdf 51 КБ' });
+    await expect(pdf).toHaveAttribute('href', /fileId=504.*download=1/);
+    await expect(pdf).toHaveAttribute('download', 'договор.pdf');
+  },
+);
 
-test('мессенджер: скрепка, поле и микрофон стоят в одну линию', async ({ page }) => {
-  const chat = await openDmitry(page);
-  const boxes = await Promise.all(
-    [
-      chat.getByRole('button', { name: 'Прикрепить файл' }),
-      chat.getByLabel('Сообщение', { exact: true }),
-      chat.getByRole('button', { name: 'Записать голосовое' }),
-    ].map((locator) => locator.boundingBox()),
-  );
-  const [clip, field, mic] = boxes;
-  expect(clip && field && mic).toBeTruthy();
-  // Поле целиком в окне: раньше страница стояла ниже окна, и поле уходило за край.
-  expect(field!.y + field!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  // Плавающая кнопка меню на телефоне не лежит на кнопке отправки.
-  const menuButton = page.getByRole('button', { name: 'Открыть меню' });
-  if (await menuButton.count()) {
-    const menu = (await menuButton.boundingBox())!;
-    // Под мессенджером оставлена полоса для кнопки меню: поле целиком выше неё.
-    expect(field!.y + field!.height).toBeLessThanOrEqual(menu.y);
-  }
-  for (const box of [clip!, mic!]) {
-    expect(Math.abs(box.y - field!.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(box.height - field!.height)).toBeLessThanOrEqual(1);
-  }
-});
+test(
+  'мессенджер: скрепка, поле и микрофон стоят в одну линию',
+  { tag: '@mobile' },
+  async ({ page }) => {
+    const chat = await openDmitry(page);
+    const boxes = await Promise.all(
+      [
+        chat.getByRole('button', { name: 'Прикрепить файл' }),
+        chat.getByLabel('Сообщение', { exact: true }),
+        chat.getByRole('button', { name: 'Записать голосовое' }),
+      ].map((locator) => locator.boundingBox()),
+    );
+    const [clip, field, mic] = boxes;
+    expect(clip && field && mic).toBeTruthy();
+    // Поле целиком в окне: раньше страница стояла ниже окна, и поле уходило за край.
+    expect(field!.y + field!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    // Плавающая кнопка меню на телефоне не лежит на кнопке отправки.
+    const menuButton = page.getByRole('button', { name: 'Открыть меню' });
+    if (await menuButton.count()) {
+      const menu = (await menuButton.boundingBox())!;
+      // Под мессенджером оставлена полоса для кнопки меню: поле целиком выше неё.
+      expect(field!.y + field!.height).toBeLessThanOrEqual(menu.y);
+    }
+    for (const box of [clip!, mic!]) {
+      expect(Math.abs(box.y - field!.y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(box.height - field!.height)).toBeLessThanOrEqual(1);
+    }
+  },
+);
 
 test('меню: пункты переставляются перетаскиванием, порядок переживает перезагрузку', async ({
   page,
@@ -483,36 +493,43 @@ async function bubble(chat: import('@playwright/test').Locator, text: string) {
   return message;
 }
 
-test('мессенджер: ответ, лайк и пересылка чужого сообщения', async ({ page }) => {
-  const chat = await openDmitry(page);
-  const posts: unknown[] = [];
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && /\/api\/messenger\/(messages|message)$/.test(request.url()))
-      posts.push(request.postDataJSON());
-  });
+test(
+  'мессенджер: ответ, лайк и пересылка чужого сообщения',
+  { tag: '@mobile' },
+  async ({ page }) => {
+    const chat = await openDmitry(page);
+    const posts: unknown[] = [];
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        /\/api\/messenger\/(messages|message)$/.test(request.url())
+      )
+        posts.push(request.postDataJSON());
+    });
 
-  const message = await bubble(chat, 'Сообщение 54');
-  await message.getByRole('button', { name: 'Нравится' }).click();
-  await expect(chat.getByRole('button', { name: 'Нравится: 1' })).toBeVisible();
-  expect(posts).toContainEqual({ messageId: 54, action: 'like' });
+    const message = await bubble(chat, 'Сообщение 54');
+    await message.getByRole('button', { name: 'Нравится' }).click();
+    await expect(chat.getByRole('button', { name: 'Нравится: 1' })).toBeVisible();
+    expect(posts).toContainEqual({ messageId: 54, action: 'like' });
 
-  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ответить' }).click();
-  await expect(chat.getByText('Ответ для Дмитрий Соколов: Сообщение 54')).toBeVisible();
-  await chat.getByLabel('Сообщение', { exact: true }).fill('Согласен');
-  await chat.getByRole('button', { name: 'Отправить' }).click();
-  await expect
-    .poll(() => JSON.stringify(posts))
-    .toContain('[QUOTE]Дмитрий Соколов: Сообщение 54[/QUOTE]');
-  await expect(chat.getByText('Ответ для Дмитрий Соколов')).toHaveCount(0);
+    await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ответить' }).click();
+    await expect(chat.getByText('Ответ для Дмитрий Соколов: Сообщение 54')).toBeVisible();
+    await chat.getByLabel('Сообщение', { exact: true }).fill('Согласен');
+    await chat.getByRole('button', { name: 'Отправить' }).click();
+    await expect
+      .poll(() => JSON.stringify(posts))
+      .toContain('[QUOTE]Дмитрий Соколов: Сообщение 54[/QUOTE]');
+    await expect(chat.getByText('Ответ для Дмитрий Соколов')).toHaveCount(0);
 
-  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Переслать' }).click();
-  await page
-    .getByRole('dialog', { name: 'Переслать в чат' })
-    .getByRole('button', { name: /Разработка API v2/ })
-    .click();
-  await expect(chat.getByRole('status')).toContainText('Переслано в «Разработка API v2»');
-  expect(JSON.stringify(posts)).toContain('Переслано от Дмитрий Соколов: Сообщение 54');
-});
+    await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Переслать' }).click();
+    await page
+      .getByRole('dialog', { name: 'Переслать в чат' })
+      .getByRole('button', { name: /Разработка API v2/ })
+      .click();
+    await expect(chat.getByRole('status')).toContainText('Переслано в «Разработка API v2»');
+    expect(JSON.stringify(posts)).toContain('Переслано от Дмитрий Соколов: Сообщение 54');
+  },
+);
 
 test('мессенджер: свои сообщения правятся и удаляются, чужие нет', async ({ page }) => {
   const chat = await openDmitry(page);
@@ -578,7 +595,7 @@ test('мессенджер: поиск по сообщениям ведёт к �
   await expect(chat).toContainText('Посмотришь ревью?');
 });
 
-test('мессенджер: новый личный чат и новая группа', async ({ page }) => {
+test('мессенджер: новый личный чат и новая группа', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/messenger');
   await page.getByRole('button', { name: 'Новый чат' }).click();
   const modal = page.getByRole('dialog', { name: 'Новый чат' });
@@ -680,7 +697,7 @@ test('мессенджер: набор текста шлёт сигнал «пе
   expect(signals[0]).toEqual({ dialogId: '2' });
 });
 
-test('событие из очереди портала показывает уведомление браузера', async ({ page }) => {
+test('событие из очереди портала показывает уведомление браузера', async ({ page, testDb }) => {
   await page.addInitScript(() => {
     const notes: string[][] = [];
     (window as unknown as { __notes: string[][] }).__notes = notes;
@@ -704,7 +721,7 @@ test('событие из очереди портала показывает у�
   const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
   const notes = () => page.evaluate(() => (window as unknown as { __notes: string[][] }).__notes);
   try {
-    const db = client.db('bitrix_kanban_test');
+    const db = client.db(testDb);
     const token = await db.collection('user_tokens').findOne({});
     for (let attempt = 0; attempt < 8 && !(await notes()).length; attempt++) {
       await db.collection('events_stream').insertOne({
@@ -740,17 +757,21 @@ test('мессенджер: у файлов видны имена, голосо�
   await expect(chat.getByRole('button', { name: 'Скорость воспроизведения 1.5×' })).toBeVisible();
 });
 
-test('мессенджер: после обновления страницы открывается тот же диалог', async ({ page }) => {
-  const chat = await openDmitry(page);
-  await expect(page).toHaveURL(/\?dialog=2$/);
-  await page.reload();
-  await expect(chat).toContainText('Посмотришь ревью?');
-  await expect(chat.getByRole('heading', { name: 'Дмитрий Соколов' })).toBeVisible();
+test(
+  'мессенджер: после обновления страницы открывается тот же диалог',
+  { tag: '@mobile' },
+  async ({ page }) => {
+    const chat = await openDmitry(page);
+    await expect(page).toHaveURL(/\?dialog=2$/);
+    await page.reload();
+    await expect(chat).toContainText('Посмотришь ревью?');
+    await expect(chat.getByRole('heading', { name: 'Дмитрий Соколов' })).toBeVisible();
 
-  // Диалог, которого нет на первой странице списка, подгружается отдельным запросом.
-  await page.goto('/messenger?dialog=chat777');
-  await expect(chat.getByRole('heading', { name: 'Старый чат' })).toBeVisible();
-});
+    // Диалог, которого нет на первой странице списка, подгружается отдельным запросом.
+    await page.goto('/messenger?dialog=chat777');
+    await expect(chat.getByRole('heading', { name: 'Старый чат' })).toBeVisible();
+  },
+);
 
 test('мессенджер: присутствие по свежей активности и статусу, а не по одному статусу', async ({
   page,
@@ -810,7 +831,7 @@ test('мессенджер: в группе рядом с автором и в �
   ).toBeVisible();
 });
 
-test('мессенджер: диалог закрепляется кнопкой в шапке', async ({ page }) => {
+test('мессенджер: диалог закрепляется кнопкой в шапке', { tag: '@mobile' }, async ({ page }) => {
   const chat = await openDmitry(page);
   const list = page.getByRole('region', { name: 'Диалоги' });
   // На телефоне список прячется за открытым чатом.
@@ -991,25 +1012,26 @@ test('мессенджер: просмотрщик держит фокус вн�
   await expect(photo).toBeFocused();
 });
 
-test('английский включается переключателем и переживает перезагрузку', async ({
-  page,
-  context,
-}) => {
-  await page.goto('/all-tasks');
-  await settle(page);
-  const english = page.getByRole('button', { name: 'EN', exact: true });
-  // На мобильном боковая панель спрятана за кнопкой меню.
-  if (!(await english.isVisible()))
-    await page.getByRole('button', { name: 'Открыть меню' }).click();
-  await english.click();
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
-  await page.reload();
-  await expect(page).toHaveTitle('All tasks — BitrixFlow');
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
-  await context.clearCookies({ name: 'bitrix-flow-locale' });
-});
+test(
+  'английский включается переключателем и переживает перезагрузку',
+  { tag: '@mobile' },
+  async ({ page, context }) => {
+    await page.goto('/all-tasks');
+    await settle(page);
+    const english = page.getByRole('button', { name: 'EN', exact: true });
+    // На мобильном боковая панель спрятана за кнопкой меню.
+    if (!(await english.isVisible()))
+      await page.getByRole('button', { name: 'Открыть меню' }).click();
+    await english.click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
+    await page.reload();
+    await expect(page).toHaveTitle('All tasks — BitrixFlow');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
+    await context.clearCookies({ name: 'bitrix-flow-locale' });
+  },
+);
 
 test('мессенджер: задача создаётся из реплики с цитатой и названием из первой строки', async ({
   page,
@@ -1085,89 +1107,90 @@ test('поиск: слово в названии выделяется, лишн�
   await expect(page.getByText('не найдены')).toBeVisible();
 });
 
-test('аналитика часов делит часы по классам и фильтрует по клику на плитку', async ({
-  page,
-  isMobile,
-}) => {
-  // Период из URL: сид кладёт списания на две недели вокруг 2026-03-02.
-  await page.goto('/analytics?from=2026-02-23&to=2026-03-08');
-  await expect(page.getByRole('heading', { name: 'Аналитика часов', level: 1 })).toBeVisible();
-  const unassigned = page.getByRole('button', { name: /Нераспределено/ }).first();
-  await expect(unassigned).toContainText('3,5 ч');
-  await expect(page.getByRole('button', { name: /Коммерческие/ }).first()).toContainText('16 ч');
+test(
+  'аналитика часов делит часы по классам и фильтрует по клику на плитку',
+  { tag: '@mobile' },
+  async ({ page, isMobile }) => {
+    // Период из URL: сид кладёт списания на две недели вокруг 2026-03-02.
+    await page.goto('/analytics?from=2026-02-23&to=2026-03-08');
+    await expect(page.getByRole('heading', { name: 'Аналитика часов', level: 1 })).toBeVisible();
+    const unassigned = page.getByRole('button', { name: /Нераспределено/ }).first();
+    await expect(unassigned).toContainText('3,5 ч');
+    await expect(page.getByRole('button', { name: /Коммерческие/ }).first()).toContainText('16 ч');
 
-  // На телефоне вместо таблиц карточки и список: в таблице часы уезжали за правый край.
-  const role = isMobile ? 'list' : 'table';
-  const pivot = page.getByRole(role, { name: 'Проекты по классам' }).first();
-  const detail = page.getByRole(role, { name: 'Детализация часов' }).first();
-  const apiRow = isMobile
-    ? pivot.getByRole('listitem', { name: 'Разработка API v2' })
-    : pivot.getByRole('row', { name: /Разработка API v2/ });
+    // На телефоне вместо таблиц карточки и список: в таблице часы уезжали за правый край.
+    const role = isMobile ? 'list' : 'table';
+    const pivot = page.getByRole(role, { name: 'Проекты по классам' }).first();
+    const detail = page.getByRole(role, { name: 'Детализация часов' }).first();
+    const apiRow = isMobile
+      ? pivot.getByRole('listitem', { name: 'Разработка API v2' })
+      : pivot.getByRole('row', { name: /Разработка API v2/ });
 
-  // План API v2: подзадача 103 (2 ч) заменяет оценку родителя 101, плюс 102 (4 ч).
-  await expect(apiRow).toContainText('+10');
-  await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
+    // План API v2: подзадача 103 (2 ч) заменяет оценку родителя 101, плюс 102 (4 ч).
+    await expect(apiRow).toContainText('+10');
+    await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
 
-  // Класс проекта закрывает задачи без своего тега, «Класс не выбран» возвращает ручную разметку.
-  const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
-  const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
-  await backlogClass.selectOption('internal');
-  await expect(internal).toContainText('3,5 ч');
-  await expect(unassigned).toContainText('0 ч');
-  await backlogClass.selectOption('');
-  await expect(unassigned).toContainText('3,5 ч');
-  await expect(internal).toContainText('0 ч');
+    // Класс проекта закрывает задачи без своего тега, «Класс не выбран» возвращает ручную разметку.
+    const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
+    const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
+    await backlogClass.selectOption('internal');
+    await expect(internal).toContainText('3,5 ч');
+    await expect(unassigned).toContainText('0 ч');
+    await backlogClass.selectOption('');
+    await expect(unassigned).toContainText('3,5 ч');
+    await expect(internal).toContainText('0 ч');
 
-  await unassigned.click();
-  await expect(page).toHaveURL(/class=unassigned/);
-  await expect(detail).toContainText('Внутренний бэклог');
-  await expect(detail).not.toContainText('Разработка API v2');
+    await unassigned.click();
+    await expect(page).toHaveURL(/class=unassigned/);
+    await expect(detail).toContainText('Внутренний бэклог');
+    await expect(detail).not.toContainText('Разработка API v2');
 
-  // Класс ставится прямо из детализации: селект пишет тег задачи в Битрикс.
-  await detail
-    .getByRole('button', { name: /Внутренний бэклог/ })
-    .first()
-    .click();
-  // Детализация идёт проект, исполнитель, задачи: задача в листе, под исполнителем.
-  await detail
-    .getByRole('button', { name: /Анна Кузнецова/ })
-    .first()
-    .click();
-  await expect(detail).toContainText('Обновить зависимости');
-  const pick = detail.getByRole('combobox').first();
-  await expect(pick).toHaveValue('');
-  const update = page.waitForRequest(
-    (request) =>
-      request.url().includes('tasks.task.update') &&
-      (request.postData() || '').includes(encodeURIComponent('часы-внутреннее')),
-  );
-  await pick.selectOption('internal');
-  await update;
-  await expect(pick).toBeEnabled();
-  await expect(page.getByText(/Не удалось поставить класс/)).toHaveCount(0);
+    // Класс ставится прямо из детализации: селект пишет тег задачи в Битрикс.
+    await detail
+      .getByRole('button', { name: /Внутренний бэклог/ })
+      .first()
+      .click();
+    // Детализация идёт проект, исполнитель, задачи: задача в листе, под исполнителем.
+    await detail
+      .getByRole('button', { name: /Анна Кузнецова/ })
+      .first()
+      .click();
+    await expect(detail).toContainText('Обновить зависимости');
+    const pick = detail.getByRole('combobox').first();
+    await expect(pick).toHaveValue('');
+    const update = page.waitForRequest(
+      (request) =>
+        request.url().includes('tasks.task.update') &&
+        (request.postData() || '').includes(encodeURIComponent('часы-внутреннее')),
+    );
+    await pick.selectOption('internal');
+    await update;
+    await expect(pick).toBeEnabled();
+    await expect(page.getByText(/Не удалось поставить класс/)).toHaveCount(0);
 
-  // Число класса в сводной ведёт к раскрытым задачам за ним.
-  await unassigned.click();
-  await expect(page).not.toHaveURL(/class=/);
-  await apiRow
-    .getByRole('button', { name: isMobile ? /Коммерческие\s*16/ : '16', exact: !isMobile })
-    .last()
-    .click();
-  await expect(page).toHaveURL(/project=10&class=commercial|class=commercial&project=10/);
-  const taskLink = detail.getByRole('link').first();
-  await expect(taskLink).toHaveAttribute('href', /\/all-tasks\?task=/);
-  // Четыре задачи: на телефоне ссылка это вся строка, в таблице ссылки у названия и у часов.
-  await expect(detail.getByRole('link')).toHaveCount(isMobile ? 4 : 8);
+    // Число класса в сводной ведёт к раскрытым задачам за ним.
+    await unassigned.click();
+    await expect(page).not.toHaveURL(/class=/);
+    await apiRow
+      .getByRole('button', { name: isMobile ? /Коммерческие\s*16/ : '16', exact: !isMobile })
+      .last()
+      .click();
+    await expect(page).toHaveURL(/project=10&class=commercial|class=commercial&project=10/);
+    const taskLink = detail.getByRole('link').first();
+    await expect(taskLink).toHaveAttribute('href', /\/all-tasks\?task=/);
+    // Четыре задачи: на телефоне ссылка это вся строка, в таблице ссылки у названия и у часов.
+    await expect(detail.getByRole('link')).toHaveCount(isMobile ? 4 : 8);
 
-  // Сумма группы сворачивает группу так же, как стрелка.
-  if (isMobile) await detail.getByRole('button', { name: /Разработка API v2/ }).click();
-  else await detail.getByRole('row').nth(1).getByRole('button').last().click();
-  await expect(detail.getByRole('link')).toHaveCount(0);
+    // Сумма группы сворачивает группу так же, как стрелка.
+    if (isMobile) await detail.getByRole('button', { name: /Разработка API v2/ }).click();
+    else await detail.getByRole('row').nth(1).getByRole('button').last().click();
+    await expect(detail.getByRole('link')).toHaveCount(0);
 
-  // Итог класса включает фильтр класса по всем проектам.
-  if (isMobile)
-    await pivot.getByRole('listitem', { name: 'Итого' }).getByRole('button').first().click();
-  else await pivot.locator('tfoot').getByRole('button').first().click();
-  await expect(page).not.toHaveURL(/project=/);
-  await expect(page).toHaveURL(/class=commercial/);
-});
+    // Итог класса включает фильтр класса по всем проектам.
+    if (isMobile)
+      await pivot.getByRole('listitem', { name: 'Итого' }).getByRole('button').first().click();
+    else await pivot.locator('tfoot').getByRole('button').first().click();
+    await expect(page).not.toHaveURL(/project=/);
+    await expect(page).toHaveURL(/class=commercial/);
+  },
+);

@@ -4,7 +4,14 @@
 import { MongoClient } from 'mongodb';
 
 const url = process.env.MONGO_URL || process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018';
-const dbName = process.env.MONGO_DB || 'bitrix_kanban_test';
+// UI-тесты идут в несколько потоков, у каждого свой сервер и своя база (правило имён в
+// tests/workers.ts): общие данные потоки портили бы друг другу. Явный MONGO_DB сеет одну.
+const workers = Math.max(1, Number(process.env.UI_WORKERS) || 2);
+const dbNames = process.env.MONGO_DB
+  ? [process.env.MONGO_DB]
+  : Array.from({ length: workers }, (_, i) =>
+      i ? `bitrix_kanban_test_${i}` : 'bitrix_kanban_test',
+    );
 const MEMBER_ID = 'test-member';
 
 // Дата отсчёта: все сроки задаются относительно неё, чтобы «просрочено» и
@@ -76,105 +83,107 @@ const task = ([
 
 const client = new MongoClient(url);
 await client.connect();
-const db = client.db(dbName);
+for (const dbName of dbNames) {
+  const db = client.db(dbName);
 
-for (const name of [
-  'task_mirror',
-  'tasks',
-  'projects',
-  'user_tokens',
-  'sessions',
-  'notifications',
-  'events_stream',
-  'cache',
-  'workload_time_task',
-]) {
-  await db.collection(name).deleteMany({});
-}
+  for (const name of [
+    'task_mirror',
+    'tasks',
+    'projects',
+    'user_tokens',
+    'sessions',
+    'notifications',
+    'events_stream',
+    'cache',
+    'workload_time_task',
+  ]) {
+    await db.collection(name).deleteMany({});
+  }
 
-await db.collection('user_tokens').insertOne({
-  member_id: MEMBER_ID,
-  domain: 'mock.bitrix24.ru',
-  access_token: 'test-access-token',
-  refresh_token: 'test-refresh-token',
-  application_token: 'test-app-token',
-  installed_at: new Date(),
-  updated_at: new Date(),
-});
-
-await db.collection('projects').insertMany(
-  PROJECTS.map((project) => ({
+  await db.collection('user_tokens').insertOne({
     member_id: MEMBER_ID,
-    id: project.id,
-    data: { ID: project.id, NAME: project.name, NUMBER_OF_MEMBERS: '3' },
-    cachedAt: new Date(),
-  })),
-);
-
-await db.collection('task_mirror').insertMany(
-  TASKS.map((row) => ({
-    member_id: MEMBER_ID,
-    id: row[0],
-    data: task(row),
+    domain: 'mock.bitrix24.ru',
+    access_token: 'test-access-token',
+    refresh_token: 'test-refresh-token',
+    application_token: 'test-app-token',
+    installed_at: new Date(),
     updated_at: new Date(),
-  })),
-);
+  });
 
-// У коллекции TTL на 30 дней: уведомления с датами от BASE (март 2026) Mongo
-// удалял в первую же минуту после сида, и тест ленты был флаки. Берём ту же
-// раскладку по дням, но от даты в будущем; в снимках даты замаскированы.
-const NOTIFY_BASE = new Date('2099-03-02T09:00:00.000Z');
-const notifyDay = (offset) => new Date(NOTIFY_BASE.getTime() + offset * 86400000).toISOString();
-await db.collection('notifications').insertMany([
-  {
-    member_id: MEMBER_ID,
-    id: 'n1',
-    type: 'task_added',
-    title: 'Новая задача',
-    message: 'Перевести справочники на GraphQL',
-    taskId: '101',
-    projectId: '10',
-    created_at: new Date(notifyDay(-1)),
-  },
-  {
-    member_id: MEMBER_ID,
-    id: 'n2',
-    type: 'comment_added',
-    title: 'Комментарий',
-    message: 'Уточните лимиты, пожалуйста',
-    taskId: '103',
-    projectId: '10',
-    created_at: new Date(notifyDay(-2)),
-  },
-]);
-
-// Списания для аналитики часов: две недели вокруг BASE. Задачи проекта 12 без тега
-// класса, чтобы была видна корзина «нераспределено».
-const LOGS = [
-  ['2026-02-23', '101', '1', '2026-02-24', 6],
-  ['2026-02-23', '102', '2', '2026-02-25', 3],
-  ['2026-02-23', '104', '1', '2026-02-26', 4],
-  ['2026-03-02', '101', '2', '2026-03-02', 5],
-  ['2026-03-02', '103', '3', '2026-03-03', 2],
-  ['2026-03-02', '105', '2', '2026-03-04', 3.5],
-  ['2026-03-02', '106', '3', '2026-03-05', 1.5],
-  ['2026-03-02', '107', '1', '2026-03-06', 2],
-];
-await db.collection('workload_time_task').insertMany(
-  ['2026-02-23', '2026-03-02'].map((start) => ({
-    member_id: MEMBER_ID,
-    start,
-    task_id: '__global__',
-    entries: LOGS.filter((log) => log[0] === start).map(([, taskId, userId, dayKey, hours]) => ({
-      userId,
-      day: dayKey,
-      seconds: hours * 3600,
-      taskId,
+  await db.collection('projects').insertMany(
+    PROJECTS.map((project) => ({
+      member_id: MEMBER_ID,
+      id: project.id,
+      data: { ID: project.id, NAME: project.name, NUMBER_OF_MEMBERS: '3' },
+      cachedAt: new Date(),
     })),
-    // Сбор в 02:00 по Москве, как у ночного шедулера: экран показывает это время.
-    updated_at: new Date('2026-03-08T23:00:00Z'),
-  })),
-);
+  );
 
-console.log(`[seed] база ${dbName}: задач ${TASKS.length}, проектов ${PROJECTS.length}`);
+  await db.collection('task_mirror').insertMany(
+    TASKS.map((row) => ({
+      member_id: MEMBER_ID,
+      id: row[0],
+      data: task(row),
+      updated_at: new Date(),
+    })),
+  );
+
+  // У коллекции TTL на 30 дней: уведомления с датами от BASE (март 2026) Mongo
+  // удалял в первую же минуту после сида, и тест ленты был флаки. Берём ту же
+  // раскладку по дням, но от даты в будущем; в снимках даты замаскированы.
+  const NOTIFY_BASE = new Date('2099-03-02T09:00:00.000Z');
+  const notifyDay = (offset) => new Date(NOTIFY_BASE.getTime() + offset * 86400000).toISOString();
+  await db.collection('notifications').insertMany([
+    {
+      member_id: MEMBER_ID,
+      id: 'n1',
+      type: 'task_added',
+      title: 'Новая задача',
+      message: 'Перевести справочники на GraphQL',
+      taskId: '101',
+      projectId: '10',
+      created_at: new Date(notifyDay(-1)),
+    },
+    {
+      member_id: MEMBER_ID,
+      id: 'n2',
+      type: 'comment_added',
+      title: 'Комментарий',
+      message: 'Уточните лимиты, пожалуйста',
+      taskId: '103',
+      projectId: '10',
+      created_at: new Date(notifyDay(-2)),
+    },
+  ]);
+
+  // Списания для аналитики часов: две недели вокруг BASE. Задачи проекта 12 без тега
+  // класса, чтобы была видна корзина «нераспределено».
+  const LOGS = [
+    ['2026-02-23', '101', '1', '2026-02-24', 6],
+    ['2026-02-23', '102', '2', '2026-02-25', 3],
+    ['2026-02-23', '104', '1', '2026-02-26', 4],
+    ['2026-03-02', '101', '2', '2026-03-02', 5],
+    ['2026-03-02', '103', '3', '2026-03-03', 2],
+    ['2026-03-02', '105', '2', '2026-03-04', 3.5],
+    ['2026-03-02', '106', '3', '2026-03-05', 1.5],
+    ['2026-03-02', '107', '1', '2026-03-06', 2],
+  ];
+  await db.collection('workload_time_task').insertMany(
+    ['2026-02-23', '2026-03-02'].map((start) => ({
+      member_id: MEMBER_ID,
+      start,
+      task_id: '__global__',
+      entries: LOGS.filter((log) => log[0] === start).map(([, taskId, userId, dayKey, hours]) => ({
+        userId,
+        day: dayKey,
+        seconds: hours * 3600,
+        taskId,
+      })),
+      // Сбор в 02:00 по Москве, как у ночного шедулера: экран показывает это время.
+      updated_at: new Date('2026-03-08T23:00:00Z'),
+    })),
+  );
+
+  console.log(`[seed] база ${dbName}: задач ${TASKS.length}, проектов ${PROJECTS.length}`);
+}
 await client.close();
