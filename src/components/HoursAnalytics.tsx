@@ -195,12 +195,28 @@ function HoursAnalyticsView() {
       const tags = [...own.filter((tag) => !CLASS_TAG_KEYS.has(tagKey(tag))), HOUR_CLASS_TAG[cls]];
       setSavingTask(taskId);
       setClassError('');
+      // Класс виден сразу: запись в портал, обновление зеркала и пересчёт отчёта идут
+      // около секунды, и всё это время селект показывал старое значение, будто выбор не
+      // сработал. Подзадачи, наследующие класс, догоняет перезагрузка отчёта ниже.
+      setReport(
+        (prev) =>
+          prev && {
+            ...prev,
+            taskTags: { ...prev.taskTags, [taskId]: tags },
+            rows: prev.rows.map((row) =>
+              row.taskId === taskId
+                ? { ...row, hourClass: cls, conflict: false, source: 'task' as const }
+                : row,
+            ),
+          },
+      );
       try {
         await updateTaskFull(taskId, { tags });
-        await load();
       } catch {
         setClassError(t('Не удалось поставить класс задаче #{0}', taskId));
       } finally {
+        // И после успеха, и после ошибки: правда в портале, а не в оптимистичной копии.
+        await load();
         setSavingTask('');
       }
     },
@@ -248,6 +264,29 @@ function HoursAnalyticsView() {
     async (projectId: string, cls: HourClass | null) => {
       setSavingTask(`project:${projectId}`);
       setClassError('');
+      // Как и у задачи, класс проекта виден сразу. Он достаётся строкам без своего
+      // класса и без конфликта, ровно как в resolveWithParents на сервере.
+      setReport((prev) => {
+        if (!prev) return prev;
+        const projectClasses = { ...prev.projectClasses };
+        if (cls) projectClasses[projectId] = cls;
+        else delete projectClasses[projectId];
+        return {
+          ...prev,
+          projectClasses,
+          rows: prev.rows.map((row) =>
+            row.projectId === projectId &&
+            !row.conflict &&
+            (row.source === 'project' || !row.source)
+              ? {
+                  ...row,
+                  hourClass: cls ?? UNASSIGNED,
+                  source: cls ? ('project' as const) : ('' as const),
+                }
+              : row,
+          ),
+        };
+      });
       try {
         const response = await fetch('/api/analytics/project-class', {
           method: 'POST',
@@ -255,10 +294,10 @@ function HoursAnalyticsView() {
           body: JSON.stringify({ projectId, hourClass: cls }),
         });
         if (!response.ok) throw new Error();
-        await load();
       } catch {
         setClassError(t('Не удалось поставить класс проекту'));
       } finally {
+        await load();
         setSavingTask('');
       }
     },
