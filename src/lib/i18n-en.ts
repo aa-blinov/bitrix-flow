@@ -800,8 +800,19 @@ export const EN: Record<string, string> = {
   Отклонение: 'Variance',
   'Факт: списания за период. План: оценки корневых задач, у которых срок от создания до дедлайна задевает период.':
     'Actual: time logged in the period. Plan: estimates of root tasks whose span from creation to deadline touches the period.',
-  'Отклонение в итоге складывается только по проектам с планом.':
-    'The total variance only adds up projects that have a plan.',
+  'Отклонение считается, когда оценки покрывают хотя бы четверть факта; в итоге складываются только такие проекты.':
+    'Variance is shown when estimates cover at least a quarter of the actual hours; the total adds up only those projects.',
+  'Оценки есть у малой части работы: план {0} ч при факте {1} ч':
+    'Only a small part of the work is estimated: {0} h planned against {1} h actual',
+  'план неполный': 'partial plan',
+  'Забрать свежие списания из Битрикса': 'Pull fresh time logs from Bitrix24',
+  'Не удалось забрать свежие часы из Битрикса': 'Could not pull fresh hours from Bitrix24',
+  'Свежие часы забираются максимум за полгода: сузьте период':
+    'Fresh hours can be pulled for at most six months: narrow the period',
+  'Этот месяц': 'This month',
+  'Прошлый месяц': 'Last month',
+  Квартал: 'Quarter',
+  '3 месяца': '3 months',
   'Не удалось поставить класс задаче #{0}': 'Could not set the class on task #{0}',
   'Класс задачи {0}': 'Class of task {0}',
   'Класс взят с родительской задачи': 'Class taken from the parent task',

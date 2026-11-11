@@ -72,8 +72,10 @@ type PivotRow = {
   project: string;
   total: number;
   plan: number;
-  /** Факт минус план; undefined, когда плана нет и сравнивать не с чем. */
+  /** Факт минус план; undefined, когда плана нет или он неполный и сравнивать не с чем. */
   variance?: number;
+  /** План есть, но покрывает меньше PARTIAL_PLAN_SHARE факта. */
+  planPartial?: boolean;
 } & Record<HourClassOrUnassigned, number>;
 
 const DETAIL_FIELDS = ['project', 'user', 'month', 'classLabel', 'task'] as const;
@@ -93,6 +95,32 @@ function defaultPeriod() {
   const now = new Date();
   return { from: isoDay(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: isoDay(now) };
 }
+
+// ПМ смотрит часы месяцами и кварталами: даты руками набирают редко.
+const PERIOD_PRESETS = {
+  month: () => {
+    const now = new Date();
+    return { from: isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDay(now) };
+  },
+  previous: () => {
+    const now = new Date();
+    return {
+      from: isoDay(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      to: isoDay(new Date(now.getFullYear(), now.getMonth(), 0)),
+    };
+  },
+  quarter: () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    return { from: isoDay(start), to: isoDay(now) };
+  },
+  three: defaultPeriod,
+};
+type PeriodPreset = keyof typeof PERIOD_PRESETS;
+
+// План, который покрывает меньше четверти факта, это не перерасход, а оценки, заведённые
+// у малой части работы: «+756» при плане 7 ч пугал на самом видном месте сводной.
+const PARTIAL_PLAN_SHARE = 0.25;
 
 const sumBy = (rows: HourRow[], pick: (row: HourRow) => boolean) =>
   rows.reduce((total, row) => (pick(row) ? total + row.hours : total), 0);
@@ -183,6 +211,42 @@ function HoursAnalyticsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Ночной сбор видит списания только до вчерашнего дня: «Обновить» забирает их из
+  // портала заново за весь период. Ошибка не прячет уже показанные цифры.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshError('');
+    try {
+      const response = await fetch('/api/analytics/hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(
+          body.error === 'PERIOD_TOO_LONG'
+            ? t('Свежие часы забираются максимум за полгода: сузьте период')
+            : t('Не удалось забрать свежие часы из Битрикса'),
+        );
+      }
+      setReport(await response.json());
+    } catch (reason) {
+      setRefreshError(
+        reason instanceof Error ? reason.message : t('Не удалось забрать свежие часы из Битрикса'),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [from, to]);
+  const periodPreset =
+    (Object.keys(PERIOD_PRESETS) as PeriodPreset[]).find((key) => {
+      const preset = PERIOD_PRESETS[key]();
+      return preset.from === from && preset.to === to;
+    }) || '';
 
   // Класс ставится тегом в самом Битриксе: аналитика своей разметки не хранит. Прокси
   // обновляет зеркало до ответа, поэтому сразу после записи отчёт уже видит тег, а с ним
@@ -404,8 +468,10 @@ function HoursAnalyticsView() {
     }
     // Проект с планом и без списаний тоже строка: это работа, к которой не приступили.
     if (!classFilter) for (const projectId of Object.keys(plans)) entryFor(projectId);
-    for (const entry of byProject.values())
-      entry.variance = entry.plan > 0 ? entry.total - entry.plan : undefined;
+    for (const entry of byProject.values()) {
+      entry.planPartial = entry.plan > 0 && entry.plan < entry.total * PARTIAL_PLAN_SHARE;
+      entry.variance = entry.plan > 0 && !entry.planPartial ? entry.total - entry.plan : undefined;
+    }
     return [...byProject.values()];
   }, [rows, classFilter, projectName, plans]);
 
@@ -498,6 +564,20 @@ function HoursAnalyticsView() {
               },
               cell: (info) => {
                 const value = info.getValue();
+                const row = info.row.original;
+                if (row.planPartial)
+                  return (
+                    <span
+                      className="text-xs text-ink-faint"
+                      title={t(
+                        'Оценки есть у малой части работы: план {0} ч при факте {1} ч',
+                        fmt(row.plan),
+                        fmt(row.total),
+                      )}
+                    >
+                      {t('план неполный')}
+                    </span>
+                  );
                 if (value === undefined) return '';
                 return (
                   <span className={value > 0 ? 'text-danger-text' : ''}>
@@ -626,11 +706,12 @@ function HoursAnalyticsView() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void load()}
-              disabled={isLoading}
+              onClick={() => void refresh()}
+              disabled={isLoading || refreshing}
+              title={t('Забрать свежие списания из Битрикса')}
               icon={
                 <RefreshCw
-                  className={isLoading ? 'animate-spin' : ''}
+                  className={isLoading || refreshing ? 'animate-spin' : ''}
                   size={14}
                   strokeWidth={1.7}
                 />
@@ -644,6 +725,17 @@ function HoursAnalyticsView() {
       <div className="space-y-3 px-4 py-4 lg:px-6">
         <Card padding="none">
           <div className="flex flex-wrap items-center gap-2 p-3 text-sm">
+            <SegmentedControl
+              size="sm"
+              value={periodPreset}
+              onChange={(value) => setParams(PERIOD_PRESETS[value as PeriodPreset]())}
+              options={[
+                { value: 'month', label: t('Этот месяц') },
+                { value: 'previous', label: t('Прошлый месяц') },
+                { value: 'quarter', label: t('Квартал') },
+                { value: 'three', label: t('3 месяца') },
+              ]}
+            />
             <span className="text-ink-soft">{t('Период:')}</span>
             <TextField
               type="date"
@@ -705,6 +797,7 @@ function HoursAnalyticsView() {
         ) : null}
 
         {classError ? <Notice tone="danger">{classError}</Notice> : null}
+        {refreshError ? <Notice tone="danger">{refreshError}</Notice> : null}
 
         {error ? (
           <Notice tone="danger">{error}</Notice>
@@ -753,7 +846,9 @@ function HoursAnalyticsView() {
                 {t(
                   'Факт: списания за период. План: оценки корневых задач, у которых срок от создания до дедлайна задевает период.',
                 )}{' '}
-                {t('Отклонение в итоге складывается только по проектам с планом.')}
+                {t(
+                  'Отклонение считается, когда оценки покрывают хотя бы четверть факта; в итоге складываются только такие проекты.',
+                )}
               </p>
               {isMobile ? (
                 <PivotCards

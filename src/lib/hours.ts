@@ -204,11 +204,29 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     });
   }
 
+  // Задачи, которых нет в зеркале: либо зеркало их ещё не догнало (сверка добирает такие
+  // за 10 минут), либо задачу удалили. Портал оставляет списания удалённых задач, и в
+  // «Без проекта» копились часы тестовых задач. Удалённая задача пропадает из обеих
+  // коллекций, поэтому часы считаем, только если задача есть хотя бы в одной из них.
+  const unmirrored = taskIds.filter((id) => !tasks.has(id));
+  const fallback = new Map<string, string>();
+  if (unmirrored.length) {
+    const docs = await db
+      .collection('tasks')
+      .find(
+        { id: { $in: [...unmirrored, ...unmirrored.map(Number)] } },
+        { projection: { id: 1, groupId: 1 } },
+      )
+      .toArray();
+    for (const doc of docs) fallback.set(String(doc.id), String(doc.groupId || '') || '0');
+  }
+
   const byKey = new Map<string, HourRow>();
   for (const e of entries) {
     const taskId = String(e.taskId);
     const task = tasks.get(taskId);
-    const projectId = task?.projectId || '0';
+    if (!task && !fallback.has(taskId)) continue;
+    const projectId = task?.projectId || fallback.get(taskId) || '0';
     const { hourClass, conflict, source } = resolveWithParents(
       taskId,
       (id) => tasks.get(id)?.tags ?? ancestorTags.get(id),

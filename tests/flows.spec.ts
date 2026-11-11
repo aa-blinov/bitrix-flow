@@ -1130,6 +1130,15 @@ test(
     await expect(apiRow).toContainText('+10');
     await expect(page.getByText('Данные на 09.03, 02:00')).toBeVisible();
 
+    // «Обновить» забирает часы из портала заново, а не только перечитывает отчёт.
+    const refresh = page.waitForRequest(
+      (request) => request.url().endsWith('/api/analytics/hours') && request.method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Обновить' }).click();
+    await refresh;
+    await expect(unassigned).toContainText('3,5 ч');
+    await expect(page.getByText(/Не удалось забрать/)).toHaveCount(0);
+
     // Класс проекта закрывает задачи без своего тега, «Класс не выбран» возвращает ручную разметку.
     const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
     const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
@@ -1192,5 +1201,11 @@ test(
     else await pivot.locator('tfoot').getByRole('button').first().click();
     await expect(page).not.toHaveURL(/project=/);
     await expect(page).toHaveURL(/class=commercial/);
+
+    // Быстрый период ставит обе даты: прошлый месяц целиком, с первого по последнее число.
+    const previous = page.getByRole('button', { name: 'Прошлый месяц', exact: true });
+    await previous.click();
+    await expect(page).toHaveURL(/from=\d{4}-\d{2}-01&to=\d{4}-\d{2}-(28|29|30|31)/);
+    await expect(previous).toHaveAttribute('aria-pressed', 'true');
   },
 );
