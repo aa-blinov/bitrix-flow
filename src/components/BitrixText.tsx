@@ -67,7 +67,13 @@ function render(nodes: BitrixNode[]): ReactNode[] {
       );
     if (node.type === 'quote')
       return (
-        <blockquote key={index} className="my-2 border-l-2 border-line pl-3 text-ink-soft">
+        // Ответ в чате уходит цитатой: на фоне своего сообщения тонкая серая черта
+        // сливалась, и ответ читался как обычная строка. Карточка с акцентной чертой
+        // отделяет цитату от текста на любом фоне.
+        <blockquote
+          key={index}
+          className="my-2 rounded-r-ui border-l-2 border-accent bg-canvas/60 px-2.5 py-1 text-ink-soft"
+        >
           {children}
         </blockquote>
       );

@@ -77,8 +77,11 @@ type PivotRow = {
 } & Record<HourClassOrUnassigned, number>;
 
 const DETAIL_FIELDS = ['project', 'user', 'month', 'classLabel', 'task'] as const;
+// Две группы сверху и задачи листьями в каждом разрезе: при смене таба меняется только
+// порядок групп, а не набор колонок. Раньше «Проекты» шли проект, задача, а под задачей
+// строки по людям и месяцам, и в каждом табе своя глубина.
 const GROUPINGS = {
-  project: ['project', 'task'],
+  project: ['project', 'user'],
   user: ['user', 'project'],
   month: ['month', 'project'],
   class: ['classLabel', 'project'],
@@ -319,6 +322,20 @@ function HoursAnalyticsView() {
     [visible, projectName, userName],
   );
 
+  // Лист это задача: строки отчёта бьются ещё и по месяцам и людям, а в листе они
+  // складываются в одну задачу внутри своей группы.
+  const leaves = useMemo<DetailRow[]>(() => {
+    const levels = GROUPINGS[groupingKey];
+    const merged = new Map<string, DetailRow>();
+    for (const row of detail) {
+      const key = [...levels.map((level) => row[level]), row.taskId].join('|');
+      const leaf = merged.get(key);
+      if (leaf) leaf.hours += row.hours;
+      else merged.set(key, { ...row });
+    }
+    return [...merged.values()];
+  }, [detail, groupingKey]);
+
   const plans = useMemo(() => report?.projectPlans ?? {}, [report]);
   const pivot = useMemo<PivotRow[]>(() => {
     const byProject = new Map<string, PivotRow>();
@@ -486,14 +503,17 @@ function HoursAnalyticsView() {
 
   const detailColumns = useMemo(
     () => [
-      detailHelper.accessor('project', { header: () => t('Проект') }),
-      detailHelper.accessor('user', { header: () => t('Специалист') }),
-      detailHelper.accessor('month', { header: () => t('Месяц') }),
-      detailHelper.accessor('classLabel', {
-        header: () => t('Класс'),
-        cell: (info) =>
-          info.row.getIsGrouped() ? info.getValue() : classSelect(info.row.original),
-      }),
+      ...GROUPINGS[groupingKey].map((level) =>
+        detailHelper.accessor(level, {
+          header: () =>
+            ({
+              project: t('Проект'),
+              user: t('Исполнитель'),
+              month: t('Месяц'),
+              classLabel: t('Класс'),
+            })[level],
+        }),
+      ),
       detailHelper.accessor('task', {
         header: () => t('Задача'),
         cell: (info) =>
@@ -510,6 +530,15 @@ function HoursAnalyticsView() {
             </Link>
           ),
       }),
+      ...((GROUPINGS[groupingKey] as readonly string[]).includes('classLabel')
+        ? []
+        : [
+            detailHelper.accessor('classLabel', {
+              header: () => t('Класс'),
+              cell: (info) =>
+                info.row.getIsGrouped() ? info.getValue() : classSelect(info.row.original),
+            }),
+          ]),
       detailHelper.accessor('hours', {
         header: () => t('Часы'),
         aggregationFn: 'sum',
@@ -521,7 +550,7 @@ function HoursAnalyticsView() {
         aggregatedCell: (info) => fmt(Number(info.getValue()) || 0),
       }),
     ],
-    [classSelect],
+    [classSelect, groupingKey],
   );
 
   const exportCsv = () =>
@@ -729,7 +758,7 @@ function HoursAnalyticsView() {
               {isMobile ? (
                 <DetailTree
                   key={`${groupingKey}|${projectFilter}|${classFilter}`}
-                  rows={detail.map((row) => ({
+                  rows={leaves.map((row) => ({
                     taskId: row.taskId,
                     task: row.task,
                     hours: row.hours,
@@ -741,11 +770,7 @@ function HoursAnalyticsView() {
                     fields: Object.fromEntries(DETAIL_FIELDS.map((field) => [field, row[field]])),
                   }))}
                   levels={[...GROUPINGS[groupingKey]]}
-                  leafFields={DETAIL_FIELDS.filter(
-                    (field) =>
-                      field !== 'task' &&
-                      !(GROUPINGS[groupingKey] as readonly string[]).includes(field),
-                  )}
+                  leafFields={groupingKey === 'class' ? [] : ['classLabel']}
                   expandAll={Boolean(projectFilter)}
                   fmt={fmt}
                   emptyLabel={t('Списаний за период нет')}
@@ -756,7 +781,7 @@ function HoursAnalyticsView() {
                   expandAll={Boolean(projectFilter)}
                   caption={t('Детализация часов')}
                   columns={detailColumns}
-                  data={detail}
+                  data={leaves}
                   grouping={[...GROUPINGS[groupingKey]]}
                   initialSorting={[{ id: 'hours', desc: true }]}
                   numeric={['hours']}

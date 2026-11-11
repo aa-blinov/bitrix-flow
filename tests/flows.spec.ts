@@ -1128,10 +1128,12 @@ test('аналитика часов делит часы по классам и �
     .getByRole('button', { name: /Внутренний бэклог/ })
     .first()
     .click();
+  // Детализация идёт проект, исполнитель, задачи: задача в листе, под исполнителем.
   await detail
-    .getByRole('button', { name: /Обновить зависимости/ })
+    .getByRole('button', { name: /Анна Кузнецова/ })
     .first()
     .click();
+  await expect(detail).toContainText('Обновить зависимости');
   const pick = detail.getByRole('combobox').first();
   await expect(pick).toHaveValue('');
   const update = page.waitForRequest(
@@ -1154,7 +1156,8 @@ test('аналитика часов делит часы по классам и �
   await expect(page).toHaveURL(/project=10&class=commercial|class=commercial&project=10/);
   const taskLink = detail.getByRole('link').first();
   await expect(taskLink).toHaveAttribute('href', /\/all-tasks\?task=/);
-  await expect(detail.getByRole('link')).toHaveCount(4);
+  // Четыре задачи: на телефоне ссылка это вся строка, в таблице ссылки у названия и у часов.
+  await expect(detail.getByRole('link')).toHaveCount(isMobile ? 4 : 8);
 
   // Сумма группы сворачивает группу так же, как стрелка.
   if (isMobile) await detail.getByRole('button', { name: /Разработка API v2/ }).click();
