@@ -214,7 +214,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     const docs = await db
       .collection('tasks')
       .find(
-        { id: { $in: [...unmirrored, ...unmirrored.map(Number)] } },
+        { member_id: memberId, id: { $in: [...unmirrored, ...unmirrored.map(Number)] } },
         { projection: { id: 1, groupId: 1 } },
       )
       .toArray();
