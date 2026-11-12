@@ -50,6 +50,7 @@ export default function AccountsPage() {
   const toasts = useTaskToasts();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState<Account | null>(null);
   const [username, setUsername] = useState('');
@@ -59,9 +60,15 @@ export default function AccountsPage() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch('/api/admin/users');
-    if (response.status === 403) return setForbidden(true);
-    if (response.ok) setAccounts((await response.json()).users);
+    setLoadFailed(false);
+    try {
+      const response = await fetch('/api/admin/users');
+      if (response.status === 403) return setForbidden(true);
+      if (!response.ok) throw new Error(`HTTP_${response.status}`);
+      setAccounts((await response.json()).users);
+    } catch {
+      setLoadFailed(true);
+    }
   }, []);
   useEffect(() => {
     void load();
@@ -145,6 +152,13 @@ export default function AccountsPage() {
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
         {forbidden ? (
           <Notice tone="danger">{t('Раздел доступен только администраторам.')}</Notice>
+        ) : !accounts && loadFailed ? (
+          <Notice tone="danger">
+            {t('Не удалось загрузить учётные записи.')}{' '}
+            <Button size="sm" variant="text" onClick={() => void load()}>
+              {t('Повторить')}
+            </Button>
+          </Notice>
         ) : !accounts ? (
           <LoadingState label={t('Загрузка…')} />
         ) : (

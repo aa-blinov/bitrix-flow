@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useRouter } from 'next/navigation';
 import {
@@ -162,18 +162,26 @@ export default function TeamWorkload() {
   const weekStartKey = calendarDayKey(weekStart);
   const weekEndKey = calendarDayKey(addDays(weekStart, 6));
 
+  // Опрос и смена недели шлют запросы внахлёст: поздний ответ за прошлую неделю не должен
+  // затереть факт выбранной.
+  const currentWeekRef = useRef(weekStartKey);
+  currentWeekRef.current = weekStartKey;
+
   const loadActualTime = async () => {
+    const week = weekStartKey;
     try {
-      const response = await fetch(`/api/workload/time?start=${weekStartKey}`, {
+      const response = await fetch(`/api/workload/time?start=${week}`, {
         cache: 'no-store',
       });
       const payload = await response.json();
+      if (week !== currentWeekRef.current) return;
       if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
       setTimeRows(payload.data?.rows || []);
       setTimeDetails(payload.data?.details || []);
       setTimeRefreshing(Boolean(payload.refreshing));
       setTimeError(null);
     } catch (error) {
+      if (week !== currentWeekRef.current) return;
       console.error('[workload-time] failed to load actual time', error);
       setTimeError(t('Не удалось загрузить факт времени'));
     }

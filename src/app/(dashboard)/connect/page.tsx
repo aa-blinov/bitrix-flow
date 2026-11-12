@@ -46,7 +46,7 @@ export default function ConnectPage() {
         if (data?.member_id) {
           const next = sessionStorage.getItem('bitrix-connect-next') || '/';
           sessionStorage.removeItem('bitrix-connect-next');
-          window.location.replace(next.startsWith('/') ? next : '/');
+          window.location.replace(isLocalPath(next) ? next : '/');
         }
       });
       return;
@@ -57,7 +57,7 @@ export default function ConnectPage() {
 
   const handleConnect = () => {
     const next = new URLSearchParams(window.location.search).get('next');
-    if (next?.startsWith('/')) sessionStorage.setItem('bitrix-connect-next', next);
+    if (next && isLocalPath(next)) sessionStorage.setItem('bitrix-connect-next', next);
     window.location.href = '/api/oauth';
   };
 
@@ -125,4 +125,19 @@ export default function ConnectPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * `//evil.example` и `/\evil.example` тоже начинаются со слэша, но браузер уводит по ним на чужой
+ * сайт, поэтому сверяем origin после разбора.
+ */
+function isLocalPath(value: string): boolean {
+  try {
+    return (
+      value.startsWith('/') &&
+      new URL(value, window.location.origin).origin === window.location.origin
+    );
+  } catch {
+    return false;
+  }
 }

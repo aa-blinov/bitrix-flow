@@ -19,6 +19,8 @@ import { cn, getProjectInitials, pluralRu } from '@/lib/utils';
 import PageHeader from '@/components/PageHeader';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
+import { Notice } from '@/components/monos/Notice';
+import { Button } from '@/components/monos/Button';
 import { t } from '@/lib/i18n';
 
 export default function DashboardPage() {
@@ -39,12 +41,20 @@ export default function DashboardPage() {
     projects: Record<string, { total: number; done: number; overdue: number }>;
     totals: { attention: number; inProgress: number; week: number; noDeadline: number };
   } | null>(null);
+  const [statsFailed, setStatsFailed] = useState(false);
+  const [statsAttempt, setStatsAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setStatsFailed(false);
     void fetch('/api/tasks/stats?byProject=true')
-      .then((response) => response.json())
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.projects))
+          throw new Error(`HTTP_${response.status}`);
+        return data;
+      })
       .then((data) => {
-        if (cancelled || !Array.isArray(data.projects)) return;
+        if (cancelled) return;
         setStats({
           projects: Object.fromEntries(
             data.projects.map((item: { id: string }) => [item.id, item]),
@@ -52,11 +62,13 @@ export default function DashboardPage() {
           totals: data.totals || { attention: 0, inProgress: 0, week: 0, noDeadline: 0 },
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setStatsFailed(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [statsAttempt]);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const hasBootstrapped = useRef(false);
   // Проект выбираем, как только список появился — неважно, чей запрос его
@@ -126,6 +138,14 @@ export default function DashboardPage() {
       <PageHeader title={t('Главная')} description={t('Обзор проектов, задач и сроков')} />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
+        {statsFailed && (
+          <Notice tone="danger" className="mb-4">
+            {t('Не удалось загрузить сводку.')}{' '}
+            <Button size="sm" variant="text" onClick={() => setStatsAttempt((n) => n + 1)}>
+              {t('Повторить')}
+            </Button>
+          </Notice>
+        )}
         {/* Stats */}
         <div className="mb-8 grid auto-rows-fr grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard

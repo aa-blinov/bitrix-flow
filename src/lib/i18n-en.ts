@@ -343,6 +343,8 @@ export const EN: Record<string, string> = {
   'Не удалось загрузить диалоги. Обновите страницу.': 'Could not load dialogs. Refresh the page.',
   'Не удалось загрузить ещё диалоги.': 'Could not load more dialogs.',
   'Не удалось загрузить нагрузку': 'Could not load the workload',
+  'Не удалось загрузить учётные записи.': 'Could not load the accounts.',
+  'Не удалось загрузить сводку.': 'Could not load the summary.',
   'Не удалось загрузить проекты': 'Could not load projects',
   'Не удалось загрузить сообщения.': 'Could not load messages.',
   'Не удалось загрузить страницу. Повторите попытку.': 'Could not load the page. Try again.',
