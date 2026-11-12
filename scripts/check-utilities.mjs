@@ -105,11 +105,13 @@ function baseUtility(token) {
   return parts[parts.length - 1];
 }
 
-/** Класс относится к набору, если заканчивается именем из токенов. */
+/**
+ * Класс относится к набору, если заканчивается именем из токенов после префикса
+ * утилиты. Голое имя токена (`'whisper-lg'` в конфиге tailwind-merge) классом не является.
+ */
 function isKitClass(token) {
   const base = baseUtility(token);
-  if (!base.includes('-')) return false;
-  return [...KIT_VALUES].some((value) => base === value || base.endsWith(`-${value}`));
+  return [...KIT_VALUES].some((value) => base.endsWith(`-${value}`));
 }
 
 // Негативная проверка самого скрипта: если бы он ничего не проверял, он
