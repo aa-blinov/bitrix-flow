@@ -22,7 +22,7 @@ let counter = 0;
 // относится к самому ящику, и в глобальный CSS ему не место.
 const DRAWER_CSS = `
 .ui-drawer {
-  animation: ui-drawer-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: ui-drawer-in var(--ui-duration-base) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes ui-drawer-in {
   from {

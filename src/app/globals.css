@@ -230,10 +230,10 @@ body {
   }
 }
 .animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn var(--ui-duration-base) ease-out;
 }
 .animate-slide-up {
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideUp var(--ui-duration-base) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .line-clamp-2 {

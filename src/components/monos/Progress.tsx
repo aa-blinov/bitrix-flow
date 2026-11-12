@@ -40,7 +40,7 @@ const SIZES: Record<'sm' | 'md' | 'lg', string> = {
  */
 const PROGRESS_CSS = `
 .ui-progress-fill {
-  transition: width 200ms ease;
+  transition: width var(--ui-duration-base) ease;
 }
 .ui-progress-indeterminate {
   position: absolute;

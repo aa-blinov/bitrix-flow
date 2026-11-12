@@ -73,24 +73,37 @@ export async function setChatNotify(on: boolean): Promise<boolean> {
   return on;
 }
 
-// Короткий сигнал без звукового файла: ради одного звука ассет не нужен.
-export function beep() {
+let audio: AudioContext | null = null;
+
+// Сигнал без звукового файла: ради двух звуков ассет не нужен. Ровный синус с резким обрывом
+// щёлкал и звучал как ошибка, поэтому каждая нота с быстрой атакой и затуханием, как колокольчик.
+// Упоминание звучит тремя нотами вверх, чтобы его отличали от обычного сообщения на слух.
+export function chime(mentioned = false) {
   try {
-    const context = new AudioContext();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.frequency.value = 880;
-    gain.gain.value = 0.05;
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.12);
-    oscillator.onended = () => void context.close();
+    // Один контекст на вкладку: браузер ограничивает их число, а новый после автоплея
+    // стартует приостановленным.
+    audio ??= new AudioContext();
+    void audio.resume();
+    const notes = mentioned ? [784, 988, 1319] : [880, 1175];
+    const start = audio.currentTime + 0.01;
+    notes.forEach((frequency, index) => {
+      const at = start + index * 0.09;
+      const oscillator = audio!.createOscillator();
+      const gain = audio!.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.08, at + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
+      oscillator.connect(gain).connect(audio!.destination);
+      oscillator.start(at);
+      oscillator.stop(at + 0.5);
+    });
   } catch {}
 }
 
 export function showChatNotification(event: MessengerEvent, onClick: () => void) {
   if (!chatNotifyEnabled()) return;
-  beep();
+  chime(event.mentioned);
   const { title, body } = pingText(event, {
     mention: t('Вас упомянули:'),
     message: t('Сообщение'),

@@ -87,7 +87,7 @@ function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boo
           <a
             key={file.id}
             href={`${href}${attached ? '&' : '?'}download=1`}
-            className="flex items-center gap-2 rounded-ui border border-line px-2.5 py-1.5 text-xs transition-colors hover:bg-surface-2"
+            className="flex items-center gap-2 rounded-ui border border-line px-2.5 py-1.5 text-xs transition-colors duration-fast hover:bg-surface-2"
           >
             <Paperclip size={13} strokeWidth={1.7} className="shrink-0 text-ink-faint" />
             <span className="max-w-56 truncate">{file.name}</span>

@@ -1087,7 +1087,10 @@ export default function Conversation({
               aria-valuenow={progress}
               className="h-1 bg-surface-2"
             >
-              <div className="h-full bg-ink transition-[width]" style={{ width: `${progress}%` }} />
+              <div
+                className="h-full bg-ink transition-[width] duration-base"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           )}
           {mention && suggestions.length > 0 && (

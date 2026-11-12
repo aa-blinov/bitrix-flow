@@ -516,7 +516,7 @@ const EditableTitle = memo(function EditableTitle({
               size="sm"
               label={t('Переименовать задачу {0}', task.id)}
               tooltipText={t('Переименовать')}
-              className="opacity-0 transition-opacity group-hover/title:opacity-100 focus-visible:opacity-100"
+              className="opacity-0 transition-opacity duration-fast group-hover/title:opacity-100 focus-visible:opacity-100"
               onClick={() => setEditing(true)}
             >
               <Pencil size={14} strokeWidth={1.7} />
