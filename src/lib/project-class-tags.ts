@@ -8,6 +8,7 @@ import {
   resolveHourClass,
   type HourClass,
 } from '@/lib/hour-class';
+import { mirrorProjectId } from '@/lib/hours';
 import { isMockEnabled } from '@/lib/mock-b24';
 import { getDb } from '@/lib/mongo';
 import { bx24OAuth } from '@/lib/oauth-client';
@@ -84,8 +85,11 @@ async function loadNodes(memberId: string): Promise<TaskNode[]> {
       {
         projection: {
           id: 1,
-          parent_id: 1,
-          project_id: 1,
+          'data.group': 1,
+          'data.groupId': 1,
+          'data.GROUP_ID': 1,
+          'data.parentId': 1,
+          'data.PARENT_ID': 1,
           'data.title': 1,
           'data.TITLE': 1,
           'data.tags': 1,
@@ -96,8 +100,10 @@ async function loadNodes(memberId: string): Promise<TaskNode[]> {
     .toArray();
   return docs.map((doc) => ({
     id: String(doc.id),
-    parentId: String(doc.parent_id || ''),
-    projectId: String(doc.project_id || '0'),
+    // Верхних project_id и parent_id у большей части зеркала нет (записи из снимка):
+    // проект и родитель лежат в данных задачи. Без этого план видел треть задач проекта.
+    parentId: String(doc.data?.parentId ?? doc.data?.PARENT_ID ?? ''),
+    projectId: mirrorProjectId(doc.data || {}),
     title: String(doc.data?.title || doc.data?.TITLE || ''),
     tags: bitrixTaskTags(doc.data?.tags ?? doc.data?.TAGS),
   }));
