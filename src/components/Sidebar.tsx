@@ -402,9 +402,10 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             {t('Учётные записи')}
           </Link>
         )}
-        <div className="mt-2 space-y-2">
-          <ThemeSwitcher />
-          <LanguageSwitcher />
+        <div className="mt-2">
+          <ThemeSwitcher>
+            <LanguageSwitcher />
+          </ThemeSwitcher>
         </div>
       </div>
     </div>
