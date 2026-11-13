@@ -2,7 +2,7 @@
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { Menu, LogOut, ChevronDown, Plus, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/monos/Button';
@@ -24,7 +24,7 @@ import SortableNav, { useNavOrder } from '@/components/SortableNav';
 import { useChatAlerts } from '@/components/messenger/useChatAlerts';
 import { t } from '@/lib/i18n';
 
-export default function Sidebar() {
+export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
   // (загрузка задач, стадий, SSE) и меню моргает во время первой загрузки.
   const projects = useKanbanStore((s) => s.projects);
@@ -33,6 +33,9 @@ export default function Sidebar() {
   const [failedPhoto, setFailedPhoto] = useState('');
   const photo = usableAvatar(currentUser.photo);
   const isLoading = useKanbanStore((s) => s.isLoading);
+  const isRehydrated = useKanbanStore((s) => s.isRehydrated);
+  // Крутилка только при пустом списке: фоновое обновление кеша не прячет проекты.
+  const projectsLoading = isLoading && !projects.length;
   const loadError = useKanbanStore((s) => s.error);
   const loadProjects = useKanbanStore((s) => s.loadProjects);
   const createProject = useKanbanStore((s) => s.createProject);
@@ -55,9 +58,14 @@ export default function Sidebar() {
   // перезапускался, это был плотный цикл запросов, а в панели висело «Нет
   // проектов». Теперь после ошибки — повтор через 3с и честное сообщение.
   const projectsFailed = Boolean(loadError) && !projects.length;
+  // До регидратации список пуст лишь потому, что кеш ещё не поднят. После неё один раз
+  // обновляем проекты из портала: кеш мог устареть.
+  const projectsRefreshed = useRef(false);
   useEffect(() => {
-    if (!projects.length && !isLoading && !loadError) void loadProjects();
-  }, [isLoading, loadError, loadProjects, projects.length]);
+    if (!isRehydrated || projectsRefreshed.current) return;
+    projectsRefreshed.current = true;
+    void loadProjects(projects.length > 0);
+  }, [isRehydrated, loadProjects, projects.length]);
   useEffect(() => {
     if (!projectsFailed) return;
     const timer = window.setTimeout(() => void loadProjects(), 3000);
@@ -152,15 +160,6 @@ export default function Sidebar() {
     }
   }
 
-  // Раздел учётных записей виден только администраторам; сервер всё равно проверяет роль.
-  const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    void fetch('/api/auth/me')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setIsAdmin(data?.role === 'admin'))
-      .catch(() => {});
-  }, []);
-
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     try {
@@ -200,7 +199,7 @@ export default function Sidebar() {
           <div className="mb-2 flex items-center justify-between px-2.5">
             <p className="text-whisper font-bold uppercase tracking-widest text-ink-faint">
               {t('Проекты (')}
-              {(isLoading || projectsFailed) && !projects.length ? '…' : projects.length})
+              {!isRehydrated || projectsLoading || projectsFailed ? '…' : projects.length})
             </p>
             <IconButton
               label={t('Создать проект')}
@@ -222,7 +221,7 @@ export default function Sidebar() {
             className="mb-2"
           />
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
-            {isLoading ? (
+            {!isRehydrated ? null : projectsLoading ? (
               <LoadingState className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (
               <>

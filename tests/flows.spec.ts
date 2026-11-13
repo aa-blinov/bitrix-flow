@@ -551,7 +551,7 @@ test('мессенджер: свои сообщения правятся и уд
   await expect(chat.getByText('Сообщение 55, поправил')).toBeVisible();
   expect(calls).toContainEqual({
     method: 'PUT',
-    body: { messageId: 55, text: 'Сообщение 55, поправил' },
+    body: { messageId: 55, text: 'Сообщение 55, поправил', dialogId: '2' },
   });
 
   await (await bubble(chat, 'Сообщение 49')).getByRole('button', { name: 'Удалить' }).click();

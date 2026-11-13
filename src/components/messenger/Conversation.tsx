@@ -268,7 +268,7 @@ export default function Conversation({
         const response = await fetch('/api/messenger/message', {
           method: 'PUT',
           headers: json,
-          body: JSON.stringify({ messageId: editing.id, text: raw }),
+          body: JSON.stringify({ messageId: editing.id, text: raw, dialogId }),
         });
         if (!response.ok) throw new Error(String(response.status));
         const id = editing.id;
