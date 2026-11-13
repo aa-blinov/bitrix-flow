@@ -142,10 +142,14 @@ export async function applyClassTags(
         if (own.hourClass !== UNASSIGNED && !(own.hourClass === previous && previous !== next))
           continue;
         tags = withClassTag(current, next);
-        await bx24OAuth(memberId, 'tasks.task.update', {
-          taskId: change.taskId,
-          fields: JSON.stringify({ TAGS: tags }),
-        });
+        // Массив тегов уходит только JSON-телом: формой со строкой fields портал отвечает
+        // «Should be value of type array».
+        await bx24OAuth(
+          memberId,
+          'tasks.task.update',
+          { taskId: change.taskId, fields: { TAGS: tags } },
+          { json: true },
+        );
       }
       await db
         .collection('task_mirror')
