@@ -50,6 +50,9 @@ export default function ProjectsSummaryPage() {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // Пересборка идёт на сервере в фоне: признак приходит с ответом и переживает перезагрузку.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
   const [calculatedAt, setCalculatedAt] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -83,6 +86,8 @@ export default function ProjectsSummaryPage() {
         if (!response.ok) throw new Error(data.message || t('Не удалось получить сводку'));
         setProjects(data.projects || []);
         setCalculatedAt(data.calculatedAt || '');
+        setRefreshing(Boolean(data.refreshing));
+        setRefreshError(data.refreshError ? t('Не удалось обновить сводку из Битрикса') : '');
         if (data.refreshing) {
           if (refreshTimer.current) clearTimeout(refreshTimer.current);
           refreshTimer.current = setTimeout(() => {
@@ -304,10 +309,10 @@ export default function ProjectsSummaryPage() {
               variant="secondary"
               size="sm"
               onClick={() => void load(true)}
-              disabled={isLoading}
+              disabled={isLoading || refreshing}
               icon={
                 <RefreshCw
-                  className={isLoading ? 'animate-spin' : ''}
+                  className={isLoading || refreshing ? 'animate-spin' : ''}
                   size={14}
                   strokeWidth={1.7}
                 />
@@ -400,6 +405,9 @@ export default function ProjectsSummaryPage() {
               {t('Сбросить')}
             </Button>
           </div>
+          {refreshError && !error ? (
+            <p className="px-6 pt-4 text-sm text-danger-text">{refreshError}</p>
+          ) : null}
           {error ? (
             <p className="p-6 text-sm text-danger-text">{error}</p>
           ) : isLoading ? (

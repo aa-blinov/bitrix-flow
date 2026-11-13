@@ -38,6 +38,10 @@ export type HoursReport = {
   taskTags: Record<string, string[]>;
   /** Класс по умолчанию у проектов, где он выбран: тег часы-* в ключевых словах группы. */
   projectClasses: Record<string, HourClass>;
+  /** Идёт сбор списаний из портала за этот период (ответ GET, а не loadHours). */
+  refreshing?: boolean;
+  /** Последний сбор за часть недель периода упал. */
+  refreshError?: string;
 };
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны

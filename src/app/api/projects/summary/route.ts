@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
-import { serverCache } from '@/lib/server-cache';
+import { invalidateServerCache, serverCache } from '@/lib/server-cache';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
@@ -235,6 +235,7 @@ export async function GET(req: NextRequest) {
             source,
             calculated_at: calculatedAt,
             stale: false,
+            refresh_error: '',
           },
         },
         { upsert: true },
@@ -247,11 +248,35 @@ export async function GET(req: NextRequest) {
     const dateField =
       req.nextUrl.searchParams.get('date_field') === 'created' ? 'created' : 'changed';
     const snapshot = await snapshots.findOne({ member_id: memberId });
-    if (snapshot?.source && !force) {
+    // «Обновить» помечает снимок устаревшим и пересобирает его в фоне, как событие задачи.
+    // Признак лежит в базе: перезагрузка страницы пересборку не обрывает, а страница после
+    // неё видит refreshing и ждёт. Кеш сбрасываем, иначе пересборка взяла бы данные
+    // тридцатисекундной давности.
+    if (snapshot?.source && force) {
+      invalidateServerCache(`${memberId}:projects:summary`);
+      await snapshots.updateOne(
+        { member_id: memberId },
+        { $set: { stale: true, stale_at: new Date() } },
+      );
+      snapshot.stale = true;
+    }
+    if (snapshot?.source) {
       // Serve the last complete snapshot immediately. A task event marks it stale;
       // one deduplicated rebuild then refreshes Mongo in the background.
+      // Упавшая пересборка снимает флаг: иначе каждый опрос страницы запускал бы её заново.
       if (snapshot.stale)
-        void rebuild().catch((error) => console.error('Summary background rebuild failed', error));
+        void rebuild().catch(async (error) => {
+          console.error('Summary background rebuild failed', error);
+          await snapshots.updateOne(
+            { member_id: memberId },
+            {
+              $set: {
+                stale: false,
+                refresh_error: error instanceof Error ? error.message : String(error),
+              },
+            },
+          );
+        });
       return NextResponse.json({
         projects:
           from || to
@@ -273,6 +298,7 @@ export async function GET(req: NextRequest) {
             : snapshot.projects || [],
         calculatedAt: snapshot.calculated_at?.toISOString?.() || new Date().toISOString(),
         refreshing: Boolean(snapshot.stale),
+        refreshError: snapshot.stale ? '' : String(snapshot.refresh_error || ''),
       });
     }
     const result = await rebuild(force);

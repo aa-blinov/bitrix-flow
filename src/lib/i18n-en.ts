@@ -494,6 +494,7 @@ export const EN: Record<string, string> = {
   'По умолчанию': 'Default',
   'По фазе': 'By phase',
   Повторить: 'Retry',
+  'Не удалось обновить сводку из Битрикса': 'Could not refresh the summary from Bitrix24',
   Отчёты: 'Reports',
   Подзадача: 'Subtask',
   'Подзадачи (': 'Subtasks (',

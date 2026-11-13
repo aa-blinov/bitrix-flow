@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
-import { getDb } from '@/lib/mongo';
-import { getWorkloadTime, refreshWorkloadTime } from '@/lib/workload-time';
+import { getWorkloadTime, refreshStatus, refreshWorkloadTime } from '@/lib/workload-time';
 
 function validDay(value: string | null) {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
@@ -19,10 +18,10 @@ export async function GET(request: NextRequest) {
   if (!validDay(start)) return NextResponse.json({ error: 'INVALID_START' }, { status: 400 });
   const [aggregate, status] = await Promise.all([
     getWorkloadTime(member, start!),
-    (await getDb()).collection('workload_time_status').findOne({ member_id: member, start }),
+    refreshStatus(member, [start!]),
   ]);
   return NextResponse.json(
-    { data: aggregate || null, refreshing: Boolean(status?.refreshing) },
+    { data: aggregate || null, refreshing: status.refreshing },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

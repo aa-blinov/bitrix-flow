@@ -1139,7 +1139,19 @@ test('поиск: слово в названии выделяется, лишн�
 test(
   'аналитика часов делит часы по классам и фильтрует по клику на плитку',
   { tag: '@mobile' },
-  async ({ page, isMobile }) => {
+  async ({ page, isMobile, testDb }) => {
+    // Класс проекта раскладывает теги по задачам, и они остаются после теста: десктоп и
+    // телефон гоняют его в одной базе. Возвращаем бэклог к сиду: без класса и без тегов.
+    const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+    try {
+      const db = client.db(testDb);
+      await db
+        .collection('task_mirror')
+        .updateMany({ 'data.group.id': '12' }, { $set: { 'data.tags': [] } });
+      await db.collection('projects').updateMany({ id: '12' }, { $unset: { keywords: '' } });
+    } finally {
+      await client.close();
+    }
     // Период из URL: сид кладёт списания на две недели вокруг 2026-03-02.
     await page.goto('/analytics?from=2026-02-23&to=2026-03-08');
     await expect(page.getByRole('heading', { name: 'Аналитика часов', level: 1 })).toBeVisible();
@@ -1167,16 +1179,6 @@ test(
     await refresh;
     await expect(unassigned).toContainText('3,5 ч');
     await expect(page.getByText(/Не удалось забрать/)).toHaveCount(0);
-
-    // Класс проекта закрывает задачи без своего тега, «Класс не выбран» возвращает ручную разметку.
-    const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
-    const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
-    await backlogClass.selectOption('internal');
-    await expect(internal).toContainText('3,5 ч');
-    await expect(unassigned).toContainText('0 ч');
-    await backlogClass.selectOption('');
-    await expect(unassigned).toContainText('3,5 ч');
-    await expect(internal).toContainText('0 ч');
 
     await unassigned.click();
     await expect(page).toHaveURL(/class=unassigned/);
@@ -1209,6 +1211,18 @@ test(
     // Число класса в сводной ведёт к раскрытым задачам за ним.
     await unassigned.click();
     await expect(page).not.toHaveURL(/class=/);
+
+    // Класс проекта раскладывается тегом на задачи без своего тега. Снятый класс проекта
+    // теги не стирает: класс уже лежит на задачах в Битриксе.
+    const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
+    const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
+    await backlogClass.selectOption('internal');
+    await expect(internal).toContainText('3,5 ч');
+    await expect(unassigned).toContainText('0 ч');
+    await backlogClass.selectOption('');
+    await expect(internal).toContainText('3,5 ч');
+    await expect(unassigned).toContainText('0 ч');
+
     await apiRow
       .getByRole('button', { name: isMobile ? /Коммерческие\s*16/ : '16', exact: !isMobile })
       .last()

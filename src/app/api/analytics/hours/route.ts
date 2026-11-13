@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { loadHours, weekStarts } from '@/lib/hours';
 import { isMockEnabled } from '@/lib/mock-b24';
 import { sessionCookie } from '@/lib/session';
-import { refreshWorkloadTime } from '@/lib/workload-time';
+import { markRefreshing, refreshStatus, refreshWorkloadTime } from '@/lib/workload-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +27,21 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get('to') || '',
   );
   if (!range) return NextResponse.json({ error: 'INVALID_PERIOD' }, { status: 400 });
-  return NextResponse.json(await loadHours(memberId, range.from, range.to));
+  const [report, status] = await Promise.all([
+    loadHours(memberId, range.from, range.to),
+    refreshStatus(memberId, pastWeeks(range.from, range.to)),
+  ]);
+  return NextResponse.json({
+    ...report,
+    refreshing: status.refreshing,
+    refreshError: status.error,
+  });
 }
+
+const pastWeeks = (from: string, to: string) => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  return weekStarts(from, to).filter((week) => week <= today);
+};
 
 // «Обновить» забирает списания из портала заново: ночной сбор видит только вчерашний
 // день, а ПМ жмёт кнопку, чтобы увидеть сегодняшние часы.
@@ -39,24 +52,23 @@ export async function POST(req: NextRequest) {
   const range = period(String(body.from || ''), String(body.to || ''));
   if (!range) return NextResponse.json({ error: 'INVALID_PERIOD' }, { status: 400 });
 
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
-  const weeks = weekStarts(range.from, range.to).filter((week) => week <= today);
+  const weeks = pastWeeks(range.from, range.to);
   if (weeks.length > MAX_REFRESH_WEEKS)
     return NextResponse.json({ error: 'PERIOD_TOO_LONG' }, { status: 400 });
+  // Сбор идёт в фоне, а признак «обновляется» лежит в базе: перезагрузка страницы его не
+  // обрывает, и страница после неё снова показывает крутилку, пока сбор не кончится.
   // В мок-режиме портала нет: списания лежат в базе из сида.
   if (!isMockEnabled()) {
-    try {
+    await markRefreshing(memberId, weeks);
+    after(async () => {
       for (const week of weeks) {
         const end = new Date(`${week}T12:00:00Z`);
         end.setUTCDate(end.getUTCDate() + 6);
-        await refreshWorkloadTime(memberId, week, end.toISOString().slice(0, 10));
+        await refreshWorkloadTime(memberId, week, end.toISOString().slice(0, 10)).catch((error) =>
+          console.error('[analytics-refresh]', week, error),
+        );
       }
-    } catch (error) {
-      return NextResponse.json(
-        { error: 'BITRIX_ERROR', message: error instanceof Error ? error.message : String(error) },
-        { status: 502 },
-      );
-    }
+    });
   }
-  return NextResponse.json(await loadHours(memberId, range.from, range.to));
+  return NextResponse.json({ started: true }, { status: 202 });
 }

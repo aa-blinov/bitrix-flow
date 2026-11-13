@@ -110,6 +110,41 @@ export async function getWorkloadTime(memberId: string, start: string) {
   return db.collection('workload_time_aggregate').findOne({ member_id: memberId, start });
 }
 
+// Признак «идёт сбор» лежит в базе, чтобы пережить перезагрузку страницы. Сбор, начатый
+// больше 15 минут назад, считаем оборвавшимся вместе с сервером: иначе крутилка висела бы вечно.
+const REFRESH_STALE_MS = 15 * 60_000;
+
+export async function markRefreshing(memberId: string, starts: string[]) {
+  if (!starts.length) return;
+  const db = await getDb();
+  await db.collection('workload_time_status').bulkWrite(
+    starts.map((start) => ({
+      updateOne: {
+        filter: { member_id: memberId, start },
+        update: { $set: { refreshing: true, started_at: new Date() } },
+        upsert: true,
+      },
+    })),
+  );
+}
+
+export async function refreshStatus(
+  memberId: string,
+  starts: string[],
+): Promise<{ refreshing: boolean; error: string }> {
+  const db = await getDb();
+  const statuses = await db
+    .collection('workload_time_status')
+    .find({ member_id: memberId, start: { $in: starts } })
+    .toArray();
+  const fresh = Date.now() - REFRESH_STALE_MS;
+  const refreshing = statuses.some(
+    (status) => status.refreshing && new Date(status.started_at).getTime() > fresh,
+  );
+  const failed = statuses.find((status) => !status.refreshing && status.last_error);
+  return { refreshing, error: refreshing ? '' : String(failed?.last_error || '') };
+}
+
 export async function refreshWorkloadTime(memberId: string, start: string, end: string) {
   const db = await getDb();
   await db
@@ -120,6 +155,7 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
       { upsert: true },
     );
 
+  let failure = '';
   try {
     let entries: TimeEntry[];
     let source = 'global';
@@ -172,12 +208,15 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
         { upsert: true },
       );
     return data;
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+    throw error;
   } finally {
     await db
       .collection('workload_time_status')
       .updateOne(
         { member_id: memberId, start },
-        { $set: { refreshing: false, finished_at: new Date() } },
+        { $set: { refreshing: false, finished_at: new Date(), last_error: failure } },
         { upsert: true },
       );
   }

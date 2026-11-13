@@ -189,36 +189,49 @@ function HoursAnalyticsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    if (!memberId) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams({ from, to });
-      const response = await fetch(`/api/analytics/hours?${params}`);
-      if (!response.ok) throw new Error(t('Не удалось получить часы'));
-      setReport(await response.json());
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('Не удалось получить часы'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [memberId, from, to]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!memberId) {
+        setIsLoading(false);
+        return;
+      }
+      if (!silent) setIsLoading(true);
+      setError('');
+      try {
+        const params = new URLSearchParams({ from, to });
+        const response = await fetch(`/api/analytics/hours?${params}`);
+        if (!response.ok) throw new Error(t('Не удалось получить часы'));
+        setReport(await response.json());
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : t('Не удалось получить часы'));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [memberId, from, to],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
   // Ночной сбор видит списания только до вчерашнего дня: «Обновить» забирает их из
-  // портала заново за весь период. Ошибка не прячет уже показанные цифры.
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState('');
+  // портала заново за весь период. Сбор идёт на сервере в фоне, признак «обновляется»
+  // приходит с отчётом: после перезагрузки страница снова ждёт его и тихо перечитывает
+  // отчёт. Ошибка не прячет уже показанные цифры.
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
+  const refreshing = starting || Boolean(report?.refreshing);
+  const refreshError =
+    startError || (report?.refreshError ? t('Не удалось забрать свежие часы из Битрикса') : '');
+  useEffect(() => {
+    if (!report?.refreshing) return;
+    const timer = window.setInterval(() => void load(true), 3000);
+    return () => window.clearInterval(timer);
+  }, [report?.refreshing, load]);
   const refresh = useCallback(async () => {
-    setRefreshing(true);
-    setRefreshError('');
+    setStarting(true);
+    setStartError('');
     try {
       const response = await fetch('/api/analytics/hours', {
         method: 'POST',
@@ -233,15 +246,15 @@ function HoursAnalyticsView() {
             : t('Не удалось забрать свежие часы из Битрикса'),
         );
       }
-      setReport(await response.json());
+      await load(true);
     } catch (reason) {
-      setRefreshError(
+      setStartError(
         reason instanceof Error ? reason.message : t('Не удалось забрать свежие часы из Битрикса'),
       );
     } finally {
-      setRefreshing(false);
+      setStarting(false);
     }
-  }, [from, to]);
+  }, [from, to, load]);
   const periodPreset =
     (Object.keys(PERIOD_PRESETS) as PeriodPreset[]).find((key) => {
       const preset = PERIOD_PRESETS[key]();
