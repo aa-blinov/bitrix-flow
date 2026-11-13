@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/mongo';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { randomUUID } from 'node:crypto';
+import { tagNewTask } from '@/lib/project-class-tags';
 
 function taskId(task: any) {
   return String(task?.id || task?.ID || '');
@@ -63,6 +64,8 @@ export async function syncTaskMirror(memberId: string, id: string, event: string
     },
     { upsert: true },
   );
+  // Новая задача проекта с классом сразу получает его тег: класс должен лежать на задаче.
+  if (event === 'ONTASKADD') await tagNewTask(memberId, resolvedId, projectId(task));
 }
 
 // Reuses the verified complete paginated summary snapshot for the initial mirror.
