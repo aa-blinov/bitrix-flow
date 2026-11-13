@@ -3,6 +3,7 @@
 import {
   Bell,
   CalendarDays,
+  ChevronRight,
   ChartNoAxesColumn,
   LayoutDashboard,
   ListChecks,
@@ -41,55 +42,23 @@ export const NAV_ITEMS = [
   {
     href: '/',
     icon: LayoutDashboard,
+    section: 'main',
     get label() {
       return t('Главная');
     },
   },
   {
-    href: '/projects-summary',
-    icon: TableProperties,
-    get label() {
-      return t('Сводка проектов');
-    },
-  },
-  {
-    href: '/analytics',
-    icon: ChartNoAxesColumn,
-    get label() {
-      return t('Аналитика часов');
-    },
-  },
-  {
     href: '/search',
     icon: Search,
+    section: 'main',
     get label() {
       return t('Поиск');
     },
   },
   {
-    href: '/all-tasks',
-    icon: ListChecks,
-    get label() {
-      return t('Все задачи');
-    },
-  },
-  {
-    href: '/my-tasks',
-    icon: UserCheck,
-    get label() {
-      return t('Мои задачи');
-    },
-  },
-  {
-    href: '/team-workload',
-    icon: CalendarDays,
-    get label() {
-      return t('Нагрузка команды');
-    },
-  },
-  {
     href: '/messenger',
     icon: MessagesSquare,
+    section: 'main',
     get label() {
       return t('Сообщения');
     },
@@ -97,11 +66,75 @@ export const NAV_ITEMS = [
   {
     href: '/notifications',
     icon: Bell,
+    section: 'main',
     get label() {
       return t('Уведомления');
     },
   },
+  {
+    href: '/my-tasks',
+    icon: UserCheck,
+    section: 'tasks',
+    get label() {
+      return t('Мои задачи');
+    },
+  },
+  {
+    href: '/all-tasks',
+    icon: ListChecks,
+    section: 'tasks',
+    get label() {
+      return t('Все задачи');
+    },
+  },
+  {
+    href: '/projects-summary',
+    icon: TableProperties,
+    section: 'reports',
+    get label() {
+      return t('Сводка проектов');
+    },
+  },
+  {
+    href: '/team-workload',
+    icon: CalendarDays,
+    section: 'reports',
+    get label() {
+      return t('Нагрузка команды');
+    },
+  },
+  {
+    href: '/analytics',
+    icon: ChartNoAxesColumn,
+    section: 'reports',
+    get label() {
+      return t('Аналитика часов');
+    },
+  },
 ] as const;
+
+type NavSection = (typeof NAV_ITEMS)[number]['section'];
+
+// Каждодневное лежит сверху без группы, остальное свёрнуто в группы: девять пунктов подряд
+// читались сплошной стеной.
+const GROUPS = [
+  {
+    key: 'tasks',
+    icon: ListChecks,
+    get label() {
+      return t('Задачи');
+    },
+  },
+  {
+    key: 'reports',
+    icon: ChartNoAxesColumn,
+    get label() {
+      return t('Отчёты');
+    },
+  },
+] as const;
+
+const sectionOf = (href: string) => NAV_ITEMS.find((item) => item.href === href)?.section;
 
 const DEFAULT_ORDER: string[] = NAV_ITEMS.map((item) => item.href);
 const STORAGE_KEY = 'bitrix-flow-nav-order';
@@ -207,16 +240,60 @@ export default function SortableNav({
     }),
   );
 
+  // Пункт переносится только внутри своей группы: перенос между группами ломал бы смысл
+  // группировки. Порядок остальных групп в общем списке не трогаем.
   function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
-    const from = order.indexOf(String(active.id));
-    const to = order.indexOf(String(over.id));
-    if (from >= 0 && to >= 0) onReorder(arrayMove(order, from, to));
+    const section = sectionOf(String(active.id));
+    if (!section || sectionOf(String(over.id)) !== section) return;
+    const ids = order.filter((href) => sectionOf(href) === section);
+    const moved = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    let next = 0;
+    onReorder(order.map((href) => (sectionOf(href) === section ? moved[next++] : href)));
   }
 
-  const items = order
-    .map((href) => NAV_ITEMS.find((item) => item.href === href))
-    .filter((item): item is (typeof NAV_ITEMS)[number] => Boolean(item));
+  const itemsOf = (section: NavSection) =>
+    order
+      .map((href) => NAV_ITEMS.find((item) => item.href === href))
+      .filter((item): item is (typeof NAV_ITEMS)[number] => item?.section === section);
+
+  // Группа текущей страницы раскрыта сразу, ещё на сервере: иначе меню прыгало бы после
+  // загрузки. Раскрытая группа остаётся раскрытой при переходах, пока её не свернут.
+  // Между перезагрузками не храним по той же причине.
+  const activeSection = sectionOf(pathname);
+  const [open, setOpen] = useState<string[]>(() => (activeSection ? [activeSection] : []));
+  useEffect(() => {
+    if (activeSection && activeSection !== 'main')
+      setOpen((current) =>
+        current.includes(activeSection) ? current : [...current, activeSection],
+      );
+  }, [activeSection]);
+  const toggle = (key: string) =>
+    setOpen((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
+
+  const list = (section: NavSection, id?: string) => {
+    const items = itemsOf(section);
+    return (
+      <SortableContext
+        items={items.map((item) => item.href)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div id={id} className={`space-y-0.5 ${section === 'main' ? '' : 'pl-3'}`}>
+          {items.map((item) => (
+            <SortableNavLink
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              badge={badges[item.href]}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    );
+  };
 
   return (
     <DndContext
@@ -249,19 +326,39 @@ export default function SortableNav({
         },
       }}
     >
-      <SortableContext items={order} strategy={verticalListSortingStrategy}>
-        <div className="space-y-0.5">
-          {items.map((item) => (
-            <SortableNavLink
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              onNavigate={onNavigate}
-              badge={badges[item.href]}
-            />
-          ))}
-        </div>
-      </SortableContext>
+      <div className="space-y-0.5">
+        {list('main')}
+        {GROUPS.map((group) => {
+          const expanded = open.includes(group.key);
+          const Icon = group.icon;
+          const hidden = itemsOf(group.key).reduce(
+            (sum, item) => sum + (badges[item.href] || 0),
+            0,
+          );
+          return (
+            <div key={group.key}>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={`nav-${group.key}`}
+                onClick={() => toggle(group.key)}
+                className="flex min-h-9 w-full items-center gap-2.5 rounded-ui px-2.5 text-sm text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:min-h-11"
+              >
+                <Icon size={16} strokeWidth={1.7} />
+                <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
+                {!expanded && hidden > 0 ? <Badge tone="neutral">{hidden}</Badge> : null}
+                <ChevronRight
+                  size={14}
+                  strokeWidth={1.7}
+                  aria-hidden
+                  className={`transition-transform duration-fast ${expanded ? 'rotate-90' : ''}`}
+                />
+              </button>
+              {expanded && list(group.key, `nav-${group.key}`)}
+            </div>
+          );
+        })}
+      </div>
     </DndContext>
   );
 }

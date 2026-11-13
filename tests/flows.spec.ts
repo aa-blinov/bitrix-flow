@@ -425,7 +425,7 @@ test('меню: пункты переставляются перетаскива
         .allInnerTexts()
         .catch(() => [])
     ).slice(0, 3);
-  await expect.poll(order).toEqual(['Главная', 'Сводка проектов', 'Аналитика часов']);
+  await expect.poll(order).toEqual(['Главная', 'Поиск', 'Сообщения']);
 
   const from = (await nav.getByRole('link', { name: 'Поиск' }).boundingBox())!;
   const to = (await nav.getByRole('link', { name: 'Главная' }).boundingBox())!;
@@ -435,9 +435,38 @@ test('меню: пункты переставляются перетаскива
   await page.mouse.move(to.x + to.width / 2, to.y + 2, { steps: 12 });
   await page.mouse.up();
 
-  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сводка проектов']);
+  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сообщения']);
   await page.reload();
-  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сводка проектов']);
+  await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сообщения']);
+});
+
+test('меню: группы свёрнуты, группа текущей страницы раскрыта сразу', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
+  const nav = page.locator('aside nav');
+  await page.goto('/');
+  const reports = nav.getByRole('button', { name: 'Отчёты' });
+  await expect(reports).toHaveAttribute('aria-expanded', 'false');
+  await expect(nav.getByRole('link', { name: 'Аналитика часов' })).toHaveCount(0);
+  await reports.click();
+  await expect(reports).toHaveAttribute('aria-expanded', 'true');
+  await nav.getByRole('link', { name: 'Аналитика часов' }).click();
+  await expect(page).toHaveURL(/\/analytics/);
+
+  await page.goto('/team-workload');
+  await expect(nav.getByRole('button', { name: 'Отчёты' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(nav.getByRole('link', { name: 'Нагрузка команды' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(nav.getByRole('button', { name: 'Задачи' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
 });
 
 test('мессенджер: пока фото грузится, на его месте заглушка с индикатором', async ({ page }) => {
