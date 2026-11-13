@@ -87,7 +87,8 @@ export function markdownNodes(text: string, atLineStart = true): BitrixNode[] {
       flush();
       const body: string[] = [];
       for (; i < lines.length && lines[i].startsWith('>'); i++)
-        body.push(lines[i].replace(/^>\s?/, ''));
+        // >> это родная цитата чата Битрикса, > привычная markdown-форма.
+        body.push(lines[i].replace(/^>>?\s?/, ''));
       i--;
       out.push({ type: 'quote', children: markdownNodes(body.join('\n')) });
       continue;

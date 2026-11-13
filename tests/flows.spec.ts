@@ -545,9 +545,7 @@ test(
     await expect(chat.getByText('Ответ для Дмитрий Соколов: Сообщение 54')).toBeVisible();
     await chat.getByLabel('Сообщение', { exact: true }).fill('Согласен');
     await chat.getByRole('button', { name: 'Отправить' }).click();
-    await expect
-      .poll(() => JSON.stringify(posts))
-      .toContain('[QUOTE]Дмитрий Соколов: Сообщение 54[/QUOTE]');
+    await expect.poll(() => JSON.stringify(posts)).toContain('>>Дмитрий Соколов: Сообщение 54\\n');
     await expect(chat.getByText('Ответ для Дмитрий Соколов')).toHaveCount(0);
 
     await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Переслать' }).click();

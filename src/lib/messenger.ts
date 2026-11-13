@@ -337,18 +337,16 @@ export function normalizeUsers(result: any): UserHit[] {
 }
 
 // REST не возвращает связь «ответ на сообщение» (REPLY_ID приходит пустым в
-// params), поэтому ответ и пересылка уходят цитатой в тексте: она одинаково
-// читается и у нас, и в самом Битриксе.
+// params), поэтому ответ и пересылка уходят цитатой в тексте. Чат Битрикса рисует
+// цитатой строки с >>, а [QUOTE] показывает сырым текстом.
 export function quoteBlock(
   author: string,
   message: Pick<Message, 'text' | 'files'>,
   label = '',
 ): string {
-  const plain = bitrixPlainText(message.text, parseMessageNodes)
-    .replace(/\[\/?quote\]/gi, '')
-    .slice(0, 300);
+  const plain = bitrixPlainText(message.text, parseMessageNodes).slice(0, 300);
   const snippet = plain || message.files.map((file) => file.name).join(', ') || 'Сообщение';
-  return `[QUOTE]${label}${author}: ${snippet}[/QUOTE]\n`;
+  return `>>${label}${author}: ${snippet}\n`;
 }
 
 // В поле ввода упоминание выглядит как @Имя, а в тег Битрикса превращается при отправке.

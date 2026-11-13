@@ -6,12 +6,15 @@ import {
   portalErrorHint,
   presenceOf,
   presenceText,
+  quoteBlock,
   normalizeDialogs,
   normalizeMessages,
   normalizeReaders,
   readersOf,
   VOICE_NAME,
 } from './messenger';
+import { bitrixPlainText } from './bitrix-markup';
+import { parseMessageNodes } from './message-markdown';
 
 describe('messenger', () => {
   it('accepts only person ids and chat ids as DIALOG_ID', () => {
@@ -224,5 +227,13 @@ describe('messenger', () => {
     expect(portalErrorHint('expired_token')).toMatch(/истёк/);
     expect(portalErrorHint('что-то непонятное')).toBeNull();
     expect(portalErrorHint(undefined)).toBeNull();
+  });
+
+  it('цитата уходит строками >>, их чат Битрикса рисует цитатой, и у нас она читается так же', () => {
+    const quote = quoteBlock('Анна', { text: 'первая\nвторая', files: [] });
+    expect(quote).toBe('>>Анна: первая вторая\n');
+    const nodes = parseMessageNodes(quote + 'ответ');
+    expect(nodes[0]).toMatchObject({ type: 'quote' });
+    expect(bitrixPlainText(quote, parseMessageNodes)).not.toContain('>');
   });
 });

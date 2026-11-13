@@ -15,6 +15,19 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
+    // Вкладка, открытая до деплоя, просит чанки старой сборки, а их на сервере уже нет.
+    // Перезагрузка берёт новую сборку; метка в sessionStorage не даёт уйти в цикл, если
+    // чанк не грузится по другой причине.
+    if (error.name === 'ChunkLoadError' || /failed to load chunk/i.test(error.message)) {
+      try {
+        const last = Number(sessionStorage.getItem('chunk-reload') || 0);
+        if (Date.now() - last > 30_000) {
+          sessionStorage.setItem('chunk-reload', String(Date.now()));
+          window.location.reload();
+          return;
+        }
+      } catch {}
+    }
     console.error(t('Ошибка страницы'), error);
     Sentry.captureException(error, { tags: { source: 'error-boundary' } });
   }, [error]);
