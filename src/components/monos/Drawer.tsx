@@ -16,8 +16,6 @@ export type DrawerProps = {
   children?: React.ReactNode;
 };
 
-let counter = 0;
-
 // Анимация приезда живёт здесь, а не в общих стилях: правило набора
 // относится к самому ящику, и в глобальный CSS ему не место.
 const DRAWER_CSS = `
@@ -87,7 +85,7 @@ export function Drawer({
 }: DrawerProps) {
   const panel = React.useRef<HTMLElement | null>(null);
   const lastFocused = React.useRef<HTMLElement | null>(null);
-  const uid = React.useMemo(() => ++counter, []);
+  const uid = React.useId();
   const titleId = `ui-drawer-title-${uid}`;
   const descriptionId = `ui-drawer-description-${uid}`;
 

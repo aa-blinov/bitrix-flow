@@ -10,8 +10,6 @@ export type SelectOption = {
   disabled?: boolean;
 };
 
-let counter = 0;
-
 /**
  * Подписанный нативный select. Список вариантов остаётся системным: его
  * рисует сама система — нужным шрифтом и с нужным поведением клавиатуры, —
@@ -46,7 +44,7 @@ export function SelectField({
   id,
   ...props
 }: SelectFieldProps) {
-  const fallbackId = React.useMemo(() => `ui-select-${++counter}`, []);
+  const fallbackId = `ui-select-${React.useId()}`;
   const fieldId = id || fallbackId;
   const describedBy =
     [hint ? `${fieldId}-hint` : '', error ? `${fieldId}-error` : ''].filter(Boolean).join(' ') ||

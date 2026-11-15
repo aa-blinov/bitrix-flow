@@ -12,8 +12,6 @@ const SIZES: Record<FieldSize, string> = {
   lg: 'h-11 text-sm',
 };
 
-let counter = 0;
-
 /**
  * Поле с подписью. `underline` — строка формы, `boxed` — отдельный предмет
  * для поиска. Высота задана ступенью, а не выведена из отступов, поэтому
@@ -39,7 +37,7 @@ export function TextField({
   id,
   ...props
 }: TextFieldProps) {
-  const fallbackId = React.useMemo(() => `ui-field-${++counter}`, []);
+  const fallbackId = `ui-field-${React.useId()}`;
   const fieldId = id || fallbackId;
   const describedBy =
     [hint ? `${fieldId}-hint` : '', error ? `${fieldId}-error` : ''].filter(Boolean).join(' ') ||

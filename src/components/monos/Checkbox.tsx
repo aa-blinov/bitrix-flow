@@ -3,8 +3,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-let counter = 0;
-
 /**
  * Галка с настоящим полем ввода под ней. Сам квадрат 16px, строка 24px
  * (44px на телефоне), подпись приходит через children.
@@ -26,7 +24,7 @@ export function Checkbox({
   children,
   ...props
 }: CheckboxProps) {
-  const fallbackId = React.useMemo(() => `ui-checkbox-${++counter}`, []);
+  const fallbackId = `ui-checkbox-${React.useId()}`;
   const fieldId = id || fallbackId;
   const input = React.useRef<HTMLInputElement | null>(null);
 

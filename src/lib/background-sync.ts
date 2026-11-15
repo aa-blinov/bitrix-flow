@@ -255,6 +255,7 @@ async function fetchChanged(memberId: string, since: Date): Promise<any[]> {
 async function reconcileDeleted(memberId: string): Promise<void> {
   const db = await getDb();
   const alive = new Set<string>();
+  const changed = new Map<string, number>();
   let start = 0;
   for (let page = 0; page < 200; page += 1) {
     let data: any;
@@ -262,7 +263,7 @@ async function reconcileDeleted(memberId: string): Promise<void> {
       data = await bx24OAuth(
         memberId,
         'tasks.task.list',
-        { 'select[0]': 'ID', start: String(start) },
+        { 'select[0]': 'ID', 'select[1]': 'CHANGED_DATE', start: String(start) },
         { parallel: true },
       );
     } catch (e) {
@@ -272,18 +273,44 @@ async function reconcileDeleted(memberId: string): Promise<void> {
     }
     const batch = data?.result?.tasks || data?.tasks || [];
     if (!Array.isArray(batch) || batch.length === 0) break;
-    batch.forEach((t: any) => alive.add(String(t.id ?? t.ID)));
+    batch.forEach((t: any) => {
+      const id = String(t.id ?? t.ID);
+      alive.add(id);
+      changed.set(id, Date.parse(String(t.changedDate ?? t.CHANGED_DATE ?? '')));
+    });
     if (batch.length < PAGE_SIZE) break;
     start += PAGE_SIZE;
   }
   if (alive.size === 0) return;
 
-  const localIds = await db.collection('task_mirror').distinct('id', { member_id: memberId });
+  const mirror = await db
+    .collection('task_mirror')
+    .find({ member_id: memberId }, { projection: { id: 1, 'data.changedDate': 1 } })
+    .toArray();
+  const localIds = mirror.map((doc) => doc.id);
+  const mirrorChanged = new Map(
+    mirror.map((doc) => [String(doc.id), Date.parse(String(doc.data?.changedDate ?? ''))]),
+  );
   // Сверка в обратную сторону: задача, событие о которой потерялось, в зеркало не
   // попадала никогда, и её часы в аналитике уходили в «без проекта» (10 таких из 2586).
-  const local = new Set(localIds.map(String));
-  for (const id of alive)
-    if (!local.has(id)) await enqueueTaskMirrorSync(memberId, id, 'reconcile');
+  // Тот же потерянный вебхук оставлял и устаревшую запись: проход выше пишет только в
+  // tasks, и задачи, закрытые в портале, неделями числились в зеркале открытыми (4 из 206).
+  // Разбор очереди идёт по 20 задач в 15 секунд: без этой проверки сверка через 10 минут
+  // поставила бы ещё не разобранные задачи второй раз.
+  const queued = new Set(
+    (
+      await db
+        .collection('task_sync_jobs')
+        .distinct('task_id', { member_id: memberId, status: { $in: ['pending', 'processing'] } })
+    ).map(String),
+  );
+  for (const id of alive) {
+    if (queued.has(id)) continue;
+    const local = mirrorChanged.get(id);
+    if (local === undefined) await enqueueTaskMirrorSync(memberId, id, 'reconcile');
+    else if (Number.isFinite(changed.get(id)) && !(local >= changed.get(id)!))
+      await enqueueTaskMirrorSync(memberId, id, 'reconcile-stale');
+  }
   const stale = localIds.filter((id: string) => !alive.has(String(id)));
   if (stale.length === 0) return;
 

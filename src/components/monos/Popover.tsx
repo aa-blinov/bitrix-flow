@@ -14,8 +14,6 @@ export type PopoverProps = {
   children?: React.ReactNode;
 };
 
-let counter = 0;
-
 /** То, что триггер получает при клонировании. */
 type TriggerProps = {
   onClick?: (event: React.MouseEvent<HTMLElement>) => void;
@@ -61,7 +59,7 @@ export function Popover({
   const panelEl = React.useRef<HTMLDivElement | null>(null);
   const [flipped, setFlipped] = React.useState(false);
 
-  const panelId = React.useMemo(() => `ui-popover-${++counter}`, []);
+  const panelId = `ui-popover-${React.useId()}`;
 
   const setOpen = React.useCallback(
     (next: boolean) => {

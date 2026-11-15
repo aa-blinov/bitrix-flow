@@ -46,7 +46,7 @@ export type HoursReport = {
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны
 // размывать доли классов, поэтому их убирают до агрегации, а не в интерфейсе.
-const excludedUsers = () =>
+export const excludedUsers = () =>
   new Set(
     (process.env.HOURS_EXCLUDED_USER_IDS || '')
       .split(',')

@@ -1,7 +1,15 @@
 'use client';
 
 import {
+  Activity,
   Bell,
+  Bug,
+  CalendarClock,
+  Clock,
+  FileText,
+  Gauge,
+  Hourglass,
+  Scale,
   CalendarDays,
   ChevronRight,
   ChartNoAxesColumn,
@@ -111,6 +119,62 @@ export const NAV_ITEMS = [
       return t('Аналитика часов');
     },
   },
+  {
+    href: '/reports/plan-fact',
+    icon: Scale,
+    section: 'control',
+    get label() {
+      return t('План и факт');
+    },
+  },
+  {
+    href: '/reports/deadlines',
+    icon: CalendarClock,
+    section: 'control',
+    get label() {
+      return t('Сроки');
+    },
+  },
+  {
+    href: '/reports/throughput',
+    icon: Activity,
+    section: 'control',
+    get label() {
+      return t('Поток задач');
+    },
+  },
+  {
+    href: '/reports/defects',
+    icon: Bug,
+    section: 'control',
+    get label() {
+      return t('Брак');
+    },
+  },
+  {
+    href: '/reports/timesheets',
+    icon: Clock,
+    section: 'control',
+    get label() {
+      return t('Списание часов');
+    },
+  },
+  {
+    href: '/reports/stale',
+    icon: Hourglass,
+    section: 'control',
+    get label() {
+      return t('Зависшие задачи');
+    },
+  },
+  {
+    href: '/reports/client',
+    icon: FileText,
+    section: 'control',
+    get label() {
+      return t('Отчёт клиенту');
+    },
+  },
 ] as const;
 
 type NavSection = (typeof NAV_ITEMS)[number]['section'];
@@ -130,6 +194,13 @@ const GROUPS = [
     icon: ChartNoAxesColumn,
     get label() {
       return t('Отчёты');
+    },
+  },
+  {
+    key: 'control',
+    icon: Gauge,
+    get label() {
+      return t('Контроль');
     },
   },
 ] as const;

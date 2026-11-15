@@ -6,6 +6,7 @@
 // а у AG Grid группировка только в платной версии и тема своя.
 import { ChevronRight, ChevronUp } from 'lucide-react';
 import {
+  aggregationFn_max,
   aggregationFn_sum,
   columnGroupingFeature,
   createExpandedRowModel,
@@ -35,7 +36,7 @@ export const dataTableFeatures = tableFeatures({
   rowExpandingFeature,
   expandedRowModel: createExpandedRowModel(),
   rowAggregationFeature,
-  aggregationFns: { sum: aggregationFn_sum },
+  aggregationFns: { sum: aggregationFn_sum, max: aggregationFn_max },
 });
 
 export type DataTableFeatures = typeof dataTableFeatures;
