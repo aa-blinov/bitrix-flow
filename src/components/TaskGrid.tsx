@@ -212,6 +212,7 @@ type SortKey =
   | 'storyPoints'
   | 'tags';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' };
+const DEFAULT_SORTS: Sort[] = [{ key: 'updated', direction: 'desc' }];
 export type TaskGridPageQuery = {
   page: number;
   query: string;
@@ -915,6 +916,7 @@ export default function TaskGrid({
   const [isServerPageLoading, setIsServerPageLoading] = useState(false);
   const [serverPageError, setServerPageError] = useState<string | null>(null);
   const [serverPageRetry, setServerPageRetry] = useState(0);
+  const tasksVersion = useKanbanStore((state) => state.tasksVersion);
   const loadPageRef = useRef(loadPage);
   useEffect(() => {
     loadPageRef.current = loadPage;
@@ -1017,12 +1019,18 @@ export default function TaskGrid({
   // Панель фильтров общая с доской: переключение вида не схлопывает её.
   const showFilters = useKanbanStore((state) => state.filtersPanelOpen);
   const setShowFilters = useKanbanStore((state) => state.setFiltersPanelOpen);
-  const [sorts, setSorts] = useState<Sort[]>([{ key: 'updated', direction: 'desc' }]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState(COLUMN_WIDTHS);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
   const [loadedLayoutScope, setLoadedLayoutScope] = useState<string | null>(null);
   const [layoutDirty, setLayoutDirty] = useState(false);
+  const [sorts, setSortsState] = useState<Sort[]>(DEFAULT_SORTS);
+  // Сортировка, выбранная руками, запоминается вместе с колонками: после
+  // перезагрузки список открывался снова по дате обновления.
+  const setSorts = (next: Sort[] | ((current: Sort[]) => Sort[])) => {
+    setLayoutDirty(true);
+    setSortsState(next);
+  };
   const [views, setViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewOpen, setSaveViewOpen] = useState(false);
@@ -1434,6 +1442,7 @@ export default function TaskGrid({
     setLayoutDirty(false);
     setVisibleColumns(DEFAULT_COLUMNS);
     setColumnWidths(COLUMN_WIDTHS);
+    setSortsState(DEFAULT_SORTS);
     void fetch(`/api/task-grid-preferences?scope=${encodeURIComponent(layoutScope)}`)
       .then((response) => response.json())
       .then((data) => {
@@ -1442,6 +1451,7 @@ export default function TaskGrid({
         if (data.preference.columnWidths && typeof data.preference.columnWidths === 'object') {
           setColumnWidths({ ...COLUMN_WIDTHS, ...data.preference.columnWidths });
         }
+        if (Array.isArray(data.preference.sorts)) setSortsState(data.preference.sorts);
       })
       .catch(() => {})
       .finally(() => {
@@ -1460,12 +1470,12 @@ export default function TaskGrid({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scope: layoutScope,
-          config: { visibleColumns, columnWidths: customColumnWidths(columnWidths) },
+          config: { visibleColumns, columnWidths: customColumnWidths(columnWidths), sorts },
         }),
       });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [columnWidths, layoutDirty, layoutScope, loadedLayoutScope, visibleColumns]);
+  }, [columnWidths, layoutDirty, layoutScope, loadedLayoutScope, sorts, visibleColumns]);
 
   useEffect(() => {
     setPage(1);
@@ -1496,7 +1506,7 @@ export default function TaskGrid({
       hierarchy: groupBy === 'hierarchy',
       groupBy: groupBy === 'hierarchy' ? 'none' : groupBy,
     };
-    const key = JSON.stringify([request, serverPageRetry]);
+    const key = JSON.stringify([request, serverPageRetry, tasksVersion]);
     if (key === lastPageKeyRef.current) return;
     const timer = window.setTimeout(() => {
       const load = loadPageRef.current;
@@ -1526,7 +1536,18 @@ export default function TaskGrid({
         });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [filters, groupBy, pageSize, page, query, serverPageRetry, setPagedTasks, showProject, sorts]);
+  }, [
+    filters,
+    groupBy,
+    pageSize,
+    page,
+    query,
+    serverPageRetry,
+    setPagedTasks,
+    showProject,
+    sorts,
+    tasksVersion,
+  ]);
 
   const resetFilters = () => {
     if (isMobile) setShowFilters(false);
@@ -1540,7 +1561,7 @@ export default function TaskGrid({
       setActiveViewId('');
       setFilters(initialFilterValues(initialStatus, 'all', 'all'));
       setGroupBy('none');
-      setSorts([{ key: 'updated', direction: 'desc' }]);
+      setSorts(DEFAULT_SORTS);
       setVisibleColumns(DEFAULT_COLUMNS);
       setColumnWidths(COLUMN_WIDTHS);
       setLayoutDirty(true);

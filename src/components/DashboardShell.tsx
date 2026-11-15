@@ -61,14 +61,11 @@ export default function DashboardShell({
       .catch(() => {});
   }, [pathname, router, setMemberId]);
 
+  // Список сам перезапрашивает открытую страницу. Раньше здесь грузилась первая
+  // полусотня задач и заменяла стор: строки других страниц и сортировок не
+  // обновлялись, а своя инлайн-правка на экране откатывалась к старому значению.
   useSSE(memberId, (event) => {
-    if (
-      event?.type === 'tasks-changed' &&
-      (pathname === '/all-tasks' || pathname === '/my-tasks')
-    ) {
-      const state = useKanbanStore.getState();
-      if (!state.isLoadingAllTasks) void state.loadAllTasks();
-    }
+    if (event?.type === 'tasks-changed') useKanbanStore.getState().bumpTasksVersion();
   });
 
   return (

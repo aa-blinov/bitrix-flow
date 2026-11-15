@@ -73,7 +73,18 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  const savedConfig = { visibleColumns, columnWidths };
+  const sorts = (Array.isArray(config?.sorts) ? config.sorts : [])
+    .filter(
+      (sort: { key?: unknown; direction?: unknown }) =>
+        COLUMN_KEYS.has(String(sort?.key)) && ['asc', 'desc'].includes(String(sort?.direction)),
+    )
+    .slice(0, 3)
+    .map((sort: { key: string; direction: string }) => ({
+      key: sort.key,
+      direction: sort.direction,
+    }));
+
+  const savedConfig = { visibleColumns, columnWidths, sorts };
   await (await getDb()).collection('task_grid_preferences').updateOne(
     { memberId: member, scope },
     {

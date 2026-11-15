@@ -109,6 +109,9 @@ interface KanbanStore {
   taskFiltersScope: string;
   /** Раскрытая строка фильтров тоже общая: вид переключается без скачка. */
   filtersPanelOpen: boolean;
+  /** Растёт на каждое событие синка: список задач перезапрашивает свою страницу. */
+  tasksVersion: number;
+  bumpTasksVersion: () => void;
   /** Наборы по экранам: возврат на экран восстанавливает его фильтры. */
   taskFiltersByScope: Record<string, FilterValues>;
 
@@ -316,6 +319,8 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   taskSearch: '',
   taskFiltersScope: '',
   filtersPanelOpen: false,
+  tasksVersion: 0,
+  bumpTasksVersion: () => set((state) => ({ tasksVersion: state.tasksVersion + 1 })),
   taskFiltersByScope: {},
   searchQuery: '',
   searchResults: [],
