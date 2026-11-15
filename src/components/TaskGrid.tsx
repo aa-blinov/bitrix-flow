@@ -1024,6 +1024,12 @@ export default function TaskGrid({
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
   const [loadedLayoutScope, setLoadedLayoutScope] = useState<string | null>(null);
   const [layoutDirty, setLayoutDirty] = useState(false);
+  // Ответ с сохранённой раскладкой может прийти после того, как юзер уже
+  // поменял колонки или сортировку: тогда он не должен их перетирать.
+  const layoutDirtyRef = useRef(false);
+  useEffect(() => {
+    layoutDirtyRef.current = layoutDirty;
+  }, [layoutDirty]);
   const [sorts, setSortsState] = useState<Sort[]>(DEFAULT_SORTS);
   // Сортировка, выбранная руками, запоминается вместе с колонками: после
   // перезагрузки список открывался снова по дате обновления.
@@ -1440,13 +1446,14 @@ export default function TaskGrid({
     let cancelled = false;
     setLoadedLayoutScope(null);
     setLayoutDirty(false);
+    layoutDirtyRef.current = false;
     setVisibleColumns(DEFAULT_COLUMNS);
     setColumnWidths(COLUMN_WIDTHS);
     setSortsState(DEFAULT_SORTS);
     void fetch(`/api/task-grid-preferences?scope=${encodeURIComponent(layoutScope)}`)
       .then((response) => response.json())
       .then((data) => {
-        if (cancelled || !data.preference) return;
+        if (cancelled || !data.preference || layoutDirtyRef.current) return;
         setVisibleColumns(normalizeVisibleColumns(data.preference.visibleColumns));
         if (data.preference.columnWidths && typeof data.preference.columnWidths === 'object') {
           setColumnWidths({ ...COLUMN_WIDTHS, ...data.preference.columnWidths });
@@ -1578,7 +1585,9 @@ export default function TaskGrid({
     setSorts(config.sorts);
     setVisibleColumns(normalizeVisibleColumns(config.visibleColumns));
     setColumnWidths({ ...COLUMN_WIDTHS, ...config.columnWidths });
-    setLayoutDirty(false);
+    // Раскладка вью становится раскладкой экрана: вернувшись, юзер видит список
+    // таким, каким оставил, а не прежнюю сортировку.
+    setLayoutDirty(true);
   };
   const saveView = async () => {
     const name = viewName.trim();
