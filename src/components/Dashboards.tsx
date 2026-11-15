@@ -3,7 +3,8 @@
 // Конструктор дашбордов: виджет собирается из метрики, разреза и фильтров, а не
 // пишется кодом. Период общий на экран: ПМ сравнивает виджеты между собой, и разные
 // периоды у соседей дали бы числа, которые нельзя сложить в одну картину.
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowDown,
@@ -18,6 +19,7 @@ import {
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { Checkbox } from '@/components/monos/Checkbox';
+import { Drawer } from '@/components/monos/Drawer';
 import { useConfirm } from '@/components/monos/confirm-dialog';
 import { EmptyState } from '@/components/monos/EmptyState';
 import { IconButton } from '@/components/monos/IconButton';
@@ -35,7 +37,9 @@ import { PRESETS, type Preset } from '@/components/PmReport';
 import {
   dimensionsFor,
   METRICS,
+  SNAPSHOT,
   type Dashboard,
+  type DrillRow,
   type Dimension,
   type Metric,
   type View,
@@ -54,11 +58,26 @@ const METRIC_LABEL: Record<Metric, () => string> = {
   overdue: () => t('Просрочено сейчас'),
   late: () => t('Закрыто с опозданием'),
   onTime: () => t('Доля закрытых в срок'),
-  leadTime: () => t('Медиана дней до закрытия'),
+  leadTime: () => t('Дней до закрытия, медиана'),
   hours: () => t('Списано часов'),
 };
+/** Подсказка под выбором метрики: что именно попадёт в число, без чтения кода. */
+const METRIC_HINT: Record<Metric, () => string> = {
+  created: () => t('Задачи, созданные в выбранном периоде.'),
+  closed: () => t('Задачи, завершённые в выбранном периоде.'),
+  open: () => t('Незакрытые задачи на сегодня, без отложенных. Период на число не влияет.'),
+  overdue: () =>
+    t('Незакрытые задачи, у которых срок уже прошёл, на сегодня. Период на число не влияет.'),
+  late: () => t('Задачи со сроком, завершённые в периоде позже срока.'),
+  onTime: () => t('Из задач со сроком, завершённых в периоде: какая часть закрыта до срока.'),
+  leadTime: () =>
+    t(
+      'От создания до завершения, для задач, закрытых в периоде. Половина задач закрывается быстрее.',
+    ),
+  hours: () => t('Часы из списаний за период, по дню списания.'),
+};
 const DIMENSION_LABEL: Record<Dimension, () => string> = {
-  none: () => t('Итог'),
+  none: () => t('Без группировки'),
   project: () => t('По проектам'),
   user: () => t('По людям'),
   status: () => t('По статусам'),
@@ -107,6 +126,26 @@ function formatValue(metric: Metric, value: number | null) {
   if (metric === 'leadTime') return t('{0} дн', HOURS.format(value));
   return COUNT.format(value);
 }
+
+const shiftDay = (day: string, days: number) => {
+  const value = new Date(`${day}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+};
+
+/** Неделя или месяц, попавшие в период не целиком: их столбик ниже не из-за работы. */
+function isPartial(by: Dimension, key: string, from: string, to: string) {
+  if (by === 'week') return key < from || shiftDay(key, 6) > to;
+  if (by !== 'month') return false;
+  const [year, month] = key.split('-').map(Number);
+  const last = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  return `${key}-01` < from || last > to;
+}
+
+const taskHref = (row: DrillRow) =>
+  row.projectId && row.projectId !== NO_PROJECT_ID
+    ? `/projects/${row.projectId}?task=${encodeURIComponent(row.id)}`
+    : `/all-tasks?task=${encodeURIComponent(row.id)}`;
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 const widget = (patch: Partial<Widget>): Widget => ({
@@ -165,6 +204,7 @@ function useNames(): Names {
 function describe(item: Widget, names: Names) {
   return [
     item.title ? METRIC_LABEL[item.metric]() : '',
+    SNAPSHOT.includes(item.metric) ? t('на сегодня') : '',
     item.by !== 'none' ? DIMENSION_LABEL[item.by]().toLowerCase() : '',
     item.projectId ? names.project(item.projectId) : '',
     item.userId ? names.user(item.userId) : '',
@@ -175,29 +215,67 @@ function describe(item: Widget, names: Names) {
 
 const LIMIT = 12;
 
-function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; names: Names }) {
+type ChartProps = {
+  item: Widget;
+  result?: WidgetResult;
+  names: Names;
+  from: string;
+  to: string;
+  /** Клик по числу или точке: null это весь итог. Без него график не кликается (превью). */
+  onPick?: (key: string | null) => void;
+};
+
+/** Есть ли за числом задачи: 0% в срок или медиана 0 дней это задачи, а нет данных это null. */
+const hasTasks = (metric: Metric, value: number | null) =>
+  value !== null && (value > 0 || metric === 'onTime' || metric === 'leadTime');
+
+const pickable =
+  'rounded-ui text-left transition-colors hover:bg-surface-2 focus-visible:outline-2';
+
+function Chart({ item, result, names, from, to, onPick }: ChartProps) {
   const [all, setAll] = useState(false);
   if (!result) return <div className="h-24 animate-pulse rounded-ui bg-surface-2" />;
-  if (item.view === 'number' || item.by === 'none')
-    return (
-      <p className="text-3xl font-semibold tabular-nums text-ink">
+  const label = (key: string) =>
+    names.key(item.by, key) + (isPartial(item.by, key, from, to) ? ` (${t('неполная')})` : '');
+  if (item.view === 'number' || item.by === 'none') {
+    const value = (
+      <span className="text-3xl font-semibold tabular-nums text-ink">
         {formatValue(item.metric, result.total)}
-      </p>
+      </span>
     );
+    return onPick && hasTasks(item.metric, result.total) ? (
+      <button
+        className={cn(pickable, '-mx-1 px-1')}
+        onClick={() => onPick(null)}
+        title={t('Показать задачи')}
+      >
+        {value}
+      </button>
+    ) : (
+      <p>{value}</p>
+    );
+  }
   const points = result.points;
   if (!points.length) return <p className="text-sm text-ink-faint">{t('Нет данных за период')}</p>;
   const max = Math.max(...points.map((point) => point.value ?? 0), 0) || 1;
+  const anyPartial = points.some((point) => isPartial(item.by, point.key, from, to));
 
   if (item.view === 'columns')
     return (
       <div>
-        <div className="flex h-40 items-end gap-1" role="list">
+        <div className="flex h-40 items-end gap-1">
           {points.map((point) => (
-            <div
+            <button
               key={point.key}
-              role="listitem"
-              className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
-              title={`${names.key(item.by, point.key)}: ${formatValue(item.metric, point.value)}`}
+              type="button"
+              disabled={!onPick || !hasTasks(item.metric, point.value)}
+              onClick={() => onPick?.(point.key)}
+              className={cn(
+                'group relative flex h-full min-w-0 flex-1 flex-col justify-end',
+                isPartial(item.by, point.key, from, to) && 'opacity-50',
+              )}
+              title={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
+              aria-label={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
             >
               <span className="mb-1 truncate text-center text-[10px] tabular-nums text-ink-soft">
                 {point.value === null
@@ -211,7 +289,7 @@ function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; n
                   minHeight: point.value ? 2 : 0,
                 }}
               />
-            </div>
+            </button>
           ))}
         </div>
         <div className="mt-1 flex gap-1 border-t border-line pt-1">
@@ -227,6 +305,7 @@ function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; n
         </div>
         <p className="mt-2 text-xs text-ink-soft">
           {t('Итого')}: {formatValue(item.metric, result.total)}
+          {anyPartial && ` · ${t('бледные столбики попали в период не целиком')}`}
         </p>
       </div>
     );
@@ -239,7 +318,15 @@ function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; n
           <tbody>
             {shown.map((point) => (
               <tr key={point.key} className="border-b border-line last:border-0">
-                <td className="py-1.5 pr-2 text-ink">{names.key(item.by, point.key)}</td>
+                <td className="py-1.5 pr-2 text-ink">
+                  {onPick && hasTasks(item.metric, point.value) ? (
+                    <button className="text-left hover:underline" onClick={() => onPick(point.key)}>
+                      {label(point.key)}
+                    </button>
+                  ) : (
+                    label(point.key)
+                  )}
+                </td>
                 <td className="py-1.5 text-right tabular-nums text-ink">
                   {formatValue(item.metric, point.value)}
                 </td>
@@ -253,10 +340,19 @@ function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; n
 
   return (
     <div>
-      {/* Одна сетка на все строки: колонка значения общая, и дорожки полос одной длины. */}
-      <div className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-x-2 gap-y-1.5 text-sm">
+      {/* Колонка значения фиксированной ширины: иначе дорожки полос разной длины. */}
+      <div className="space-y-0.5 text-sm">
         {shown.map((point) => (
-          <div key={point.key} className="contents">
+          <button
+            key={point.key}
+            type="button"
+            disabled={!onPick || !hasTasks(item.metric, point.value)}
+            onClick={() => onPick?.(point.key)}
+            className={cn(
+              'grid w-full grid-cols-[minmax(0,10rem)_1fr_5.5rem] items-center gap-2 py-0.5',
+              onPick && pickable,
+            )}
+          >
             <span className="truncate text-ink" title={names.key(item.by, point.key)}>
               {names.key(item.by, point.key)}
             </span>
@@ -269,7 +365,7 @@ function Chart({ item, result, names }: { item: Widget; result?: WidgetResult; n
             <span className="text-right tabular-nums text-ink-soft">
               {formatValue(item.metric, point.value)}
             </span>
-          </div>
+          </button>
         ))}
       </div>
       <More count={points.length} all={all} onToggle={() => setAll(!all)} />
@@ -283,6 +379,99 @@ function More({ count, all, onToggle }: { count: number; all: boolean; onToggle:
     <button className="mt-1 text-xs text-ink-soft hover:text-ink" onClick={onToggle}>
       {all ? t('Свернуть') : t('Ещё {0}', count - LIMIT)}
     </button>
+  );
+}
+
+async function drillQuery(item: Widget, from: string, to: string, key: string | null) {
+  const response = await fetch('/api/dashboards/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ widgets: [item], from, to, drill: { key } }),
+  });
+  if (!response.ok) throw new Error(String(response.status));
+  return (await response.json()) as { tasks: DrillRow[]; total: number };
+}
+
+function DrillValue({ metric, value }: { metric: Metric; value: number }) {
+  if (metric === 'hours' || metric === 'leadTime')
+    return <span className="tabular-nums text-ink-soft">{formatValue(metric, value)}</span>;
+  if (metric === 'onTime')
+    return (
+      <span className={value ? 'text-ink-soft' : 'text-danger-text'}>
+        {value ? t('в срок') : t('с опозданием')}
+      </span>
+    );
+  return null;
+}
+
+/** Список задач за числом: тот же расчёт, что у виджета, поэтому строк столько же, сколько в числе. */
+function DrillDrawer({
+  drill,
+  from,
+  to,
+  names,
+  onClose,
+}: {
+  drill: { item: Widget; key: string | null } | null;
+  from: string;
+  to: string;
+  names: Names;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{ tasks: DrillRow[]; total: number } | 'error'>();
+  useEffect(() => {
+    if (!drill) return;
+    let cancelled = false;
+    drillQuery(drill.item, from, to, drill.key)
+      .then((result) => !cancelled && setData(result))
+      .catch(() => !cancelled && setData('error'));
+    return () => {
+      cancelled = true;
+      setData(undefined);
+    };
+  }, [drill, from, to]);
+  if (!drill) return null;
+  const { item, key } = drill;
+  const title = item.title || METRIC_LABEL[item.metric]();
+  return (
+    <Drawer
+      open
+      onClose={onClose}
+      title={key === null ? title : `${title}: ${names.key(item.by, key)}`}
+      description={describe(item, names)}
+      className="w-full sm:w-[28rem]"
+    >
+      {data === undefined ? (
+        <LoadingState />
+      ) : data === 'error' ? (
+        <Notice tone="danger">{t('Не удалось загрузить задачи.')}</Notice>
+      ) : !data.tasks.length ? (
+        <p className="text-sm text-ink-faint">{t('Задач нет')}</p>
+      ) : (
+        <div className="space-y-1">
+          <p className="mb-2 text-xs text-ink-soft">
+            {data.total > data.tasks.length
+              ? t('Показаны {0} из {1}', data.tasks.length, data.total)
+              : t('Задач: {0}', data.total)}
+          </p>
+          {data.tasks.map((row) => (
+            <Link
+              key={row.id}
+              href={taskHref(row)}
+              className="flex items-start gap-3 rounded-ui px-2 py-1.5 text-sm hover:bg-surface-2"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-ink">{row.title}</span>
+                <span className="block truncate text-xs text-ink-faint">
+                  {names.project(row.projectId)} · {names.user(row.userId)}
+                </span>
+              </span>
+              <DrillValue metric={item.metric} value={row.value} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </Drawer>
   );
 }
 
@@ -369,8 +558,9 @@ function Editor({
             onChange={(event) => update({ metric: event.target.value as Metric })}
             options={METRICS.map((metric) => ({ value: metric, label: METRIC_LABEL[metric]() }))}
           />
+          <p className="-mt-1 text-xs text-ink-faint">{METRIC_HINT[item.metric]()}</p>
           <SelectField
-            label={t('Разрез')}
+            label={t('Группировать')}
             value={item.by}
             onChange={(event) => update({ by: event.target.value as Dimension })}
             options={dims.map((by) => ({ value: by, label: DIMENSION_LABEL[by]() }))}
@@ -427,7 +617,7 @@ function Editor({
             {item.title || METRIC_LABEL[item.metric]()}
           </p>
           <p className="mb-3 text-xs text-ink-faint">{describe(item, names)}</p>
-          <Chart item={item} result={preview} names={names} />
+          <Chart item={item} result={preview} names={names} from={from} to={to} />
         </Card>
       </div>
     </Modal>
@@ -441,11 +631,17 @@ function DashboardsView() {
   const names = useNames();
   const memberId = useKanbanStore((state) => state.memberId);
   const [dashboards, setDashboards] = useState<Dashboard[] | null>(null);
-  const [results, setResults] = useState<Record<string, WidgetResult>>({});
+  // Ответ помнит, на какой запрос он пришёл: пока считается новый период, старое число
+  // под новыми датами не показываем.
+  const [computed, setComputed] = useState<{
+    key: string;
+    results: Record<string, WidgetResult>;
+  }>();
   const [collectedFrom, setCollectedFrom] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Widget | null>(null);
   const [naming, setNaming] = useState<{ id: string; name: string } | null>(null);
+  const [drill, setDrill] = useState<{ item: Widget; key: string | null } | null>(null);
 
   const fallback = PRESETS.month();
   const from = searchParams.get('from') || fallback.from;
@@ -465,13 +661,22 @@ function DashboardsView() {
     [router, searchParams],
   );
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const versions = useRef<Record<string, number>>({});
+  const saving = useRef(Promise.resolve());
+
+  const load = useCallback(async () => {
+    const response = await fetch('/api/dashboards', { cache: 'no-store' });
+    if (!response.ok) throw new Error(String(response.status));
+    const data = (await response.json()) as { dashboards: Dashboard[] };
+    versions.current = Object.fromEntries(data.dashboards.map((item) => [item.id, item.version]));
+    setDashboards(data.dashboards);
+  }, []);
+
   useEffect(() => {
     if (!memberId) return;
-    fetch('/api/dashboards', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
-      .then((data) => setDashboards(data.dashboards))
-      .catch(() => setError(t('Не удалось загрузить дашборды.')));
-  }, [memberId]);
+    load().catch(() => setLoadFailed(true));
+  }, [memberId, load]);
 
   // Пересчёт только при смене состава виджетов или периода: подпись и ширина числа
   // не меняют, и перезапрос на каждую из них дёргал бы весь экран.
@@ -484,16 +689,25 @@ function DashboardsView() {
       userId,
     ]),
   );
+  const requestKey = `${signature}|${from}|${to}`;
+  const results = computed?.key === requestKey ? computed.results : {};
   useEffect(() => {
     if (!active?.widgets.length) return;
     let cancelled = false;
     query(active.widgets, from, to)
       .then((data) => {
         if (cancelled) return;
-        setResults(data.results);
+        setComputed({ key: requestKey, results: data.results });
         setCollectedFrom(data.collectedFrom);
       })
-      .catch(() => !cancelled && setError(t('Не удалось посчитать виджеты.')));
+      .catch((reason) => {
+        if (cancelled) return;
+        setError(
+          String(reason?.message) === '400'
+            ? t('Период слишком длинный: выберите не больше двух лет.')
+            : t('Не удалось посчитать виджеты.'),
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -506,16 +720,35 @@ function DashboardsView() {
         ? list.map((item) => (item.id === dashboard.id ? dashboard : item))
         : [...(list || []), dashboard],
     );
-    const response = await fetch('/api/dashboards', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dashboard),
+    // Сохранения идут по очереди: каждое берёт версию из ответа предыдущего, иначе две
+    // быстрые правки подряд конфликтуют сами с собой.
+    saving.current = saving.current.then(async () => {
+      try {
+        const response = await fetch('/api/dashboards', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...dashboard, version: versions.current[dashboard.id] || 0 }),
+        });
+        if (response.ok) {
+          const data = (await response.json()) as { dashboard: Dashboard };
+          versions.current[dashboard.id] = data.dashboard.version;
+          return;
+        }
+        setError(
+          response.status === 409
+            ? t('Дашборд только что изменил кто-то ещё. Показана свежая версия, повторите правку.')
+            : t('Не удалось сохранить дашборд. Показана последняя сохранённая версия.'),
+        );
+      } catch {
+        setError(t('Не удалось сохранить дашборд. Показана последняя сохранённая версия.'));
+      }
+      await load().catch(() => {});
     });
-    if (!response.ok) setError(t('Не удалось сохранить дашборд.'));
+    await saving.current;
   };
 
   const create = (name: string, widgets: Widget[]) => {
-    const dashboard = { id: crypto.randomUUID(), name, widgets };
+    const dashboard = { id: crypto.randomUUID(), name, widgets, version: 0 };
     void save(dashboard);
     setParams({ d: dashboard.id });
   };
@@ -557,7 +790,20 @@ function DashboardsView() {
       />
       <div className="space-y-3 px-4 py-4 lg:px-6">
         {error && <Notice tone="danger">{error}</Notice>}
-        {dashboards === null ? (
+        {dashboards === null && loadFailed ? (
+          <Notice tone="danger">
+            {t('Не удалось загрузить дашборды.')}{' '}
+            <button
+              className="underline"
+              onClick={() => {
+                setLoadFailed(false);
+                load().catch(() => setLoadFailed(true));
+              }}
+            >
+              {t('Повторить')}
+            </button>
+          </Notice>
+        ) : dashboards === null ? (
           <LoadingState />
         ) : !active ? (
           <EmptyState
@@ -743,7 +989,14 @@ function DashboardsView() {
                         }
                       />
                     </div>
-                    <Chart item={item} result={results[item.id]} names={names} />
+                    <Chart
+                      item={item}
+                      result={results[item.id]}
+                      names={names}
+                      from={from}
+                      to={to}
+                      onPick={(key) => setDrill({ item, key })}
+                    />
                   </Card>
                 ))}
               </div>
@@ -771,6 +1024,8 @@ function DashboardsView() {
           }}
         />
       )}
+
+      <DrillDrawer drill={drill} from={from} to={to} names={names} onClose={() => setDrill(null)} />
 
       {naming && (
         <Modal

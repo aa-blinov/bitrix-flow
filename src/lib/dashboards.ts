@@ -24,7 +24,7 @@ export const VIEWS = ['number', 'bars', 'columns', 'table'] as const;
 export type View = (typeof VIEWS)[number];
 
 /** Метрики-срезы на сейчас: период к ним не относится, и разреза по времени у них нет. */
-const SNAPSHOT: Metric[] = ['open', 'overdue'];
+export const SNAPSHOT: Metric[] = ['open', 'overdue'];
 
 export function dimensionsFor(metric: Metric): Dimension[] {
   if (metric === 'hours') return ['none', 'project', 'user', 'class', 'week', 'month'];
@@ -43,7 +43,7 @@ export type Widget = {
   wide: boolean;
 };
 
-export type Dashboard = { id: string; name: string; widgets: Widget[] };
+export type Dashboard = { id: string; name: string; widgets: Widget[]; version: number };
 
 export type Point = { key: string; value: number | null };
 export type WidgetResult = { total: number | null; points: Point[] };
@@ -76,6 +76,7 @@ function weeks(from: string, to: string) {
 }
 
 type Fact = {
+  task: string;
   day: string;
   project: string;
   user: string;
@@ -108,12 +109,15 @@ function facts(
     return data.entries
       .filter((entry) => inPeriod(entry.day, from, to))
       .map((entry) => ({
+        task: entry.taskId,
         day: entry.day,
         project: project.get(entry.taskId) || NO_PROJECT_ID,
         user: entry.userId,
         status: '',
         cls: data.classes.get(entry.taskId) || 'unassigned',
-        value: hours(entry.seconds),
+        // Секунды, а не часы: округление каждого списания копит ошибку, отчёты
+        // округляют только сумму.
+        value: entry.seconds,
       }));
   }
   const today = new Date(now).toLocaleDateString('en-CA');
@@ -121,6 +125,7 @@ function facts(
   for (const task of data.tasks) {
     const closedDay = portalDay(task.closed);
     const base = {
+      task: task.id,
       project: task.projectId || NO_PROJECT_ID,
       user: task.responsibleId,
       status: task.status,
@@ -154,24 +159,31 @@ function facts(
 /** Сумма, медиана или доля: как метрика собирается внутри группы. */
 function reduce(metric: Metric, values: number[]): number | null {
   if (metric === 'leadTime') return median(values);
-  if (metric === 'onTime')
-    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) * 100) / 100;
+  const sum = values.reduce((total, value) => total + value, 0);
+  if (metric === 'onTime') return values.length ? sum / values.length : null;
+  return metric === 'hours' ? hours(sum) : sum;
 }
 
-export function runWidget(
-  widget: Widget,
-  data: { tasks: ReportTask[]; entries: TimeEntry[]; classes: Map<string, string> },
-  from: string,
-  to: string,
-  now = Date.now(),
-): WidgetResult {
+type Data = { tasks: ReportTask[]; entries: TimeEntry[]; classes: Map<string, string> };
+
+function scoped(widget: Widget, data: Data, from: string, to: string, now: number) {
   const by = dimensionsFor(widget.metric).includes(widget.by) ? widget.by : 'none';
   const all = facts(widget, data, from, to, now).filter(
     (fact) =>
       (!widget.projectId || fact.project === widget.projectId) &&
       (!widget.userId || fact.user === widget.userId),
   );
+  return { by, all };
+}
+
+export function runWidget(
+  widget: Widget,
+  data: Data,
+  from: string,
+  to: string,
+  now = Date.now(),
+): WidgetResult {
+  const { by, all } = scoped(widget, data, from, to, now);
   const total = reduce(
     widget.metric,
     all.map((fact) => fact.value),
@@ -184,7 +196,9 @@ export function runWidget(
   if (by === 'month') for (const month of months(from, to)) groups.set(month, []);
   for (const fact of all) {
     const key = keyOf(fact, by);
-    groups.set(key, [...(groups.get(key) || []), fact.value]);
+    const values = groups.get(key);
+    if (values) values.push(fact.value);
+    else groups.set(key, [fact.value]);
   }
   const points = [...groups].map(([key, values]) => ({
     key,
@@ -193,6 +207,45 @@ export function runWidget(
   }));
   if (by !== 'week' && by !== 'month') points.sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
   return { total, points };
+}
+
+export type DrillRow = {
+  id: string;
+  title: string;
+  projectId: string;
+  userId: string;
+  value: number;
+};
+
+/** Задачи за числом или точкой графика: ПМ видит проблему и сразу идёт к ней. */
+export function drillWidget(
+  widget: Widget,
+  data: Data,
+  from: string,
+  to: string,
+  key: string | null,
+  now = Date.now(),
+): DrillRow[] {
+  const { by, all } = scoped(widget, data, from, to, now);
+  const titles = new Map(data.tasks.map((task) => [task.id, task.title]));
+  const rows = new Map<string, DrillRow>();
+  for (const fact of all) {
+    if (key !== null && by !== 'none' && keyOf(fact, by) !== key) continue;
+    const row = rows.get(fact.task);
+    // У часов на задачу несколько записей, у остальных метрик факт на задачу один.
+    if (row) row.value += fact.value;
+    else
+      rows.set(fact.task, {
+        id: fact.task,
+        title: titles.get(fact.task) || `#${fact.task}`,
+        projectId: fact.project,
+        userId: fact.user,
+        value: fact.value,
+      });
+  }
+  const list = [...rows.values()];
+  if (widget.metric === 'hours') for (const row of list) row.value = hours(row.value);
+  return list.sort((a, b) => b.value - a.value || Number(b.id) - Number(a.id));
 }
 
 const pick = <T extends string>(list: readonly T[], value: unknown, fallback: T): T =>

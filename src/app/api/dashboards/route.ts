@@ -11,6 +11,13 @@ async function member(req: NextRequest) {
   return getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
 }
 
+const toDashboard = (doc: Record<string, unknown>): Dashboard => ({
+  id: String(doc.id),
+  name: String(doc.name),
+  widgets: (doc.widgets as Widget[]) || [],
+  version: Number(doc.version) || 0,
+});
+
 const denied = () => NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
 
 export async function GET(req: NextRequest) {
@@ -24,7 +31,7 @@ export async function GET(req: NextRequest) {
     .sort({ createdAt: 1 })
     .toArray();
   return NextResponse.json({
-    dashboards: docs.map((doc) => ({ id: doc.id, name: doc.name, widgets: doc.widgets || [] })),
+    dashboards: docs.map(toDashboard),
   });
 }
 
@@ -40,17 +47,36 @@ export async function PUT(req: NextRequest) {
   const widgets: Widget[] = (Array.isArray(body.widgets) ? body.widgets : [])
     .slice(0, 40)
     .map(cleanWidget);
-  const dashboard: Dashboard = { id: String(body.id || '') || randomUUID(), name, widgets };
-  await (
-    await getDb()
-  )
-    .collection('dashboards')
-    .updateOne(
-      { memberId, id: dashboard.id },
-      { $set: { name, widgets, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
-      { upsert: true },
+  const id = String(body.id || '').slice(0, 64) || randomUUID();
+  const version = Number(body.version) || 0;
+  const collection = (await getDb()).collection('dashboards');
+  const now = new Date();
+  if (!(await collection.findOne({ memberId, id }, { projection: { _id: 1 } }))) {
+    await collection.insertOne({
+      memberId,
+      id,
+      name,
+      widgets,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return NextResponse.json({ dashboard: { id, name, widgets, version: 1 } });
+  }
+  // Дашборд общий: правка идёт поверх той версии, которую видел автор. Иначе второй
+  // сохранивший молча стирает виджеты первого.
+  const { matchedCount } = await collection.updateOne(
+    { memberId, id, version: version || { $in: [0, null] } },
+    { $set: { name, widgets, updatedAt: now }, $inc: { version: 1 } },
+  );
+  if (!matchedCount) {
+    const current = await collection.findOne({ memberId, id });
+    return NextResponse.json(
+      { error: 'CONFLICT', dashboard: current ? toDashboard(current) : null },
+      { status: 409 },
     );
-  return NextResponse.json({ dashboard });
+  }
+  return NextResponse.json({ dashboard: { id, name, widgets, version: version + 1 } });
 }
 
 export async function DELETE(req: NextRequest) {

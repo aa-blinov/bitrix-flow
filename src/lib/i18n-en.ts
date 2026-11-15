@@ -994,4 +994,36 @@ export const EN: Record<string, string> = {
   Выше: 'Move up',
   Ниже: 'Move down',
   'Переименовать дашборд': 'Rename dashboard',
+  'Дней до закрытия, медиана': 'Days to close, median',
+  'Задачи, созданные в выбранном периоде.': 'Tasks created in the selected period.',
+  'Задачи, завершённые в выбранном периоде.': 'Tasks completed in the selected period.',
+  'Незакрытые задачи, у которых срок уже прошёл, на сегодня. Период на число не влияет.':
+    'Open tasks past their deadline as of today. The period does not affect this number.',
+  'Задачи со сроком, завершённые в периоде позже срока.':
+    'Tasks with a deadline completed in the period after the deadline.',
+  'Из задач со сроком, завершённых в периоде: какая часть закрыта до срока.':
+    'Of the tasks with a deadline completed in the period, the share closed on time.',
+  'От создания до завершения, для задач, закрытых в периоде. Половина задач закрывается быстрее.':
+    'From creation to completion for tasks closed in the period. Half of the tasks close faster.',
+  'Часы из списаний за период, по дню списания.':
+    'Logged hours in the period, by the day they were logged.',
+  'на сегодня': 'as of today',
+  неполная: 'partial',
+  'Показать задачи': 'Show tasks',
+  'бледные столбики попали в период не целиком': 'faded bars only partly fall in the period',
+  'в срок': 'on time',
+  'с опозданием': 'late',
+  'Не удалось загрузить задачи.': 'Could not load tasks.',
+  'Задач нет': 'No tasks',
+  'Показаны {0} из {1}': 'Showing {0} of {1}',
+  'Задач: {0}': 'Tasks: {0}',
+  Группировать: 'Group by',
+  'Незакрытые задачи на сегодня, без отложенных. Период на число не влияет.':
+    'Open tasks as of today, excluding deferred ones. The period does not affect this number.',
+  'Период слишком длинный: выберите не больше двух лет.':
+    'The period is too long: choose two years or less.',
+  'Дашборд только что изменил кто-то ещё. Показана свежая версия, повторите правку.':
+    'Someone else just changed this dashboard. The latest version is shown, please repeat your edit.',
+  'Не удалось сохранить дашборд. Показана последняя сохранённая версия.':
+    'Could not save the dashboard. The last saved version is shown.',
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runWidget, type Widget } from './dashboards';
+import { drillWidget, runWidget, type Widget } from './dashboards';
 import { deadlines, throughput, type ReportTask } from './pm-reports';
 
 const H = 3600;
@@ -104,5 +104,26 @@ describe('конструктор дашбордов', () => {
 
   it('разрез, которого у метрики нет, превращается в итог', () => {
     expect(run({ metric: 'open', by: 'week' })).toEqual({ total: 1, points: [] });
+  });
+
+  it('список за точкой: те же задачи, что в числе, часы складываются по задаче', () => {
+    const drill = (patch: Partial<Widget>, key: string | null) =>
+      drillWidget(widget(patch), data, '2026-11-01', '2026-11-30', key, NOW);
+    expect(drill({ metric: 'closed', by: 'project' }, '20').map((row) => row.id)).toEqual(['3']);
+    expect(drill({ metric: 'closed' }, null)).toHaveLength(run({ metric: 'closed' }).total!);
+    expect(drill({ metric: 'overdue' }, null).map((row) => row.id)).toEqual(['2']);
+    expect(drill({ metric: 'hours', by: 'class' }, 'commercial')).toEqual([
+      { id: '3', title: '#3', projectId: '20', userId: '2', value: 3 },
+    ]);
+  });
+
+  it('часы суммируются в секундах и округляются один раз, как в отчётах', () => {
+    const short = {
+      ...data,
+      entries: [1, 2].map(() => ({ userId: '1', day: '2026-11-04', seconds: 20, taskId: '1' })),
+    };
+    expect(
+      runWidget(widget({ metric: 'hours' }), short, '2026-11-01', '2026-11-30', NOW).total,
+    ).toBe(0.01);
   });
 });
