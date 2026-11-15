@@ -973,8 +973,6 @@ export const EN: Record<string, string> = {
   'Виджеты пропадут у всей команды. Задачи и часы не трогаются.':
     'The widgets disappear for the whole team. Tasks and hours are not touched.',
   Дашборды: 'Dashboards',
-  'Свои экраны из метрик и разрезов: задачи, сроки, часы':
-    'Your own screens of metrics and breakdowns: tasks, deadlines, hours',
   Обзор: 'Overview',
   'Новый дашборд': 'New dashboard',
   'Действия с дашбордом': 'Dashboard actions',
@@ -988,7 +986,6 @@ export const EN: Record<string, string> = {
   Копия: 'Duplicate',
   Выше: 'Move up',
   Ниже: 'Move down',
-  'Переименовать дашборд': 'Rename dashboard',
   'Задачи, созданные в выбранном периоде.': 'Tasks created in the selected period.',
   'Задачи, завершённые в выбранном периоде.': 'Tasks completed in the selected period.',
   'Незакрытые задачи, у которых срок уже прошёл, на сегодня. Период на число не влияет.':
@@ -1066,4 +1063,28 @@ export const EN: Record<string, string> = {
   'Соберите первый дашборд': 'Build your first dashboard',
   'Дней до закрытия': 'Days to close',
   медиана: 'median',
+  'Всё о проекте «{0}»: сроки, часы, кто над чем работает.':
+    'Everything about «{0}»: deadlines, hours, who works on what.',
+  'Название и описание': 'Name and description',
+  'Что считает виджет': 'What this widget counts',
+  'На какой вопрос отвечает': 'What question it answers',
+  'Новое: дашборды': 'New: dashboards',
+  'Сроки, просрочка, часы и поток задач на одном экране, по клику на число открываются задачи. Раздел «Контроль» в меню слева.':
+    'Deadlines, overdue tasks, hours and task flow on one screen; click a number to open the tasks. Find it under Control in the left menu.',
+  'Открыть дашборды': 'Open dashboards',
+  'Выберите дашборд во вкладках. Под вкладками написано, на какой вопрос он отвечает.':
+    'Pick a dashboard in the tabs. The line under the tabs says what question it answers.',
+  'Задайте период: этот месяц, прошлый, квартал или свои даты. Метрики «на сегодня» от периода не зависят.':
+    'Set the period: this month, last month, quarter or your own dates. Metrics marked as of today do not depend on the period.',
+  'Кликните по числу, полосе или столбику: справа откроется список задач, из него можно перейти в задачу.':
+    'Click a number, bar or column: a task list opens on the right, and you can jump to any task from it.',
+  'Значок i у виджета объясняет, что именно посчитано.':
+    'The i icon on a widget explains what exactly is counted.',
+  'Нужен свой вопрос: кнопка «Виджет», готовый вопрос или своя метрика. Свой экран: «+» рядом с вкладками. Дашборды общие для всей команды.':
+    'Need your own question: the Widget button, a ready question or your own metric. Your own screen: the + next to the tabs. Dashboards are shared with the whole team.',
+  'Готовые и свои экраны: задачи, сроки, часы. Клик по числу открывает задачи.':
+    'Ready-made and custom screens: tasks, deadlines, hours. Click a number to open the tasks.',
+  'Как пользоваться': 'How to use',
+  'Как пользоваться дашбордами': 'How to use dashboards',
+  Понятно: 'Got it',
 };

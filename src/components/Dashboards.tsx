@@ -9,6 +9,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowDown,
   ArrowUp,
+  HelpCircle,
+  Info,
   Copy,
   LayoutDashboard,
   MoreHorizontal,
@@ -29,6 +31,7 @@ import { Notice } from '@/components/monos/Notice';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { SelectField } from '@/components/monos/SelectField';
 import { Tabs } from '@/components/monos/Tabs';
+import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
 import LoadingState from '@/components/LoadingState';
@@ -286,8 +289,31 @@ const ONBOARDING = [
   () => t('Кликните по числу или столбику, и откроется список задач за ним.'),
 ];
 
+/** Справка «Как пользоваться»: открыта при первом визите, дальше по кнопке в шапке. */
+const GUIDE = [
+  () => t('Выберите дашборд во вкладках. Под вкладками написано, на какой вопрос он отвечает.'),
+  () =>
+    t(
+      'Задайте период: этот месяц, прошлый, квартал или свои даты. Метрики «на сегодня» от периода не зависят.',
+    ),
+  () =>
+    t(
+      'Кликните по числу, полосе или столбику: справа откроется список задач, из него можно перейти в задачу.',
+    ),
+  () => t('Значок i у виджета объясняет, что именно посчитано.'),
+  () =>
+    t(
+      'Нужен свой вопрос: кнопка «Виджет», готовый вопрос или своя метрика. Свой экран: «+» рядом с вкладками. Дашборды общие для всей команды.',
+    ),
+];
+const GUIDE_KEY = 'bitrix-flow-dashboards-guide';
+
 /** Галерея шаблонов с названием: и онбординг на пустом экране, и окно нового дашборда. */
-function TemplatePicker({ onCreate }: { onCreate: (name: string, widgets: Widget[]) => void }) {
+function TemplatePicker({
+  onCreate,
+}: {
+  onCreate: (name: string, widgets: Widget[], description: string) => void;
+}) {
   const projects = useKanbanStore((state) => state.projects);
   const [chosen, setChosen] = useState(TEMPLATES[0]);
   const [name, setName] = useState('');
@@ -355,6 +381,11 @@ function TemplatePicker({ onCreate }: { onCreate: (name: string, widgets: Widget
             onCreate(
               name.trim() || fallbackName,
               chosen.widgets().map((item) => ({ ...item, projectId: projectId || item.projectId })),
+              chosen.needsProject && project
+                ? t('Всё о проекте «{0}»: сроки, часы, кто над чем работает.', project.name)
+                : chosen.id === 'blank'
+                  ? ''
+                  : chosen.description(),
             )
           }
         >
@@ -856,8 +887,26 @@ function DashboardsView() {
   const [collectedFrom, setCollectedFrom] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Widget | null>(null);
-  const [naming, setNaming] = useState<{ id: string; name: string } | null>(null);
+  const [naming, setNaming] = useState<{ id: string; name: string; description: string } | null>(
+    null,
+  );
   const [creating, setCreating] = useState(false);
+  const [hints, setHints] = useState<Record<string, boolean>>({});
+  const [guide, setGuide] = useState(false);
+
+  // Первый визит: справка открыта сама. Отметка в браузере, а не в базе: это не данные,
+  // и без неё справка просто покажется ещё раз.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(GUIDE_KEY)) setGuide(true);
+    } catch {}
+  }, []);
+  const closeGuide = () => {
+    setGuide(false);
+    try {
+      localStorage.setItem(GUIDE_KEY, '1');
+    } catch {}
+  };
   const [drill, setDrill] = useState<{ item: Widget; key: string | null } | null>(null);
 
   const fallback = PRESETS.month();
@@ -964,8 +1013,8 @@ function DashboardsView() {
     await saving.current;
   };
 
-  const create = (name: string, widgets: Widget[]) => {
-    const dashboard = { id: crypto.randomUUID(), name, widgets, version: 0 };
+  const create = (name: string, widgets: Widget[], description = '') => {
+    const dashboard = { id: crypto.randomUUID(), name, description, widgets, version: 0 };
     void save(dashboard);
     setParams({ d: dashboard.id });
   };
@@ -1003,10 +1052,44 @@ function DashboardsView() {
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title={t('Дашборды')}
-        description={t('Свои экраны из метрик и разрезов: задачи, сроки, часы')}
+        description={t(
+          'Готовые и свои экраны: задачи, сроки, часы. Клик по числу открывает задачи.',
+        )}
+        actions={
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<HelpCircle size={14} strokeWidth={1.7} />}
+            onClick={() => (guide ? closeGuide() : setGuide(true))}
+          >
+            {t('Как пользоваться')}
+          </Button>
+        }
       />
       <div className="space-y-3 px-4 py-4 lg:px-6">
         {error && <Notice tone="danger">{error}</Notice>}
+        {/* На пустом экране свой онбординг, вторая справка рядом с ним лишняя. */}
+        {guide && active && (
+          <Card>
+            <div className="flex items-start gap-3">
+              <HelpCircle className="mt-0.5 size-5 shrink-0 text-ink-soft" strokeWidth={1.5} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">{t('Как пользоваться дашбордами')}</p>
+                <ol className="mt-2 space-y-1.5 text-sm text-ink-soft">
+                  {GUIDE.map((step, index) => (
+                    <li key={index} className="flex gap-2">
+                      <span className="tabular-nums text-ink-faint">{index + 1}.</span>
+                      <span>{step()}</span>
+                    </li>
+                  ))}
+                </ol>
+                <Button size="sm" className="mt-3" onClick={closeGuide}>
+                  {t('Понятно')}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
         {dashboards === null && loadFailed ? (
           <Notice tone="danger">
             {t('Не удалось загрузить дашборды.')}{' '}
@@ -1064,9 +1147,14 @@ function DashboardsView() {
                   align="end"
                   items={[
                     {
-                      label: t('Переименовать'),
+                      label: t('Название и описание'),
                       icon: <Pencil className="size-4" />,
-                      onSelect: () => setNaming({ id: active.id, name: active.name }),
+                      onSelect: () =>
+                        setNaming({
+                          id: active.id,
+                          name: active.name,
+                          description: active.description,
+                        }),
                     },
                     {
                       label: t('Удалить'),
@@ -1083,6 +1171,8 @@ function DashboardsView() {
                 />
               </div>
             </div>
+
+            {active.description && <p className="text-sm text-ink-soft">{active.description}</p>}
 
             <Card padding="none">
               <div className="flex flex-wrap items-center gap-2 p-3 text-sm">
@@ -1157,10 +1247,31 @@ function DashboardsView() {
                   >
                     <div className="mb-3 flex items-start gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink">
-                          {item.title || METRIC_LABEL[item.metric]()}
-                        </p>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <p className="truncate text-sm font-semibold text-ink">
+                            {item.title || METRIC_LABEL[item.metric]()}
+                          </p>
+                          {/* Подсказка раскрывается в карточке: всплывашка у правого края
+                              телефона уезжала за экран, а наведения там нет. */}
+                          <button
+                            type="button"
+                            aria-label={t('Что считает виджет')}
+                            aria-expanded={Boolean(hints[item.id])}
+                            onClick={() => setHints({ ...hints, [item.id]: !hints[item.id] })}
+                            className={cn(
+                              'shrink-0 rounded-ui p-0.5 hover:text-ink',
+                              hints[item.id] ? 'text-ink' : 'text-ink-faint',
+                            )}
+                          >
+                            <Info className="size-3.5" strokeWidth={1.7} />
+                          </button>
+                        </div>
                         <p className="truncate text-xs text-ink-faint">{describe(item, names)}</p>
+                        {hints[item.id] && (
+                          <p className="mt-1.5 text-xs text-ink-soft">
+                            {METRIC_HINT[item.metric]()}
+                          </p>
+                        )}
                       </div>
                       <Menu
                         label={t('Действия с виджетом')}
@@ -1249,8 +1360,8 @@ function DashboardsView() {
       {creating && (
         <Modal open size="xl" onClose={() => setCreating(false)} title={t('Новый дашборд')}>
           <TemplatePicker
-            onCreate={(name, widgets) => {
-              create(name, widgets);
+            onCreate={(name, widgets, description) => {
+              create(name, widgets, description);
               setCreating(false);
             }}
           />
@@ -1262,7 +1373,7 @@ function DashboardsView() {
           open
           size="sm"
           onClose={() => setNaming(null)}
-          title={t('Переименовать дашборд')}
+          title={t('Название и описание')}
           footer={
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setNaming(null)}>
@@ -1273,7 +1384,8 @@ function DashboardsView() {
                 onClick={() => {
                   const name = naming.name.trim();
                   const current = dashboards?.find((item) => item.id === naming.id);
-                  if (current) void save({ ...current, name });
+                  if (current)
+                    void save({ ...current, name, description: naming.description.trim() });
                   setNaming(null);
                 }}
               >
@@ -1288,6 +1400,14 @@ function DashboardsView() {
             maxLength={80}
             autoFocus
             onChange={(event) => setNaming({ ...naming, name: event.target.value })}
+          />
+          <TextArea
+            className="mt-3"
+            label={t('На какой вопрос отвечает')}
+            value={naming.description}
+            maxLength={300}
+            rows={3}
+            onChange={(event) => setNaming({ ...naming, description: event.target.value })}
           />
         </Modal>
       )}

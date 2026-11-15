@@ -14,6 +14,7 @@ async function member(req: NextRequest) {
 const toDashboard = (doc: Record<string, unknown>): Dashboard => ({
   id: String(doc.id),
   name: String(doc.name),
+  description: String(doc.description || ''),
   widgets: (doc.widgets as Widget[]) || [],
   version: Number(doc.version) || 0,
 });
@@ -47,6 +48,9 @@ export async function PUT(req: NextRequest) {
   const widgets: Widget[] = (Array.isArray(body.widgets) ? body.widgets : [])
     .slice(0, 40)
     .map(cleanWidget);
+  const description = String(body.description || '')
+    .trim()
+    .slice(0, 300);
   const id = String(body.id || '').slice(0, 64) || randomUUID();
   const version = Number(body.version) || 0;
   const collection = (await getDb()).collection('dashboards');
@@ -56,18 +60,19 @@ export async function PUT(req: NextRequest) {
       memberId,
       id,
       name,
+      description,
       widgets,
       version: 1,
       createdAt: now,
       updatedAt: now,
     });
-    return NextResponse.json({ dashboard: { id, name, widgets, version: 1 } });
+    return NextResponse.json({ dashboard: { id, name, description, widgets, version: 1 } });
   }
   // Дашборд общий: правка идёт поверх той версии, которую видел автор. Иначе второй
   // сохранивший молча стирает виджеты первого.
   const { matchedCount } = await collection.updateOne(
     { memberId, id, version: version || { $in: [0, null] } },
-    { $set: { name, widgets, updatedAt: now }, $inc: { version: 1 } },
+    { $set: { name, description, widgets, updatedAt: now }, $inc: { version: 1 } },
   );
   if (!matchedCount) {
     const current = await collection.findOne({ memberId, id });
@@ -76,7 +81,7 @@ export async function PUT(req: NextRequest) {
       { status: 409 },
     );
   }
-  return NextResponse.json({ dashboard: { id, name, widgets, version: version + 1 } });
+  return NextResponse.json({ dashboard: { id, name, description, widgets, version: version + 1 } });
 }
 
 export async function DELETE(req: NextRequest) {

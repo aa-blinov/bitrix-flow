@@ -23,7 +23,24 @@ import { Notice } from '@/components/monos/Notice';
 import { Button } from '@/components/monos/Button';
 import { t } from '@/lib/i18n';
 
+const DASHBOARDS_INTRO_KEY = 'bitrix-flow-dashboards-intro';
+
 export default function DashboardPage() {
+  // Плашка о новом разделе: пока не закрыли и не перешли. Отметка в браузере, база тут
+  // не нужна: в худшем случае плашка покажется ещё раз.
+  const [dashboardsIntro, setDashboardsIntro] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(DASHBOARDS_INTRO_KEY)) setDashboardsIntro(true);
+    } catch {}
+  }, []);
+  const hideDashboardsIntro = () => {
+    setDashboardsIntro(false);
+    try {
+      localStorage.setItem(DASHBOARDS_INTRO_KEY, '1');
+    } catch {}
+  };
+
   const { projects, allTasks, isLoading, selectedProjectId, setSelectedProject } = useKanbanStore(
     useShallow((s) => ({
       projects: s.projects,
@@ -138,6 +155,26 @@ export default function DashboardPage() {
       <PageHeader title={t('Главная')} description={t('Обзор проектов, задач и сроков')} />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
+        {dashboardsIntro && (
+          <Notice
+            tone="info"
+            title={t('Новое: дашборды')}
+            className="mb-4"
+            dismissible
+            onDismiss={hideDashboardsIntro}
+          >
+            {t(
+              'Сроки, просрочка, часы и поток задач на одном экране, по клику на число открываются задачи. Раздел «Контроль» в меню слева.',
+            )}{' '}
+            <Link
+              href="/dashboards"
+              onClick={hideDashboardsIntro}
+              className="font-semibold text-ink underline"
+            >
+              {t('Открыть дашборды')}
+            </Link>
+          </Notice>
+        )}
         {statsFailed && (
           <Notice tone="danger" className="mb-4">
             {t('Не удалось загрузить сводку.')}{' '}

@@ -43,7 +43,14 @@ export type Widget = {
   wide: boolean;
 };
 
-export type Dashboard = { id: string; name: string; widgets: Widget[]; version: number };
+export type Dashboard = {
+  id: string;
+  name: string;
+  /** На какой вопрос отвечает дашборд: строка под вкладками, чтобы экран читался без автора. */
+  description: string;
+  widgets: Widget[];
+  version: number;
+};
 
 export type Point = { key: string; value: number | null };
 export type WidgetResult = { total: number | null; points: Point[] };
