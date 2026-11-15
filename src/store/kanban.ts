@@ -898,6 +898,11 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           );
         else if (value === 'testing') await bxUpdateStatus(id, '2', '-4');
       }
+      // Пока шло сохранение, список мог перезапросить страницу по событию синка
+      // и положить в стор задачу из зеркала ещё со старым значением.
+      set((state) => ({
+        allTasks: state.allTasks.map((task) => (task.id === id ? { ...task, ...update } : task)),
+      }));
     } catch (error) {
       console.error('Task field update failed:', error);
       set((state) => ({
