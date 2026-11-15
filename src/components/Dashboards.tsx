@@ -471,7 +471,7 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
     );
     return onPick && hasTasks(item.metric, result.total) ? (
       <button
-        className={cn(pickable, '-mx-1 px-1')}
+        className={cn(pickable, '-mx-1 flex min-h-11 items-center px-1')}
         onClick={() => onPick(null)}
         title={t('Показать задачи')}
       >
@@ -496,20 +496,21 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
               type="button"
               disabled={!onPick || !hasTasks(item.metric, point.value)}
               onClick={() => onPick?.(point.key)}
-              className={cn(
-                'group relative flex h-full min-w-0 flex-1 flex-col justify-end',
-                isPartial(item.by, point.key, from, to) && 'opacity-50',
-              )}
+              className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
               title={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
               aria-label={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
             >
-              <span className="mb-1 truncate text-center text-[10px] tabular-nums text-ink-soft">
+              <span className="mb-1 truncate text-center text-whisper tabular-nums text-ink-soft">
                 {point.value === null
                   ? ''
                   : formatValue(item.metric, point.value).replace(/\s?(ч|h|дн|d)$/, '')}
               </span>
+              {/* Бледнеет только столбик: подпись с ним падала ниже AA по контрасту. */}
               <div
-                className="w-full rounded-t-sm bg-accent transition-opacity group-hover:opacity-80"
+                className={cn(
+                  'w-full rounded-t-sm bg-accent transition-opacity group-hover:opacity-80',
+                  isPartial(item.by, point.key, from, to) && 'opacity-40',
+                )}
                 style={{
                   height: `${((point.value ?? 0) / max) * 100}%`,
                   minHeight: point.value ? 2 : 0,
@@ -522,7 +523,7 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
           {points.map((point, index) => (
             <span
               key={point.key}
-              className="min-w-0 flex-1 truncate text-center text-[10px] text-ink-faint"
+              className="min-w-0 flex-1 truncate text-center text-whisper text-ink-faint"
             >
               {/* Подписи через одну, когда столбиков много: иначе они слипаются. */}
               {points.length > 14 && index % 2 ? '' : names.key(item.by, point.key)}
@@ -546,7 +547,10 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
               <tr key={point.key} className="border-b border-line last:border-0">
                 <td className="py-1.5 pr-2 text-ink">
                   {onPick && hasTasks(item.metric, point.value) ? (
-                    <button className="text-left hover:underline" onClick={() => onPick(point.key)}>
+                    <button
+                      className="w-full text-left hover:underline max-lg:min-h-11"
+                      onClick={() => onPick(point.key)}
+                    >
                       {label(point.key)}
                     </button>
                   ) : (
@@ -575,7 +579,7 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
             disabled={!onPick || !hasTasks(item.metric, point.value)}
             onClick={() => onPick?.(point.key)}
             className={cn(
-              'grid w-full grid-cols-[minmax(0,2fr)_minmax(0,3fr)_5rem] items-center gap-2 py-0.5 text-left',
+              'grid w-full grid-cols-[minmax(0,2fr)_minmax(0,3fr)_5rem] items-center gap-2 py-0.5 text-left max-lg:min-h-11',
               onPick && pickable,
             )}
           >
@@ -1259,7 +1263,7 @@ function DashboardsView() {
                             aria-expanded={Boolean(hints[item.id])}
                             onClick={() => setHints({ ...hints, [item.id]: !hints[item.id] })}
                             className={cn(
-                              'shrink-0 rounded-ui p-0.5 hover:text-ink',
+                              'shrink-0 rounded-ui p-0.5 hover:text-ink max-lg:-my-[15px] max-lg:-mr-[15px] max-lg:p-[15px]',
                               hints[item.id] ? 'text-ink' : 'text-ink-faint',
                             )}
                           >

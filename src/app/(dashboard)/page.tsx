@@ -169,7 +169,7 @@ export default function DashboardPage() {
             <Link
               href="/dashboards"
               onClick={hideDashboardsIntro}
-              className="font-semibold text-ink underline"
+              className="inline-flex items-center font-semibold text-ink underline max-lg:min-h-11"
             >
               {t('Открыть дашборды')}
             </Link>

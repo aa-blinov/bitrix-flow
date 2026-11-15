@@ -573,9 +573,13 @@ function MobileRows({ meta, rows }: { meta: TableMeta; rows: ReportRow[] }) {
   return (
     <ul className="space-y-2">
       {sorted.slice(0, 200).map((row, index) => (
-        <li key={index} className="rounded-ui border border-line bg-surface p-3 text-sm">
+        <li key={index} className="relative rounded-ui border border-line bg-surface p-3 text-sm">
           {title.kind === 'task' ? (
-            <Link className="font-medium text-ink hover:underline" href={taskHref(row)}>
+            // Ссылка растянута на всю карточку: на телефоне в название высотой 18px не попасть.
+            <Link
+              className="font-medium text-ink after:absolute after:inset-0 after:rounded-ui hover:underline"
+              href={taskHref(row)}
+            >
               {String(row.task)}
             </Link>
           ) : (
