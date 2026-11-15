@@ -58,7 +58,7 @@ const METRIC_LABEL: Record<Metric, () => string> = {
   overdue: () => t('Просрочено сейчас'),
   late: () => t('Закрыто с опозданием'),
   onTime: () => t('Доля закрытых в срок'),
-  leadTime: () => t('Дней до закрытия, медиана'),
+  leadTime: () => t('Дней до закрытия'),
   hours: () => t('Списано часов'),
 };
 /** Подсказка под выбором метрики: что именно попадёт в число, без чтения кода. */
@@ -160,16 +160,210 @@ const widget = (patch: Partial<Widget>): Widget => ({
   ...patch,
 });
 
-/** Стартовый набор: то, что ПМ спрашивает первым, чтобы экран не начинался с пустоты. */
-const STARTER = (): Widget[] => [
-  widget({ metric: 'closed' }),
-  widget({ metric: 'overdue' }),
-  widget({ metric: 'onTime' }),
-  widget({ metric: 'hours' }),
-  widget({ metric: 'closed', by: 'week', view: 'columns', wide: true }),
-  widget({ metric: 'hours', by: 'project', view: 'bars' }),
-  widget({ metric: 'overdue', by: 'user', view: 'bars' }),
+type Template = {
+  id: string;
+  name: () => string;
+  description: () => string;
+  /** Шаблон про один проект: все виджеты получают его фильтр. */
+  needsProject?: boolean;
+  widgets: () => Widget[];
+};
+
+const bars = (patch: Partial<Widget>) => widget({ view: 'bars', ...patch });
+const weekly = (patch: Partial<Widget>) => widget({ by: 'week', view: 'columns', ...patch });
+
+// Шаблоны отвечают на вопросы, с которыми ПМ приходит, а не перечисляют метрики:
+// пустой конструктор пугает, готовый экран правят под себя.
+const TEMPLATES: Template[] = [
+  {
+    id: 'overview',
+    name: () => t('Обзор'),
+    description: () => t('Главное за период: закрыто, просрочено, в срок, часы и ритм по неделям.'),
+    widgets: () => [
+      widget({ metric: 'closed' }),
+      widget({ metric: 'overdue' }),
+      widget({ metric: 'onTime' }),
+      widget({ metric: 'hours' }),
+      weekly({ metric: 'closed', wide: true }),
+      bars({ metric: 'hours', by: 'project' }),
+      bars({ metric: 'overdue', by: 'user' }),
+    ],
+  },
+  {
+    id: 'deadlines',
+    name: () => t('Сроки и просрочка'),
+    description: () => t('Где горят сроки, у кого просрочка и как часто закрываем вовремя.'),
+    widgets: () => [
+      widget({ metric: 'overdue' }),
+      widget({ metric: 'late' }),
+      widget({ metric: 'onTime' }),
+      widget({ metric: 'leadTime' }),
+      weekly({ metric: 'onTime', title: t('Доля в срок по неделям'), wide: true }),
+      bars({ metric: 'overdue', by: 'user', title: t('Кто держит просрочку') }),
+      bars({ metric: 'overdue', by: 'project', title: t('Где просрочка') }),
+    ],
+  },
+  {
+    id: 'hours',
+    name: () => t('Часы команды'),
+    description: () => t('Куда уходит время: по людям, проектам, классам работ и неделям.'),
+    widgets: () => [
+      widget({ metric: 'hours' }),
+      weekly({ metric: 'hours', title: t('Часы по неделям'), wide: true }),
+      bars({ metric: 'hours', by: 'user', title: t('Кто сколько списал') }),
+      bars({ metric: 'hours', by: 'project', title: t('Часы по проектам') }),
+      bars({ metric: 'hours', by: 'class', title: t('Часы по классам работ') }),
+    ],
+  },
+  {
+    id: 'flow',
+    name: () => t('Поток задач'),
+    description: () =>
+      t('Успеваем ли разбирать входящее: создано против закрыто и скорость закрытия.'),
+    widgets: () => [
+      widget({ metric: 'created' }),
+      widget({ metric: 'closed' }),
+      widget({ metric: 'open' }),
+      widget({ metric: 'leadTime' }),
+      weekly({ metric: 'created', title: t('Создано по неделям') }),
+      weekly({ metric: 'closed', title: t('Закрыто по неделям') }),
+      bars({ metric: 'open', by: 'status', title: t('Открытые по статусам') }),
+      bars({ metric: 'open', by: 'user', title: t('Открытые по людям') }),
+    ],
+  },
+  {
+    id: 'project',
+    name: () => t('Один проект'),
+    description: () => t('Всё о выбранном проекте: сроки, часы, кто над чем работает.'),
+    needsProject: true,
+    widgets: () => [
+      widget({ metric: 'closed' }),
+      widget({ metric: 'overdue' }),
+      widget({ metric: 'onTime' }),
+      widget({ metric: 'hours' }),
+      weekly({ metric: 'closed', wide: true }),
+      bars({ metric: 'hours', by: 'user', title: t('Кто сколько списал') }),
+      bars({ metric: 'overdue', by: 'user', title: t('Кто держит просрочку') }),
+      bars({ metric: 'open', by: 'status', title: t('Открытые по статусам') }),
+    ],
+  },
+  {
+    id: 'blank',
+    name: () => t('Пустой'),
+    description: () => t('Без виджетов: соберёте сами.'),
+    widgets: () => [],
+  },
 ];
+
+/** Готовые вопросы в редакторе: один клик заполняет форму, дальше можно поправить. */
+const QUESTIONS: { label: () => string; patch: Partial<Widget> }[] = [
+  {
+    label: () => t('Кто держит просрочку?'),
+    patch: { metric: 'overdue', by: 'user', view: 'bars' },
+  },
+  {
+    label: () => t('Сколько закрываем в неделю?'),
+    patch: { metric: 'closed', by: 'week', view: 'columns' },
+  },
+  { label: () => t('Кто сколько списал?'), patch: { metric: 'hours', by: 'user', view: 'bars' } },
+  { label: () => t('Куда уходят часы?'), patch: { metric: 'hours', by: 'project', view: 'bars' } },
+  {
+    label: () => t('Как часто успеваем в срок?'),
+    patch: { metric: 'onTime', by: 'week', view: 'columns' },
+  },
+  {
+    label: () => t('Сколько дней живёт задача?'),
+    patch: { metric: 'leadTime', by: 'none', view: 'number' },
+  },
+];
+
+const ONBOARDING = [
+  () => t('Дашборд это набор виджетов. Он общий: команда видит то же, что и вы.'),
+  () =>
+    t(
+      'Виджет отвечает на один вопрос: что считать, как группировать и по какому проекту или человеку.',
+    ),
+  () => t('Кликните по числу или столбику, и откроется список задач за ним.'),
+];
+
+/** Галерея шаблонов с названием: и онбординг на пустом экране, и окно нового дашборда. */
+function TemplatePicker({ onCreate }: { onCreate: (name: string, widgets: Widget[]) => void }) {
+  const projects = useKanbanStore((state) => state.projects);
+  const [chosen, setChosen] = useState(TEMPLATES[0]);
+  const [name, setName] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const project = projects.find((item) => item.id === projectId);
+  const fallbackName = chosen.needsProject && project ? project.name : chosen.name();
+  const blocked = chosen.needsProject && !projectId;
+  return (
+    <div className="space-y-4 text-left">
+      <div
+        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        role="radiogroup"
+        aria-label={t('Шаблон')}
+      >
+        {TEMPLATES.map((template) => (
+          <button
+            key={template.id}
+            type="button"
+            role="radio"
+            aria-checked={chosen.id === template.id}
+            onClick={() => setChosen(template)}
+            className={cn(
+              'rounded-ui border p-3 text-left transition-colors',
+              chosen.id === template.id
+                ? 'border-accent bg-surface-2'
+                : 'border-line hover:bg-surface-2',
+            )}
+          >
+            <span className="block text-sm font-semibold text-ink">{template.name()}</span>
+            <span className="mt-1 block text-xs text-ink-soft">{template.description()}</span>
+            {template.widgets().length > 0 && (
+              <span className="mt-2 block text-xs text-ink-faint">
+                {t('Виджетов: {0}', template.widgets().length)}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {chosen.needsProject && (
+          <SelectField
+            label={t('Проект')}
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            options={[
+              { value: '', label: t('Выберите проект') },
+              ...projects
+                .filter((item) => !item.isArchived)
+                .map((item) => ({ value: item.id, label: item.name })),
+            ]}
+          />
+        )}
+        <TextField
+          label={t('Название')}
+          placeholder={fallbackName}
+          value={name}
+          maxLength={80}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button
+          disabled={blocked}
+          onClick={() =>
+            onCreate(
+              name.trim() || fallbackName,
+              chosen.widgets().map((item) => ({ ...item, projectId: projectId || item.projectId })),
+            )
+          }
+        >
+          {t('Создать дашборд')}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 type Names = {
   key: (by: Dimension, key: string) => string;
@@ -205,6 +399,7 @@ function describe(item: Widget, names: Names) {
   return [
     item.title ? METRIC_LABEL[item.metric]() : '',
     SNAPSHOT.includes(item.metric) ? t('на сегодня') : '',
+    item.metric === 'leadTime' ? t('медиана') : '',
     item.by !== 'none' ? DIMENSION_LABEL[item.by]().toLowerCase() : '',
     item.projectId ? names.project(item.projectId) : '',
     item.userId ? names.user(item.userId) : '',
@@ -349,7 +544,7 @@ function Chart({ item, result, names, from, to, onPick }: ChartProps) {
             disabled={!onPick || !hasTasks(item.metric, point.value)}
             onClick={() => onPick?.(point.key)}
             className={cn(
-              'grid w-full grid-cols-[minmax(0,10rem)_1fr_5.5rem] items-center gap-2 py-0.5',
+              'grid w-full grid-cols-[minmax(0,2fr)_minmax(0,3fr)_5rem] items-center gap-2 py-0.5 text-left',
               onPick && pickable,
             )}
           >
@@ -550,6 +745,27 @@ function Editor({
         </div>
       }
     >
+      {isNew && (
+        <div className="mb-4">
+          <p className="mb-2 text-xs text-ink-soft">
+            {t('Начните с готового вопроса или соберите свой ниже')}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {QUESTIONS.map((question) => (
+              <button
+                key={question.label()}
+                type="button"
+                onClick={() =>
+                  update({ ...question.patch, title: question.label().replace(/\?$/, '') })
+                }
+                className="rounded-ui border border-line px-2.5 py-1 text-xs text-ink hover:bg-surface-2"
+              >
+                {question.label()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-3 text-sm">
           <SelectField
@@ -641,6 +857,7 @@ function DashboardsView() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Widget | null>(null);
   const [naming, setNaming] = useState<{ id: string; name: string } | null>(null);
+  const [creating, setCreating] = useState(false);
   const [drill, setDrill] = useState<{ item: Widget; key: string | null } | null>(null);
 
   const fallback = PRESETS.month();
@@ -806,21 +1023,23 @@ function DashboardsView() {
         ) : dashboards === null ? (
           <LoadingState />
         ) : !active ? (
-          <EmptyState
-            icon={<LayoutDashboard className="size-8" strokeWidth={1.5} />}
-            title={t('Дашбордов пока нет')}
-            description={t(
-              'Начните с готового набора: закрыто, просрочено, в срок, часы, поток по неделям. Любой виджет потом можно поменять.',
-            )}
-            actions={
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => create(t('Обзор'), STARTER())}>{t('Создать обзор')}</Button>
-                <Button variant="secondary" onClick={() => setNaming({ id: '', name: '' })}>
-                  {t('Пустой дашборд')}
-                </Button>
+          <Card>
+            <div className="mb-4 flex items-start gap-3">
+              <LayoutDashboard className="mt-0.5 size-6 shrink-0 text-ink-soft" strokeWidth={1.5} />
+              <div>
+                <p className="text-base font-semibold text-ink">{t('Соберите первый дашборд')}</p>
+                <ol className="mt-2 space-y-1 text-sm text-ink-soft">
+                  {ONBOARDING.map((step, index) => (
+                    <li key={index} className="flex gap-2">
+                      <span className="tabular-nums text-ink-faint">{index + 1}.</span>
+                      {step()}
+                    </li>
+                  ))}
+                </ol>
               </div>
-            }
-          />
+            </div>
+            <TemplatePicker onCreate={create} />
+          </Card>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
@@ -835,7 +1054,7 @@ function DashboardsView() {
                 label={t('Новый дашборд')}
                 variant="ghost"
                 size="sm"
-                onClick={() => setNaming({ id: '', name: '' })}
+                onClick={() => setCreating(true)}
               >
                 <Plus className="size-4" strokeWidth={1.7} />
               </IconButton>
@@ -1027,12 +1246,23 @@ function DashboardsView() {
 
       <DrillDrawer drill={drill} from={from} to={to} names={names} onClose={() => setDrill(null)} />
 
+      {creating && (
+        <Modal open size="xl" onClose={() => setCreating(false)} title={t('Новый дашборд')}>
+          <TemplatePicker
+            onCreate={(name, widgets) => {
+              create(name, widgets);
+              setCreating(false);
+            }}
+          />
+        </Modal>
+      )}
+
       {naming && (
         <Modal
           open
           size="sm"
           onClose={() => setNaming(null)}
-          title={naming.id ? t('Переименовать дашборд') : t('Новый дашборд')}
+          title={t('Переименовать дашборд')}
           footer={
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setNaming(null)}>
@@ -1044,7 +1274,6 @@ function DashboardsView() {
                   const name = naming.name.trim();
                   const current = dashboards?.find((item) => item.id === naming.id);
                   if (current) void save({ ...current, name });
-                  else create(name, []);
                   setNaming(null);
                 }}
               >

@@ -975,12 +975,7 @@ export const EN: Record<string, string> = {
   Дашборды: 'Dashboards',
   'Свои экраны из метрик и разрезов: задачи, сроки, часы':
     'Your own screens of metrics and breakdowns: tasks, deadlines, hours',
-  'Дашбордов пока нет': 'No dashboards yet',
-  'Начните с готового набора: закрыто, просрочено, в срок, часы, поток по неделям. Любой виджет потом можно поменять.':
-    'Start with a ready set: closed, overdue, on time, hours, weekly flow. Any widget can be changed later.',
   Обзор: 'Overview',
-  'Создать обзор': 'Create overview',
-  'Пустой дашборд': 'Empty dashboard',
   'Новый дашборд': 'New dashboard',
   'Действия с дашбордом': 'Dashboard actions',
   'Списания в базе собраны с {0}: часы до этой даты не видны.':
@@ -994,7 +989,6 @@ export const EN: Record<string, string> = {
   Выше: 'Move up',
   Ниже: 'Move down',
   'Переименовать дашборд': 'Rename dashboard',
-  'Дней до закрытия, медиана': 'Days to close, median',
   'Задачи, созданные в выбранном периоде.': 'Tasks created in the selected period.',
   'Задачи, завершённые в выбранном периоде.': 'Tasks completed in the selected period.',
   'Незакрытые задачи, у которых срок уже прошёл, на сегодня. Период на число не влияет.':
@@ -1026,4 +1020,50 @@ export const EN: Record<string, string> = {
     'Someone else just changed this dashboard. The latest version is shown, please repeat your edit.',
   'Не удалось сохранить дашборд. Показана последняя сохранённая версия.':
     'Could not save the dashboard. The last saved version is shown.',
+  'Главное за период: закрыто, просрочено, в срок, часы и ритм по неделям.':
+    'The essentials for the period: closed, overdue, on time, hours and weekly rhythm.',
+  'Сроки и просрочка': 'Deadlines and overdue',
+  'Где горят сроки, у кого просрочка и как часто закрываем вовремя.':
+    'Where deadlines are at risk, who has overdue tasks and how often we close on time.',
+  'Доля в срок по неделям': 'On-time share by week',
+  'Кто держит просрочку': 'Who holds overdue tasks',
+  'Где просрочка': 'Where tasks are overdue',
+  'Часы команды': 'Team hours',
+  'Куда уходит время: по людям, проектам, классам работ и неделям.':
+    'Where time goes: by people, projects, work classes and weeks.',
+  'Часы по неделям': 'Hours by week',
+  'Кто сколько списал': 'Who logged how much',
+  'Часы по проектам': 'Hours by project',
+  'Часы по классам работ': 'Hours by work class',
+  'Успеваем ли разбирать входящее: создано против закрыто и скорость закрытия.':
+    'Are we keeping up with incoming work: created vs closed and closing speed.',
+  'Создано по неделям': 'Created by week',
+  'Закрыто по неделям': 'Closed by week',
+  'Открытые по статусам': 'Open by status',
+  'Открытые по людям': 'Open by person',
+  'Один проект': 'Single project',
+  'Всё о выбранном проекте: сроки, часы, кто над чем работает.':
+    'Everything about one project: deadlines, hours, who works on what.',
+  Пустой: 'Blank',
+  'Без виджетов: соберёте сами.': 'No widgets: build your own.',
+  'Кто держит просрочку?': 'Who holds overdue tasks?',
+  'Сколько закрываем в неделю?': 'How much do we close per week?',
+  'Кто сколько списал?': 'Who logged how much?',
+  'Куда уходят часы?': 'Where do the hours go?',
+  'Как часто успеваем в срок?': 'How often are we on time?',
+  'Сколько дней живёт задача?': 'How many days does a task live?',
+  'Дашборд это набор виджетов. Он общий: команда видит то же, что и вы.':
+    'A dashboard is a set of widgets. It is shared: the team sees what you see.',
+  'Виджет отвечает на один вопрос: что считать, как группировать и по какому проекту или человеку.':
+    'A widget answers one question: what to count, how to group it and for which project or person.',
+  'Кликните по числу или столбику, и откроется список задач за ним.':
+    'Click a number or a bar to open the tasks behind it.',
+  Шаблон: 'Template',
+  'Виджетов: {0}': 'Widgets: {0}',
+  'Создать дашборд': 'Create dashboard',
+  'Начните с готового вопроса или соберите свой ниже':
+    'Start from a ready question or build your own below',
+  'Соберите первый дашборд': 'Build your first dashboard',
+  'Дней до закрытия': 'Days to close',
+  медиана: 'median',
 };
