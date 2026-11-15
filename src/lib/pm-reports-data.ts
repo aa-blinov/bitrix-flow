@@ -32,7 +32,7 @@ export type ReportKind = (typeof REPORT_KINDS)[number];
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value));
 
-async function loadTasks(memberId: string): Promise<ReportTask[]> {
+export async function loadTasks(memberId: string): Promise<ReportTask[]> {
   const db = await getDb();
   const docs = await db
     .collection('task_mirror')
@@ -79,7 +79,7 @@ async function loadTasks(memberId: string): Promise<ReportTask[]> {
   });
 }
 
-async function loadEntries(memberId: string, weeks: string[] | null) {
+export async function loadEntries(memberId: string, weeks: string[] | null) {
   const db = await getDb();
   const docs = await db
     .collection('workload_time_task')

@@ -9,11 +9,12 @@ import {
   FileText,
   Gauge,
   Hourglass,
+  LayoutDashboard,
   Scale,
   CalendarDays,
   ChevronRight,
   ChartNoAxesColumn,
-  LayoutDashboard,
+  PanelsTopLeft,
   ListChecks,
   MessagesSquare,
   Search,
@@ -117,6 +118,14 @@ export const NAV_ITEMS = [
     section: 'reports',
     get label() {
       return t('Аналитика часов');
+    },
+  },
+  {
+    href: '/dashboards',
+    icon: PanelsTopLeft,
+    section: 'control',
+    get label() {
+      return t('Дашборды');
     },
   },
   {

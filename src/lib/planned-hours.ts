@@ -87,3 +87,10 @@ export function planForPeriod(tasks: PlanTask[], from: string, to: string): numb
   }
   return seconds;
 }
+
+export function mondayFor(date: string) {
+  const value = new Date(`${date}T12:00:00Z`);
+  const day = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() - day + 1);
+  return value.toISOString().slice(0, 10);
+}

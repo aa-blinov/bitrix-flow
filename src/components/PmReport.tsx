@@ -349,7 +349,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
 };
 
 const isoDay = (date: Date) => date.toLocaleDateString('en-CA');
-const PRESETS = {
+export const PRESETS = {
   month: () => {
     const now = new Date();
     return { from: isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDay(now) };
@@ -373,7 +373,7 @@ const PRESETS = {
     return { from: isoDay(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: isoDay(now) };
   },
 };
-type Preset = keyof typeof PRESETS;
+export type Preset = keyof typeof PRESETS;
 
 const HOURS = numberFormat({ maximumFractionDigits: 1 });
 const COUNT = numberFormat({ maximumFractionDigits: 0 });

@@ -1,4 +1,7 @@
 import { getDb } from './mongo';
+import { mondayFor } from './planned-hours';
+
+export { mondayFor };
 
 const SCHEDULER_INTERVAL_MS = 15 * 60 * 1000;
 const SCHEDULER_HOUR_MOSCOW = 2;
@@ -20,13 +23,6 @@ function moscowNow() {
     date: `${value('year')}-${value('month')}-${value('day')}`,
     hour: Number(value('hour')),
   };
-}
-
-export function mondayFor(date: string) {
-  const value = new Date(`${date}T12:00:00Z`);
-  const day = value.getUTCDay() || 7;
-  value.setUTCDate(value.getUTCDate() - day + 1);
-  return value.toISOString().slice(0, 10);
 }
 
 function addDays(date: string, days: number) {
