@@ -17,6 +17,7 @@ import { downloadCsv } from '@/lib/csv';
 import { cn, pluralRu } from '@/lib/utils';
 import { Bx24User } from '@/types/bitrix';
 import { useKanbanStore } from '@/store/kanban';
+import TaskModal from '@/components/TaskModal';
 import PageHeader from '@/components/PageHeader';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/monos/Button';
@@ -137,6 +138,7 @@ export default function TeamWorkload() {
   const projects = useKanbanStore((state) => state.projects);
   const loadAllTasks = useKanbanStore((state) => state.loadAllTasks);
   const loadProjects = useKanbanStore((state) => state.loadProjects);
+  const loadTaskById = useKanbanStore((state) => state.loadTaskById);
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [timeRows, setTimeRows] = useState<Array<{ userId: string; day: string; seconds: number }>>(
@@ -148,6 +150,9 @@ export default function TeamWorkload() {
   const [selectedActual, setSelectedActual] = useState<{ userId: string; day: string } | null>(
     null,
   );
+  // Карточка открывается поверх отчёта: переход на другую страницу терял неделю и проект.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const openTask = openTaskId ? allTasks.find((item) => item.id === openTaskId) : undefined;
   const [timeTitles, setTimeTitles] = useState<Record<string, string>>({});
   const [timeError, setTimeError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState('all');
@@ -626,8 +631,10 @@ export default function TeamWorkload() {
                 className="w-full rounded-ui border border-line p-3 text-left transition-colors duration-fast hover:bg-surface-2"
                 onClick={() => {
                   setSelectedActual(null);
-                  // Карточку открывают страницы со списком задач; здесь параметр task никто не читает.
-                  router.push(`/all-tasks?task=${entry.taskId}`);
+                  setOpenTaskId(entry.taskId);
+                  // Закрытой задачи может не быть в общем списке.
+                  if (!allTasks.some((item) => item.id === entry.taskId))
+                    void loadTaskById(entry.taskId);
                 }}
               >
                 <p className="font-medium">{title || t('Задача #{0}', entry.taskId)}</p>
@@ -644,6 +651,8 @@ export default function TeamWorkload() {
           )}
         </div>
       </Modal>
+
+      {openTask && <TaskModal task={openTask} onClose={() => setOpenTaskId(null)} />}
     </div>
   );
 }
