@@ -5,15 +5,18 @@ const CLIENT_ID = process.env.BITRIX24_CLIENT_ID!;
 const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET!;
 
 // Refresh токена если истек
-async function refreshToken(member_id: string): Promise<string> {
+// rejected: токен, который портал только что отклонил. Портал отзывает токен и раньше
+// расчётного срока, поэтому по часам его не прощаем: если в базе всё ещё он, обновляем.
+async function refreshToken(member_id: string, rejected?: string): Promise<string> {
   const db = await getDb();
   const token = await db.collection('user_tokens').findOne({ member_id });
 
   if (!token) throw new Error('No token found');
 
-  // Проверяем не истек ли
+  // Другой запрос уже обновил токен: берём новый, а не тратим refresh_token повторно.
+  if (rejected && token.access_token !== rejected) return token.access_token;
   const expiresAt = new Date(token.updated_at).getTime() + token.expires_in * 1000;
-  if (Date.now() < expiresAt - 60000) {
+  if (!rejected && Date.now() < expiresAt - 60000) {
     return token.access_token;
   }
 
@@ -72,10 +75,22 @@ export async function bx24OAuth(
       options.parallel === true,
     );
 
-  let data = await call(token.access_token);
+  // Ответ портала обязан быть объектом: на null обращение к data.error упало бы
+  // TypeError, а его обвязка приняла бы за точный отказ, хотя мутация могла пройти.
+  const checked = async (accessToken: string) => {
+    const body = await call(accessToken);
+    if (!body || typeof body !== 'object') throw new Error('BITRIX24_INVALID_RESPONSE');
+    return body;
+  };
+  let data = await checked(token.access_token);
   if (data.error === 'expired_token' || data.error === 'invalid_token') {
-    data = await call(await refreshToken(member_id));
+    data = await checked(await refreshToken(member_id, token.access_token));
   }
-  if (data.error) throw new Error(data.error_description || data.error);
+  // Код ошибки портала идёт отдельным полем: по нему вызывающий отличает «нет доступа»
+  // от прочих отказов. Не code: так Node называет ошибки сети.
+  if (data.error)
+    throw Object.assign(new Error(data.error_description || data.error), {
+      portalCode: String(data.error),
+    });
   return data.result;
 }

@@ -19,6 +19,8 @@ import {
   useDebounced,
   useMessengerEvents,
   useRealtime,
+  CHAT_OPEN_EVENT,
+  CHAT_READ_EVENT,
 } from '@/components/messenger/realtime';
 import { PresenceDot } from '@/components/messenger/Presence';
 import { usePolling, when } from '@/components/messenger/util';
@@ -30,6 +32,7 @@ import {
   type DialogKind,
 } from '@/lib/messenger';
 import { t } from '@/lib/i18n';
+import { setOwnPortal } from '@/lib/portal-links';
 
 const TABS: ReadonlyArray<{ value: 'all' | DialogKind; label: string }> = [
   {
@@ -79,6 +82,16 @@ const fetchDialogs = (offset: number, me: number) =>
     throw new Error(portalErrorHint(body?.message) || String(response.status));
   });
 
+// Коды im.dialog.get, означающие, что диалога нет или он закрыт для этого пользователя.
+const GONE_CODES = new Set([
+  'ACCESS_ERROR',
+  'ACCESS_DENIED',
+  'DIALOG_ID_EMPTY',
+  'CHAT_NOT_FOUND',
+  'USER_NOT_FOUND',
+  'NOT_FOUND',
+]);
+
 export default function Messenger() {
   const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
   const [me, setMe] = useState(0);
@@ -93,6 +106,7 @@ export default function Messenger() {
   const [notifyOn, setNotifyOn] = useState(false);
   // Чаты с портала по тому же запросу: список диалогов знает только последние.
   const [found, setFound] = useState<Dialog[]>([]);
+  const [foundFailed, setFoundFailed] = useState(false);
   const realtime = useRealtime();
 
   useEffect(() => {
@@ -106,6 +120,14 @@ export default function Messenger() {
       } catch {}
     }
     if (dialog && DIALOG_ID.test(dialog)) setActiveId(dialog);
+    // Уведомление о другом диалоге, пока страница чата открыта: адрес меняется без
+    // перемонтирования, поэтому диалог переключаем по событию.
+    const open = (event: Event) => {
+      const id = String((event as CustomEvent<string>).detail || '');
+      if (DIALOG_ID.test(id)) setActiveId(id);
+    };
+    window.addEventListener(CHAT_OPEN_EVENT, open);
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, open);
   }, []);
 
   // Открытый диалог держим в адресе и в браузере: после обновления страницы человек
@@ -130,38 +152,112 @@ export default function Messenger() {
   // не трогает, иначе подгруженные диалоги терялись бы каждые 15 секунд.
   const [paging, setPaging] = useState<{ hasMore: boolean; nextOffset: number } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const pagedFurther = useRef(false);
 
+  // Ответы списка применяются по порядку запросов, а счётчик диалога, прочитанного уже
+  // после начала запроса, ответ не возвращает: иначе прочитанное снова горело бы.
+  const listBusy = useRef(false);
+  const listAgain = useRef(false);
+  const listRepeat = useRef(() => {});
+  const [moreFailed, setMoreFailed] = useState(false);
+  // Прочтение: когда и до какого сообщения. Сообщение новее границы ответ списка
+  // показывает непрочитанным честно, его ещё не видели.
+  const readAt = useRef(new Map<string, { at: number; upTo: number }>());
+  const readOverride = (dialog: Dialog, startedAt: number) => {
+    const read = readAt.current.get(dialog.id);
+    // >=: запрос списка, начатый в ту же миллисекунду, мог не увидеть отметку.
+    return read &&
+      read.at >= startedAt &&
+      (!read.upTo || (dialog.lastMessage?.id || 0) <= read.upTo)
+      ? { ...dialog, unread: 0 }
+      : dialog;
+  };
+  const readGen = useRef(new Map<string, number>());
+  const confirmed = useRef(new Map<string, number>());
+  const readsInFlight = useRef(new Map<string, number>());
+  const dialogsRef = useRef<Dialog[] | null>(null);
+  useEffect(() => {
+    dialogsRef.current = dialogs;
+  }, [dialogs]);
+  // Загрузки первой страницы идут по одной: при частых событиях и медленном портале
+  // каждый новый запрос отменял бы ответ прошлого, и список застывал бы. Просьба во
+  // время запроса ставит ещё один проход после него.
   const loadDialogs = useCallback(() => {
+    if (listBusy.current) {
+      listAgain.current = true;
+      return;
+    }
+    listBusy.current = true;
+    const startedAt = Date.now();
     void fetchDialogs(0, me)
       .then((data) => {
-        setDialogs((current) => mergeDialogs(current || [], data.dialogs));
+        const fresh = data.dialogs.map((dialog: Dialog) => readOverride(dialog, startedAt));
+        setDialogs((current) => mergeDialogs(current || [], fresh));
         setMe(data.me);
-        if (data.portal) setPortal(data.portal);
-        setPaging((current) => current || { hasMore: data.hasMore, nextOffset: data.nextOffset });
+        if (data.portal) {
+          setPortal(data.portal);
+          setOwnPortal(data.portal);
+        }
+        // Пока дальше первой страницы не листали, курсор берём свежий: чатов могло стать
+        // больше страницы, и подгрузка должна появиться.
+        setPaging((current) =>
+          current && pagedFurther.current
+            ? current
+            : { hasMore: data.hasMore, nextOffset: data.nextOffset },
+        );
         setError('');
       })
-      .catch((failure: Error) =>
+      .catch((failure: Error) => {
+        // Следом уже идёт новый проход: его результат важнее этой ошибки.
+        if (listAgain.current) return;
         setError(
           /^\d+$/.test(failure.message)
             ? t('Не удалось загрузить диалоги. Обновите страницу.')
             : failure.message,
-        ),
-      );
+        );
+      })
+      .finally(() => {
+        listBusy.current = false;
+        // Подгрузка следующих страниц после сбоя снова разрешена: связь могла вернуться.
+        setMoreFailed(false);
+        if (listAgain.current) {
+          listAgain.current = false;
+          listRepeat.current();
+        }
+      });
   }, [me]);
+  useEffect(() => {
+    listRepeat.current = loadDialogs;
+  }, [loadDialogs]);
   usePolling(loadDialogs, realtime ? DIALOGS_POLL_REALTIME_MS : DIALOGS_POLL_MS);
 
   const reload = useDebounced(loadDialogs, 700);
-  useMessengerEvents(reload);
+  // При непрерывном потоке событий отложенная загрузка откладывалась бы до конца потока:
+  // раз в пять секунд список перечитываем сразу.
+  const lastListLoad = useRef(0);
+  useMessengerEvents(() => {
+    if (Date.now() - lastListLoad.current > 5000) {
+      lastListLoad.current = Date.now();
+      loadDialogs();
+    } else reload();
+  });
 
   async function loadMoreDialogs() {
     if (!paging || loadingMore) return;
     setLoadingMore(true);
     try {
+      const startedAt = Date.now();
       const data = await fetchDialogs(paging.nextOffset, me);
-      setDialogs((current) => mergeDialogs(current || [], data.dialogs));
+      // Страницы пересекаются: старый ответ не возвращает счётчик прочитанному диалогу.
+      const fresh = data.dialogs.map((dialog: Dialog) => readOverride(dialog, startedAt));
+      setDialogs((current) => mergeDialogs(current || [], fresh));
       setPaging({ hasMore: data.hasMore, nextOffset: data.nextOffset });
+      pagedFurther.current = true;
     } catch {
       setError(t('Не удалось загрузить ещё диалоги.'));
+      // Метка конца списка видна по-прежнему: без паузы наблюдатель повторял бы запрос
+      // без остановки. Снова пробуем после ближайшего обновления списка.
+      setMoreFailed(true);
     } finally {
       setLoadingMore(false);
     }
@@ -172,7 +268,13 @@ export default function Messenger() {
   // оказаться короче окна, и без этого пользователь не дотянулся бы до остального.
   useEffect(() => {
     const target = moreRef.current;
-    if (!target || !paging?.hasMore || loadingMore || typeof IntersectionObserver === 'undefined')
+    if (
+      !target ||
+      !paging?.hasMore ||
+      loadingMore ||
+      moreFailed ||
+      typeof IntersectionObserver === 'undefined'
+    )
       return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) void loadMoreDialogs();
@@ -180,20 +282,29 @@ export default function Messenger() {
     observer.observe(target);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paging, loadingMore, dialogs]);
+  }, [paging, loadingMore, dialogs, moreFailed]);
 
   useEffect(() => {
     const needle = query.trim();
+    // Чаты прошлого запроса не должны оставаться нажимаемыми под новым.
+    setFound([]);
     if (needle.length < 2) {
-      setFound([]);
       return;
     }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       fetch(`/api/messenger/find?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
-        .then((response) => (response.ok ? response.json() : { dialogs: [] }))
-        .then((data) => setFound(data.dialogs))
-        .catch(() => {});
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((data) => {
+          setFoundFailed(false);
+          setFound(data.dialogs);
+        })
+        // Сбой поиска на портале не выдаём за «Ничего не найдено».
+        .catch((failure) => {
+          if (failure?.name === 'AbortError') return;
+          setFound([]);
+          setFoundFailed(true);
+        });
     }, 400);
     return () => {
       window.clearTimeout(timer);
@@ -217,25 +328,111 @@ export default function Messenger() {
     if (!missing) return;
     let cancelled = false;
     void fetch(`/api/messenger/dialogs?dialogId=${encodeURIComponent(activeId)}`)
-      .then((response) => (response.ok ? response.json() : null))
+      // Портал ответил, что диалога нет или к нему нет доступа: ссылку забываем. Прочие
+      // отказы (токен, лимит запросов) временные, ссылка остаётся.
+      .then((response) =>
+        response.ok
+          ? response.json()
+          : response
+              .json()
+              .then((body) =>
+                GONE_CODES.has(String(body?.code || '')) ? { dialog: null } : Promise.reject(),
+              ),
+      )
       .then((data) => {
         if (cancelled) return;
         if (data?.dialog) setDialogs((current) => mergeDialogs(current || [], [data.dialog]));
+        // Портал ответил, что такого диалога нет: ссылка устарела.
         else setActiveId('');
       })
-      .catch(() => {});
+      // Сбой сети или портала не значит, что диалога нет: ссылку не теряем.
+      .catch(() => {
+        if (!cancelled) setError(t('Не удалось открыть диалог. Обновите страницу.'));
+      });
     return () => {
       cancelled = true;
     };
   }, [missing, activeId]);
 
-  const markRead = useCallback((id: string) => {
-    setDialogs((current) => current && current.map((d) => (d.id === id ? { ...d, unread: 0 } : d)));
-    void fetch('/api/messenger/messages', {
+  // Ноль в списке сразу, а портал догоняет. Отказ портала возвращает настоящий счётчик
+  // диалога, иначе список показывал бы прочитанным то, что в Битриксе не прочитано.
+  const markRead = useCallback((id: string, messageId = 0): Promise<boolean> => {
+    // Отметки одного диалога могут идти одновременно: откатывать счётчик и границу
+    // вправе только последняя, иначе поздний сбой старой затёр бы успешную новую.
+    const mine = (readGen.current.get(id) || 0) + 1;
+    readGen.current.set(id, mine);
+    readsInFlight.current.set(id, (readsInFlight.current.get(id) || 0) + 1);
+    // Цепочка параллельных отметок кончилась: подтверждённый счётчик больше не нужен,
+    // иначе его старый ноль достался бы следующей, уже не связанной отметке.
+    const settle = () => {
+      const left = (readsInFlight.current.get(id) || 1) - 1;
+      if (left) readsInFlight.current.set(id, left);
+      else {
+        readsInFlight.current.delete(id);
+        confirmed.current.delete(id);
+      }
+    };
+    const latest = () => readGen.current.get(id) === mine;
+    readAt.current.set(id, { at: Date.now(), upTo: messageId });
+    // Прежний счётчик нужен, если ни отметка, ни перечитывание не удались: ноль из
+    // пустого ответа выводить нельзя.
+    // Пока идут отметки, подтверждённым остаётся счётчик до первой из них: вторая
+    // увидела бы уже оптимистичный ноль.
+    const before = confirmed.current.has(id)
+      ? (confirmed.current.get(id) as number)
+      : (dialogsRef.current?.find((d) => d.id === id)?.unread ?? 0);
+    confirmed.current.set(id, before);
+    const restore = (unread: number) => {
+      if (latest()) confirmed.current.delete(id);
+      if (latest())
+        setDialogs(
+          (current) => current && current.map((d) => (d.id === id ? { ...d, unread } : d)),
+        );
+    };
+    // Ноль сразу, только если в списке нет сообщения новее границы: его ещё не видели.
+    setDialogs(
+      (current) =>
+        current &&
+        current.map((d) =>
+          d.id === id && (!messageId || (d.lastMessage?.id || 0) <= messageId)
+            ? { ...d, unread: 0 }
+            : d,
+        ),
+    );
+    return fetch('/api/messenger/messages', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dialogId: id }),
-    });
+      body: JSON.stringify({ dialogId: id, messageId }),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        // Прочтение подтверждено: откат параллельной отметки не вернёт этот счётчик.
+        // Значение живёт до конца цепочки, его убирает settle.
+        confirmed.current.set(id, 0);
+        window.dispatchEvent(new Event(CHAT_READ_EVENT));
+        return true;
+      })
+      .catch(() => {
+        if (latest()) readAt.current.delete(id);
+        return (
+          fetch(`/api/messenger/dialogs?dialogId=${encodeURIComponent(id)}`)
+            .then((response) => (response.ok ? response.json() : null))
+            // Счётчик берём из ответа напрямую: дата у этой записи от создания чата, и
+            // mergeDialogs отверг бы её как более старую.
+            // Без ответа портала откатываемся к подтверждённому: если за это время другая
+            // отметка прошла успешно, это уже ноль, а не счётчик до первой.
+            .then((data) =>
+              restore(
+                data?.dialog
+                  ? Number(data.dialog.unread) || 0
+                  : (confirmed.current.get(id) ?? before),
+              ),
+            )
+            .catch(() => restore(confirmed.current.get(id) ?? before))
+            .then(() => false)
+        );
+      })
+      .finally(settle);
   }, []);
 
   // Настройки диалога меняются сразу, а портал догоняет: при отказе список перечитывается.
@@ -266,7 +463,10 @@ export default function Messenger() {
     if (!response?.ok) {
       setError(t('Не удалось изменить настройки диалога.'));
       loadDialogs();
+      return;
     }
+    // Ручная отметка «непрочитанным» меняет и значок в меню.
+    if (action === 'unread') window.dispatchEvent(new Event(CHAT_READ_EVENT));
   }
 
   async function toggleNotify() {
@@ -283,7 +483,9 @@ export default function Messenger() {
       setDialogs((current) =>
         current?.some((item) => item.id === dialog.id)
           ? current
-          : mergeDialogs(current || [], [{ ...dialog, unread: 0, date: new Date().toISOString() }]),
+          : mergeDialogs(current || [], [
+              { ...dialog, unread: 0, date: new Date().toISOString(), local: true },
+            ]),
       );
       setActiveId(dialog.id);
       setNewChatOpen(false);
@@ -357,7 +559,13 @@ export default function Messenger() {
                 <LoadingState className="min-h-40 bg-transparent" />
               )
             ) : visible.length === 0 ? (
-              <p className="p-4 text-sm text-ink-soft">{t('Ничего не найдено')}</p>
+              <p className="p-4 text-sm text-ink-soft">
+                {foundFailed
+                  ? t(
+                      'Поиск чатов на портале не выполнился. Измените запрос, чтобы попробовать ещё раз.',
+                    )
+                  : t('Ничего не найдено')}
+              </p>
             ) : (
               <ul>
                 {visible.map((dialog) => (
@@ -365,10 +573,9 @@ export default function Messenger() {
                     <button
                       type="button"
                       aria-current={dialog.id === activeId ? 'true' : undefined}
-                      onClick={() => {
-                        setActiveId(dialog.id);
-                        if (dialog.unread) markRead(dialog.id);
-                      }}
+                      // Прочитанным диалог отметит сама переписка, когда последние сообщения
+                      // загрузятся и будут видны.
+                      onClick={() => setActiveId(dialog.id)}
                       className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-surface-2 ${
                         dialog.id === activeId ? 'bg-surface-2' : ''
                       }`}
@@ -460,6 +667,14 @@ export default function Messenger() {
                 ))}
               </ul>
             )}
+            {/* Сбой поиска на портале виден и тогда, когда что-то нашлось в загруженном списке. */}
+            {foundFailed && visible.length > 0 && (
+              <p className="px-3 py-2 text-xs text-ink-soft">
+                {t(
+                  'Поиск чатов на портале не выполнился. Измените запрос, чтобы попробовать ещё раз.',
+                )}
+              </p>
+            )}
             {found.filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id)).length >
               0 && (
               <div className="border-t border-line">
@@ -517,10 +732,10 @@ export default function Messenger() {
                 )
               }
               onLeft={() => {
-                setDialogs((current) =>
-                  current ? current.filter((d) => d.id !== active.id) : current,
-                );
-                setActiveId('');
+                const left = active.id;
+                setDialogs((current) => (current ? current.filter((d) => d.id !== left) : current));
+                // Пока портал отвечал, могли открыть другой диалог: его не закрываем.
+                setActiveId((current) => (current === left ? '' : current));
               }}
             />
           ) : (

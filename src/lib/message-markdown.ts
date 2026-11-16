@@ -64,7 +64,11 @@ const HEADING = /^#{1,6}\s+(.+)$/;
 // atLineStart: первая строка узла стоит в начале строки сообщения. Узел после
 // тега ([USER=1]Имя[/USER] - привет) начинается посреди строки, и дефис в нём
 // это не маркер списка.
-export function markdownNodes(text: string, atLineStart = true): BitrixNode[] {
+// Глубже этого цитаты не вкладываем: строка из сотен «>» иначе давала бы столько же
+// уровней рекурсии и вложенных блоков, и разбор или рендер переполнял бы стек.
+const MAX_QUOTE_DEPTH = 8;
+
+export function markdownNodes(text: string, atLineStart = true, depth = 0): BitrixNode[] {
   const lines = text.split('\n');
   const out: BitrixNode[] = [];
   let paragraph: string[] = [];
@@ -76,21 +80,25 @@ export function markdownNodes(text: string, atLineStart = true): BitrixNode[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const blockAllowed = atLineStart || i > 0;
-    if (blockAllowed && line.startsWith('```')) {
+    // Блок кода только с закрывающей строкой: без неё открывающая строка и остальное
+    // остаются текстом, а не пропадают.
+    const fenceEnd = line.startsWith('```')
+      ? lines.findIndex((next, j) => j > i && next.startsWith('```'))
+      : -1;
+    if (blockAllowed && fenceEnd > i) {
       flush();
-      const body: string[] = [];
-      for (i++; i < lines.length && !lines[i].startsWith('```'); i++) body.push(lines[i]);
-      out.push({ type: 'code', text: body.join('\n'), block: true });
+      out.push({ type: 'code', text: lines.slice(i + 1, fenceEnd).join('\n'), block: true });
+      i = fenceEnd;
       continue;
     }
-    if (blockAllowed && line.startsWith('>')) {
+    if (blockAllowed && line.startsWith('>') && depth < MAX_QUOTE_DEPTH) {
       flush();
       const body: string[] = [];
       for (; i < lines.length && lines[i].startsWith('>'); i++)
         // >> это родная цитата чата Битрикса, > привычная markdown-форма.
         body.push(lines[i].replace(/^>>?\s?/, ''));
       i--;
-      out.push({ type: 'quote', children: markdownNodes(body.join('\n')) });
+      out.push({ type: 'quote', children: markdownNodes(body.join('\n'), true, depth + 1) });
       continue;
     }
     const marker = !blockAllowed
@@ -140,18 +148,96 @@ function trimBlockBreaks(nodes: BitrixNode[]): BitrixNode[] {
   });
 }
 
-function withMarkdown(nodes: BitrixNode[], top: boolean): BitrixNode[] {
+function withMarkdown(nodes: BitrixNode[], top: boolean, depth = 0): BitrixNode[] {
   return trimBlockBreaks(
     nodes.flatMap((node, index): BitrixNode[] => {
-      if (node.type === 'text') return markdownNodes(node.text, top && index === 0);
+      if (node.type === 'text') return markdownNodes(node.text, top && index === 0, depth);
       // Внутри ссылки Markdown не ищем: вложенная ссылка в <a> недопустима.
       if (node.type === 'format' || node.type === 'quote')
-        return [{ ...node, children: withMarkdown(node.children, false) }];
+        return [{ ...node, children: withMarkdown(node.children, false, depth) }];
       return [node];
     }),
   );
 }
 
-export function parseMessageNodes(text: string): BitrixNode[] {
-  return withMarkdown(parseBitrixNodes(text), true);
+const PAIRED_TAG =
+  /\[(\/?)(b|i|u|s|strike|quote|code|url|user|img|list|chat|size|color|font|send|put|call|context)(?:=[^\]]*)?\]/gi;
+
+// Строка > внутри парного тега ([QUOTE], [CODE], [B] на несколько строк): её разберёт
+// сам тег, иначе открывающий и закрывающий попали бы в разные куски и остались без пары.
+// Состояние копится по строкам: пересчёт всего накопленного текста на каждой строке
+// делал разбор длинного сообщения квадратичным.
+function tagTracker() {
+  const open = new Map<string, number>();
+  // Внутри [CODE] всё текст: теги в нём не открывают и не закрывают разметку.
+  let inCode = false;
+  return {
+    feed(line: string) {
+      for (const [, close, tag] of line.matchAll(PAIRED_TAG)) {
+        const name = tag.toLowerCase();
+        if (inCode) {
+          if (close && name === 'code') inCode = false;
+          continue;
+        }
+        if (name === 'code' && !close) {
+          inCode = true;
+          continue;
+        }
+        // По порядку: лишний закрывающий тег раньше пары её не гасит.
+        const depth = open.get(name) || 0;
+        if (!close) open.set(name, depth + 1);
+        else if (depth) open.set(name, depth - 1);
+      }
+    },
+    isOpen: () => inCode || [...open.values()].some((depth) => depth > 0),
+  };
+}
+
+// Цитата строками > собирается до разбора тегов: в ней бывают [USER] и [B], и разбор
+// тегов первым резал её на куски, после которых цитатой оставалась только первая часть.
+// Внутри блока кода строки с > это код, а не цитата.
+export function parseMessageNodes(text: string, depth = 0): BitrixNode[] {
+  const lines = text.split('\n');
+  const out: BitrixNode[] = [];
+  let rest: string[] = [];
+  let tags = tagTracker();
+  const flush = () => {
+    if (rest.length) out.push(...withMarkdown(parseBitrixNodes(rest.join('\n')), true, depth));
+    rest = [];
+    tags = tagTracker();
+  };
+  for (let i = 0; i < lines.length; i++) {
+    // Блок кода ```…``` берём целиком до разбора тегов: [B] в коде это текст кода.
+    if (lines[i].startsWith('```') && !tags.isOpen()) {
+      const body: string[] = [];
+      let j = i + 1;
+      for (; j < lines.length && !lines[j].startsWith('```'); j++) body.push(lines[j]);
+      if (j < lines.length) {
+        flush();
+        out.push({ type: 'code', text: body.join('\n'), block: true });
+        i = j;
+        continue;
+      }
+      // Незакрытый блок: дальше всё буквально, без цитат и тегов. Перенос перед ним
+      // сохраняем, иначе ``` прилипло бы к предыдущей строке.
+      const before = out.length > 0 || rest.length > 0;
+      flush();
+      out.push({ type: 'text', text: (before ? '\n' : '') + lines.slice(i).join('\n') });
+      return out;
+    }
+    if (depth >= MAX_QUOTE_DEPTH || !lines[i].startsWith('>') || tags.isOpen()) {
+      rest.push(lines[i]);
+      tags.feed(lines[i]);
+      continue;
+    }
+    const body: string[] = [];
+    for (; i < lines.length && lines[i].startsWith('>'); i++)
+      // >> это родная цитата чата Битрикса, > привычная markdown-форма.
+      body.push(lines[i].replace(/^>>?\s?/, ''));
+    i--;
+    flush();
+    out.push({ type: 'quote', children: parseMessageNodes(body.join('\n'), depth + 1) });
+  }
+  flush();
+  return out;
 }

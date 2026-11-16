@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { invalidatePushWanted } from '@/lib/messenger-events';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { pushConfigured, removeSubscription, saveSubscription, vapidPublicKey } from '@/lib/push';
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
   if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
   const body = await req.json().catch(() => null);
   const saved = await saveSubscription(memberId, body?.subscription ?? {});
+  // Вкладку могут закрыть сразу после включения: поллер не ждёт минуту до перепроверки.
+  invalidatePushWanted();
   return saved
     ? NextResponse.json({ ok: true })
     : NextResponse.json({ error: 'BAD_SUBSCRIPTION' }, { status: 400 });
@@ -31,5 +34,6 @@ export async function DELETE(req: NextRequest) {
   if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
   const body = await req.json().catch(() => null);
   if (typeof body?.endpoint === 'string') await removeSubscription(memberId, body.endpoint);
+  invalidatePushWanted();
   return NextResponse.json({ ok: true });
 }

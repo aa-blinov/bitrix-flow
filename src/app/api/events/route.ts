@@ -16,6 +16,10 @@ type Subscriber = {
   memberId: string;
   /** Курсор подписчика: до какого события ему уже отдали. */
   lastSentId: ObjectId | null;
+  /** Когда курсор вкладки зафиксирован: событие, записанное раньше, ей не дойдёт. */
+  readyAt: number;
+  /** Вкладка показывает уведомления о чате: только такая заменяет пуш. */
+  alerts: boolean;
   enqueue: (chunk: string) => void;
 };
 
@@ -23,6 +27,7 @@ const subscribers = new Set<Subscriber>();
 // Поллер событий чата читает очередь портала только пока есть открытые вкладки.
 globalThis.__sseSubscribers = subscribers;
 let pump: NodeJS.Timeout | null = null;
+const RESUME_WINDOW_MS = 5 * 60_000;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
 async function queryEvents(memberId: string, after: ObjectId | null) {
@@ -69,7 +74,8 @@ async function pumpOnce() {
         if (subscriber.lastSentId && event._id <= subscriber.lastSentId) continue;
         subscriber.lastSentId = event._id;
         try {
-          subscriber.enqueue(`data: ${JSON.stringify(event.event)}\n\n`);
+          // id нужен браузеру: после разрыва он сам пришлёт Last-Event-ID.
+          subscriber.enqueue(`id: ${event._id}\ndata: ${JSON.stringify(event.event)}\n\n`);
         } catch {
           // Подписчик отключился между выборкой и отправкой.
         }
@@ -101,6 +107,17 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Вкладку могут закрыть, пока ждём базу: отмену ловим до первого await, иначе
+      // подписчик остался бы навсегда и подавлял пуши за несуществующую вкладку.
+      let closed = req.signal.aborted;
+      let subscriber: Subscriber | null = null;
+      req.signal.addEventListener('abort', () => {
+        closed = true;
+        if (subscriber) subscribers.delete(subscriber);
+        try {
+          controller.close();
+        } catch {}
+      });
       // History is loaded through /api/notifications. Snapshot the cursor
       // before confirming connection so an event cannot be skipped in-between.
       const db = await getDb();
@@ -110,22 +127,38 @@ export async function GET(req: NextRequest) {
         .sort({ _id: -1 })
         .limit(1)
         .toArray();
-      const lastSentId: ObjectId | null = latest[0]?._id || null;
+      // Переподключение после разрыва продолжает с последнего полученного события: иначе
+      // сообщение, пришедшее за время разрыва, осталось бы без уведомления. Досылаем только
+      // события последних минут: после сна ноутбука звон о давнем только мешает. Граница по
+      // времени самих событий, а не последнего полученного: тот мог прийти и час назад.
+      const resume =
+        req.headers.get('last-event-id') || req.nextUrl.searchParams.get('after') || '';
+      const resumeId =
+        ObjectId.isValid(resume) && resume.length === 24 ? new ObjectId(resume) : null;
+      const floor = ObjectId.createFromTime(Math.floor((Date.now() - RESUME_WINDOW_MS) / 1000));
+      const lastSentId: ObjectId | null = resumeId
+        ? resumeId.getTimestamp() > floor.getTimestamp()
+          ? resumeId
+          : floor
+        : latest[0]?._id || null;
 
-      const subscriber: Subscriber = {
+      if (closed) return;
+      subscriber = {
         memberId,
         lastSentId,
+        readyAt: Date.now(),
+        alerts: req.nextUrl.searchParams.get('alerts') === '1',
         enqueue: (chunk) => controller.enqueue(encoder.encode(chunk)),
       };
       subscribers.add(subscriber);
       ensurePump();
 
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
-
-      req.signal.addEventListener('abort', () => {
-        subscribers.delete(subscriber);
-        controller.close();
-      });
+      // Курсор с самого начала: если связь оборвётся до первого события, браузер
+      // переподключится с этим Last-Event-ID и получит пришедшее за время разрыва.
+      const cursor = lastSentId || ObjectId.createFromTime(Math.floor(Date.now() / 1000));
+      controller.enqueue(
+        encoder.encode(`id: ${cursor}\ndata: ${JSON.stringify({ type: 'connected' })}\n\n`),
+      );
     },
   });
 

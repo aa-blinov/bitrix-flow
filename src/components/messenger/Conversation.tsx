@@ -62,6 +62,46 @@ import { dateLocale, t } from '@/lib/i18n';
 const MESSAGES_POLL_MS = 5_000;
 const MESSAGES_POLL_REALTIME_MS = 20_000;
 
+// Черновик и очередь файлов каждого диалога живут дольше переписки: она размонтируется
+// при переходе в другой чат, и набранный текст с прикреплёнными файлами терялся бы.
+// ponytail: только в памяти вкладки, после перезагрузки страницы черновиков нет.
+type Mention = { id: number | 'all'; name: string };
+const drafts = new Map<string, { text: string; files: File[]; mentions?: Mention[] }>();
+// Сколько отправок идёт в каждом диалоге: вернувшаяся переписка не даёт отправить то же
+// второй раз. Счётчик, а не флаг: голосовое и текст могут идти одновременно.
+const sendingDialogs = new Map<string, number>();
+
+// Отправка могла закончиться, когда переписку уже открыли заново: открытая копия тоже
+// должна убрать отправленное, поэтому подтверждения раздаются подписчикам.
+type Sent = { dialogId: string; text?: string; file?: File; requeued?: File; finished?: boolean };
+const sentListeners = new Set<(sent: Sent) => void>();
+
+function startSending(dialogId: string) {
+  sendingDialogs.set(dialogId, (sendingDialogs.get(dialogId) || 0) + 1);
+}
+
+function finishSending(dialogId: string) {
+  const left = (sendingDialogs.get(dialogId) || 1) - 1;
+  if (left) {
+    sendingDialogs.set(dialogId, left);
+    return;
+  }
+  sendingDialogs.delete(dialogId);
+  for (const listener of sentListeners) listener({ dialogId, finished: true });
+}
+
+function forgetSent(dialogId: string, text: string) {
+  const saved = drafts.get(dialogId);
+  if (saved?.text === text) drafts.set(dialogId, { ...saved, text: '' });
+  for (const listener of sentListeners) listener({ dialogId, text });
+}
+
+function forgetFile(dialogId: string, file: File) {
+  const saved = drafts.get(dialogId);
+  if (saved) drafts.set(dialogId, { ...saved, files: saved.files.filter((item) => item !== file) });
+  for (const listener of sentListeners) listener({ dialogId, file });
+}
+
 export default function Conversation({
   dialog,
   dialogs,
@@ -79,7 +119,7 @@ export default function Conversation({
   me: number;
   portal: string;
   onBack: () => void;
-  onRead: (id: string) => void;
+  onRead: (id: string, messageId: number) => Promise<boolean>;
   onSent: () => void;
   onPin: () => void;
   onRenamed: (title: string) => void;
@@ -87,14 +127,29 @@ export default function Conversation({
 }) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [people, setPeople] = useState<Record<string, Person>>({});
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+  const [draft, setDraft] = useState(() => drafts.get(dialog.id)?.text ?? '');
+  // Выбранные упоминания живут вместе с черновиком, иначе @Имя ушло бы простым текстом.
+  const [mentions, setMentions] = useState<Mention[]>(() => drafts.get(dialog.id)?.mentions ?? []);
+  // Правка занимает поле ввода: набранное новое сообщение откладываем и возвращаем, когда
+  // правку закончили или отменили.
+  const beforeEdit = useRef('');
+  const beforeEditMentions = useRef<Mention[]>([]);
+  const editingRef = useRef<Message | null>(null);
+  const [sending, setSending] = useState(() => sendingDialogs.has(dialog.id));
+  const beginSend = () => {
+    setSending(true);
+    startSending(dialog.id);
+  };
   const [error, setError] = useState('');
   const [hasOlder, setHasOlder] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   // null пока портал не ответил: галочки без данных не рисуем.
   const [readers, setReaders] = useState<Reader[] | null>(null);
   const [canPost, setCanPost] = useState(true);
+  const canPostRef = useRef(true);
+  useEffect(() => {
+    canPostRef.current = canPost;
+  }, [canPost]);
   // Роль в чате: владелец и менеджер могут удалять чужие сообщения.
   const [role, setRole] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -102,10 +157,25 @@ export default function Conversation({
   const [seconds, setSeconds] = useState(0);
   const [canRecord, setCanRecord] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
+  // Фрагменты у каждой записи свои: остановка прошлой заканчивается асинхронно, и общий
+  // буфер смешал бы её со следующей записью.
+  const chunks = useRef(new WeakMap<MediaRecorder, Blob[]>());
   const picker = useRef<HTMLInputElement>(null);
   // Файлы ждут в очереди до отправки: можно убрать лишний и дописать подпись.
-  const [pending, setPending] = useState<File[]>([]);
+  const [pending, setPending] = useState<File[]>(() => drafts.get(dialog.id)?.files ?? []);
+  useEffect(() => {
+    const listener = (sent: Sent) => {
+      if (sent.dialogId !== dialog.id) return;
+      if (sent.text !== undefined) setDraft((current) => (current === sent.text ? '' : current));
+      if (sent.file) setPending((current) => current.filter((item) => item !== sent.file));
+      if (sent.requeued) setPending((current) => [...current, sent.requeued as File]);
+      if (sent.finished) setSending(false);
+    };
+    sentListeners.add(listener);
+    return () => {
+      sentListeners.delete(listener);
+    };
+  }, [dialog.id]);
   // Доля загрузки текущего файла на наш сервер; null когда ничего не отправляется.
   const [progress, setProgress] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -114,19 +184,29 @@ export default function Conversation({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
+  useEffect(() => {
+    // Во время правки в поле текст старого сообщения: сохраняем отложенный черновик.
+    const text = editing ? beforeEdit.current : draft;
+    const saved = editing ? beforeEditMentions.current : mentions;
+    if (text || pending.length) drafts.set(dialog.id, { text, files: pending, mentions: saved });
+    else drafts.delete(dialog.id);
+  }, [dialog.id, draft, pending, editing, mentions]);
   const [deleting, setDeleting] = useState<Message | null>(null);
   const [forwarding, setForwarding] = useState<Message | null>(null);
   const [taskFrom, setTaskFrom] = useState<Message | null>(null);
   const [notice, setNotice] = useState('');
   // Сообщение, у которого открыта панель действий (на телефоне вместо наведения).
   const [actionsFor, setActionsFor] = useState<number | null>(null);
-  const [mentions, setMentions] = useState<{ id: number | 'all'; name: string }[]>([]);
   const [mention, setMention] = useState<{ query: string; from: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [members, setMembers] = useState<UserHit[] | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<Message[] | null>(null);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   // После перехода к найденному сообщению окно истории не доходит до последних.
   const [jumped, setJumped] = useState(false);
@@ -158,37 +238,175 @@ export default function Conversation({
     [dialogId, me],
   );
 
+  // Новое чужое сообщение ждёт отметки до конца догоняющего прохода. Флаг живёт между
+  // загрузками: если следующая страница упала, отметка не теряется.
+  const sawNew = useRef(false);
+  // Идёт загрузка истории: отметки прочитанного ждут её конца.
+  const loading = useRef(false);
+  // Отметка не прошла (портал или связь): ждёт следующего прохода опроса.
+  // Без показанного сообщения границы нет, а im.dialog.read без неё погасил бы и то, что
+  // придёт в эту секунду: пустой истории читать нечего.
+  const readNow = useCallback(
+    () =>
+      newestRef.current &&
+      void onRead(dialogId, newestRef.current).then((ok) => {
+        if (!ok) sawNew.current = true;
+      }),
+    [onRead, dialogId],
+  );
+  // Сообщение пришло, пока вкладка скрыта: прочитанным его отметим, когда человек вернётся.
+  const unseen = useRef(false);
+  // То же, пока человек читает старую часть истории (отлистал вверх или прыгнул к
+  // найденному): отметка ждёт, когда он вернётся к последним сообщениям.
+  const markSeen = useCallback(() => {
+    if (document.visibilityState === 'visible' && stickToBottom.current && !jumpedRef.current)
+      readNow();
+    else unseen.current = true;
+  }, [readNow]);
+  const flushSeen = () => {
+    // Программная прокрутка в скрытой вкладке тоже вызывает onScroll: без проверки
+    // видимости сообщения отмечались бы прочитанными до возвращения человека.
+    if (document.visibilityState !== 'visible') return;
+    if (!unseen.current || !stickToBottom.current || jumpedRef.current) return;
+    unseen.current = false;
+    // Идёт догрузка: отметим в её конце, когда всё загруженное уже на экране.
+    if (loading.current) {
+      sawNew.current = true;
+      return;
+    }
+    readNow();
+  };
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !unseen.current) return;
+      if (!stickToBottom.current || jumpedRef.current) return;
+      unseen.current = false;
+      if (loading.current) {
+        sawNew.current = true;
+        return;
+      }
+      readNow();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [readNow]);
+  // Открытый непрочитанный диалог (кликом, по ссылке уведомления или после обновления
+  // страницы) отмечается прочитанным, когда последние сообщения загрузились и видны, а не
+  // при открытии: зависшая или упавшая загрузка не должна гасить счётчик.
+  const unreadAtOpen = useRef(dialog.unread > 0);
+
   // Первый запрос берёт последние сообщения, дальше опрос идёт курсором
   // afterId (FIRST_ID портала) и тянет только новое, не затирая подгруженную историю.
-  const load = useCallback(() => {
-    // Каждый шестой опрос (раз в полминуты) перечитывает последнюю страницу целиком:
-    // правки, удаления и лайки чужих сообщений курсором afterId не приходят.
-    polls.current += 1;
-    const after = polls.current % 6 === 0 && !jumpedRef.current ? 0 : newestRef.current;
-    const latest = newestRef.current;
-    void request(after ? `&afterId=${after}` : '')
-      .then((data) => {
-        setMessages((current) => mergeMessages(current || [], data.messages));
+  // Загрузки идут по одной: поздний ответ старого опроса иначе откатывал бы курсор
+  // и затирал свежую версию сообщения. Вызов во время загрузки ставит ещё один проход.
+  const again = useRef(false);
+  // Прыжок к найденному и возврат к последним заменяют окно истории: ответ загрузки,
+  // начатой до этого, в новое окно не попадает.
+  const generation = useRef(0);
+  const loaded = useRef(false);
+  const load = useCallback(async () => {
+    if (loading.current) {
+      again.current = true;
+      return;
+    }
+    loading.current = true;
+    try {
+      // Одна страница: без курсора это последние сообщения, и тогда она заменяет свой
+      // диапазон целиком (удалённое на портале исчезает), с afterId только новое.
+      const page = async (after: number) => {
+        const gen = generation.current;
+        const data = await request(after ? `&afterId=${after}` : '');
+        if (gen !== generation.current) return 0;
+        const first = !loaded.current;
+        // История опустела на портале: начатая до этого подгрузка старых страниц не должна
+        // вернуть удалённое.
+        if (!after && !data.messages.length && newestRef.current) generation.current += 1;
+        setMessages((current) => mergeMessages(current || [], data.messages, !after));
+        // История снова грузится: прошлое предупреждение о сбое больше не правда.
+        setError((current) => (current === t('Не удалось загрузить сообщения.') ? '' : current));
         setPeople((known) => ({ ...known, ...data.people }));
         if (data.readers) setReaders(data.readers);
         if (data.canPost !== undefined) setCanPost(data.canPost);
         if (data.role !== undefined) setRole(data.role);
-        if (!latest) setHasOlder(data.messages.length >= MESSAGES_PAGE);
-        // Пришло чужое сообщение в открытом диалоге: сразу прочитано.
-        if (latest && data.messages.some((m) => m.id > latest && m.authorId !== me))
-          onRead(dialogId);
+        if (first) setHasOlder(data.messages.length >= MESSAGES_PAGE);
+        const latest = newestRef.current;
+        // Пришло чужое сообщение в открытом диалоге: прочитано, если его видно. Пустой
+        // до этого диалог тоже считается: курсор у него ноль, но история уже загружена.
+        // Отмечаем после прохода целиком: im.dialog.read гасит всё, в том числе страницы,
+        // которые ещё не догнаны.
+        if (!first && data.messages.some((m) => m.id > latest && m.authorId !== me))
+          sawNew.current = true;
+        if (first && !after && (unreadAtOpen.current || unseen.current)) {
+          unreadAtOpen.current = false;
+          unseen.current = false;
+          sawNew.current = true;
+        }
+        loaded.current = true;
         newestRef.current = Math.max(latest, ...data.messages.map((m) => m.id));
-      })
-      .catch(() => setError(t('Не удалось загрузить сообщения.')));
-  }, [request, dialogId, me, onRead]);
+        return data.messages.length;
+      };
+      do {
+        again.current = false;
+        // Каждый шестой опрос (раз в полминуты) перечитывает последнюю страницу целиком:
+        // правки, удаления и лайки чужих сообщений курсором afterId не приходят.
+        polls.current += 1;
+        const full = polls.current % 6 === 0 && !jumpedRef.current;
+        // Новое догоняем страницами: за время разрыва его могло прийти больше страницы,
+        // и одна страница с переносом курсора на её конец оставила бы дыру в истории.
+        // После прыжка к найденному окно растёт к последним по странице за опрос.
+        const pages = jumpedRef.current ? 1 : 20;
+        let caughtUp = true;
+        if (loaded.current && newestRef.current)
+          for (let n = 0; (await page(newestRef.current)) >= MESSAGES_PAGE; n++)
+            if (n + 1 >= pages) {
+              caughtUp = false;
+              break;
+            }
+        // Последнюю страницу целиком берём, только когда новое догнано: иначе между
+        // догнанным и последней страницей осталась бы дыра. Не догнали: ещё проход.
+        // Пустой диалог курсора не имеет: его последнюю страницу спрашиваем каждый раз,
+        // иначе первое сообщение ждало бы полного перечитывания.
+        if (!loaded.current || !newestRef.current || (full && caughtUp)) await page(0);
+        if (sawNew.current && caughtUp) {
+          sawNew.current = false;
+          markSeen();
+        }
+        if (!caughtUp && !jumpedRef.current) again.current = true;
+      } while (again.current);
+    } catch {
+      setError(t('Не удалось загрузить сообщения.'));
+    } finally {
+      loading.current = false;
+    }
+  }, [request, me, markSeen]);
   const realtime = useRealtime();
   usePolling(load, realtime ? MESSAGES_POLL_REALTIME_MS : MESSAGES_POLL_MS);
 
   // Событие по этому диалогу: новое сообщение подтягивается сразу, а правка, удаление
   // и лайк перечитывают страницу целиком (курсор afterId такие изменения не отдаёт).
+  // Правка или удаление сообщения со старой, уже подгруженной страницы: полное
+  // перечитывание берёт только последнюю страницу, поэтому это сообщение спрашиваем само.
+  // Две быстрые правки одного сообщения: применяется ответ только последнего запроса.
+  const refreshing = useRef(new Map<number, number>());
+  async function refreshOne(id: number) {
+    const gen = generation.current;
+    const mine = (refreshing.current.get(id) || 0) + 1;
+    refreshing.current.set(id, mine);
+    const data = await request(`&afterId=${id - 1}`).catch(() => null);
+    if (!data || gen !== generation.current || refreshing.current.get(id) !== mine) return;
+    const fresh = data.messages.find((m) => m.id === id);
+    // Нет в ответе не значит удалено: портал мог отдать страницу новее него. Удалённое
+    // портал и так оставляет на месте пометкой, её принесёт сам ответ.
+    if (fresh) setMessages((current) => current && current.map((m) => (m.id === id ? fresh : m)));
+  }
+
   useMessengerEvents((event) => {
     if (event.dialogId !== dialog.id) return;
-    if (event.kind !== 'add') polls.current = 5;
+    if (event.kind !== 'add') {
+      polls.current = 5;
+      const tailFrom = messages?.at(-MESSAGES_PAGE)?.id ?? 0;
+      if (event.messageId && event.messageId < tailFrom) void refreshOne(event.messageId);
+    }
     load();
   });
 
@@ -196,10 +414,20 @@ export default function Conversation({
   async function loadOlder() {
     if (!oldestId || loadingOlder) return;
     setLoadingOlder(true);
+    const gen = generation.current;
     try {
       const data = await request(`&beforeId=${oldestId}`);
+      if (gen !== generation.current) return;
       heightBeforePrepend.current = scroller.current?.scrollHeight || 0;
-      setMessages((current) => mergeMessages(current || [], data.messages));
+      // Старая страница только добавляет недостающее: версии, уже обновлённые опросом,
+      // поздний ответ не откатывает.
+      setMessages((current) => {
+        const known = new Set((current || []).map((m) => m.id));
+        return mergeMessages(
+          current || [],
+          data.messages.filter((m) => !known.has(m.id)),
+        );
+      });
       setPeople((known) => ({ ...known, ...data.people }));
       // Портал может вернуть больше LIMIT, но не меньше, пока история не кончилась.
       setHasOlder(data.messages.length >= MESSAGES_PAGE);
@@ -258,55 +486,117 @@ export default function Conversation({
 
   const json = { 'Content-Type': 'application/json' };
 
+  // Поле ввода открыто и во время отправки: если человек уже набирает следующее,
+  // успешный ответ прошлой отправки не должен стереть новый текст.
+  const clearSent = (sent: string) => {
+    setDraft((current) => (current === sent ? '' : current));
+    setMentions((current) => (draftRef.current === sent ? [] : current));
+  };
+  const draftRef = useRef('');
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
   async function send() {
+    // Ответ, выбранный при отправке: если за время запроса выбрали другой, его не трогаем.
+    const replied = replyTo?.id;
+    let unsure = false;
+    const sent = draft;
     const raw = draft.trim();
     if ((!raw && !pending.length) || sending) return;
-    setSending(true);
+    beginSend();
     setError('');
     try {
       if (editing) {
+        // Упоминание, выбранное в правке, тоже становится тегом; старые теги остаются.
+        const edited = applyMentions(raw, mentions);
         const response = await fetch('/api/messenger/message', {
           method: 'PUT',
           headers: json,
-          body: JSON.stringify({ messageId: editing.id, text: raw, dialogId }),
-        });
+          body: JSON.stringify({ messageId: editing.id, text: edited, dialogId }),
+        }).catch(() => null);
+        // Связь оборвалась: правка могла пройти. Перечитываем, а не объявляем отказ.
+        if (!response || response.status >= 500) {
+          unsure = true;
+          throw new Error('UNSURE');
+        }
         if (!response.ok) throw new Error(String(response.status));
         const id = editing.id;
         setMessages(
           (current) =>
-            current && current.map((m) => (m.id === id ? { ...m, text: raw, edited: true } : m)),
+            current && current.map((m) => (m.id === id ? { ...m, text: edited, edited: true } : m)),
         );
-        setEditing(null);
-        setDraft('');
+        // Пока шла правка, могли выбрать другое сообщение: тот выбор не сбрасываем.
+        setEditing((current) => (current?.id === id ? null : current));
+        // Правка ушла: в поле возвращается отложенный черновик нового сообщения.
+        setDraft((current) => (current === sent ? beforeEdit.current : current));
+        // Если за время запроса начали другую правку, её упоминания не трогаем.
+        if (editingRef.current?.id === id) setMentions(beforeEditMentions.current);
         return;
       }
       const text =
         (replyTo ? quoteBlock(nameOf(replyTo), replyTo) : '') + applyMentions(raw, mentions);
-      if (pending.length) await sendPending(text);
+      if (pending.length)
+        await sendPending(text, sent, () => {
+          clearSent(sent);
+          setReplyTo((current) => (current?.id === replied ? null : current));
+        });
       else {
         const response = await fetch('/api/messenger/messages', {
           method: 'POST',
           headers: json,
           body: JSON.stringify({ dialogId: dialog.id, text }),
-        });
+        }).catch(() => null);
+        // Нет ответа или портал не ответил (502): сообщение могло дойти. Перечитываем
+        // историю и просим проверить её, а не повторять вслепую.
+        if (!response || response.status >= 500) {
+          unsure = true;
+          throw new Error('UNSURE');
+        }
         if (!response.ok) throw new Error(String(response.status));
       }
-      setDraft('');
-      setReplyTo(null);
-      setMentions([]);
+      clearSent(sent);
+      // Переписку закрыли, пока шла отправка: сохранённый черновик с этим текстом тоже
+      // чистим, иначе по возвращении его можно было бы отправить второй раз.
+      if (closed.current) forgetSent(dialog.id, sent);
+      setReplyTo((current) => (current?.id === replied ? null : current));
       stickToBottom.current = true;
       if (jumpedRef.current) showLatest();
       else load();
       onSent();
-    } catch {
+    } catch (failure) {
       // Черновик остаётся в поле: текст не теряется, можно отправить ещё раз.
+      if ((failure as Error)?.message === 'UNSURE') unsure = true;
+      if (unsure) load();
+      // Правку старого сообщения полное перечитывание не покажет: спрашиваем его само.
+      if (unsure && editing) void refreshOne(editing.id);
+      const partial = /^PARTIAL:(\d+):(\d+)$/.exec((failure as Error)?.message || '');
+      if (partial) {
+        load();
+        setError(
+          t(
+            'Отправлено файлов: {0} из {1}. Остальные остались в очереди, отправьте их ещё раз.',
+            partial[1],
+            partial[2],
+          ),
+        );
+        return;
+      }
       setError(
-        editing
-          ? t('Не удалось изменить сообщение: править можно только свои и недолго после отправки.')
-          : t('Сообщение не отправилось. Попробуйте ещё раз.'),
+        editing && unsure
+          ? t('Не удалось узнать, сохранилась ли правка. Проверьте сообщение в переписке.')
+          : editing
+            ? t(
+                'Не удалось изменить сообщение: править можно только свои и недолго после отправки.',
+              )
+            : unsure
+              ? t(
+                  'Не удалось узнать, дошло ли сообщение. Проверьте переписку, прежде чем отправлять ещё раз.',
+                )
+              : t('Сообщение не отправилось. Попробуйте ещё раз.'),
       );
     } finally {
-      setSending(false);
+      finishSending(dialog.id);
     }
   }
 
@@ -326,14 +616,25 @@ export default function Conversation({
     if (!response?.ok) apply(message.likes);
   }
 
+  const restoreDraft = () => {
+    setDraft(beforeEdit.current);
+    setMentions(beforeEditMentions.current);
+  };
   function startEdit(message: Message) {
     setReplyTo(null);
+    if (!editing) {
+      beforeEdit.current = draft;
+      beforeEditMentions.current = mentions;
+    }
+    // У текста правки свой список упоминаний: чужие из черновика к нему не относятся.
+    setMentions([]);
     setEditing(message);
     setDraft(message.text);
     inputRef.current?.focus();
   }
 
   function startReply(message: Message) {
+    if (editing) restoreDraft();
     setEditing(null);
     setReplyTo(message);
     inputRef.current?.focus();
@@ -348,7 +649,13 @@ export default function Conversation({
       headers: json,
       body: JSON.stringify({ messageId: target.id }),
     }).catch(() => null);
-    if (!response?.ok) {
+    // Связь оборвалась: удаление могло пройти. Сверяем само сообщение с порталом.
+    if (!response || response.status >= 500) {
+      setError(t('Не удалось узнать, удалилось ли сообщение. Проверьте переписку.'));
+      void refreshOne(target.id);
+      return;
+    }
+    if (!response.ok) {
       setError(
         t('Не удалось удалить сообщение: удалять можно только свои и недолго после отправки.'),
       );
@@ -374,7 +681,7 @@ export default function Conversation({
     if (!message) return;
     const text = // Цитата уходит коллегам в чат: она всегда русская, как и остальные
       // тексты, которые приложение пишет в Битрикс от вашего имени.
-      quoteBlock(nameOf(message), message, 'Переслано от ');
+      quoteBlock(nameOf(message), message, 'Переслано от ', true);
     // С файлами пересылает сервер: он скачивает их из этого чата и загружает в целевой.
     const response = await (
       message.files.length
@@ -394,7 +701,38 @@ export default function Conversation({
             body: JSON.stringify({ dialogId: target.id, text }),
           })
     ).catch(() => null);
-    if (response?.ok) {
+    // Ответа нет или портал не ответил: пересылка могла дойти, повтор её задвоит.
+    if (!response || response.status >= 500) {
+      setError(
+        t(
+          'Не удалось узнать, дошла ли пересылка в «{0}». Проверьте этот чат, прежде чем повторять.',
+          target.title,
+        ),
+      );
+      return;
+    }
+    const result = response.ok ? await response.json().catch(() => null) : null;
+    // 200 без разборчивого тела: исход неизвестен, «Переслано» говорить нельзя.
+    if (response.ok && !result) {
+      setError(
+        t(
+          'Не удалось узнать, дошла ли пересылка в «{0}». Проверьте этот чат, прежде чем повторять.',
+          target.title,
+        ),
+      );
+      return;
+    }
+    if (result && result.sent < result.total) {
+      setError(
+        t(
+          'В «{0}» переслано файлов: {1} из {2}. Проверьте чат: остальные могли не дойти.',
+          target.title,
+          result.sent,
+          result.total,
+        ),
+      );
+      onSent();
+    } else if (result) {
       setNotice(t('Переслано в «{0}»', target.title));
       onSent();
     } else setError(t('Не удалось переслать сообщение.'));
@@ -432,9 +770,13 @@ export default function Conversation({
     if (members === null) {
       setMembers([]);
       void fetch(`/api/messenger/users?dialogId=${encodeURIComponent(dialog.id)}`)
-        .then((response) => (response.ok ? response.json() : { users: [] }))
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then((data) => setMembers(data.users))
-        .catch(() => setMembers([]));
+        // Состав не загрузился: следующий @ спросит снова, а пока видно, почему пусто.
+        .catch(() => {
+          setMembers(null);
+          setError(t('Не удалось загрузить участников чата для упоминания.'));
+        });
     }
   }
 
@@ -468,8 +810,9 @@ export default function Conversation({
   // Поиск по диалогу: запрос уходит после паузы в наборе.
   useEffect(() => {
     const needle = searchQuery.trim();
+    // Найденное по прошлому запросу не должно вести к сообщению под новым.
+    setResults(null);
     if (!searchOpen || needle.length < 2) {
-      setResults(null);
       return;
     }
     const controller = new AbortController();
@@ -478,12 +821,18 @@ export default function Conversation({
         `/api/messenger/search?dialogId=${encodeURIComponent(dialog.id)}&q=${encodeURIComponent(needle)}`,
         { signal: controller.signal },
       )
-        .then((response) => (response.ok ? response.json() : { messages: [], people: {} }))
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then((data) => {
+          setSearchFailed(false);
           setResults([...data.messages].reverse());
           setPeople((known) => ({ ...known, ...data.people }));
         })
-        .catch(() => {});
+        // Сбой поиска не выдаём за «Ничего не найдено»; смена запроса отменяет прошлый.
+        .catch((error) => {
+          if (error?.name === 'AbortError') return;
+          setResults([]);
+          setSearchFailed(true);
+        });
     }, 400);
     return () => {
       window.clearTimeout(timer);
@@ -494,7 +843,16 @@ export default function Conversation({
   // Переход к найденному: берём страницу истории, оканчивающуюся этим сообщением.
   async function jumpTo(id: number) {
     try {
+      const gen = ++generation.current;
       const data = await request(`&beforeId=${id + 1}`);
+      if (gen !== generation.current) return;
+      // Сообщение успели удалить: пустое окно сломало бы курсор, остаёмся где были.
+      if (!data.messages.some((m) => m.id === id)) {
+        setError(t('Это сообщение больше недоступно.'));
+        return;
+      }
+      // Опрос, начатый во время запроса, уже взял это поколение: новое окно его не примет.
+      generation.current += 1;
       setMessages(data.messages);
       setPeople((known) => ({ ...known, ...data.people }));
       newestRef.current = Math.max(...data.messages.map((m) => m.id));
@@ -510,10 +868,13 @@ export default function Conversation({
   }
 
   function showLatest() {
+    generation.current += 1;
     jumpedRef.current = false;
     setJumped(false);
     setMessages(null);
     newestRef.current = 0;
+    loaded.current = false;
+    // Отложенная отметка прочитанного сработает после загрузки последних сообщений.
     stickToBottom.current = true;
     load();
   }
@@ -526,7 +887,9 @@ export default function Conversation({
   }, [highlightId, messages]);
 
   // XMLHttpRequest, а не fetch: только он отдаёт ход загрузки файла.
-  function postFile(file: File, caption: string): Promise<boolean> {
+  // unsure: ответа нет или портал не ответил (502), файл мог дойти. Такой исход не
+  // предлагаем повторить вслепую: повтор дал бы второй файл и вторую подпись.
+  function postFile(file: File, caption: string): Promise<'ok' | 'fail' | 'unsure'> {
     return new Promise((resolve) => {
       const body = new FormData();
       body.set('dialogId', dialog.id);
@@ -537,8 +900,15 @@ export default function Conversation({
       request.upload.onprogress = (event) => {
         if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
       };
-      request.onload = () => resolve(request.status >= 200 && request.status < 300);
-      request.onerror = () => resolve(false);
+      request.onload = () =>
+        resolve(
+          request.status >= 200 && request.status < 300
+            ? 'ok'
+            : request.status >= 500
+              ? 'unsure'
+              : 'fail',
+        );
+      request.onerror = () => resolve('unsure');
       setProgress(0);
       request.send(body);
     });
@@ -552,11 +922,34 @@ export default function Conversation({
   }
 
   // Голосовое уходит сразу: проверять в нём нечего.
+  // Блокировку отправки голосовое занимает раньше, при остановке записи.
   async function upload(file: File) {
-    setSending(true);
     setError('');
     try {
-      if (!(await postFile(file, ''))) throw new Error('upload');
+      const result = await postFile(file, '');
+      // Запись не теряется: при сбое она возвращается в очередь, откуда её можно
+      // отправить ещё раз или убрать, если она всё-таки дошла.
+      if (result !== 'ok') {
+        setPending((current) => [...current, file]);
+        // Переписку уже закрыли: запись кладём в очередь её диалога напрямую.
+        if (closed.current) {
+          const saved = drafts.get(dialog.id) ?? { text: '', files: [] };
+          drafts.set(dialog.id, { ...saved, files: [...saved.files, file] });
+          // Переписку уже открыли заново: её копия тоже покажет запись в очереди.
+          for (const listener of sentListeners) listener({ dialogId: dialog.id, requeued: file });
+        }
+      }
+      if (result === 'unsure') {
+        load();
+        setError(
+          t(
+            'Не удалось узнать, дошло ли «{0}». Проверьте переписку, прежде чем отправлять ещё раз.',
+            file.name,
+          ),
+        );
+        return;
+      }
+      if (result === 'fail') throw new Error('upload');
       stickToBottom.current = true;
       load();
       onSent();
@@ -564,18 +957,30 @@ export default function Conversation({
       setError(t('Не удалось отправить «{0}». Попробуйте ещё раз.', file.name));
     } finally {
       setProgress(null);
-      setSending(false);
+      finishSending(dialog.id);
     }
   }
 
   // Подпись уходит с первым файлом, как в самом Битриксе. Отправленные файлы
   // покидают очередь сразу: при сбое остаются только неотправленные.
-  async function sendPending(caption: string) {
+  // Подпись уходит с первым файлом. Если следующий файл не загрузился, подпись уже у
+  // получателя: поле и цитату очищаем сразу, иначе повтор отправил бы её второй раз.
+  async function sendPending(caption: string, sentText: string, captionSent: () => void) {
     let first = true;
+    let done = 0;
     for (const file of pending) {
-      if (!(await postFile(file, first ? caption : ''))) {
+      const result = await postFile(file, first ? caption : '');
+      if (result !== 'ok') {
         setProgress(null);
-        throw new Error(file.name);
+        if (result === 'unsure') throw new Error('UNSURE');
+        // Часть уже у получателя: это не «не отправилось», а «осталось в очереди».
+        throw new Error(done ? `PARTIAL:${done}:${pending.length}` : file.name);
+      }
+      done += 1;
+      if (closed.current) forgetFile(dialog.id, file);
+      if (first && caption) {
+        captionSent();
+        if (closed.current) forgetSent(dialog.id, sentText);
       }
       first = false;
       setPending((current) => current.filter((item) => item !== file));
@@ -594,47 +999,77 @@ export default function Conversation({
   }, [recording]);
 
   // Диалог закрыт посреди записи: микрофон отпускаем, запись не отправляем.
-  useEffect(
-    () => () => {
+  const closed = useRef(false);
+  useEffect(() => {
+    // StrictMode монтирует эффект дважды: флаг поднимается заново после пробной очистки.
+    closed.current = false;
+    return () => {
+      closed.current = true;
       const recorder = recorderRef.current;
       if (!recorder) return;
       recorder.onstop = null;
       if (recorder.state !== 'inactive') recorder.stop();
       recorder.stream.getTracks().forEach((track) => track.stop());
-    },
-    [],
-  );
+    };
+  }, []);
 
+  // Пока браузер спрашивает разрешение, повторное нажатие не запускает вторую запись:
+  // её поток никто бы не остановил.
+  const starting = useRef(false);
   async function startRecording() {
+    if (starting.current || recorderRef.current) return;
+    starting.current = true;
     setError('');
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Разрешение выдали, когда диалог уже закрыт или писать в него стало нельзя: иначе
+      // микрофон остался бы включён без кнопки остановки.
+      if (closed.current || !canPostRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       // Firefox пишет ogg, Safari mp4, Chrome только webm: берём лучшее из поддерживаемого.
       const mimeType = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus'].find(
         (type) => MediaRecorder.isTypeSupported(type),
       );
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      chunks.current = [];
+      const parts: Blob[] = [];
+      chunks.current.set(recorder, parts);
       recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.current.push(event.data);
+        if (event.data.size) parts.push(event.data);
       };
       recorder.start();
       recorderRef.current = recorder;
       setSeconds(0);
       setRecording(true);
     } catch {
+      stream?.getTracks().forEach((track) => track.stop());
       setError(t('Нет доступа к микрофону. Разрешите его в настройках браузера.'));
+    } finally {
+      starting.current = false;
     }
   }
+
+  // Право писать пропало посреди записи: кнопок остановки больше нет, поэтому запись
+  // отменяем сами и отпускаем микрофон.
+  useEffect(() => {
+    if (!canPost && recorderRef.current) finishRecording(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canPost]);
 
   function finishRecording(send: boolean) {
     const recorder = recorderRef.current;
     if (!recorder) return;
     recorderRef.current = null;
+    // Отправку занимаем сразу: onstop придёт позже, и текст, отправленный в этот
+    // промежуток, иначе ушёл бы параллельно голосовому.
+    if (send) beginSend();
     recorder.onstop = () => {
       recorder.stream.getTracks().forEach((track) => track.stop());
       const type = recorder.mimeType || 'audio/webm';
-      if (send && chunks.current.length) {
+      const parts = chunks.current.get(recorder) || [];
+      if (send && parts.length) {
         const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm';
         const stamp = new Date()
           .toLocaleString('ru-RU', {
@@ -645,9 +1080,17 @@ export default function Conversation({
           })
           .replace(',', '')
           .replace(':', '-');
-        void upload(new File(chunks.current, `${VOICE_NAME} ${stamp}.${ext}`, { type }));
-      }
-      chunks.current = [];
+        const file = new File(parts, `${VOICE_NAME} ${stamp}.${ext}`, { type });
+        // Переписку закрыли, пока запись останавливалась: отправка уже ушла бы в фоне без
+        // видимого результата, поэтому кладём запись в очередь её диалога.
+        if (closed.current) {
+          const saved = drafts.get(dialog.id) ?? { text: '', files: [] };
+          drafts.set(dialog.id, { ...saved, files: [...saved.files, file] });
+          for (const listener of sentListeners) listener({ dialogId: dialog.id, requeued: file });
+          finishSending(dialog.id);
+        } else void upload(file);
+      } else if (send) finishSending(dialog.id);
+      chunks.current.delete(recorder);
     };
     recorder.stop();
     setRecording(false);
@@ -791,7 +1234,11 @@ export default function Conversation({
                 </li>
               ))}
               {results.length === 0 && (
-                <li className="p-2 text-xs text-ink-soft">{t('Ничего не найдено')}</li>
+                <li className="p-2 text-xs text-ink-soft">
+                  {searchFailed
+                    ? t('Поиск не выполнился. Измените запрос, чтобы попробовать ещё раз.')
+                    : t('Ничего не найдено')}
+                </li>
               )}
             </ul>
           )}
@@ -806,6 +1253,7 @@ export default function Conversation({
         onScroll={(event) => {
           const box = event.currentTarget;
           stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+          flushSeen();
         }}
       >
         {jumped && (
@@ -1056,7 +1504,7 @@ export default function Conversation({
                 onClick={() => {
                   setReplyTo(null);
                   setEditing(null);
-                  if (editing) setDraft('');
+                  if (editing) restoreDraft();
                 }}
               >
                 <X className="size-3.5" strokeWidth={1.7} />
@@ -1185,7 +1633,7 @@ export default function Conversation({
                 }
                 if (event.key === 'Escape' && (replyTo || editing)) {
                   setReplyTo(null);
-                  if (editing) setDraft('');
+                  if (editing) restoreDraft();
                   setEditing(null);
                   return;
                 }
@@ -1241,6 +1689,7 @@ export default function Conversation({
           setSettingsOpen(false);
           onRenamed(title);
         }}
+        onTitleSync={onRenamed}
         onLeft={() => {
           setSettingsOpen(false);
           onLeft();

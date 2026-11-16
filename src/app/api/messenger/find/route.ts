@@ -11,6 +11,9 @@ export function GET(req: NextRequest) {
   if (q.length < 2) return Promise.resolve(NextResponse.json({ dialogs: [] }));
   return withMessenger(req, async (call) => {
     const result = await call('im.search.chat.list', { FIND: q, LIMIT: 15 });
+    // Ответ без списка не «чаты не найдены»: клиент покажет сбой поиска.
+    if (!Array.isArray(result))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     return NextResponse.json({ dialogs: normalizeChatHits(result) });
   });
 }

@@ -46,6 +46,32 @@ function configure() {
   configured = true;
 }
 
+// Push-сервисы браузеров: Chrome и Edge на FCM и WNS, Firefox у Mozilla, Safari у Apple.
+// Адрес подписки приходит от клиента, а сервер шлёт на него POST: без списка хостов это
+// способ заставить сервер ходить во внутреннюю сеть (SSRF).
+const PUSH_HOSTS = [
+  /^fcm\.googleapis\.com$/,
+  /^android\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /^([a-z0-9-]+\.)*push\.apple\.com$/,
+  /^([a-z0-9-]+\.)*notify\.windows\.com$/,
+];
+
+export function pushEndpointAllowed(endpoint: unknown): boolean {
+  if (typeof endpoint !== 'string' || endpoint.length > 1000) return false;
+  try {
+    const url = new URL(endpoint);
+    return (
+      url.protocol === 'https:' &&
+      !url.port &&
+      !url.username &&
+      PUSH_HOSTS.some((host) => host.test(url.hostname.toLowerCase()))
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function subscriptions() {
   return (await getDb()).collection<StoredSubscription>('push_subscriptions');
 }
@@ -56,11 +82,10 @@ export async function saveSubscription(
 ): Promise<boolean> {
   const { endpoint, keys } = subscription;
   // Адрес push-сервиса приходит от клиента, а сервер потом шлёт на него запросы:
-  // принимаем только https, иначе это способ заставить сервер ходить куда угодно.
+  // принимаем только известные push-сервисы браузеров.
   if (
     typeof endpoint !== 'string' ||
-    !/^https:\/\//.test(endpoint) ||
-    endpoint.length > 1000 ||
+    !pushEndpointAllowed(endpoint) ||
     typeof keys?.p256dh !== 'string' ||
     typeof keys?.auth !== 'string'
   )
@@ -95,6 +120,8 @@ export async function sendPush(memberId: string, payload: PushPayload) {
   const list = await collection.find({ member_id: memberId }).toArray();
   await Promise.all(
     list.map(async (subscription) => {
+      // Подписки, сохранённые до списка хостов, тоже проверяем перед отправкой.
+      if (!pushEndpointAllowed(subscription.endpoint)) return;
       try {
         await webpush.sendNotification(
           { endpoint: subscription.endpoint, keys: subscription.keys },

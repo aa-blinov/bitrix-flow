@@ -468,6 +468,37 @@ export const EN: Record<string, string> = {
   Переподключить: 'Reconnect',
   Переработка: 'Overtime',
   'Переслано в «{0}»': 'Forwarded to "{0}"',
+  'Не удалось узнать, удалилось ли сообщение. Проверьте переписку.':
+    'Could not confirm the message was deleted. Check the conversation.',
+  'Не удалось узнать, сохранилась ли правка. Проверьте сообщение в переписке.':
+    'Could not confirm the edit was saved. Check the message in the conversation.',
+  'Это сообщение больше недоступно.': 'This message is no longer available.',
+  'Не удалось узнать, выполнилось ли действие. Проверьте состав и название чата.':
+    'Could not confirm the action went through. Check the chat members and title.',
+  'Отправлено файлов: {0} из {1}. Остальные остались в очереди, отправьте их ещё раз.':
+    'Sent {0} of {1} files. The rest are still queued, send them again.',
+  'Не удалось узнать, создался ли чат. Проверьте список диалогов, прежде чем повторять.':
+    'Could not confirm the chat was created. Check the conversation list before trying again.',
+  'Не удалось загрузить участников чата для упоминания.':
+    'Could not load the chat members to mention.',
+  'Не удалось узнать, дошло ли «{0}». Проверьте переписку, прежде чем отправлять ещё раз.':
+    'Could not confirm "{0}" was delivered. Check the conversation before sending it again.',
+  'Не удалось узнать, дошла ли пересылка в «{0}». Проверьте этот чат, прежде чем повторять.':
+    'Could not confirm the forward to "{0}" was delivered. Check that chat before trying again.',
+  'Поиск чатов на портале не выполнился. Измените запрос, чтобы попробовать ещё раз.':
+    'Chat search on the portal failed. Change the query to try again.',
+  'Не удалось открыть диалог. Обновите страницу.':
+    'Could not open the conversation. Reload the page.',
+  'Поиск не выполнился. Измените запрос, чтобы попробовать ещё раз.':
+    'Search failed. Change the query to try again.',
+  'Поиск людей не выполнился. Измените запрос, чтобы попробовать ещё раз.':
+    'People search failed. Change the query to try again.',
+  'Не удалось узнать, дошло ли сообщение. Проверьте переписку, прежде чем отправлять ещё раз.':
+    'Could not confirm the message was delivered. Check the conversation before sending it again.',
+  'В «{0}» переслано файлов: {1} из {2}. Проверьте чат: остальные могли не дойти.':
+    'Forwarded {1} of {2} files to "{0}". Check the chat: the rest may not have arrived.',
+  'Не удалось загрузить участников. Закройте настройки и откройте снова.':
+    'Could not load the members. Close the settings and open them again.',
   Переслать: 'Forward',
   'Переслать в чат': 'Forward to a chat',
   'Перетащите, чтобы изменить порядок': 'Drag to reorder',

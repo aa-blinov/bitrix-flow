@@ -57,18 +57,54 @@ const TRANSPARENT_TAGS = new Set([
 // Незакрытый тег такого вида остаётся в обрезанных названиях задач и ломал бы строку.
 const DROP_WHEN_UNCLOSED = new Set([...TRANSPARENT_TAGS, 'user', 'url']);
 
+// Пункты списка делятся только по [*] своего уровня: маркеры вложенного [LIST] остаются
+// внутри пункта, и его разберёт свой тег.
+function splitListItems(body: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (const match of body.matchAll(/\[(\/?)list(?:=[^\]]*)?\]|\[\*\]/gi)) {
+    if (match[0] === '[*]') {
+      if (depth) continue;
+      if (start >= 0) items.push(body.slice(start, match.index));
+      start = match.index! + 3;
+    } else if (match[1]) depth = Math.max(0, depth - 1);
+    else depth += 1;
+  }
+  if (start >= 0) items.push(body.slice(start));
+  return items;
+}
+
 function closingIndex(text: string, tag: string, from: number) {
+  // Внутри [CODE] всё текст: буквальный [CODE] там не открывает вложенный блок.
+  if (tag === 'code') {
+    const start = text.toLowerCase().indexOf('[/code]', from);
+    return start < 0 ? undefined : { start, end: start + '[/code]'.length };
+  }
+  // Содержимое [CODE] буквальное: теги в нём не закрывают внешний тег. Заменяем его
+  // пробелами той же длины, чтобы позиции совпадали с исходным текстом.
+  const masked = text.replace(
+    /\[code\]([\s\S]*?)\[\/code\]/gi,
+    (block, body: string) =>
+      // [CODE] слева и [/CODE] (7 символов) справа остаются, тело между ними пробелами.
+      block.slice(0, block.length - body.length - 7) + ' '.repeat(body.length) + block.slice(-7),
+  );
   const pattern = new RegExp(`\\[(/?)${tag}(?:=[^\\]]+)?\\]`, 'gi');
   pattern.lastIndex = from;
   let depth = 1;
-  for (const match of text.matchAll(pattern)) {
+  for (const match of masked.matchAll(pattern)) {
     if (match[1]) {
       if (--depth === 0) return { start: match.index!, end: match.index! + match[0].length };
     } else depth++;
   }
 }
 
-function parseNodes(text: string): BitrixNode[] {
+// Глубже этого теги не разбираем: сотни вложенных [QUOTE] иначе переполняли бы стек при
+// показе переписки и превью диалога. Остаток показывается текстом как есть.
+const MAX_TAG_DEPTH = 12;
+
+function parseNodes(text: string, depth = 0): BitrixNode[] {
+  if (depth > MAX_TAG_DEPTH) return text ? [{ type: 'text', text }] : [];
   const nodes: BitrixNode[] = [];
   const opener =
     /\[(b|i|u|s|strike|quote|code|url|user|img|list|chat|size|color|font|send|put|call|context)(?:=([^\]]+))?\]/gi;
@@ -88,13 +124,15 @@ function parseNodes(text: string): BitrixNode[] {
     const body = text.slice(match.index! + match[0].length, close.start);
     const value = match[2] || '';
     if (TRANSPARENT_TAGS.has(tag)) {
-      nodes.push(...parseNodes(body));
+      nodes.push(...parseNodes(body, depth + 1));
     } else if (tag === 'url' || tag === 'user') {
       // Служебные сообщения несут [USER=9 REPLACE]: id идёт первым словом.
       const userId = tag === 'user' ? /^(\d+)\b/.exec(value)?.[1] : undefined;
       const href = userId ? getBitrixUserUrl(userId) : safeUrl(value || body);
       nodes.push(
-        href ? { type: 'link', href, children: parseNodes(body) } : { type: 'text', text: body },
+        href
+          ? { type: 'link', href, children: parseNodes(body, depth + 1) }
+          : { type: 'text', text: body },
       );
     } else if (tag === 'img') {
       const src = safeUrl(body.trim());
@@ -102,22 +140,19 @@ function parseNodes(text: string): BitrixNode[] {
     } else if (tag === 'code') {
       nodes.push({ type: 'code', text: body, block: body.includes('\n') });
     } else if (tag === 'list') {
-      const items = body
-        .split(/\[\*\]/i)
-        .slice(1)
-        .map((item) => parseNodes(item.trim()));
+      const items = splitListItems(body).map((item) => parseNodes(item.trim(), depth + 1));
       nodes.push(
         items.length
           ? { type: 'list', ordered: value === '1', items }
           : { type: 'text', text: body },
       );
     } else if (tag === 'quote') {
-      nodes.push({ type: 'quote', children: parseNodes(body) });
+      nodes.push({ type: 'quote', children: parseNodes(body, depth + 1) });
     } else {
       nodes.push({
         type: 'format',
         format: tag === 'strike' ? 's' : (tag as 'b' | 'i' | 'u' | 's'),
-        children: parseNodes(body),
+        children: parseNodes(body, depth + 1),
       });
     }
     position = close.end;

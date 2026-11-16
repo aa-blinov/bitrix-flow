@@ -702,7 +702,7 @@ const MOCK_HISTORY = Array.from({ length: 60 }, (_, index) => {
         : id === 58
           ? '**Важно**: смотри [схему](https://example.com/schema) и `npm test`'
           : id === 52
-            ? '[URL]https://eora.bitrix24.ru/company/personal/user/9/tasks/task/view/4521/[/URL]'
+            ? '[URL]https://mock.bitrix24.ru/company/personal/user/9/tasks/task/view/4521/[/URL]'
             : id === 56
               ? '[B]Релиз[/B] в [USER=2]Дмитрий[/USER]\n> цитата из markdown\n- первый пункт\n- второй пункт'
               : `Сообщение ${id}`,
@@ -868,6 +868,9 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'im.message.like':
     case 'im.message.update':
     case 'im.message.delete':
+    case 'im.recent.pin':
+    case 'im.recent.unread':
+    case 'im.chat.mute':
       return true;
 
     case 'im.chat.add':

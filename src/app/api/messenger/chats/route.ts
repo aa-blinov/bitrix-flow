@@ -17,7 +17,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'BAD_CHAT' }, { status: 400 });
 
   return withMessenger(req, async (call) => {
-    const id = await call('im.chat.add', { TYPE: 'CHAT', TITLE: title, USERS: users }, true, true);
-    return NextResponse.json({ dialogId: `chat${Number(id)}` });
+    const id = Number(
+      await call('im.chat.add', { TYPE: 'CHAT', TITLE: title, USERS: users }, true, true),
+    );
+    // Без номера чата исход неизвестен: открыть «chatNaN» хуже, чем попросить проверить.
+    if (!Number.isInteger(id) || id <= 0)
+      return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
+    return NextResponse.json({ dialogId: `chat${id}` });
   });
 }

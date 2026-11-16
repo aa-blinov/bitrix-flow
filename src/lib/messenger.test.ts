@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyMentions,
   DIALOG_ID,
   mergeDialogs,
   mergeMessages,
@@ -95,6 +96,14 @@ describe('messenger', () => {
     expect(
       mergeMessages([msg(3), msg(4)], [msg(1), msg(2), msg(3), msg(5)]).map((m) => m.id),
     ).toEqual([1, 2, 3, 4, 5]);
+    // Последняя страница целиком: удалённое на портале 4 пропадает, история до 3 цела.
+    expect(
+      mergeMessages([msg(1), msg(2), msg(3), msg(4), msg(5)], [msg(3), msg(5)], true).map(
+        (m) => m.id,
+      ),
+    ).toEqual([1, 2, 3, 5]);
+    // Пустая последняя страница: последнее сообщение удалили, история пуста.
+    expect(mergeMessages([msg(1)], [], true)).toEqual([]);
 
     const dialog = (id: string, date: string, unread = 0) => ({
       id,
@@ -112,6 +121,11 @@ describe('messenger', () => {
       ['b', 0],
       ['c', 0],
     ]);
+    // Поздний ответ другой страницы со старой версией диалога её не откатывает.
+    expect(
+      mergeDialogs(merged, [dialog('a', '2026-10-01T00:00:00Z', 5)]).find((d) => d.id === 'a')
+        ?.unread,
+    ).toBe(0);
   });
 
   it('attaches files and cards to messages, params may be an empty array', () => {
@@ -235,5 +249,62 @@ describe('messenger', () => {
     const nodes = parseMessageNodes(quote + 'ответ');
     expect(nodes[0]).toMatchObject({ type: 'quote' });
     expect(bitrixPlainText(quote, parseMessageNodes)).not.toContain('>');
+  });
+
+  it('turns every selected mention into a tag, longer names first', () => {
+    expect(
+      applyMentions('@Анна и снова @Анна, @Анна Петрова', [
+        { id: 1, name: 'Анна' },
+        { id: 2, name: 'Анна Петрова' },
+      ]),
+    ).toBe('[USER=1]Анна[/USER] и снова [USER=1]Анна[/USER], [USER=2]Анна Петрова[/USER]');
+    expect(applyMentions('@АннаПетрова, @Анна.', [{ id: 1, name: 'Анна' }])).toBe(
+      '@АннаПетрова, [USER=1]Анна[/USER].',
+    );
+  });
+});
+
+describe('quoteBlock', () => {
+  it('пересылка несёт текст целиком, каждая строка цитатой; ответ только начало', () => {
+    const long = 'а'.repeat(500) + '\nвторая строка';
+    const forwarded = quoteBlock('Анна', { text: long, files: [] }, 'Переслано от ', true);
+    expect(forwarded).toContain('а'.repeat(500));
+    expect(
+      forwarded
+        .trim()
+        .split('\n')
+        .every((line) => line.startsWith('>>')),
+    ).toBe(true);
+    expect(quoteBlock('Анна', { text: long, files: [] }).length).toBeLessThan(330);
+    // Нумерация, отступы и код сохраняются, упоминание становится именем.
+    const rich = '1. Первый\n    отступ\n[USER=5]Борис[/USER], глянь';
+    expect(quoteBlock('Анна', { text: rich, files: [] }, 'Переслано от ', true)).toBe(
+      '>>Переслано от Анна: 1. Первый\n>>    отступ\n>>Борис, глянь\n',
+    );
+  });
+});
+
+describe('isTransportFailure', () => {
+  it('отличает обрыв связи (исход неизвестен) от отказа портала (точный ответ)', async () => {
+    const { isTransportFailure } = await import('./messenger-api');
+    expect(isTransportFailure(new Error('BITRIX24_RESPONSE_TIMEOUT'))).toBe(true);
+    expect(isTransportFailure(Object.assign(new Error('reset'), { code: 'ECONNRESET' }))).toBe(
+      true,
+    );
+    expect(isTransportFailure(new Error('Access denied'))).toBe(false);
+  });
+});
+
+describe('pushEndpointAllowed', () => {
+  it('пускает только push-сервисы браузеров, а не внутренние адреса', async () => {
+    const { pushEndpointAllowed } = await import('./push');
+    expect(pushEndpointAllowed('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
+    expect(pushEndpointAllowed('https://web.push.apple.com/QW')).toBe(true);
+    expect(pushEndpointAllowed('https://wns2-par02p.notify.windows.com/w/?token=1')).toBe(true);
+    expect(pushEndpointAllowed('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true);
+    expect(pushEndpointAllowed('https://127.0.0.1/hook')).toBe(false);
+    expect(pushEndpointAllowed('https://fcm.googleapis.com.evil.io/x')).toBe(false);
+    expect(pushEndpointAllowed('https://fcm.googleapis.com:8443/x')).toBe(false);
+    expect(pushEndpointAllowed('http://fcm.googleapis.com/x')).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { subscribeToConnection, useSSE } from '@/hooks/useSSE';
+import { CHAT_NOTIFY_KEY, reconnectSSE, subscribeToConnection, useSSE } from '@/hooks/useSSE';
 import { useKanbanStore } from '@/store/kanban';
 import type { MessengerEvent } from '@/lib/messenger-events';
 import { pingText } from '@/lib/ping';
@@ -42,7 +42,7 @@ export function useDebounced(run: () => void, delay: number) {
   };
 }
 
-const NOTIFY_KEY = 'bitrix-flow-chat-notify';
+const NOTIFY_KEY = CHAT_NOTIFY_KEY;
 
 export function chatNotifyEnabled(): boolean {
   try {
@@ -69,6 +69,7 @@ export async function setChatNotify(on: boolean): Promise<boolean> {
   try {
     localStorage.setItem(NOTIFY_KEY, on ? '1' : '0');
   } catch {}
+  reconnectSSE();
   void syncPush(on);
   return on;
 }
@@ -101,7 +102,63 @@ export function chime(mentioned = false) {
   } catch {}
 }
 
-export function showChatNotification(event: MessengerEvent, onClick: () => void) {
+/** Диалог прочитан на портале: счётчик в меню перечитывается сразу, а не через минуту. */
+export const CHAT_READ_EVENT = 'messenger:read';
+/** Открыть диалог на уже открытой странице чата (переход из уведомления). */
+export const CHAT_OPEN_EVENT = 'messenger:open';
+
+// Каждая открытая вкладка получает то же событие: звенит и показывает уведомление
+// только та, что первой взяла блокировку на это сообщение.
+// inView: вкладка показывает этот диалог. Она берёт блокировку сразу и молчит, а
+// остальные ждут немного, чтобы не опередить её и не звенеть о видимом сообщении.
+const SHOWN_KEY = 'bitrix-flow-chat-shown';
+function alreadyShown(key: string): boolean {
+  try {
+    const now = Date.now();
+    const shown: Record<string, number> = JSON.parse(localStorage.getItem(SHOWN_KEY) || '{}');
+    for (const [old, at] of Object.entries(shown)) if (now - at > 10 * 60_000) delete shown[old];
+    const seen = key in shown;
+    shown[key] = now;
+    localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
+    return seen;
+  } catch {
+    return false;
+  }
+}
+
+// inView спрашивается в момент показа: за 300 мс ожидания человек мог открыть диалог.
+export function showChatNotification(
+  event: MessengerEvent,
+  inView: () => boolean,
+  onClick: () => void,
+) {
+  if (!chatNotifyEnabled()) return;
+  if (!navigator.locks) {
+    if (!inView()) notify(event, onClick);
+    return;
+  }
+  const take = () =>
+    navigator.locks
+      .request(
+        `chat-alert-${event.dialogId}-${event.messageId}`,
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) return;
+          // Вкладка, разбуженная браузером позже пяти секунд, взяла бы блокировку заново:
+          // факт показа помним в общем для вкладок хранилище ещё десять минут.
+          if (alreadyShown(`${event.dialogId}:${event.messageId}`)) return;
+          if (!inView()) notify(event, onClick);
+          // Держим блокировку, пока событие доходит до остальных вкладок.
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        },
+      )
+      .catch(() => {});
+  if (inView()) void take();
+  else window.setTimeout(() => void take(), 300);
+}
+
+function notify(event: MessengerEvent, onClick: () => void) {
+  // Уведомления могли выключить за время ожидания других вкладок.
   if (!chatNotifyEnabled()) return;
   chime(event.mentioned);
   const { title, body } = pingText(event, {
@@ -131,7 +188,17 @@ function urlBase64ToBytes(value: string) {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 }
 
-export async function syncPush(on: boolean) {
+// Включение и выключение идут по очереди: иначе быстрое «выкл-вкл» дало бы гонку, где
+// позднее выключение снимает подписку, только что подтверждённую включением.
+let pushQueue: Promise<void> = Promise.resolve();
+let pushWantedOn = false;
+export function syncPush(on: boolean) {
+  pushWantedOn = on;
+  pushQueue = pushQueue.then(() => (pushWantedOn === on ? applyPush(on) : undefined));
+  return pushQueue;
+}
+
+async function applyPush(on: boolean) {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     const registration = await navigator.serviceWorker.register('/sw.js');

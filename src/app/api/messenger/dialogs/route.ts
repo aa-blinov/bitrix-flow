@@ -12,9 +12,11 @@ export function GET(req: NextRequest) {
       return Promise.resolve(NextResponse.json({ error: 'BAD_DIALOG_ID' }, { status: 400 }));
     return withMessenger(req, async (call) => {
       const info = normalizeDialogInfo(await call('im.dialog.get', { DIALOG_ID: single }), single);
+      // Портал ответил без id: это сбой ответа, а не «диалога нет». Отсутствие диалога
+      // портал сообщает ошибкой, её withMessenger отдаёт как 422.
       return info
         ? NextResponse.json({ dialog: info })
-        : NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+        : NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     });
   }
   // OFFSET портал двигает на размер страницы, а не на число вернувшихся диалогов.
@@ -34,7 +36,13 @@ export function GET(req: NextRequest) {
       // me нужен клиенту, чтобы отличить свои сообщения от чужих; на следующих страницах он уже известен.
       offset === 0 ? call('user.current') : null,
     ]);
+    // Ответ без списка не пустой список: иначе пропали бы диалоги и листание.
+    if (!Array.isArray(result?.items))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     const meId = Number(me?.ID) || knownMe;
+    // Без своего id свои сообщения выглядели бы чужими: первая страница его обязана знать.
+    if (offset === 0 && !(Number(me?.ID) > 0))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     return NextResponse.json({
       dialogs: normalizeDialogs(result, meId),
       hasMore: Boolean(result?.hasMore ?? result?.hasMorePages),

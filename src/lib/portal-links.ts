@@ -3,6 +3,13 @@
 // Адрес портала приложению известен только серверу, поэтому узнаём портал по
 // домену Битрикс24 и по привычному виду пути.
 const PORTAL_HOST = /\.bitrix24\.[a-z.]+$/i;
+// Свой портал, когда он уже известен (его сообщает список диалогов). Ссылка на задачу
+// другого портала с тем же номером иначе открыла бы чужую задачу у нас.
+let ownPortal = '';
+export function setOwnPortal(host: string) {
+  ownPortal = host.toLowerCase();
+}
+export const ownPortalHost = () => ownPortal;
 const TASK_PATH = /\/tasks\/task\/view\/(\d+)\/?/;
 const GROUP_PATH = /\/workgroups\/group\/(\d+)\/?$/;
 
@@ -14,7 +21,8 @@ export function internalHref(href: string): string | null {
   } catch {
     return null;
   }
-  if (!PORTAL_HOST.test(url.hostname)) return null;
+  if (ownPortal ? url.hostname.toLowerCase() !== ownPortal : !PORTAL_HOST.test(url.hostname))
+    return null;
   const task = TASK_PATH.exec(url.pathname);
   if (task) return `/all-tasks?task=${task[1]}`;
   const group = GROUP_PATH.exec(url.pathname);

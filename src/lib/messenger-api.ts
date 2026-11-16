@@ -8,6 +8,15 @@ import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 // Общая обвязка роутов мессенджера: сессия, мок для UI-тестов и единая
 // форма ошибки. Методы im.* отсюда не светятся в allowlist прокси задач:
 // мессенджер ходит только через свои роуты с проверкой DIALOG_ID.
+// 502 значит «связь с порталом оборвалась»: мутация могла выполниться, клиент просит
+// проверить чат. Ответ портала с кодом ошибки (нет прав, чат не найден) это точный
+// отказ, ему 422: такую операцию можно спокойно повторить или объяснить причину.
+// Ошибки транспорта называет сам bitrix-request (BITRIX24_…) или Node (код errno).
+export function isTransportFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /^BITRIX24_/.test(message) || Boolean((error as NodeJS.ErrnoException)?.code);
+}
+
 export async function withMessenger(
   req: NextRequest,
   run: (
@@ -40,8 +49,12 @@ export async function withMessenger(
   } catch (error) {
     console.error('[messenger]', error);
     return NextResponse.json(
-      { error: 'BITRIX24_REQUEST_FAILED', message: error instanceof Error ? error.message : '' },
-      { status: 502 },
+      {
+        error: 'BITRIX24_REQUEST_FAILED',
+        message: error instanceof Error ? error.message : '',
+        code: String((error as { portalCode?: string })?.portalCode || ''),
+      },
+      { status: isTransportFailure(error) ? 502 : 422 },
     );
   }
 }

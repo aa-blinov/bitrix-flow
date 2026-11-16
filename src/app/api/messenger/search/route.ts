@@ -17,12 +17,17 @@ export function GET(req: NextRequest) {
     const chatId = dialogId.startsWith('chat')
       ? dialogId.slice(4)
       : String((await call('im.dialog.get', { DIALOG_ID: dialogId }))?.id || '');
-    if (!chatId) return NextResponse.json({ messages: [], people: {} });
+    // Без номера чата поиск не выполнен: это сбой ответа портала, а не пустой результат.
+    if (!/^\d+$/.test(chatId))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     const result = await call('im.dialog.messages.search', {
       CHAT_ID: chatId,
       SEARCH_MESSAGE: q,
       LIMIT: 30,
     });
+    // Ответ без списка не «ничего не найдено»: клиент должен показать сбой поиска.
+    if (!Array.isArray(result?.messages))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     return NextResponse.json(normalizeMessages(result));
   });
 }

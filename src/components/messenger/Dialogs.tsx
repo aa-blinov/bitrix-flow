@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Button } from '@/components/monos/Button';
 import { Modal } from '@/components/monos/Modal';
@@ -17,10 +17,12 @@ import { t } from '@/lib/i18n';
 function useUserSearch(query: string, enabled: boolean) {
   const [hits, setHits] = useState<UserHit[]>([]);
   const [searching, setSearching] = useState(false);
+  const [failed, setFailed] = useState(false);
   const needle = query.trim();
   useEffect(() => {
+    // Люди прошлого запроса не должны оставаться нажимаемыми под новым.
+    setHits([]);
     if (!enabled || needle.length < 2) {
-      setHits([]);
       setSearching(false);
       return;
     }
@@ -28,17 +30,26 @@ function useUserSearch(query: string, enabled: boolean) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       fetch(`/api/messenger/users?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
-        .then((response) => (response.ok ? response.json() : { users: [] }))
-        .then((data) => setHits(data.users))
-        .catch(() => {})
-        .finally(() => setSearching(false));
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((data) => {
+          setFailed(false);
+          setHits(data.users);
+          setSearching(false);
+        })
+        // Сбой поиска не выдаём за «Никого не нашли»; смена запроса отменяет прошлый.
+        .catch((failure) => {
+          if (failure?.name === 'AbortError') return;
+          setHits([]);
+          setFailed(true);
+          setSearching(false);
+        });
     }, 300);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
   }, [needle, enabled]);
-  return { hits, searching, needle };
+  return { hits, searching, needle, failed };
 }
 
 function UserRow({
@@ -91,10 +102,13 @@ export function NewChatModal({
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
-  const { hits, searching, needle } = useUserSearch(query, open);
+  const { hits, searching, needle, failed } = useUserSearch(query, open);
 
   // Закрытое окно открывается чистым, а не с прошлым поиском.
+  // Окно закрыли, пока создавалась группа: поздний ответ не переключает переписку.
+  const session = useRef(0);
   useEffect(() => {
+    session.current += 1;
     if (open) return;
     setMode('user');
     setQuery('');
@@ -105,6 +119,7 @@ export function NewChatModal({
 
   async function createGroup() {
     if (!title.trim() || !picked.length || creating) return;
+    const mine = session.current;
     setCreating(true);
     setError('');
     try {
@@ -112,12 +127,29 @@ export function NewChatModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), userIds: picked.map((user) => user.id) }),
-      });
+      }).catch(() => null);
+      // Нет ответа или портал не ответил: чат мог создаться, повтор дал бы второй.
+      if (mine !== session.current) return;
+      if (!response || response.status >= 500) {
+        setError(
+          t('Не удалось узнать, создался ли чат. Проверьте список диалогов, прежде чем повторять.'),
+        );
+        return;
+      }
       if (!response.ok) throw new Error(String(response.status));
-      const data = await response.json();
-      onOpen({ id: data.dialogId, kind: 'chat', title: title.trim() });
+      const data = await response.json().catch(() => null);
+      // Портал ответил, но тело оборвалось: чат, скорее всего, создан.
+      if (!data?.dialogId) {
+        setError(
+          t('Не удалось узнать, создался ли чат. Проверьте список диалогов, прежде чем повторять.'),
+        );
+        return;
+      }
+      if (mine === session.current)
+        onOpen({ id: data.dialogId, kind: 'chat', title: title.trim() });
     } catch {
-      setError(t('Не удалось создать чат. Попробуйте ещё раз.'));
+      // Окно закрыли и открыли заново: ошибка прошлой группы к нему не относится.
+      if (mine === session.current) setError(t('Не удалось создать чат. Попробуйте ещё раз.'));
     } finally {
       setCreating(false);
     }
@@ -184,7 +216,11 @@ export function NewChatModal({
             <p className="p-2 text-xs text-ink-soft">{t('Введите имя или фамилию')}</p>
           ) : hits.length === 0 ? (
             <p className="p-2 text-xs text-ink-soft">
-              {searching ? t('Поиск') : t('Никого не нашли')}
+              {searching
+                ? t('Поиск')
+                : failed
+                  ? t('Поиск людей не выполнился. Измените запрос, чтобы попробовать ещё раз.')
+                  : t('Никого не нашли')}
             </p>
           ) : (
             <ul>

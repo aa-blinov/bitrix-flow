@@ -26,6 +26,9 @@ const READ_METHOD = /\.(get|list|getlist|current)$|^server\.time$/i;
 
 function isReadMethod(url: string) {
   const method = new URL(url).pathname.replace(/^\/rest\//, '').replace(/\.json$/, '');
+  // Очередь событий чата только с виду чтение: запрос с offset подтверждает прочитанное,
+  // и гонка трёх одинаковых запросов нарушила бы порядок подтверждений.
+  if (/^im\.v2\.Event\./i.test(method)) return false;
   return READ_METHOD.test(method);
 }
 const MAX_PARALLEL = 3;
@@ -78,6 +81,20 @@ function isConnectFailure(error: unknown) {
       'EAI_AGAIN',
       'ETIMEDOUT',
     ].includes(code)
+  );
+}
+
+/**
+ * Запрос точно не ушёл: соединения не было. ECONNRESET, EPIPE и ETIMEDOUT сюда не входят:
+ * они бывают и после того, как тело уже отправлено и портал создал сообщение, поэтому
+ * мутацию после них на другой адрес не повторяем, иначе выйдет дубль.
+ */
+function isNeverSent(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = (error as NodeJS.ErrnoException)?.code || '';
+  return (
+    message.includes('BITRIX24_CONNECT_TIMEOUT') ||
+    ['ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN'].includes(code)
   );
 }
 
@@ -155,6 +172,9 @@ function httpRequest(
         raw += chunk;
       });
       response.on('end', () => resolve({ status: response.statusCode || 0, raw }));
+      // Обрыв посреди тела: без этого промис висел бы вечно, а клиент ждал бы ответа.
+      response.on('aborted', () => reject(new Error('BITRIX24_RESPONSE_ABORTED')));
+      response.on('error', reject);
     });
     req.end(body);
   });
@@ -191,7 +211,8 @@ export async function getBitrixFileStream(
         guardConnect(req);
         req.on('error', reject);
         req.on('response', (res) => {
-          if ((res.statusCode || 0) >= 400) {
+          // 3xx тоже ошибка: тело перенаправления ушло бы получателю вместо файла.
+          if ((res.statusCode || 0) >= 300) {
             res.resume();
             reject(new Error(`BITRIX24_HTTP_${res.statusCode}`));
             return;
@@ -269,6 +290,8 @@ export async function postBitrixJson(
       // Сервер ответил (5xx, битый JSON) — адрес живой, повтор ничего не даст
       // и для мутации был бы опасен.
       if (!failures.every((failure) => isConnectFailure(failure))) break;
+      // Мутация идёт по одному адресу: повтор только если она точно не дошла.
+      if (groupSize === 1 && !failures.every((failure) => isNeverSent(failure))) break;
     }
   }
   throw lastError instanceof Error ? lastError : new Error('BITRIX24_REQUEST_FAILED');
@@ -281,6 +304,7 @@ export async function postBitrixJson(
 // Точки для тестов: перебор адресов — самая хрупкая часть общения с порталом.
 export const __testing = {
   isConnectFailure,
+  isNeverSent,
   isReadMethod,
   markDead,
   pickProbes,

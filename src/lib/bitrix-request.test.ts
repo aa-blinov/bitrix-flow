@@ -18,6 +18,23 @@ describe('isConnectFailure', () => {
   });
 });
 
+describe('isNeverSent', () => {
+  it('мутацию повторяем только если соединения не было', () => {
+    const refused = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    expect(__testing.isNeverSent(refused)).toBe(true);
+    expect(__testing.isNeverSent(new Error('BITRIX24_CONNECT_TIMEOUT'))).toBe(true);
+    for (const code of ['ECONNRESET', 'EPIPE', 'ETIMEDOUT'])
+      expect(__testing.isNeverSent(Object.assign(new Error(code), { code }))).toBe(false);
+  });
+});
+
+describe('isReadMethod', () => {
+  it('очередь событий чата не гоняется параллельно: get там подтверждает прочитанное', () => {
+    expect(__testing.isReadMethod('https://p.bitrix24.ru/rest/im.v2.Event.get')).toBe(false);
+    expect(__testing.isReadMethod('https://p.bitrix24.ru/rest/im.dialog.get')).toBe(true);
+  });
+});
+
 describe('мёртвые адреса', () => {
   it('помеченный адрес выпадает из выбора, пока не истечёт срок', () => {
     const pool = [

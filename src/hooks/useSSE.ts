@@ -27,24 +27,68 @@ export function subscribeToConnection(listener: (state: ConnectionState) => void
   };
 }
 
+/** Включены ли уведомления о чате в этом браузере (переключатель живёт в мессенджере). */
+export const CHAT_NOTIFY_KEY = 'bitrix-flow-chat-notify';
+
+function readAlertsFlag() {
+  try {
+    return (
+      localStorage.getItem(CHAT_NOTIFY_KEY) === '1' &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function openSource(memberId: string) {
+  // alerts=1: вкладка сама покажет уведомление о чате, и пуш на другие устройства
+  // сервер может не слать. Вкладка без разрешения на уведомления пуш не заменяет.
+  const alerts = readAlertsFlag() ? '&alerts=1' : '';
+  // Своё переоткрытие (переключили уведомления) идёт без Last-Event-ID: последний id
+  // передаём сами, чтобы событие на стыке соединений не потерялось.
+  const last = lastEventId.get(memberId);
+  const after = last ? `&after=${encodeURIComponent(last)}` : '';
+  const source = new EventSource(`/api/events?member_id=${memberId}${alerts}${after}`);
+  source.onopen = () => setConnectionState('online');
+  source.onerror = () => setConnectionState('offline');
+  source.onmessage = (message) => {
+    setConnectionState('online');
+    if (message.lastEventId) lastEventId.set(memberId, message.lastEventId);
+    try {
+      const event = JSON.parse(message.data);
+      if (event.type === 'connected') return;
+      // Копия набора: слушатель может отписаться прямо в обработчике.
+      for (const current of [...(channels.get(memberId)?.listeners || [])]) current(event);
+    } catch {}
+  };
+  // EventSource сам переподключается. Не закрываем его после ошибки.
+  return source;
+}
+
+const lastEventId = new Map<string, string>();
+
+// Переключатель уведомлений общий для вкладок браузера: другие вкладки тоже
+// переоткрывают соединение, иначе сервер считал бы их по старому флагу.
+if (typeof window !== 'undefined')
+  window.addEventListener('storage', (event) => {
+    if (event.key === CHAT_NOTIFY_KEY) reconnectSSE();
+  });
+
+/** Уведомления включили или выключили: соединение открывается заново с новым флагом. */
+export function reconnectSSE() {
+  for (const [memberId, channel] of channels) {
+    channel.source.close();
+    channel.source = openSource(memberId);
+  }
+}
+
 function subscribe(memberId: string, listener: Listener) {
   let channel = channels.get(memberId);
   if (!channel) {
-    const source = new EventSource(`/api/events?member_id=${memberId}`);
-    channel = { source, listeners: new Set() };
+    channel = { source: openSource(memberId), listeners: new Set() };
     channels.set(memberId, channel);
-    source.onopen = () => setConnectionState('online');
-    source.onerror = () => setConnectionState('offline');
-    source.onmessage = (message) => {
-      setConnectionState('online');
-      try {
-        const event = JSON.parse(message.data);
-        if (event.type === 'connected') return;
-        // Копия набора: слушатель может отписаться прямо в обработчике.
-        for (const current of [...(channels.get(memberId)?.listeners || [])]) current(event);
-      } catch {}
-    };
-    // EventSource сам переподключается. Не закрываем его после ошибки.
   }
   channel.listeners.add(listener);
   return () => {

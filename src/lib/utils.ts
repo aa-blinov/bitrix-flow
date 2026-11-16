@@ -1,3 +1,4 @@
+import { ownPortalHost } from './portal-links';
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 import { getLocale, t } from './i18n';
@@ -20,8 +21,10 @@ export function getBitrixTaskUrl(taskId: string): string {
   return `https://eora.bitrix24.ru/company/personal/user/0/tasks/task/view/${encodeURIComponent(taskId)}/`;
 }
 
+// Портал берётся тот, к которому подключено приложение (его сообщает сервер); до этого
+// остаётся портал по умолчанию.
 export function getBitrixUserUrl(userId: string): string {
-  return `https://eora.bitrix24.ru/company/personal/user/${encodeURIComponent(userId)}/`;
+  return `https://${ownPortalHost() || 'eora.bitrix24.ru'}/company/personal/user/${encodeURIComponent(userId)}/`;
 }
 
 export function getProjectInitials(name: string): string {

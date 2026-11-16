@@ -80,7 +80,10 @@ function render(nodes: BitrixNode[]): ReactNode[] {
     if (node.type === 'list') {
       const List = node.ordered ? 'ol' : 'ul';
       return (
-        <List key={index} className="my-2 list-inside list-disc pl-2 marker:text-ink-faint">
+        <List
+          key={index}
+          className={`my-2 list-inside ${node.ordered ? 'list-decimal' : 'list-disc'} pl-2 marker:text-ink-faint`}
+        >
           {node.items.map((item, itemIndex) => (
             <li key={itemIndex}>{render(item)}</li>
           ))}

@@ -45,7 +45,9 @@ export function presenceText(presence: Presence | undefined, now = Date.now()): 
   if (minutes < 24 * 60)
     return t('{0} в сети {1}', verb, AGO.format(-Math.round(minutes / 60), 'hour'));
   const seen = new Date(presence.lastSeen);
-  const yesterday = new Date(now - 24 * 3_600_000);
+  // Вчера календарное: вычитание суток ошибается в день перевода часов.
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
   return seen.toDateString() === yesterday.toDateString()
     ? t('{0} в сети вчера в {1}', verb, SEEN_TIME.format(seen))
     : t('{0} в сети {1}', verb, SEEN_DAY.format(seen));
@@ -70,6 +72,8 @@ export type Dialog = {
   /** Задача или проект, к которым привязан чат, для ссылки из шапки. */
   entityId?: string;
   lastMessage?: { id: number; text: string; date: string; authorId: number };
+  /** Заготовка приложения до первого ответа портала: настоящая запись её всегда заменяет. */
+  local?: boolean;
   date: string;
 };
 
@@ -129,7 +133,12 @@ function kindOf(item: any): DialogKind {
 // Свежая версия записи вытесняет старую.
 export function mergeDialogs(current: Dialog[], incoming: Dialog[]): Dialog[] {
   const byId = new Map(current.map((dialog) => [dialog.id, dialog]));
-  for (const dialog of incoming) byId.set(dialog.id, dialog);
+  // Поздний ответ другой страницы не откатывает диалог к более старому сообщению.
+  for (const dialog of incoming) {
+    const known = byId.get(dialog.id);
+    if (!known || known.local || Date.parse(dialog.date) >= Date.parse(known.date) || !known.date)
+      byId.set(dialog.id, dialog);
+  }
   // Закреплённые наверху, как в самом Битриксе, внутри групп по свежести.
   return [...byId.values()].sort(
     (a, b) =>
@@ -140,8 +149,20 @@ export function mergeDialogs(current: Dialog[], incoming: Dialog[]): Dialog[] {
 
 // Новые сообщения (FIRST_ID) и более ранние (LAST_ID) приходят отдельными
 // запросами и могут пересечься по границе: дубли отсекаются по id.
-export function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+// replaceRange: incoming это последняя страница диалога целиком. Тогда она заменяет свой
+// диапазон: сообщение, которое портал удалил совсем, иначе висело бы в открытом чате.
+export function mergeMessages(
+  current: Message[],
+  incoming: Message[],
+  replaceRange = false,
+): Message[] {
   const byId = new Map(current.map((message) => [message.id, message]));
+  // Пустая последняя страница значит пустую историю: последнее сообщение удалили.
+  if (replaceRange && !incoming.length) return [];
+  if (replaceRange) {
+    const from = Math.min(...incoming.map((message) => message.id));
+    for (const id of byId.keys()) if (id >= from) byId.delete(id);
+  }
   for (const message of incoming) byId.set(message.id, message);
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
@@ -274,9 +295,14 @@ export function normalizeMessages(result: any): {
         edited: m.params?.IS_EDITED === 'Y',
         likes: Array.isArray(m.params?.LIKE) ? m.params.LIKE.map(Number) : [],
         // params приходит пустым массивом, а не объектом, если параметров нет.
+        // Портал не прислал запись файла: вложение не выкидываем, а показываем по номеру.
+        // Скачивание и пересылка идут по id, поэтому файл остаётся доступным.
         files: ((m.params?.FILE_ID as unknown[]) || [])
-          .map((id) => files.get(Number(id)))
-          .filter((file): file is MessageFile => Boolean(file)),
+          .map(Number)
+          .filter((id) => Number.isInteger(id) && id > 0)
+          .map(
+            (id): MessageFile => files.get(id) || { id, name: t('Файл'), size: 0, kind: 'file' },
+          ),
         attach: normalizeAttach(m.params?.ATTACH),
       }))
       .sort((a, b) => a.id - b.id),
@@ -343,22 +369,42 @@ export function quoteBlock(
   author: string,
   message: Pick<Message, 'text' | 'files'>,
   label = '',
+  // Ответ цитирует начало реплики, а пересылка обязана донести текст целиком: каждая
+  // строка идёт своей строкой цитаты, иначе после первой цитата бы обрывалась.
+  full = false,
 ): string {
+  if (full && message.text.trim()) {
+    // Пересылаем исходный текст: разбор для превью съедал бы нумерацию списков, отступы
+    // и код. Снимаем только упоминания, чтобы людям не пришло повторное уведомление.
+    const lines = message.text.replace(/\[USER=[^\]]*\]([\s\S]*?)\[\/USER\]/gi, '$1').split('\n');
+    const [first, ...rest] = lines;
+    return `>>${label}${author}: ${first}\n${rest.map((line) => `>>${line}\n`).join('')}`;
+  }
   const plain = bitrixPlainText(message.text, parseMessageNodes).slice(0, 300);
   const snippet = plain || message.files.map((file) => file.name).join(', ') || 'Сообщение';
   return `>>${label}${author}: ${snippet}\n`;
 }
 
 // В поле ввода упоминание выглядит как @Имя, а в тег Битрикса превращается при отправке.
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export function applyMentions(
   text: string,
   mentions: { id: number | 'all'; name: string }[],
 ): string {
-  return mentions.reduce(
-    (result, mention) =>
-      result.replace(`@${mention.name}`, `[USER=${mention.id}]${mention.name}[/USER]`),
-    text,
-  );
+  // Каждое вхождение, а не первое: одного человека упоминают и дважды. Длинные имена
+  // раньше коротких, иначе «@Анна» съела бы начало «@Анна Петрова».
+  return [...mentions]
+    .sort((a, b) => b.name.length - a.name.length)
+    .reduce(
+      (result, mention) =>
+        // Только имя целиком: «@АннаПетрова» не начинается с упоминания Анны.
+        result.replace(
+          new RegExp(`@${escapeRegExp(mention.name)}(?![\\p{L}\\p{N}])`, 'gu'),
+          () => `[USER=${mention.id}]${mention.name}[/USER]`,
+        ),
+      text,
+    );
 }
 
 const POST_RANK: Record<string, number> = { member: 1, manager: 2, owner: 3 };

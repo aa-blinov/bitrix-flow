@@ -76,7 +76,7 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [navOrder, setNavOrder] = useNavOrder();
-  const chatUnread = useChatAlerts(pathname);
+  const chatUnread = useChatAlerts();
 
   // Недавно открытые — сверху: пятьдесят один проект по алфавиту означает, что
   // свои три-четыре приходится каждый раз искать заново.

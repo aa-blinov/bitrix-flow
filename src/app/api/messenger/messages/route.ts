@@ -35,6 +35,9 @@ export function GET(req: NextRequest) {
       }),
       beforeId ? null : call('im.dialog.get', { DIALOG_ID: dialogId }).catch(() => null),
     ]);
+    // Ответ без списка сообщений не пустая история: иначе полное перечитывание стёрло бы её.
+    if (!Array.isArray(result?.messages))
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     return NextResponse.json({
       ...normalizeMessages(result),
       ...(dialog
@@ -55,8 +58,10 @@ export async function POST(req: NextRequest) {
   if (!DIALOG_ID.test(dialogId)) return badRequest('BAD_DIALOG_ID');
   if (!text || text.length > MAX_TEXT) return badRequest('BAD_TEXT');
   return withMessenger(req, async (call) => {
-    const id = await call('im.message.add', { DIALOG_ID: dialogId, MESSAGE: text }, true);
-    return NextResponse.json({ id: Number(id) || null });
+    const id = Number(await call('im.message.add', { DIALOG_ID: dialogId, MESSAGE: text }, true));
+    // Ответ без номера сообщения: дошло ли, неизвестно. 502 клиент так и показывает.
+    if (!id) return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
+    return NextResponse.json({ id });
   });
 }
 
@@ -65,8 +70,17 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const dialogId = String(body?.dialogId || '');
   if (!DIALOG_ID.test(dialogId)) return badRequest('BAD_DIALOG_ID');
+  // Граница прочитанного: только до последнего показанного сообщения. Пришедшее после
+  // загрузки страницы остаётся непрочитанным.
+  const messageId = Number(body?.messageId) || 0;
   return withMessenger(req, async (call) => {
-    await call('im.dialog.read', { DIALOG_ID: dialogId }, true);
+    const done = await call(
+      'im.dialog.read',
+      { DIALOG_ID: dialogId, ...(messageId > 0 ? { MESSAGE_ID: String(messageId) } : {}) },
+      true,
+    );
+    // Без подтверждения портала клиент вернёт счётчик и повторит отметку.
+    if (!done) return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
     return NextResponse.json({ ok: true });
   });
 }

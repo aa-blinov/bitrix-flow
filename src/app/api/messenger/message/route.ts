@@ -5,6 +5,12 @@ import { isMockEnabled } from '@/lib/mock-b24';
 import type { MessengerEvent } from '@/lib/messenger-events';
 import { withMessenger } from '@/lib/messenger-api';
 
+// Методы отвечают true. Без подтверждения исход неизвестен: бросаем ошибку транспорта,
+// withMessenger отдаст 502, и клиент перечитает состояние, а не покажет успех.
+function confirmed(result: unknown) {
+  if (!result) throw new Error('BITRIX24_UNCONFIRMED');
+}
+
 export const dynamic = 'force-dynamic';
 
 const MAX_TEXT = 20_000;
@@ -22,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!valid) return badRequest('BAD_MESSAGE_ID');
   const action = body?.action === 'unlike' ? 'minus' : 'plus';
   return withMessenger(req, async (call) => {
-    await call('im.message.like', { MESSAGE_ID: messageId, ACTION: action }, true);
+    confirmed(await call('im.message.like', { MESSAGE_ID: messageId, ACTION: action }, true));
     return NextResponse.json({ ok: true });
   });
 }
@@ -35,7 +41,7 @@ export async function PUT(req: NextRequest) {
   if (!valid) return badRequest('BAD_MESSAGE_ID');
   if (!text || text.length > MAX_TEXT) return badRequest('BAD_TEXT');
   return withMessenger(req, async (call, memberId) => {
-    await call('im.message.update', { MESSAGE_ID: messageId, MESSAGE: text }, true);
+    confirmed(await call('im.message.update', { MESSAGE_ID: messageId, MESSAGE: text }, true));
     // Правку через im.message.update портал в очередь событий не кладёт (так в документации
     // im.v2), поэтому другие вкладки видели её только при полном перечитывании раз в две
     // минуты. Событие ставим сами, его раздаёт тот же SSE.
@@ -54,14 +60,19 @@ export async function PUT(req: NextRequest) {
         text: '',
         muted: true,
         mentioned: false,
+        own: true,
         at: new Date().toISOString(),
       };
-      await (
-        await getDb()
-      )
-        .collection('events_stream')
-        .insertOne({ member_id: memberId, event, created_at: new Date() })
-        .catch(() => {});
+      // Правка в Битриксе уже прошла: сбой базы не должен выглядеть как неудачная правка.
+      try {
+        await (
+          await getDb()
+        )
+          .collection('events_stream')
+          .insertOne({ member_id: memberId, event, created_at: new Date() });
+      } catch (error) {
+        console.warn('[messenger] событие правки не записано', error);
+      }
     }
     return NextResponse.json({ ok: true });
   });
@@ -71,7 +82,7 @@ export async function DELETE(req: NextRequest) {
   const { messageId, valid } = await read(req);
   if (!valid) return badRequest('BAD_MESSAGE_ID');
   return withMessenger(req, async (call) => {
-    await call('im.message.delete', { MESSAGE_ID: messageId }, true);
+    confirmed(await call('im.message.delete', { MESSAGE_ID: messageId }, true));
     return NextResponse.json({ ok: true });
   });
 }

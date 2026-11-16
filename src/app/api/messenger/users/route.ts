@@ -17,6 +17,10 @@ export function GET(req: NextRequest) {
     const result = dialogId
       ? await call('im.dialog.users.list', { DIALOG_ID: dialogId, LIMIT: 200 })
       : await call('im.search.user.list', { FIND: q, LIMIT: 15 });
+    // Ответ без списка не «никого нет»: клиент должен показать сбой.
+    // Участники чата приходят массивом, поиск людей объектом или массивом.
+    if (dialogId ? !Array.isArray(result) : !result || typeof result !== 'object')
+      return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
     return NextResponse.json({ users: normalizeUsers(result) });
   });
 }

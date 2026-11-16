@@ -26,6 +26,10 @@ export type MessengerEvent = {
   /** Меня упомянули тегом [USER=…]: пинг приходит даже из чата с отключённым звуком. */
   mentioned: boolean;
   at: string;
+  /** Моё сообщение: о нём не звенят. Сервер знает свой id, вкладке он может быть неизвестен. */
+  own?: boolean;
+  /** Событие старше пары минут: данные обновить, но не звенеть. */
+  stale?: boolean;
 };
 
 const KINDS: Record<string, MessengerEvent['kind']> = {
@@ -62,6 +66,7 @@ export function mapEvent(
       (hasFile ? 'Файл' : ''),
     muted: mutedChats.has(chatId),
     mentioned: mentionsUser(String(message.text || ''), me),
+    own: Boolean(me) && Number(message.authorId ?? message.author_id) === me,
     at: String(raw.date || new Date().toISOString()),
   };
 }
@@ -81,14 +86,18 @@ type State = {
   offset: number;
   lastActive: number;
   lastOkAt: number;
+  /** Первая попытка чтения после подписки или простоя: от неё health отсчитывает сбой. */
+  startedAt: number;
   lastError: string;
   me: number;
   mutedChats: Set<number>;
   mutedAt: number;
+  mutedGeneration: number;
   seen: string[];
   /** Есть подписки на пуши: очередь читаем и без открытых вкладок. */
   pushWanted: boolean;
   pushCheckedAt: number;
+  pushGeneration: number;
 };
 
 declare global {
@@ -106,45 +115,64 @@ function getState(): State {
     offset: 0,
     lastActive: 0,
     lastOkAt: 0,
+    startedAt: 0,
     lastError: '',
     me: 0,
     mutedChats: new Set(),
     mutedAt: 0,
+    mutedGeneration: 0,
     seen: [],
     pushWanted: false,
     pushCheckedAt: 0,
+    pushGeneration: 0,
   });
 }
 
 // Портал присылает каждое событие дважды (по одному на каждую копию сообщения),
-// поэтому повтор по виду и номеру сообщения отбрасываем.
-function isDuplicate(state: State, event: MessengerEvent) {
-  const key = `${event.kind}:${event.messageId}:${event.dialogId}`;
-  if (state.seen.includes(key)) return true;
-  state.seen.push(key);
-  if (state.seen.length > 300) state.seen.shift();
-  return false;
+// поэтому повтор нового сообщения отбрасываем: он звенел бы дважды. Правку и реакцию
+// не схлопываем: вторая правка того же сообщения это новое событие, а лишний повтор
+// стоит только перечитывания страницы.
+function dedupKey(event: MessengerEvent) {
+  return event.kind === 'add' ? `add:${event.messageId}:${event.dialogId}` : null;
+}
+
+function remember(state: State, keys: string[]) {
+  state.seen.push(...keys);
+  if (state.seen.length > 300) state.seen.splice(0, state.seen.length - 300);
 }
 
 async function refreshMuted(memberId: string, state: State) {
   if (Date.now() - state.mutedAt < MUTE_REFRESH_MS) return;
-  state.mutedAt = Date.now();
+  // Сбой запроса не делает пустой список актуальным на пять минут: повтор через 15 с.
+  state.mutedAt = Date.now() - MUTE_REFRESH_MS + 15_000;
+  // Звук переключили, пока шёл запрос: его ответ уже устарел, ждём следующий проход.
+  const generation = state.mutedGeneration;
   try {
-    const result = await bx24OAuth(
-      memberId,
-      'im.recent.list',
-      { SKIP_OPENLINES: 'Y', LIMIT: '200' },
-      { parallel: true },
-    );
+    // Заглушённый чат может стоять дальше первой страницы: смотрим до пяти страниц.
+    const items: any[] = [];
+    for (let page = 0; page < 5; page++) {
+      const result = await bx24OAuth(
+        memberId,
+        'im.recent.list',
+        { SKIP_OPENLINES: 'Y', LIMIT: '200', OFFSET: String(page * 200) },
+        { parallel: true },
+      );
+      // Ответ без списка не значит «заглушённых нет»: прежний кэш остаётся.
+      if (!Array.isArray(result?.items)) throw new Error('BAD_RECENT_LIST');
+      items.push(...result.items);
+      if (!(result?.hasMore ?? result?.hasMorePages)) break;
+    }
     const muted = new Set<number>();
-    for (const item of result?.items || []) {
+    for (const item of items) {
       const list = item.chat?.mute_list;
       const mine = Array.isArray(list)
         ? list.map(Number).includes(state.me)
         : Boolean(list?.[state.me]);
       if (mine && Number(item.chat_id)) muted.add(Number(item.chat_id));
     }
+    if (generation !== state.mutedGeneration) return;
     state.mutedChats = muted;
+    state.mutedAt = Date.now();
   } catch {
     // Список отключённых чатов обновится в следующий раз.
   }
@@ -155,34 +183,63 @@ const PUSH_CHECK_MS = 60_000;
 async function refreshPushWanted(state: State) {
   if (!pushConfigured() || Date.now() - state.pushCheckedAt < PUSH_CHECK_MS) return;
   state.pushCheckedAt = Date.now();
-  const memberId = await getProtectedMemberId().catch(() => null);
-  state.pushWanted = memberId ? await hasSubscriptions(memberId).catch(() => false) : false;
+  // Подписку добавили, пока шла проверка: её ответ устарел, кэш сброшен и перечитается.
+  const generation = state.pushGeneration;
+  // Сбой базы не равен «подписок нет»: остаётся прежнее значение, повтор через 10 с.
+  try {
+    const memberId = await getProtectedMemberId();
+    const wanted = memberId ? await hasSubscriptions(memberId) : false;
+    if (generation === state.pushGeneration) state.pushWanted = wanted;
+  } catch (error) {
+    if (generation === state.pushGeneration)
+      state.pushCheckedAt = Date.now() - PUSH_CHECK_MS + 10_000;
+    console.warn('[messenger-events] проверка пуш-подписок', error);
+  }
 }
 
+// Проход занимает флаг до первого await и держит его до конца: иначе медленная проверка
+// пушей пропускала второй тик, два чтения шли с одним offset, а поздняя отписка снимала
+// подписку, которую следующий тик уже успел оформить заново.
 async function tick() {
   const state = getState();
   if (state.inFlight) return;
+  state.inFlight = true;
+  try {
+    await poll(state);
+  } finally {
+    state.inFlight = false;
+  }
+}
+
+async function poll(state: State) {
   const clients = globalThis.__sseSubscribers?.size ?? 0;
+  // Отсчёт для health до первого await: зависшая проверка пушей тоже должна быть видна.
+  if (clients && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) state.startedAt = Date.now();
   await refreshPushWanted(state);
   if (!clients && !state.pushWanted) {
-    if (state.subscribed && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) {
-      state.subscribed = false;
-      state.offset = 0;
+    // Вкладка могла подключиться, пока проверяли пуши: перед отпиской смотрим заново.
+    const now = globalThis.__sseSubscribers?.size ?? 0;
+    if (!now && state.subscribed && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) {
       const memberId = await getProtectedMemberId().catch(() => null);
       if (memberId)
         await bx24OAuth(memberId, 'im.v2.Event.unsubscribe', {}, { json: true }).catch(() => {});
+      state.subscribed = false;
+      state.offset = 0;
     }
     return;
   }
+  // Простой кончился: отсчёт для health начинается заново, а не с прошлого успеха.
+  if (Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) state.startedAt = Date.now();
   state.lastActive = Date.now();
-  state.inFlight = true;
   try {
     const memberId = await getProtectedMemberId();
     if (!memberId) return;
     if (!state.subscribed) {
       await bx24OAuth(memberId, 'im.v2.Event.subscribe', {}, { json: true });
       const me = await bx24OAuth(memberId, 'user.current', {}, { parallel: true });
-      state.me = Number(me?.ID) || 0;
+      // Без своего id нельзя отличить свои сообщения и заглушённые чаты: проход не готов.
+      if (!(Number(me?.ID) > 0)) throw new Error('BAD_CURRENT_USER');
+      state.me = Number(me.ID);
       state.subscribed = true;
     }
     await refreshMuted(memberId, state);
@@ -195,19 +252,41 @@ async function tick() {
         { limit: 100, ...(state.offset ? { offset: state.offset } : {}) },
         { json: true },
       );
-      // Повторный запрос с offset подтверждает прочитанное и удаляет события на портале.
-      if (Number(result?.nextOffset)) state.offset = Number(result.nextOffset);
+      // Ответ без массива событий не пустая страница: подтверждать его offset нельзя.
+      if (!Array.isArray(result?.events)) throw new Error('BAD_EVENT_PAGE');
       const docs = [];
+      const keys: string[] = [];
       for (const raw of result?.events || []) {
         const event = mapEvent(raw, state.mutedChats, state.me);
-        if (!event || isDuplicate(state, event)) continue;
-        if (Date.now() - Date.parse(event.at) > MAX_AGE_MS) continue;
+        if (!event) continue;
+        const key = dedupKey(event);
+        if (key && (state.seen.includes(key) || keys.includes(key))) continue;
+        if (key) keys.push(key);
+        // Старое событие (после сбоя или перезапуска) всё равно раздаём: вкладки по нему
+        // обновят данные. Не звенят о нём и не шлют пуш.
+        if (Date.now() - Date.parse(event.at) > MAX_AGE_MS) event.stale = true;
         docs.push({ member_id: memberId, event, created_at: new Date() });
-        // Открытая вкладка сама покажет уведомление; пуш нужен, когда вкладок нет.
-        if (!clients && event.kind === 'add' && event.authorId !== state.me)
-          if (!event.muted || event.mentioned) void pushEvent(memberId, event);
       }
+      // Сначала запись, потом подтверждение: следующий запрос с offset удаляет события на
+      // портале, и при сбое записи страница пропала бы. Без нового offset портал отдаст
+      // её снова, а повтор отсечёт seen.
+      const insertedAt = Date.now();
       if (docs.length) await db.collection('events_stream').insertMany(docs);
+      remember(state, keys);
+      if (Number(result?.nextOffset)) state.offset = Number(result.nextOffset);
+      // Открытая вкладка сама покажет уведомление; пуш нужен, когда вкладок нет.
+      // Пуш не нужен, только если событие точно покажет вкладка: она с уведомлениями и
+      // подключилась до записи (иначе её курсор уже за этим событием). Вкладок могло и не
+      // стать за время запроса к порталу, поэтому считаем заново.
+      const tabs = [...(globalThis.__sseSubscribers ?? [])].filter((raw) => {
+        const tab = raw as { readyAt?: number; alerts?: boolean };
+        return tab.alerts && (tab.readyAt ?? 0) < insertedAt;
+      }).length;
+      for (const { event } of docs)
+        if (!tabs && event.kind === 'add' && event.authorId !== state.me)
+          if ((!event.muted || event.mentioned) && !event.stale)
+            // Сбой пуша (в том числе базы подписок) не должен ронять процесс.
+            void pushEvent(memberId, event).catch((error) => console.warn('[push]', error));
       if (!result?.hasMore) break;
     }
     state.lastOkAt = Date.now();
@@ -215,8 +294,6 @@ async function tick() {
   } catch (error) {
     state.lastError = error instanceof Error ? error.message : String(error);
     console.warn('[messenger-events]', state.lastError);
-  } finally {
-    state.inFlight = false;
   }
 }
 
@@ -233,12 +310,28 @@ function pushEvent(memberId: string, event: MessengerEvent) {
 
 // Для /api/health: опрос живой, если есть открытые вкладки и последний проход был недавно.
 export function getMessengerEventsHealth() {
-  const { lastOkAt, lastError, subscribed } = getState();
+  const { lastOkAt, startedAt, lastError, pushWanted } = getState();
   return {
-    active: subscribed && ((globalThis.__sseSubscribers?.size ?? 0) > 0 || getState().pushWanted),
-    lastOkAt,
+    // Нужен, когда есть вкладки или пуши. Не только subscribed: если подписка падает с
+    // самого начала, subscribed так и не станет true, а сбой должен быть виден.
+    active: (globalThis.__sseSubscribers?.size ?? 0) > 0 || pushWanted,
+    lastOkAt: Math.max(lastOkAt, startedAt),
     lastError,
   };
+}
+
+/** Звук чата переключили: список заглушённых перечитывается на следующем проходе. */
+export function invalidateMuted() {
+  const state = getState();
+  state.mutedAt = 0;
+  state.mutedGeneration += 1;
+}
+
+/** Подписку на пуш добавили или убрали: поллер узнает об этом на следующем проходе. */
+export function invalidatePushWanted() {
+  const state = getState();
+  state.pushCheckedAt = 0;
+  state.pushGeneration += 1;
 }
 
 export function startMessengerEvents() {
