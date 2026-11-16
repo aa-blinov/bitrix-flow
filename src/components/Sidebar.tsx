@@ -21,7 +21,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
-import SortableNav, { useNavOrder } from '@/components/SortableNav';
+import SortableNav, { useNavOrder, useWideScreen } from '@/components/SortableNav';
 import { useChatAlerts } from '@/components/messenger/useChatAlerts';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -571,16 +571,4 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
       </Modal>
     </>
   );
-}
-
-function useWideScreen() {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 1024px)');
-    const apply = () => setWide(query.matches);
-    apply();
-    query.addEventListener('change', apply);
-    return () => query.removeEventListener('change', apply);
-  }, []);
-  return wide;
 }

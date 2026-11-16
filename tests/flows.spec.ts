@@ -447,9 +447,7 @@ test('меню: пункты переставляются перетаскива
   await expect.poll(order).toEqual(['Поиск', 'Главная', 'Сообщения']);
 });
 
-test('меню: группы свёрнуты, группа текущей страницы раскрыта сразу', async ({
-  page,
-}, testInfo) => {
+test('меню: группы выплывают вправо и закрываются после перехода', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
   const nav = page.locator('aside nav');
   await page.goto('/');
@@ -458,14 +456,19 @@ test('меню: группы свёрнуты, группа текущей ст�
   await expect(nav.getByRole('link', { name: 'Аналитика часов' })).toHaveCount(0);
   await reports.click();
   await expect(reports).toHaveAttribute('aria-expanded', 'true');
+  // Панель лежит справа от меню: список проектов под группами не сдвигается.
+  const sidebar = await page.locator('aside').boundingBox();
+  const panel = await nav.getByRole('link', { name: 'Аналитика часов' }).boundingBox();
+  expect(panel!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width);
+  await page.keyboard.press('Escape');
+  await expect(reports).toHaveAttribute('aria-expanded', 'false');
+  await reports.click();
   await nav.getByRole('link', { name: 'Аналитика часов' }).click();
   await expect(page).toHaveURL(/\/analytics/);
+  await expect(reports).toHaveAttribute('aria-expanded', 'false');
 
   await page.goto('/team-workload');
-  await expect(nav.getByRole('button', { name: 'Отчёты' })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  await nav.getByRole('button', { name: 'Отчёты' }).click();
   await expect(nav.getByRole('link', { name: 'Нагрузка команды' })).toHaveAttribute(
     'aria-current',
     'page',

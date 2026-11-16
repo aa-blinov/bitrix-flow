@@ -22,7 +22,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -247,6 +247,19 @@ export function useNavOrder() {
   return [order, update] as const;
 }
 
+// Постоянное меню с 1024px: только тогда справа от него есть место для выплывающей группы.
+export function useWideScreen() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setWide(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+  return wide;
+}
+
 function SortableNavLink({
   item,
   pathname,
@@ -353,20 +366,63 @@ export default function SortableNav({
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
     );
 
-  const list = (section: NavSection, id?: string) => {
+  // На широком экране группа выплывает вправо от меню, а не раскрывается в списке: иначе
+  // она сдвигает проекты вниз. fixed, потому что nav прокручивается и обрезала бы абсолютную
+  // панель; координаты берём от кнопки и края самого меню.
+  const wide = useWideScreen();
+  const [flyout, setFlyout] = useState<{ key: string; top: number; left: number } | null>(null);
+  const flyoutRef = useRef<HTMLDivElement>(null);
+  const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
+  useEffect(() => {
+    if (!flyout) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (
+        !flyoutRef.current?.contains(target) &&
+        !Object.values(buttons.current).some((button) => button?.contains(target))
+      )
+        setFlyout(null);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      buttons.current[flyout.key]?.focus();
+      setFlyout(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [flyout]);
+  const toggleFlyout = (key: string) => {
+    const button = buttons.current[key];
+    if (!button || flyout?.key === key) return setFlyout(null);
+    setFlyout({
+      key,
+      top: button.getBoundingClientRect().top,
+      left: (button.closest('aside') ?? button).getBoundingClientRect().right,
+    });
+  };
+  const navigate = () => {
+    setFlyout(null);
+    onNavigate();
+  };
+
+  const list = (section: NavSection, id?: string, flat = false) => {
     const items = itemsOf(section);
     return (
       <SortableContext
         items={items.map((item) => item.href)}
         strategy={verticalListSortingStrategy}
       >
-        <div id={id} className={`space-y-0.5 ${section === 'main' ? '' : 'pl-3'}`}>
+        <div id={id} className={`space-y-0.5 ${section === 'main' || flat ? '' : 'pl-3'}`}>
           {items.map((item) => (
             <SortableNavLink
               key={item.href}
               item={item}
               pathname={pathname}
-              onNavigate={onNavigate}
+              onNavigate={flat ? navigate : onNavigate}
               badge={badges[item.href]}
             />
           ))}
@@ -409,7 +465,7 @@ export default function SortableNav({
       <div className="space-y-0.5">
         {list('main')}
         {GROUPS.map((group) => {
-          const expanded = open.includes(group.key);
+          const expanded = wide ? flyout?.key === group.key : open.includes(group.key);
           const Icon = group.icon;
           const hidden = itemsOf(group.key).reduce(
             (sum, item) => sum + (badges[item.href] || 0),
@@ -419,10 +475,17 @@ export default function SortableNav({
             <div key={group.key}>
               <button
                 type="button"
+                ref={(node) => {
+                  buttons.current[group.key] = node;
+                }}
                 aria-expanded={expanded}
                 aria-controls={`nav-${group.key}`}
-                onClick={() => toggle(group.key)}
-                className="flex min-h-9 w-full items-center gap-2.5 rounded-ui px-2.5 text-sm text-ink-soft transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:min-h-11"
+                onClick={() => (wide ? toggleFlyout(group.key) : toggle(group.key))}
+                className={`flex min-h-9 w-full items-center gap-2.5 rounded-ui px-2.5 text-sm transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:min-h-11 ${
+                  wide && (expanded || activeSection === group.key)
+                    ? 'bg-surface text-ink'
+                    : 'text-ink-soft'
+                }`}
               >
                 <Icon size={16} strokeWidth={1.7} />
                 <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
@@ -431,10 +494,26 @@ export default function SortableNav({
                   size={14}
                   strokeWidth={1.7}
                   aria-hidden
-                  className={`transition-transform duration-fast ${expanded ? 'rotate-90' : ''}`}
+                  className={`transition-transform duration-fast ${expanded && !wide ? 'rotate-90' : ''}`}
                 />
               </button>
-              {expanded && list(group.key, `nav-${group.key}`)}
+              {/* lg:hidden: до гидрации на широком экране раскрытая группа не мелькает в списке. */}
+              {expanded && !wide && (
+                <div className="lg:hidden">{list(group.key, `nav-${group.key}`)}</div>
+              )}
+              {expanded && wide && flyout && (
+                <div
+                  ref={flyoutRef}
+                  style={{
+                    top: flyout.top,
+                    left: flyout.left + 8,
+                    maxHeight: `calc(100dvh - ${flyout.top}px - 8px)`,
+                  }}
+                  className="fixed z-menu w-60 overflow-y-auto rounded-ui border border-line bg-canvas p-2 shadow-overlay"
+                >
+                  {list(group.key, `nav-${group.key}`, true)}
+                </div>
+              )}
             </div>
           );
         })}
