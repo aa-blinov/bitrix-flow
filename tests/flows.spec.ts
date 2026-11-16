@@ -1264,3 +1264,17 @@ test(
     await expect(previous).toHaveAttribute('aria-pressed', 'true');
   },
 );
+
+test('кнопка «Обновить» крутится, пока список перечитывается, и подтверждает итог', async ({
+  page,
+}) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  const refresh = page.getByRole('button', { name: 'Обновить список' });
+  const reload = page.waitForRequest((request) => request.url().includes('/api/tasks/all'));
+  await refresh.click();
+  await expect(refresh).toHaveAttribute('aria-busy', 'true');
+  await reload;
+  await expect(page.getByText('Список обновлён')).toBeVisible();
+  await expect(refresh).toBeEnabled();
+});

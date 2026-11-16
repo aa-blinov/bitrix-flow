@@ -24,6 +24,7 @@ import {
 } from 'react';
 import { convertBxTask } from '@/store/kanban';
 import TaskModal from './TaskModal';
+import RefreshButton from '@/components/RefreshButton';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from 'lucide-react';
 import { Avatar } from '@/components/monos/Avatar';
@@ -650,6 +651,14 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             className="w-48 shrink-0"
           />
           <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+            <RefreshButton
+              className={toolbarControl}
+              onRefresh={async () => {
+                const { loadTasks, selectedProjectId: project } = useKanbanStore.getState();
+                await loadTasks(project ?? undefined);
+                if (useKanbanStore.getState().error) throw new Error('refresh failed');
+              }}
+            />
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'primary' : 'quiet'}
               size="md"

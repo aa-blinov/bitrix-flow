@@ -486,6 +486,12 @@ export const EN: Record<string, string> = {
     'Tasks, reports and messages open as your Bitrix account. Connect it once, then sign in with Bitrix.',
   'Подключить Битрикс': 'Connect Bitrix',
   'Профиль и настройки': 'Profile and settings',
+  'Обновить список': 'Refresh the list',
+  'Загрузить свежие данные': 'Load fresh data',
+  'Обновляем…': 'Refreshing…',
+  'Список обновлён': 'List refreshed',
+  'Не удалось обновить': 'Could not refresh',
+  'Проверьте соединение и повторите': 'Check your connection and try again',
   'Люди, которые входили через Битрикс. Учётка создаётся сама при первом входе, здесь доступ можно закрыть или дать права администратора':
     'People who signed in with Bitrix. An account is created on first sign-in; here you can revoke access or grant admin rights',
   'Вход прервался. Нажмите «Войти через Битрикс» ещё раз.':

@@ -79,6 +79,7 @@ import { TextField } from '@/components/monos/TextField';
 import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/monos/toolbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import QuickCreateTask from '@/components/QuickCreateTask';
+import RefreshButton from '@/components/RefreshButton';
 import { useTaskToasts } from '@/components/monos/toast';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import TaskFilterBar from '@/components/TaskFilterBar';
@@ -1501,6 +1502,8 @@ export default function TaskGrid({
   // Теперь запрос откладывается на тик (схлопывает первые рендеры) и не
   // повторяется с тем же ключом; ответ применяется по номеру запроса.
   const lastPageKeyRef = useRef('');
+  // Кнопка «Обновить» ждёт, пока страница перечитана: иначе нажатие нечем подтвердить.
+  const refreshWaiters = useRef<Array<{ ok: () => void; fail: () => void }>>([]);
   const pageRequestIdRef = useRef(0);
   useEffect(() => {
     if (!loadPageRef.current) return;
@@ -1529,12 +1532,14 @@ export default function TaskGrid({
           setServerPage(nextPage);
           setServerPageReady(true);
           setPagedTasks(nextPage.tasks, nextPage.total);
+          refreshWaiters.current.splice(0).forEach((waiter) => waiter.ok());
         })
         .catch(() => {
           if (!isCurrent()) return;
           // Ошибка не должна запоминать ключ, иначе «Повторить» с теми же
           // параметрами не сработает.
           lastPageKeyRef.current = '';
+          refreshWaiters.current.splice(0).forEach((waiter) => waiter.fail());
           setServerPageError(t('Не удалось загрузить страницу. Повторите попытку.'));
           setServerPageReady(true);
         })
@@ -1555,6 +1560,17 @@ export default function TaskGrid({
     sorts,
     tasksVersion,
   ]);
+
+  const refreshPage = () =>
+    new Promise<void>((resolve, reject) => {
+      // Без ответа за 20 секунд считаем обновление неудавшимся, крутилка не висит вечно.
+      const timer = window.setTimeout(() => reject(new Error('timeout')), 20_000);
+      refreshWaiters.current.push({
+        ok: () => (window.clearTimeout(timer), resolve()),
+        fail: () => (window.clearTimeout(timer), reject(new Error('failed'))),
+      });
+      useKanbanStore.getState().bumpTasksVersion();
+    });
 
   const resetFilters = () => {
     if (isMobile) setShowFilters(false);
@@ -1901,6 +1917,7 @@ export default function TaskGrid({
               // На телефоне поиск — первая строка панели, а не третья после вида.
               className={`${toolbarControl} w-full max-sm:order-first sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem] [&_input]:h-full`}
             />
+            {loadPage && <RefreshButton onRefresh={refreshPage} className={toolbarControl} />}
             <Button
               variant="secondary"
               size="sm"
