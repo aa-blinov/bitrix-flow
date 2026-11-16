@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import { Menu, LogOut, ChevronDown, Plus, Users } from 'lucide-react';
+import { Menu, LogOut, ChevronDown, ChevronRight, ChevronUp, Plus, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { Drawer } from '@/components/monos/Drawer';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { Notice } from '@/components/monos/Notice';
+import { Popover } from '@/components/monos/Popover';
 import { SelectField } from '@/components/monos/SelectField';
 import { Separator } from '@/components/monos/Separator';
 import { TextArea } from '@/components/monos/TextArea';
@@ -22,6 +23,7 @@ import { getProjectInitials, usableAvatar } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
 import SortableNav, { useNavOrder } from '@/components/SortableNav';
 import { useChatAlerts } from '@/components/messenger/useChatAlerts';
+import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
 export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
@@ -77,6 +79,9 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const [navOrder, setNavOrder] = useNavOrder();
   const chatUnread = useChatAlerts();
+  // Постоянное меню с 1024px: только тогда справа от него есть место для панелей подвала.
+  // Уже, в выдвижном меню, они открываются вверх.
+  const wide = useWideScreen();
 
   // Недавно открытые — сверху: пятьдесят один проект по алфавиту означает, что
   // свои три-четыре приходится каждый раз искать заново.
@@ -194,12 +199,16 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
           badges={{ '/messenger': chatUnread }}
         />
 
-        {/* Projects — растягивается, чтобы заполнить свободное место в сайдбаре */}
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* Проекты забирают всё свободное место, но не меньше 16rem: если меню над ними
+            разрослось, прокручивается вся панель, а не сжатый до двух строк список. */}
+        <div className="flex min-h-64 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between px-2.5">
             <p className="text-whisper font-bold uppercase tracking-widest text-ink-faint">
               {t('Проекты (')}
-              {!isRehydrated || projectsLoading || projectsFailed ? '…' : projects.length})
+              {!isRehydrated || projectsLoading || projectsFailed
+                ? '…'
+                : projects.filter((project) => !project.isArchived).length}
+              )
             </p>
             <IconButton
               label={t('Создать проект')}
@@ -302,18 +311,19 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                       variant="quiet"
                       size="sm"
                       onClick={() => setArchiveOpen((open) => !open)}
+                      aria-expanded={archiveOpen}
                       className="w-full justify-start gap-1 text-left"
                     >
                       <ChevronDown
-                        className={`size-3 transition-transform ${
-                          archiveOpen || projectQuery ? 'rotate-180' : ''
-                        }`}
+                        className={`size-3 transition-transform ${archiveOpen ? 'rotate-180' : ''}`}
                         strokeWidth={1.7}
                       />
                       {t('Архив (')}
                       {archivedProjects.length})
                     </Button>
-                    {archiveOpen || projectQuery
+                    {/* Архив скрыт, пока его не открыли, и при поиске тоже: совпадения
+                        видны счётчиком на кнопке. */}
+                    {archiveOpen
                       ? archivedProjects.map((project) => {
                           const active = pathname === `/projects/${project.id}`;
                           return (
@@ -357,55 +367,77 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
       </nav>
 
       {/* User — двухстрочный бар: имя сверху, действия снизу */}
-      <div className="p-3">
-        <Separator className="mb-3" />
-        <div className="mb-2 flex items-center gap-2.5 px-1">
-          {photo && failedPhoto !== photo ? (
-            <img
-              src={photo}
-              alt=""
-              className="size-8 shrink-0 rounded-full object-cover"
-              onError={() => setFailedPhoto(photo)}
-            />
-          ) : (
-            <div className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-ink">
-              {currentUser.id ? getInitials(currentUser.name) : '…'}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink">
-              {/* «Не определён» пугал, пока профиль просто грузился. */}
-              {currentUser.id ? currentUser.name : '…'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-1">
-          <Notifications />
-          <div className="flex items-center gap-1">
-            <IconButton
-              label={t('Выйти')}
-              variant="ghost"
-              size="sm"
-              tooltipText=""
-              onClick={() => void logout()}
-            >
-              <LogOut size={16} strokeWidth={1.7} />
-            </IconButton>
-          </div>
-        </div>
-        {isAdmin && (
-          <Link
-            href="/accounts"
-            className="mt-2 flex min-h-9 items-center gap-2 rounded-ui px-2.5 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
+      {/* Подвал одной строкой: имя открывает панель с оформлением, языком, учётками и
+          выходом. Четыре строки настроек раньше занимали место, которого не хватало проектам. */}
+      {/* relative здесь, а у панелей static: обе открываются от края всего подвала, то есть
+          сразу справа от меню, а не поверх списка проектов. */}
+      <div className="relative border-t border-line p-2">
+        <div className="flex items-center gap-1">
+          <Popover
+            placement={wide ? 'right' : 'top'}
+            align="end"
+            className={cn('min-w-0 flex-1', wide && 'static')}
+            trigger={
+              <button
+                type="button"
+                aria-label={t('Профиль и настройки')}
+                className="flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-ui px-1.5 text-left transition-colors duration-fast hover:bg-surface"
+              >
+                {photo && failedPhoto !== photo ? (
+                  <img
+                    src={photo}
+                    alt=""
+                    className="size-8 shrink-0 rounded-full object-cover"
+                    onError={() => setFailedPhoto(photo)}
+                  />
+                ) : (
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-ink">
+                    {currentUser.id ? getInitials(currentUser.name) : '…'}
+                  </span>
+                )}
+                {/* «Не определён» пугал, пока профиль просто грузился. */}
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                  {currentUser.id ? currentUser.name : '…'}
+                </span>
+                {/* Стрелка показывает, куда откроется панель. */}
+                {wide ? (
+                  <ChevronRight size={14} strokeWidth={1.7} className="shrink-0 text-ink-muted" />
+                ) : (
+                  <ChevronUp size={14} strokeWidth={1.7} className="shrink-0 text-ink-muted" />
+                )}
+              </button>
+            }
           >
-            <Users size={16} strokeWidth={1.7} />
-            {t('Учётные записи')}
-          </Link>
-        )}
-        <div className="mt-2">
-          <ThemeSwitcher>
-            <LanguageSwitcher />
-          </ThemeSwitcher>
+            <div className="flex flex-col gap-3">
+              <ThemeSwitcher>
+                <LanguageSwitcher />
+              </ThemeSwitcher>
+              <Separator />
+              {isAdmin && (
+                <Link
+                  href="/accounts"
+                  onClick={closeMobile}
+                  className="flex min-h-9 items-center gap-2 rounded-ui px-2 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink max-sm:min-h-11"
+                >
+                  <Users size={16} strokeWidth={1.7} />
+                  {t('Учётные записи')}
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="flex min-h-9 items-center gap-2 rounded-ui px-2 text-left text-sm text-ink-soft hover:bg-surface-2 hover:text-ink max-sm:min-h-11"
+              >
+                <LogOut size={16} strokeWidth={1.7} />
+                {t('Выйти')}
+              </button>
+            </div>
+          </Popover>
+          <Notifications
+            placement={wide ? 'right' : 'bottom'}
+            align="end"
+            className={wide ? 'static' : undefined}
+          />
         </div>
       </div>
     </div>
@@ -539,4 +571,16 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
       </Modal>
     </>
   );
+}
+
+function useWideScreen() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setWide(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+  return wide;
 }

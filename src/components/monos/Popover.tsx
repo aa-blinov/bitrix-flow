@@ -10,6 +10,11 @@ export type PopoverProps = {
   /** Якорь. Если его нет, компонент рисует свою кнопку. */
   trigger?: React.ReactElement;
   placement?: 'top' | 'bottom' | 'left' | 'right';
+  /**
+   * К какому краю кнопки прижать панель: start к верхнему или левому, end к нижнему или
+   * правому. Боковой панели у низа экрана нужен end, иначе она уходит за нижний край.
+   */
+  align?: 'start' | 'end';
   className?: string;
   children?: React.ReactNode;
 };
@@ -47,6 +52,7 @@ export function Popover({
   onOpenChange,
   trigger,
   placement = 'bottom',
+  align = 'start',
   className,
   children,
 }: PopoverProps) {
@@ -115,7 +121,9 @@ export function Popover({
   React.useEffect(() => {
     if (!isOpen) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!anchor.current?.contains(event.target as Node)) close(false);
+      const target = event.target as Element;
+      // Выпадашка внутри панели рисует список в портале: клик по нему это клик внутри.
+      if (!anchor.current?.contains(target) && !target.closest?.('[data-ui-portal]')) close(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -178,7 +186,14 @@ export function Popover({
   );
 
   const actualPlacement = flipped ? OPPOSITE[placement] : placement;
-  const alignClass = actualPlacement === 'left' || actualPlacement === 'right' ? 'top-0' : 'left-0';
+  const side = actualPlacement === 'left' || actualPlacement === 'right';
+  const alignClass = side
+    ? align === 'end'
+      ? 'bottom-0'
+      : 'top-0'
+    : align === 'end'
+      ? 'right-0'
+      : 'left-0';
 
   return (
     <div ref={anchor} className={cn('relative inline-block', className)}>

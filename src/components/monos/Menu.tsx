@@ -109,7 +109,9 @@ export function Menu({
   React.useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!anchor.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Element;
+      if (!anchor.current?.contains(target) && !target.closest?.('[data-ui-portal]'))
+        setOpen(false);
     };
     window.addEventListener('pointerdown', onPointerDown);
     return () => window.removeEventListener('pointerdown', onPointerDown);

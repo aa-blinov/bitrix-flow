@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { MongoClient } from 'mongodb';
+import type { Locator } from '@playwright/test';
 import { test, expect, type Page } from './fixtures';
 
 // Состояния, которые не видно на голом экране: модалка, фильтры, диалоги,
@@ -8,6 +9,12 @@ import { test, expect, type Page } from './fixtures';
 async function settle(page: Page) {
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(600);
+}
+
+// Выпадашка рисует список сама (не нативный select): открыть и нажать пункт по значению.
+async function choose(page: Page, field: Locator, value: string) {
+  await field.click();
+  await page.getByRole('listbox').locator(`[role="option"][data-value="${value}"]`).click();
 }
 
 test('карточка задачи открывается по названию', { tag: '@mobile' }, async ({ page }) => {
@@ -58,13 +65,13 @@ test('перенос в другой проект не закрывает кар
   await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  // Список вариантов искать внутри карточки: в строках таблицы тоже есть
-  // свои выпадающие списки проекта, и без области поиска Playwright
-  // находит девять одинаковых «Маркетинг Q4». Список нативный, поэтому
-  // вариант выбирается через selectOption, а не кликом по option.
-  await dialog
-    .getByRole('combobox', { name: 'Проект', exact: true })
-    .selectOption({ label: 'Маркетинг Q4' });
+  // Поле искать внутри карточки: в строках таблицы тоже есть свои выпадающие списки
+  // проекта. Открытый список один на странице, его пункт уже однозначен.
+  await dialog.getByRole('combobox', { name: 'Проект', exact: true }).click();
+  await page
+    .getByRole('listbox')
+    .getByRole('option', { name: 'Маркетинг Q4', exact: true })
+    .click();
   // Раньше тут карточка закрывалась и открывалась доска нового проекта.
   await expect(page.getByText('Задача перенесена в «Маркетинг Q4»')).toBeVisible();
   await expect(dialog).toContainText('Перевести справочники на GraphQL');
@@ -1049,8 +1056,10 @@ test(
     await settle(page);
     const english = page.getByRole('button', { name: 'EN', exact: true });
     // На мобильном боковая панель спрятана за кнопкой меню.
-    if (!(await english.isVisible()))
+    if (!(await page.getByRole('button', { name: 'Профиль и настройки' }).isVisible()))
       await page.getByRole('button', { name: 'Открыть меню' }).click();
+    // Переключатель языка лежит в панели профиля.
+    await page.getByRole('button', { name: 'Профиль и настройки' }).click();
     await english.click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByText('All tasks').and(page.locator(':visible')).first()).toBeVisible();
@@ -1197,13 +1206,13 @@ test(
       .click();
     await expect(detail).toContainText('Обновить зависимости');
     const pick = detail.getByRole('combobox').first();
-    await expect(pick).toHaveValue('');
+    await expect(pick).toHaveAttribute('data-value', '');
     const update = page.waitForRequest(
       (request) =>
         request.url().includes('tasks.task.update') &&
         (request.postData() || '').includes(encodeURIComponent('часы-внутреннее')),
     );
-    await pick.selectOption('internal');
+    await choose(page, pick, 'internal');
     await update;
     await expect(pick).toBeEnabled();
     await expect(page.getByText(/Не удалось поставить класс/)).toHaveCount(0);
@@ -1216,10 +1225,10 @@ test(
     // теги не стирает: класс уже лежит на задачах в Битриксе.
     const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
     const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
-    await backlogClass.selectOption('internal');
+    await choose(page, backlogClass, 'internal');
     await expect(internal).toContainText('3,5 ч');
     await expect(unassigned).toContainText('0 ч');
-    await backlogClass.selectOption('');
+    await choose(page, backlogClass, '');
     await expect(internal).toContainText('3,5 ч');
     await expect(unassigned).toContainText('0 ч');
 

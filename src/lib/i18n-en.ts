@@ -485,6 +485,7 @@ export const EN: Record<string, string> = {
   'Задачи, отчёты и сообщения открываются от имени вашего аккаунта Битрикса. Подключите его один раз, дальше вход будет через Битрикс.':
     'Tasks, reports and messages open as your Bitrix account. Connect it once, then sign in with Bitrix.',
   'Подключить Битрикс': 'Connect Bitrix',
+  'Профиль и настройки': 'Profile and settings',
   'Люди, которые входили через Битрикс. Учётка создаётся сама при первом входе, здесь доступ можно закрыть или дать права администратора':
     'People who signed in with Bitrix. An account is created on first sign-in; here you can revoke access or grant admin rights',
   'Вход прервался. Нажмите «Войти через Битрикс» ещё раз.':

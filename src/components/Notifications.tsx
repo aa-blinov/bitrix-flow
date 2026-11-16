@@ -37,7 +37,15 @@ function icon(type: string) {
 // они лежат в чате Bitrix, в списке их нет.
 const TASK_LIST_EVENTS = new Set(['task_added', 'task_updated', 'task_deleted', 'tasks-changed']);
 
-export default function Notifications() {
+export default function Notifications({
+  placement = 'bottom',
+  align,
+  className,
+}: {
+  placement?: 'top' | 'bottom' | 'left' | 'right';
+  align?: 'start' | 'end';
+  className?: string;
+} = {}) {
   const [items, setItems] = useState<Notice[]>([]);
   const [open, setOpen] = useState(false);
   const [seenAt, setSeenAt] = useState(0);
@@ -106,7 +114,9 @@ export default function Notifications() {
         setOpen(value);
         if (value) markAsSeen();
       }}
-      placement="bottom"
+      placement={placement}
+      align={align}
+      className={className}
       trigger={
         <IconButton label={t('Уведомления')} variant="ghost" size="sm" className="relative">
           <Bell size={16} strokeWidth={1.7} />
