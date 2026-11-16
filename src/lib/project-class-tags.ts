@@ -10,6 +10,7 @@ import {
 } from '@/lib/hour-class';
 import { mirrorProjectId } from '@/lib/hours';
 import { isMockEnabled } from '@/lib/mock-b24';
+import { findPersonToken } from './people';
 import { getDb } from '@/lib/mongo';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { bitrixTaskTags, tagKey } from '@/lib/task-tags';
@@ -128,6 +129,8 @@ export async function applyClassTags(
   changes: TagChange[],
   next: HourClass,
   previous: HourClass | null,
+  // Чьим токеном писать в портал; без него токен портала, это только для фоновой разметки.
+  asUser?: string,
 ): Promise<{ done: number; failed: string[] }> {
   const db = await getDb();
   const failed: string[] = [];
@@ -137,11 +140,12 @@ export async function applyClassTags(
     try {
       let tags = change.to;
       if (!isMockEnabled()) {
-        const fresh = await bx24OAuth(memberId, 'tasks.task.get', {
-          taskId: change.taskId,
-          'select[0]': 'ID',
-          'select[1]': 'TAGS',
-        });
+        const fresh = await bx24OAuth(
+          memberId,
+          'tasks.task.get',
+          { taskId: change.taskId, 'select[0]': 'ID', 'select[1]': 'TAGS' },
+          { asUser },
+        );
         const current = bitrixTaskTags((fresh?.task || fresh)?.tags);
         const own = resolveHourClass(current);
         if (own.conflict) continue;
@@ -154,7 +158,7 @@ export async function applyClassTags(
           memberId,
           'tasks.task.update',
           { taskId: change.taskId, fields: { TAGS: tags } },
-          { json: true },
+          { json: true, asUser },
         );
       }
       await db
@@ -173,7 +177,12 @@ export async function applyClassTags(
 }
 
 /** Новая задача в проекте с классом сразу получает его тег. */
-export async function tagNewTask(memberId: string, taskId: string, projectId: string) {
+export async function tagNewTask(
+  memberId: string,
+  taskId: string,
+  projectId: string,
+  creatorId?: string,
+) {
   if (!projectId || projectId === '0') return;
   const db = await getDb();
   const project = await db
@@ -185,11 +194,15 @@ export async function tagNewTask(memberId: string, taskId: string, projectId: st
   const task = nodes.find((node) => node.id === taskId);
   if (!task) return;
   const to = nextTags(task, new Map(nodes.map((node) => [node.id, node])), hourClass, null);
-  if (to)
-    await applyClassTags(
-      memberId,
-      [{ taskId, title: task.title, from: task.tags, to }],
-      hourClass,
-      null,
-    );
+  if (!to) return;
+  // Тег ставится от имени автора задачи, если он входил в приложение: правка в истории
+  // задачи не должна числиться за владельцем установки. Не входил: токен портала.
+  const asUser = creatorId && (await findPersonToken(memberId, creatorId)) ? creatorId : undefined;
+  await applyClassTags(
+    memberId,
+    [{ taskId, title: task.title, from: task.tags, to }],
+    hourClass,
+    null,
+    asUser,
+  );
 }

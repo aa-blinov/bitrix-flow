@@ -65,7 +65,13 @@ export async function syncTaskMirror(memberId: string, id: string, event: string
     { upsert: true },
   );
   // Новая задача проекта с классом сразу получает его тег: класс должен лежать на задаче.
-  if (event === 'ONTASKADD') await tagNewTask(memberId, resolvedId, projectId(task));
+  if (event === 'ONTASKADD')
+    await tagNewTask(
+      memberId,
+      resolvedId,
+      projectId(task),
+      String(task.createdBy || task.creator?.id || ''),
+    );
 }
 
 // Reuses the verified complete paginated summary snapshot for the initial mirror.

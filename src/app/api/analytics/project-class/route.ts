@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Задач бывают сотни, а на каждую два запроса к порталу: ответ не ждёт раскладки.
     if (hourClass && changes.length)
       after(async () => {
-        const result = await applyClassTags(memberId, changes, hourClass, previous);
+        const result = await applyClassTags(memberId, changes, hourClass, previous, person.userId);
         invalidateByPrefix(`${memberId}:`);
         console.log('[project-class]', projectId, hourClass, result.done, 'тегов', result.failed);
       });
