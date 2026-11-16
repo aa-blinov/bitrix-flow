@@ -71,6 +71,16 @@ function AllTasksInner() {
     if (next !== selectedTaskId) setSelectedTask(next);
   }, [taskFromUrl, selectedTaskId, setSelectedTask]);
 
+  // Ссылка из отчёта или дашборда ведёт на задачу, которой нет на загруженной странице
+  // списка: грид ищет карточку только среди загруженных, поэтому дочитываем её по id.
+  useEffect(() => {
+    if (!taskFromUrl) return;
+    const { allTasks, tasks, loadTaskById } = useKanbanStore.getState();
+    if (allTasks.some((task) => task.id === taskFromUrl)) return;
+    if (tasks.some((task) => task.id === taskFromUrl)) return;
+    void loadTaskById(taskFromUrl);
+  }, [taskFromUrl]);
+
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader

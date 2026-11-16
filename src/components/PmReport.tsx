@@ -22,8 +22,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { downloadCsv } from '@/lib/csv';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import type { Cell, ReportResult, ReportRow } from '@/lib/pm-reports';
-import type { ReportKind } from '@/lib/pm-reports-data';
+import type { Cell, ReportRow } from '@/lib/pm-reports';
+import type { ReportKind, ReportResponse } from '@/lib/pm-reports-data';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
 
@@ -37,7 +37,9 @@ type Kind =
   | 'days'
   | 'percent'
   | 'date'
-  | 'week'
+  | 'datetime'
+  | 'range'
+  | 'link'
   | 'month'
   | 'status'
   | 'state'
@@ -85,7 +87,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     defaultPeriod: 'three',
     tiles: [
       { id: 'plan', label: () => t('План'), kind: 'hours' },
-      { id: 'fact', label: () => t('Факт'), kind: 'hours' },
+      { id: 'fact', label: () => t('Факт задач с оценкой'), kind: 'hours' },
       {
         id: 'overrun',
         label: () => t('Перерасход'),
@@ -93,6 +95,12 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         hint: () => t('Сумма превышений по задачам, где факт больше плана'),
       },
       { id: 'overTasks', label: () => t('Задач с перерасходом'), kind: 'count' },
+      {
+        id: 'unestimated',
+        label: () => t('Часы задач без оценки'),
+        kind: 'hours',
+        hint: () => t('Списания задач без оценки, которые не вошли в факт оценённого родителя'),
+      },
     ],
     tables: [
       {
@@ -105,6 +113,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
           { id: 'state', label: () => t('Состояние'), kind: 'state' },
           { id: 'plan', label: () => t('План, ч'), kind: 'hours' },
           { id: 'fact', label: () => t('Факт, ч'), kind: 'hours' },
+          { id: 'subFact', label: () => t('Из них подзадачи, ч'), kind: 'hours' },
           { id: 'delta', label: () => t('Разница, ч'), kind: 'hours' },
           { id: 'deltaShare', label: () => t('Разница'), kind: 'percent' },
         ],
@@ -112,10 +121,24 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         groupings: ['project', 'user'],
         empty: () => t('Задач с оценкой за период нет'),
       },
+      {
+        id: 'unestimated',
+        title: () => t('Задачи без оценки со списаниями'),
+        columns: [
+          C.project,
+          C.task,
+          C.user,
+          { id: 'state', label: () => t('Состояние'), kind: 'state' },
+          { id: 'fact', label: () => t('Факт, ч'), kind: 'hours' },
+        ],
+        sort: { id: 'fact', desc: true },
+        groupings: ['project', 'user'],
+        empty: () => t('Все задачи со списаниями оценены'),
+      },
     ],
     notes: () =>
       t(
-        'Открытые задачи и закрытые за период. Факт это все списания задачи и её подзадач без своей оценки; подзадача с оценкой идёт своей строкой.',
+        'Задачи, открытые сегодня, и закрытые за период; план и факт берутся за всю жизнь задачи, а не только за период. Факт это списания задачи и её подзадач без своей оценки, даже если подзадача в другом проекте; подзадача с оценкой идёт своей строкой.',
       ),
   },
   deadlines: {
@@ -125,7 +148,12 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     defaultPeriod: 'month',
     tiles: [
       { id: 'closedWithDeadline', label: () => t('Закрыто с дедлайном'), kind: 'count' },
-      { id: 'onTime', label: () => t('В срок'), kind: 'percent' },
+      {
+        id: 'onTime',
+        label: () => t('В срок'),
+        kind: 'percent',
+        hint: () => t('Доля среди закрытых в периоде задач с дедлайном, не позднее срока'),
+      },
       { id: 'late', label: () => t('Закрыто с опозданием'), kind: 'count' },
       {
         id: 'avgLate',
@@ -137,24 +165,24 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     tables: [
       {
         id: 'tasks',
-        title: () => t('Опоздания и просрочки'),
+        title: () => t('Задачи со сроком'),
         columns: [
           C.project,
           C.task,
           C.user,
           { id: 'state', label: () => t('Состояние'), kind: 'state' },
-          C.deadline,
-          C.closed,
+          { id: 'deadline', label: () => t('Дедлайн'), kind: 'datetime' },
+          { id: 'closed', label: () => t('Закрыта'), kind: 'datetime' },
           { id: 'days', label: () => t('Дней сверх срока'), kind: 'days' },
         ],
         sort: { id: 'days', desc: true },
         groupings: ['project', 'user'],
-        empty: () => t('Опозданий нет'),
+        empty: () => t('Задач со сроком за период нет'),
       },
     ],
     notes: () =>
       t(
-        'Опоздание: задача закрыта в периоде позже дедлайна. Просрочка: открытая задача с прошедшим дедлайном, отложенные не считаются.',
+        'Опоздание: задача закрыта в периоде позже дедлайна, с точностью до минуты; неполные сутки сверх срока считаются днём. Просрочка: открытая задача с прошедшим дедлайном на сегодня, отложенные не считаются. «В срок» это доля среди закрытых с дедлайном. Нажмите на плитку, чтобы оставить в таблице только её задачи.',
       ),
   },
   throughput: {
@@ -165,7 +193,12 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     tiles: [
       { id: 'created', label: () => t('Создано'), kind: 'count' },
       { id: 'closed', label: () => t('Закрыто'), kind: 'count' },
-      { id: 'net', label: () => t('Прирост хвоста'), kind: 'count' },
+      {
+        id: 'net',
+        label: () => t('Создано минус закрыто'),
+        kind: 'count',
+        hint: () => t('Больше нуля: приходит больше, чем уходит'),
+      },
       { id: 'lead', label: () => t('Медиана до закрытия, дн'), kind: 'days' },
     ],
     tables: [
@@ -173,18 +206,36 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         id: 'weeks',
         title: () => t('По неделям'),
         columns: [
-          { id: 'week', label: () => t('Неделя'), kind: 'week' },
+          { id: 'week', label: () => t('Неделя'), kind: 'range' },
           { id: 'created', label: () => t('Создано'), kind: 'count' },
           { id: 'closed', label: () => t('Закрыто'), kind: 'count' },
-          { id: 'net', label: () => t('Прирост'), kind: 'count' },
+          { id: 'net', label: () => t('Создано минус закрыто'), kind: 'count' },
           { id: 'backlog', label: () => t('Открыто на конец недели'), kind: 'count' },
           { id: 'lead', label: () => t('Медиана до закрытия, дн'), kind: 'days' },
         ],
         sort: { id: 'week', desc: false },
         empty: () => t('Задач за период нет'),
       },
+      {
+        id: 'tasks',
+        title: () => t('Задачи периода'),
+        columns: [
+          C.project,
+          C.task,
+          C.user,
+          { id: 'created', label: () => t('Создана'), kind: 'date' },
+          C.closed,
+          { id: 'lead', label: () => t('Дней до закрытия'), kind: 'days' },
+        ],
+        sort: { id: 'created', desc: true },
+        groupings: ['project', 'user'],
+        empty: () => t('Задач за период нет'),
+      },
     ],
-    notes: () => t('Удалённые задачи в зеркале не хранятся и в поток не входят.'),
+    notes: () =>
+      t(
+        'Считается по текущему состоянию задач: переоткрытая задача уходит из закрытых своей недели, удалённые не учитываются. Подзадачи считаются отдельными задачами. Нажмите «Создано», «Закрыто» или медиану, чтобы увидеть задачи за числом.',
+      ),
   },
   defects: {
     title: () => t('Брак'),
@@ -200,6 +251,12 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         kind: 'percent',
         hint: () => t('Брак делённый на коммерцию плюс брак'),
       },
+      {
+        id: 'outside',
+        label: () => t('Часы других классов'),
+        kind: 'hours',
+        hint: () => t('Внутренние, пресейл, прочие и нераспределённые: в долю брака не входят'),
+      },
     ],
     tables: [
       {
@@ -211,6 +268,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
           { id: 'commercial', label: () => t('Коммерция, ч'), kind: 'hours' },
           { id: 'defect', label: () => t('Брак, ч'), kind: 'hours' },
           { id: 'share', label: () => t('Доля брака'), kind: 'percent' },
+          { id: 'from', label: () => t('Задачи'), kind: 'link' },
         ],
         sort: { id: 'share', desc: true },
         groupings: ['project'],
@@ -218,7 +276,9 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
       },
     ],
     notes: () =>
-      t('Классы часов те же, что в аналитике часов: тег задачи, тег предка или класс проекта.'),
+      t(
+        'Доля брака считается только по коммерции и браку, остальные классы показаны отдельной плиткой. Классы те же, что в аналитике часов: тег задачи, тег предка или класс проекта. «Открыть» в строке ведёт в аналитику часов за этот проект и месяц.',
+      ),
   },
   timesheets: {
     title: () => t('Списание часов'),
@@ -233,16 +293,29 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         id: 'below',
         label: () => t('Людей ниже 80% нормы'),
         kind: 'count',
+        hint: () => t('Доля за весь период, а не за отдельную неделю'),
       },
       { id: 'closedNoTime', label: () => t('Закрыто без списаний'), kind: 'count' },
     ],
     tables: [
       {
+        id: 'people',
+        title: () => t('Люди за период'),
+        columns: [
+          C.user,
+          { id: 'fact', label: () => t('Списано, ч'), kind: 'hours' },
+          { id: 'norm', label: () => t('Норма, ч'), kind: 'hours' },
+          { id: 'share', label: () => t('От нормы'), kind: 'percent' },
+        ],
+        sort: { id: 'share', desc: false },
+        empty: () => t('Людей нет'),
+      },
+      {
         id: 'weeks',
         title: () => t('Люди по неделям'),
         columns: [
           C.user,
-          { id: 'week', label: () => t('Неделя'), kind: 'week' },
+          { id: 'week', label: () => t('Неделя'), kind: 'date' },
           { id: 'fact', label: () => t('Списано, ч'), kind: 'hours' },
           { id: 'norm', label: () => t('Норма, ч'), kind: 'hours' },
           { id: 'share', label: () => t('От нормы'), kind: 'percent' },
@@ -262,7 +335,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     ],
     notes: () =>
       t(
-        'Норма: 8 ч в будний день периода, праздники не учтены. Люди: все, кто списывал часы, и исполнители открытых задач.',
+        'Норма: 8 ч в будний день периода, праздники и отпуска не учтены. Люди: кто списывал часы за период или за 8 недель до него, и исполнители открытых задач. Новичку и ушедшему норма начисляется за весь период: смотрите на них отдельно.',
       ),
   },
   stale: {
@@ -285,9 +358,9 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
           C.task,
           C.user,
           C.status,
-          { id: 'activity', label: () => t('Последняя активность'), kind: 'date' },
+          { id: 'activity', label: () => t('Последняя активность'), kind: 'datetime' },
           { id: 'idle', label: () => t('Дней без движения'), kind: 'days' },
-          C.deadline,
+          { id: 'deadline', label: () => t('Дедлайн'), kind: 'datetime' },
           { id: 'reasons', label: () => t('Причины'), kind: 'reasons' },
         ],
         sort: { id: 'idle', desc: true },
@@ -297,7 +370,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
     ],
     notes: () =>
       t(
-        'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка.',
+        'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка. Дни без движения это полные сутки с момента активности; если активности нет, от создания. Нажмите на плитку, чтобы оставить только её задачи.',
       ),
   },
   client: {
@@ -338,6 +411,18 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         empty: () => t('Открытых задач нет'),
       },
       {
+        id: 'other',
+        title: () => t('Другие задачи с часами за период'),
+        columns: [
+          C.task,
+          C.user,
+          C.status,
+          { id: 'periodHours', label: () => t('Часы за период'), kind: 'hours' },
+        ],
+        sort: { id: 'periodHours', desc: true },
+        empty: () => t('Других задач с часами нет'),
+      },
+      {
         id: 'people',
         title: () => t('Часы по людям'),
         columns: [C.user, { id: 'hours', label: () => t('Часы'), kind: 'hours' }],
@@ -345,41 +430,73 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         empty: () => t('Списаний за период нет'),
       },
     ],
+    notes: () =>
+      t(
+        'В работе: открытые задачи без отложенных. Часы за период это все списания по задачам проекта, «Другие задачи» это задачи со списаниями за период, которые сейчас не в «Сделано» и не в работе: закрытые вне периода, отложенные, без даты закрытия. Состав строится по текущему состоянию задач: переоткрытая задача уйдёт из «Сделано».',
+      ),
   },
 };
 
-const isoDay = (date: Date) => date.toLocaleDateString('en-CA');
+// Сегодня по часам портала: дни в отчётах считаются по Москве, и у ПМ в другом поясе
+// «этот месяц» на стыке месяцев выбирал не тот месяц.
+const portalToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+const monthStart = (today: string, back: number) => {
+  const [year, month] = today.split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1 - back, 1));
+  return value.toISOString().slice(0, 10);
+};
 export const PRESETS = {
   month: () => {
-    const now = new Date();
-    return { from: isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDay(now) };
+    const today = portalToday();
+    return { from: monthStart(today, 0), to: today };
   },
   previous: () => {
-    const now = new Date();
-    return {
-      from: isoDay(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-      to: isoDay(new Date(now.getFullYear(), now.getMonth(), 0)),
-    };
+    const today = portalToday();
+    const end = new Date(`${monthStart(today, 0)}T12:00:00Z`);
+    end.setUTCDate(0);
+    return { from: monthStart(today, 1), to: end.toISOString().slice(0, 10) };
   },
   quarter: () => {
-    const now = new Date();
-    return {
-      from: isoDay(new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)),
-      to: isoDay(now),
-    };
+    const today = portalToday();
+    return { from: monthStart(today, (Number(today.slice(5, 7)) - 1) % 3), to: today };
   },
   three: () => {
-    const now = new Date();
-    return { from: isoDay(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: isoDay(now) };
+    const today = portalToday();
+    return { from: monthStart(today, 2), to: today };
   },
 };
 export type Preset = keyof typeof PRESETS;
 
-const HOURS = numberFormat({ maximumFractionDigits: 1 });
+// Две цифры после запятой: с одной списание в 0,04 ч выглядело нулём, а сумма строк
+// расходилась с плиткой.
+const HOURS = numberFormat({ maximumFractionDigits: 2 });
 const COUNT = numberFormat({ maximumFractionDigits: 0 });
 const DAYS = numberFormat({ maximumFractionDigits: 1 });
-const PERCENT = numberFormat({ style: 'percent', maximumFractionDigits: 0 });
+const PERCENT = numberFormat({ style: 'percent', maximumFractionDigits: 1 });
 const DATE = dateFormat({ day: '2-digit', month: '2-digit', year: '2-digit' });
+const DATE_TIME = dateFormat({
+  day: '2-digit',
+  month: '2-digit',
+  year: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Moscow',
+});
+
+/**
+ * Часы для показа. Меньше 0,1 ч идут минутами: 20 секунд выглядели «0 ч», а строки по
+ * 0,01 ч в сумме не сходились с итогом. unit: дописать «ч» к целым часам (плитки, графики).
+ */
+export function formatHours(value: number, unit = true) {
+  if (value > 0 && value < 0.1) {
+    const minutes = Math.round(value * 60);
+    return minutes < 1 ? t('<1 мин') : t('{0} мин', minutes);
+  }
+  return unit ? t('{0} ч', HOURS.format(value)) : HOURS.format(value);
+}
+
+/** Доля вниз до десятой процента: 79,99 % у порога 80 % не должна показываться как 80 %. */
+export const formatShare = (value: number) => PERCENT.format(Math.floor(value * 1000) / 1000);
 const MONTH = dateFormat({ month: '2-digit', year: 'numeric' });
 
 const STATUS: Record<string, () => string> = {
@@ -395,6 +512,8 @@ const STATE: Record<string, () => string> = {
   closed: () => t('Закрыта'),
   late: () => t('Закрыта с опозданием'),
   overdue: () => t('Просрочена'),
+  onTime: () => t('Закрыта в срок'),
+  paused: () => t('Отложена'),
 };
 const REASON: Record<string, () => string> = {
   idle: () => t('без движения'),
@@ -411,11 +530,24 @@ const portalDate = (value: string) => {
 
 function formatCell(kind: Kind, value: Cell): string {
   if (value === null || value === undefined || value === '') return '';
-  if (kind === 'hours') return HOURS.format(Number(value));
+  if (kind === 'hours') return formatHours(Number(value), false);
   if (kind === 'count') return COUNT.format(Number(value));
   if (kind === 'days') return DAYS.format(Number(value));
-  if (kind === 'percent') return PERCENT.format(Number(value));
-  if (kind === 'date' || kind === 'week') return portalDate(String(value));
+  if (kind === 'percent') return formatShare(Number(value));
+  if (kind === 'date') return portalDate(String(value));
+  // Дата и время как в строке портала, в её же поясе: по этому дню задача отбирается в
+  // период, и перевод в Москву показывал закрытие 01.11 00:30 как 31.10 вне периода.
+  if (kind === 'datetime') {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(value));
+    return match
+      ? `${match[3]}.${match[2]}.${match[1].slice(2)} ${match[4]}:${match[5]}`
+      : portalDate(String(value));
+  }
+  if (kind === 'range') {
+    const [start, end] = String(value).split('..');
+    return end && end !== start ? `${portalDate(start)}–${portalDate(end)}` : portalDate(start);
+  }
+  if (kind === 'link') return '';
   if (kind === 'month') {
     const [year, month] = String(value).split('-').map(Number);
     return year && month ? MONTH.format(new Date(year, month - 1, 1)) : String(value);
@@ -429,6 +561,14 @@ function formatCell(kind: Kind, value: Cell): string {
       .join(', ');
   return String(value);
 }
+
+/** Переход из строки брака в аналитику часов: тот же проект и месяц, все классы. */
+const hoursHref = (row: ReportRow) =>
+  `/analytics?${new URLSearchParams({
+    from: String(row.from),
+    to: String(row.to),
+    project: String(row.projectId),
+  })}`;
 
 const taskHref = (row: ReportRow) =>
   row.projectId && row.projectId !== NO_PROJECT_ID
@@ -453,66 +593,88 @@ function ReportTableView({
   const columns = useMemo(
     () =>
       meta.columns.map((column) =>
-        helper.accessor((row) => row[column.id] as Cell, {
-          id: column.id,
-          header: () => column.label(),
-          sortUndefined: 'last',
-          ...(SUMMABLE.includes(column.kind) && column.id !== 'deltaShare'
-            ? {
-                aggregationFn: 'sum' as const,
-                aggregatedCell: (info: { getValue: () => unknown }) =>
-                  formatCell(column.kind, Number(info.getValue()) || 0),
-              }
-            : column.kind === 'days'
-              ? // Дни не складываются: сумма просрочек по проекту ничего не значит,
-                // а самая старая задача группы значит.
-                {
-                  aggregationFn: 'max' as const,
+        // Сортировка видит пустое как undefined, чтобы sortUndefined отправил его в конец
+        // (null таблица ставила первым), а дату как момент: строки с разными смещениями
+        // по тексту сортировались не по времени. Показ берёт исходное значение строки.
+        helper.accessor(
+          (row) => {
+            const value = row[column.id];
+            if (value === null || value === undefined || value === '') return undefined;
+            return column.kind === 'datetime' ? Date.parse(String(value)) : (value as Cell);
+          },
+          {
+            id: column.id,
+            header: () => column.label(),
+            sortUndefined: 'last',
+            ...(SUMMABLE.includes(column.kind) && column.id !== 'deltaShare'
+              ? {
+                  aggregationFn: 'sum' as const,
                   aggregatedCell: (info: { getValue: () => unknown }) =>
                     formatCell(column.kind, Number(info.getValue()) || 0),
                 }
-              : // Иначе таблица складывает любое число, и доли превращались в 300 %.
-                { aggregatedCell: () => null }),
-          cell: (info) => {
-            const value = info.getValue();
-            if (info.row.getIsGrouped()) return formatCell(column.kind, value);
-            if (column.kind === 'task')
+              : column.kind === 'days' && column.id !== 'lead'
+                ? // Дни не складываются: сумма просрочек по проекту ничего не значит,
+                  // а самая старая задача группы значит. Длительность до закрытия не
+                  // сворачивается: максимум под ней читался как типичный срок.
+                  {
+                    aggregationFn: 'max' as const,
+                    aggregatedCell: (info: { getValue: () => unknown }) => {
+                      const value = info.getValue();
+                      return value === undefined || value === null
+                        ? ''
+                        : t('макс. {0}', formatCell(column.kind, Number(value)));
+                    },
+                  }
+                : // Иначе таблица складывает любое число, и доли превращались в 300 %.
+                  { aggregatedCell: () => null }),
+            cell: (info) => {
+              const value = info.row.original[column.id] as Cell;
+              if (info.row.getIsGrouped()) return formatCell(column.kind, value);
+              if (column.kind === 'task')
+                return (
+                  <Link className="hover:underline" href={taskHref(info.row.original)}>
+                    {String(value)}
+                  </Link>
+                );
+              if (column.kind === 'link')
+                return (
+                  <Link className="text-ink underline" href={hoursHref(info.row.original)}>
+                    {t('Открыть')}
+                  </Link>
+                );
+              // Причины короткие: каждая своей строкой без переноса. Через запятую в узкой
+              // колонке они рвались посередине и раздували строку в пять этажей.
+              if (column.kind === 'reasons')
+                return (
+                  <span className="flex flex-col whitespace-nowrap">
+                    {formatCell(column.kind, value)
+                      .split(', ')
+                      .map((reason) => (
+                        <span key={reason}>{reason}</span>
+                      ))}
+                  </span>
+                );
+              const text = formatCell(column.kind, value);
+              const negative = column.id === 'delta' || column.id === 'deltaShare';
               return (
-                <Link className="hover:underline" href={taskHref(info.row.original)}>
-                  {String(value)}
-                </Link>
-              );
-            // Причины короткие: каждая своей строкой без переноса. Через запятую в узкой
-            // колонке они рвались посередине и раздували строку в пять этажей.
-            if (column.kind === 'reasons')
-              return (
-                <span className="flex flex-col whitespace-nowrap">
-                  {formatCell(column.kind, value)
-                    .split(', ')
-                    .map((reason) => (
-                      <span key={reason}>{reason}</span>
-                    ))}
+                <span className={cn(negative && Number(value) > 0 && 'text-danger-text')}>
+                  {negative && Number(value) > 0 ? '+' : ''}
+                  {text}
                 </span>
               );
-            const text = formatCell(column.kind, value);
-            const negative = column.id === 'delta' || column.id === 'deltaShare';
-            return (
-              <span className={cn(negative && Number(value) > 0 && 'text-danger-text')}>
-                {negative && Number(value) > 0 ? '+' : ''}
-                {text}
-              </span>
-            );
+            },
           },
-        }),
+        ),
       ),
     [meta],
   );
 
+  const csvColumns = meta.columns.filter((column) => column.kind !== 'link');
   const exportCsv = () =>
     downloadCsv(csvName, [
-      meta.columns.map((column) => column.label()),
+      csvColumns.map((column) => column.label()),
       ...rows.map((row) =>
-        meta.columns.map((column) =>
+        csvColumns.map((column) =>
           ['hours', 'count', 'days'].includes(column.kind)
             ? row[column.id]
             : formatCell(column.kind, row[column.id]),
@@ -550,6 +712,7 @@ function ReportTableView({
             .filter((column) => ['hours', 'count', 'days', 'percent'].includes(column.kind))
             .map((column) => column.id)}
           emptyLabel={meta.empty()}
+          pageSize={300}
         />
       )}
     </section>
@@ -557,53 +720,115 @@ function ReportTableView({
 }
 
 // На телефоне таблица в восемь колонок не читается: строка становится карточкой.
+const MOBILE_PAGE = 100;
+
 function MobileRows({ meta, rows }: { meta: TableMeta; rows: ReportRow[] }) {
+  const [shown, setShown] = useState(MOBILE_PAGE);
   const sorted = useMemo(() => {
     const { id, desc } = meta.sort;
+    // Пустые всегда в конце, как в таблице на десктопе: задача без срока не должна
+    // оттеснять ближайшие сроки за кнопку «Показать ещё».
     return [...rows].sort((a, b) => {
-      const x = a[id] ?? '';
-      const y = b[id] ?? '';
-      const order = x < y ? -1 : x > y ? 1 : 0;
+      const x = a[id];
+      const y = b[id];
+      const empty = (value: Cell | undefined) =>
+        value === null || value === undefined || value === '';
+      if (empty(x) || empty(y)) return Number(empty(x)) - Number(empty(y));
+      const order = x! < y! ? -1 : x! > y! ? 1 : 0;
       return desc ? -order : order;
     });
   }, [rows, meta.sort]);
   if (!rows.length)
     return <p className="py-6 text-center text-xs text-ink-faint">{meta.empty()}</p>;
   const title = meta.columns.find((column) => column.kind === 'task') || meta.columns[0];
+  const link = meta.columns.some((column) => column.kind === 'link');
   return (
-    <ul className="space-y-2">
-      {sorted.slice(0, 200).map((row, index) => (
-        <li key={index} className="relative rounded-ui border border-line bg-surface p-3 text-sm">
-          {title.kind === 'task' ? (
-            // Ссылка растянута на всю карточку: на телефоне в название высотой 18px не попасть.
-            <Link
-              className="font-medium text-ink after:absolute after:inset-0 after:rounded-ui hover:underline"
-              href={taskHref(row)}
-            >
-              {String(row.task)}
-            </Link>
-          ) : (
-            <p className="font-medium text-ink">{formatCell(title.kind, row[title.id])}</p>
+    <>
+      <ul className="space-y-2">
+        {sorted.slice(0, shown).map((row, index) => (
+          <li key={index} className="relative rounded-ui border border-line bg-surface p-3 text-sm">
+            {title.kind === 'task' ? (
+              // Ссылка растянута на всю карточку: на телефоне в название высотой 18px не попасть.
+              <Link
+                className="font-medium text-ink after:absolute after:inset-0 after:rounded-ui hover:underline"
+                href={taskHref(row)}
+              >
+                {String(row.task)}
+              </Link>
+            ) : (
+              <p className="font-medium text-ink">{formatCell(title.kind, row[title.id])}</p>
+            )}
+            <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+              {meta.columns
+                .filter((column) => column !== title && formatCell(column.kind, row[column.id]))
+                .map((column) => (
+                  <div key={column.id} className="contents">
+                    <dt className="text-ink-faint">{column.label()}</dt>
+                    <dd className="text-right tabular-nums text-ink-soft">
+                      {formatCell(column.kind, row[column.id])}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+            {link && (
+              <Link
+                className="mt-2 inline-flex min-h-11 items-center text-xs text-ink underline"
+                href={hoursHref(row)}
+              >
+                {t('Задачи в аналитике часов')}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+      {/* Остаток не прячется молча: число в заголовке и плитке должно быть доступно целиком. */}
+      {sorted.length > shown && (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-2 min-h-11 w-full"
+          onClick={() => setShown(shown + MOBILE_PAGE)}
+        >
+          {t(
+            'Показать ещё {0}, осталось {1}',
+            Math.min(MOBILE_PAGE, sorted.length - shown),
+            sorted.length - shown,
           )}
-          <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
-            {meta.columns
-              .filter((column) => column !== title && formatCell(column.kind, row[column.id]))
-              .map((column) => (
-                <div key={column.id} className="contents">
-                  <dt className="text-ink-faint">{column.label()}</dt>
-                  <dd className="text-right tabular-nums text-ink-soft">
-                    {formatCell(column.kind, row[column.id])}
-                  </dd>
-                </div>
-              ))}
-          </dl>
-        </li>
-      ))}
-    </ul>
+        </Button>
+      )}
+    </>
   );
 }
 
-type Response = ReportResult & { collectedFrom?: string | null };
+type Response = ReportResponse;
+
+/** Человек по id: пустой и нулевой это «без ответственного», а не технический «#0». */
+export const personName = (users: { id: string; name: string }[], id: string) =>
+  !id || id === '0'
+    ? t('Без ответственного')
+    : users.find((user) => user.id === id)?.name || `#${id}`;
+
+/**
+ * Варианты фильтра проекта: активные, «Без проекта», затем архивные с пометкой. Архивный
+ * проект нужен для итогового отчёта за месяц, когда проект уже закрыли.
+ */
+export function projectOptions(projects: { id: string; name: string; isArchived?: boolean }[]) {
+  return [
+    ...projects
+      .filter((project) => !project.isArchived)
+      .map((project) => ({ value: project.id, label: project.name })),
+    { value: NO_PROJECT_ID, label: t(NO_PROJECT_NAME) },
+    ...projects
+      .filter((project) => project.isArchived)
+      .map((project) => ({ value: project.id, label: t('{0} (архив)', project.name) })),
+  ];
+}
+
+/** Недели для предупреждения: дд.мм через запятую, длинный список сокращается. */
+export const weekList = (weeks: string[]) =>
+  weeks.length > 4
+    ? t('{0} и ещё {1}', weeks.slice(0, 3).map(portalDate).join(', '), weeks.length - 3)
+    : weeks.map(portalDate).join(', ');
 
 function PmReportView({ kind }: { kind: ReportKind }) {
   const meta = PM_REPORTS[kind];
@@ -613,7 +838,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
   const from = searchParams.get('from') || fallback.from;
   const to = searchParams.get('to') || fallback.to;
   const projectId = meta.noProject ? null : searchParams.get('project');
-  const reason = searchParams.get('reason');
+  const filter = searchParams.get('filter');
   const days = searchParams.get('days') || '14';
   const by = searchParams.get('by');
 
@@ -641,7 +866,6 @@ function PmReportView({ kind }: { kind: ReportKind }) {
     let cancelled = false;
     const params = new URLSearchParams({ from, to, days });
     if (projectId) params.set('project', projectId);
-    if (reason) params.set('reason', reason);
     setIsLoading(true);
     setError('');
     fetch(`/api/reports/${kind}?${params}`, { cache: 'no-store' })
@@ -655,7 +879,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
     return () => {
       cancelled = true;
     };
-  }, [memberId, kind, from, to, projectId, reason, days]);
+  }, [memberId, kind, from, to, projectId, days]);
 
   const projectName = useCallback(
     (id: string) =>
@@ -664,38 +888,45 @@ function PmReportView({ kind }: { kind: ReportKind }) {
         : projects.find((project) => project.id === id)?.name || t('Проект {0}', id),
     [projects],
   );
-  const userName = useCallback(
-    (id: string) => users.find((user) => user.id === id)?.name || `#${id}`,
-    [users],
-  );
+  const userName = useCallback((id: string) => personName(users, id), [users]);
   // Имена подставляются здесь: сервер отдаёт id, а люди и проекты уже лежат в сторе.
+  // Фильтр плитки оставляет строки с её ключом; таблица без таких строк скрывается.
   const tables = useMemo(
     () =>
       (report?.tables || []).map((table) => ({
         ...table,
-        rows: table.rows.map((row) => ({
-          ...row,
-          project: row.projectId === undefined ? undefined : projectName(String(row.projectId)),
-          user:
-            row.userId !== undefined
-              ? userName(String(row.userId))
-              : row.responsibleId !== undefined
-                ? userName(String(row.responsibleId))
-                : undefined,
-        })) as ReportRow[],
+        rows: table.rows
+          .filter(
+            (row) =>
+              !filter ||
+              String(row.filters || '')
+                .split(',')
+                .includes(filter),
+          )
+          .map((row) => ({
+            ...row,
+            project: row.projectId === undefined ? undefined : projectName(String(row.projectId)),
+            user:
+              row.userId !== undefined
+                ? userName(String(row.userId))
+                : row.responsibleId !== undefined
+                  ? userName(String(row.responsibleId))
+                  : undefined,
+          })) as ReportRow[],
       })),
-    [report, projectName, userName],
+    [report, projectName, userName, filter],
   );
 
   const preset = (Object.keys(PRESETS) as Preset[]).find((key) => {
     const value = PRESETS[key]();
     return value.from === from && value.to === to;
   });
-  const activeProjects = projects.filter((project) => !project.isArchived);
-  const groupings = meta.tables[0]?.groupings || [];
+  const groupings = [...new Set(meta.tables.flatMap((table) => table.groupings || []))];
   const grouping = by && (groupings as string[]).includes(by) ? by : null;
-  const beforeCollected =
-    report?.collectedFrom && from < report.collectedFrom ? report.collectedFrom : null;
+  const coverage = report?.coverage;
+  const filterTile = meta.tiles.find(
+    (tile) => report?.tiles.find((item) => item.id === tile.id)?.filter === filter,
+  );
 
   return (
     <div className="min-h-screen bg-canvas pb-12">
@@ -753,7 +984,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                     value: '',
                     label: meta.needsProject ? t('Выберите проект') : t('Все проекты'),
                   },
-                  ...activeProjects.map((project) => ({ value: project.id, label: project.name })),
+                  ...projectOptions(projects),
                 ]}
               />
             )}
@@ -766,9 +997,12 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                   size="sm"
                   min={1}
                   value={days}
-                  onChange={(event) =>
-                    setParams({ days: event.target.value === '14' ? null : event.target.value })
-                  }
+                  onChange={(event) => {
+                    // Порог меньше суток сервер не примет: в поле не держим число, по
+                    // которому отчёт не считается.
+                    const value = Math.floor(Number(event.target.value));
+                    if (value >= 1) setParams({ days: value === 14 ? null : String(value) });
+                  }}
                   className={`${toolbarControl} w-20`}
                 />
               </label>
@@ -792,18 +1026,62 @@ function PmReportView({ kind }: { kind: ReportKind }) {
         </Card>
 
         {meta.notes && <p className="text-xs text-ink-soft">{meta.notes()}</p>}
-        {beforeCollected && (
+        {report?.emptyMirror && (
+          <Notice tone="warning">
+            {t('Задачи из Битрикса ещё не загружены: нули в отчёте значат «нет данных».')}
+          </Notice>
+        )}
+        {coverage?.collectedAt && (
+          <p className="text-xs text-ink-soft">
+            {t(
+              'Часы собраны не позже {0}: списаний, сделанных после, в отчёте может не быть.',
+              DATE_TIME.format(new Date(coverage.collectedAt)),
+            )}
+          </p>
+        )}
+        {Boolean(report?.closedNoDate) && (
           <Notice tone="warning">
             {t(
-              'Списания в базе собраны с {0}: часов раньше этой даты в отчёте нет.',
-              portalDate(beforeCollected),
+              'Завершённых задач без даты закрытия: {0}. Их не отнести к периоду, в закрытые и в хвост на конец недели они не входят.',
+              report?.closedNoDate,
             )}
           </Notice>
         )}
-        {report?.notes.includes('missingWeeks') && (
+        {report?.teamIncomplete && (
           <Notice tone="warning">
-            {t('За часть недель периода списания не собраны: цифры за них занижены.')}
+            {t(
+              'Часть из 8 недель до периода не собрана: человек, списывавший только тогда, может не попасть в список.',
+            )}
           </Notice>
+        )}
+        {coverage && coverage.missingWeeks.length > 0 && (
+          <Notice tone="warning">
+            {t(
+              'Списания за недели с {0} не собраны: часов за них в отчёте нет, это не ноль работы.',
+              weekList(coverage.missingWeeks),
+            )}
+          </Notice>
+        )}
+        {coverage && coverage.partialWeeks.length > 0 && (
+          <Notice tone="warning">
+            {t(
+              'Недели с {0} собраны не полностью: часть задач Битрикс не отдал, часы занижены.',
+              weekList(coverage.partialWeeks),
+            )}
+          </Notice>
+        )}
+        {Boolean(report?.excludedUsers) && (
+          <p className="text-xs text-ink-soft">
+            {t('Служебные учётки из настроек ({0}) в часах не учитываются.', report?.excludedUsers)}
+          </p>
+        )}
+        {filterTile && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+            <span>{t('Показаны задачи плитки «{0}»', filterTile.label())}</span>
+            <Button variant="secondary" size="sm" onClick={() => setParams({ filter: null })}>
+              {t('Показать все')}
+            </Button>
+          </div>
         )}
 
         {error ? (
@@ -813,11 +1091,19 @@ function PmReportView({ kind }: { kind: ReportKind }) {
         ) : isLoading && !report ? (
           <LoadingState className="min-h-72 bg-transparent" />
         ) : report ? (
-          <div className={cn('space-y-4 transition-opacity', isLoading ? 'opacity-60' : '')}>
+          <div
+            // Пока считается новый период или проект, прежние цифры бледные и не нажимаются:
+            // по ним легко было принять старый проект за выбранный.
+            className={cn(
+              'space-y-4 transition-opacity',
+              isLoading && 'pointer-events-none opacity-40',
+            )}
+            aria-busy={isLoading}
+          >
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
               {meta.tiles.map((tile) => {
                 const value = report.tiles.find((item) => item.id === tile.id);
-                const filter = value?.filter;
+                const tileFilter = value?.filter;
                 const content = (
                   <>
                     <p className="text-xs text-ink-soft">{tile.label()}</p>
@@ -825,19 +1111,19 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                       {value?.value === null || value?.value === undefined
                         ? '—'
                         : tile.kind === 'hours'
-                          ? t('{0} ч', formatCell(tile.kind, value.value))
+                          ? formatHours(value.value)
                           : formatCell(tile.kind, value.value)}
                     </p>
                   </>
                 );
-                return filter ? (
+                return tileFilter ? (
                   <Card
                     key={tile.id}
                     interactive
                     padding="sm"
-                    selected={reason === filter}
-                    aria-pressed={reason === filter}
-                    onClick={() => setParams({ reason: reason === filter ? null : filter })}
+                    selected={filter === tileFilter}
+                    aria-pressed={filter === tileFilter}
+                    onClick={() => setParams({ filter: filter === tileFilter ? null : tileFilter })}
                     title={tile.hint?.()}
                   >
                     {content}
@@ -849,17 +1135,19 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                 );
               })}
             </div>
-            {meta.tables.map((table, index) => (
-              <ReportTableView
-                key={table.id}
-                meta={table}
-                rows={tables.find((item) => item.id === table.id)?.rows || []}
-                grouping={
-                  index === 0 || table.groupings?.includes(grouping as 'project') ? grouping : null
-                }
-                csvName={`${kind}-${table.id}-${from}-${to}.csv`}
-              />
-            ))}
+            {meta.tables.map((table) => {
+              const rows = tables.find((item) => item.id === table.id)?.rows || [];
+              if (filter && !rows.length) return null;
+              return (
+                <ReportTableView
+                  key={table.id}
+                  meta={table}
+                  rows={rows}
+                  grouping={table.groupings?.includes(grouping as 'project') ? grouping : null}
+                  csvName={`${kind}-${table.id}-${from}-${to}.csv`}
+                />
+              );
+            })}
           </div>
         ) : null}
       </div>

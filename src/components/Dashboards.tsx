@@ -33,10 +33,18 @@ import { SelectField } from '@/components/monos/SelectField';
 import { Tabs } from '@/components/monos/Tabs';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
-import { toolbarControl } from '@/components/monos/toolbar';
+import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
-import { PRESETS, type Preset } from '@/components/PmReport';
+import {
+  PRESETS,
+  formatHours,
+  formatShare,
+  personName,
+  projectOptions,
+  weekList,
+  type Preset,
+} from '@/components/PmReport';
 import {
   dimensionsFor,
   METRICS,
@@ -66,18 +74,32 @@ const METRIC_LABEL: Record<Metric, () => string> = {
 };
 /** Подсказка под выбором метрики: что именно попадёт в число, без чтения кода. */
 const METRIC_HINT: Record<Metric, () => string> = {
-  created: () => t('Задачи, созданные в выбранном периоде.'),
-  closed: () => t('Задачи, завершённые в выбранном периоде.'),
+  created: () =>
+    t(
+      'Задачи, созданные в выбранном периоде. Удалённые задачи не учитываются: зеркало хранит только живые.',
+    ),
+  closed: () =>
+    t(
+      'Задачи, завершённые в выбранном периоде, по текущему состоянию: переоткрытая задача уходит из закрытых.',
+    ),
   open: () => t('Незакрытые задачи на сегодня, без отложенных. Период на число не влияет.'),
   overdue: () =>
-    t('Незакрытые задачи, у которых срок уже прошёл, на сегодня. Период на число не влияет.'),
+    t(
+      'Незакрытые задачи с прошедшим сроком на сегодня, без отложенных. Период на число не влияет.',
+    ),
   late: () => t('Задачи со сроком, завершённые в периоде позже срока.'),
-  onTime: () => t('Из задач со сроком, завершённых в периоде: какая часть закрыта до срока.'),
+  onTime: () =>
+    t(
+      'Из задач со сроком, завершённых в периоде: какая часть закрыта не позднее срока. Задачи без срока не входят, под числом видно, из скольких задач доля.',
+    ),
   leadTime: () =>
     t(
-      'От создания до завершения, для задач, закрытых в периоде. Половина задач закрывается быстрее.',
+      'Медиана дней от создания до завершения для задач, закрытых в периоде: середина ряда, а не среднее.',
     ),
-  hours: () => t('Часы из списаний за период, по дню списания.'),
+  hours: () =>
+    t(
+      'Часы из списаний за период, по дню списания. Проект и класс берутся по текущему состоянию задачи: перенос задачи переносит и её прошлые часы. Списания удалённых задач не учитываются.',
+    ),
 };
 const DIMENSION_LABEL: Record<Dimension, () => string> = {
   none: () => t('Без группировки'),
@@ -116,17 +138,31 @@ const isTime = (by: Dimension) => by === 'week' || by === 'month';
 const viewsFor = (by: Dimension): View[] =>
   by === 'none' ? ['number'] : isTime(by) ? ['columns', 'table'] : ['bars', 'table'];
 
-const HOURS = numberFormat({ maximumFractionDigits: 1 });
+const DAYS = numberFormat({ maximumFractionDigits: 1 });
 const COUNT = numberFormat({ maximumFractionDigits: 0 });
-const PERCENT = numberFormat({ style: 'percent', maximumFractionDigits: 0 });
 const DAY = dateFormat({ day: '2-digit', month: '2-digit' });
+const COLLECTED = dateFormat({
+  day: '2-digit',
+  month: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Moscow',
+});
+const DAY_YEAR = dateFormat({ day: '2-digit', month: '2-digit', year: '2-digit' });
+// Срок как в строке портала, а не в поясе браузера: у ПМ в UTC срок 03.11 00:30
+// показывался как 02.11. Тот же день, по которому задача считается просроченной.
+const portalDay = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return match ? `${match[3]}.${match[2]}.${match[1].slice(2)}` : value;
+};
 const MONTH = dateFormat({ month: '2-digit', year: 'numeric' });
 
 function formatValue(metric: Metric, value: number | null) {
   if (value === null) return '—';
-  if (metric === 'hours') return t('{0} ч', HOURS.format(value));
-  if (metric === 'onTime') return PERCENT.format(value);
-  if (metric === 'leadTime') return t('{0} дн', HOURS.format(value));
+  if (metric === 'hours') return formatHours(value);
+  // Вниз до десятой: 999 из 1000 в срок не должно читаться как ровно 100 %.
+  if (metric === 'onTime') return formatShare(value);
+  if (metric === 'leadTime') return t('{0} дн', DAYS.format(value));
   return COUNT.format(value);
 }
 
@@ -149,6 +185,10 @@ const taskHref = (row: DrillRow) =>
   row.projectId && row.projectId !== NO_PROJECT_ID
     ? `/projects/${row.projectId}?task=${encodeURIComponent(row.id)}`
     : `/all-tasks?task=${encodeURIComponent(row.id)}`;
+
+/** Виджет с проектом экрана: 'all' снимает проект, пустой фильтр оставляет свой. */
+const withProject = (item: Widget, projectFilter: string): Widget =>
+  projectFilter ? { ...item, projectId: projectFilter === 'all' ? '' : projectFilter } : item;
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 const widget = (patch: Partial<Widget>): Widget => ({
@@ -358,12 +398,7 @@ function TemplatePicker({
             label={t('Проект')}
             value={projectId}
             onChange={(event) => setProjectId(event.target.value)}
-            options={[
-              { value: '', label: t('Выберите проект') },
-              ...projects
-                .filter((item) => !item.isArchived)
-                .map((item) => ({ value: item.id, label: item.name })),
-            ]}
+            options={[{ value: '', label: t('Выберите проект') }, ...projectOptions(projects)]}
           />
         )}
         <TextField
@@ -397,9 +432,11 @@ function TemplatePicker({
 }
 
 type Names = {
-  key: (by: Dimension, key: string) => string;
+  /** long: неделя с годом, для заголовков и периода через Новый год. */
+  key: (by: Dimension, key: string, long?: boolean) => string;
   project: (id: string) => string;
   user: (id: string) => string;
+  projects: { id: string; name: string; isArchived?: boolean }[];
 };
 
 function useNames(): Names {
@@ -410,18 +447,18 @@ function useNames(): Names {
       id === NO_PROJECT_ID
         ? t(NO_PROJECT_NAME)
         : projects.find((item) => item.id === id)?.name || t('Проект {0}', id);
-    const user = (id: string) => users.find((item) => item.id === id)?.name || `#${id}`;
-    const key = (by: Dimension, value: string) => {
+    const user = (id: string) => personName(users, id);
+    const key = (by: Dimension, value: string, long = false) => {
       if (by === 'project') return project(value);
       if (by === 'user') return user(value);
       if (by === 'status') return STATUS[value]?.() || value;
       if (by === 'class') return CLASS[value]?.() || value;
       const [year, month, day] = value.split('-').map(Number);
-      if (by === 'week') return DAY.format(new Date(year, month - 1, day));
+      if (by === 'week') return (long ? DAY_YEAR : DAY).format(new Date(year, month - 1, day));
       if (by === 'month') return MONTH.format(new Date(year, month - 1, 1));
       return value;
     };
-    return { key, project, user };
+    return { key, project, user, projects };
   }, [projects, users]);
 }
 
@@ -458,81 +495,127 @@ const hasTasks = (metric: Metric, value: number | null) =>
 const pickable =
   'rounded-ui text-left transition-colors hover:bg-surface-2 focus-visible:outline-2';
 
-function Chart({ item, result, names, from, to, onPick }: ChartProps) {
+function Chart({ item, result, names, from, to: picked, onPick }: ChartProps) {
   const [all, setAll] = useState(false);
   if (!result) return <div className="h-24 animate-pulse rounded-ui bg-surface-2" />;
+  // Сервер считает только до сегодня: неделя, обрезанная сегодняшним днём, тоже неполная,
+  // иначе среда текущей недели читалась как падение темпа.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  const to = picked > today ? today : picked;
+  const crossesYear = from.slice(0, 4) !== to.slice(0, 4);
   const label = (key: string) =>
-    names.key(item.by, key) + (isPartial(item.by, key, from, to) ? ` (${t('неполная')})` : '');
+    names.key(item.by, key, true) +
+    (isPartial(item.by, key, from, to) ? ` (${t('неполная')})` : '');
+  // Доля и медиана без размера выборки врут: 100 % из одной задачи читались как «все в срок».
+  const sample =
+    item.metric === 'onTime'
+      ? t('из {0} задач со сроком', result.count)
+      : item.metric === 'leadTime'
+        ? t('по {0} задачам', result.count)
+        : '';
   if (item.view === 'number' || item.by === 'none') {
     const value = (
       <span className="text-3xl font-semibold tabular-nums text-ink">
         {formatValue(item.metric, result.total)}
       </span>
     );
-    return onPick && hasTasks(item.metric, result.total) ? (
-      <button
-        className={cn(pickable, '-mx-1 flex min-h-11 items-center px-1')}
-        onClick={() => onPick(null)}
-        title={t('Показать задачи')}
-      >
-        {value}
-      </button>
-    ) : (
-      <p>{value}</p>
+    return (
+      <div>
+        {onPick && hasTasks(item.metric, result.total) ? (
+          <button
+            className={cn(pickable, '-mx-1 flex min-h-11 items-center px-1')}
+            onClick={() => onPick(null)}
+            title={t('Показать задачи')}
+          >
+            {value}
+          </button>
+        ) : (
+          <p>{value}</p>
+        )}
+        {sample && result.total !== null && <p className="text-xs text-ink-soft">{sample}</p>}
+      </div>
     );
   }
   const points = result.points;
   if (!points.length) return <p className="text-sm text-ink-faint">{t('Нет данных за период')}</p>;
-  const max = Math.max(...points.map((point) => point.value ?? 0), 0) || 1;
+  // Доля всегда в шкале до 100 %: иначе неделя с 20 % в срок выглядела полным столбиком.
+  const max =
+    item.metric === 'onTime' ? 1 : Math.max(...points.map((point) => point.value ?? 0), 0) || 1;
+  const pointLabel = (point: { key: string; value: number | null; count: number }) =>
+    `${label(point.key)}: ${
+      point.value === null && item.metric === 'hours'
+        ? t('нет данных')
+        : formatValue(item.metric, point.value)
+    }${sample && point.value !== null ? `, ${t('задач: {0}', point.count)}` : ''}`;
   const anyPartial = points.some((point) => isPartial(item.by, point.key, from, to));
 
+  // Больше 26 столбиков в карточку не влезают: график прокручивается, а не сжимается в нитки.
+  const scroll = points.length > 26;
+  const anyMissing = points.some((point) => point.value === null && item.metric === 'hours');
   if (item.view === 'columns')
     return (
       <div>
-        <div className="flex h-40 items-end gap-1">
-          {points.map((point) => (
-            <button
-              key={point.key}
-              type="button"
-              disabled={!onPick || !hasTasks(item.metric, point.value)}
-              onClick={() => onPick?.(point.key)}
-              className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
-              title={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
-              aria-label={`${label(point.key)}: ${formatValue(item.metric, point.value)}`}
-            >
-              <span className="mb-1 truncate text-center text-whisper tabular-nums text-ink-soft">
-                {point.value === null
-                  ? ''
-                  : formatValue(item.metric, point.value).replace(/\s?(ч|h|дн|d)$/, '')}
-              </span>
-              {/* Бледнеет только столбик: подпись с ним падала ниже AA по контрасту. */}
-              <div
-                className={cn(
-                  'w-full rounded-t-sm bg-accent transition-opacity group-hover:opacity-80',
-                  isPartial(item.by, point.key, from, to) && 'opacity-40',
+        <div className={cn(scroll && 'overflow-x-auto pb-1')}>
+          <div
+            className="flex h-40 items-end gap-1"
+            style={scroll ? { minWidth: points.length * 28 } : undefined}
+          >
+            {points.map((point) => (
+              <button
+                key={point.key}
+                type="button"
+                disabled={!onPick || !hasTasks(item.metric, point.value)}
+                onClick={() => onPick?.(point.key)}
+                className="group relative flex h-full min-w-0 flex-1 flex-col justify-end"
+                title={pointLabel(point)}
+                aria-label={pointLabel(point)}
+              >
+                <span className="mb-1 truncate text-center text-whisper tabular-nums text-ink-soft">
+                  {point.value === null
+                    ? ''
+                    : formatValue(item.metric, point.value).replace(/\s?(ч|h|дн|d)$/, '')}
+                </span>
+                {/* Доля недели из одной задачи и из ста выглядит одинаково: число задач
+                    видно под процентом, а не только при наведении, которого нет на телефоне. */}
+                {sample && point.value !== null && (
+                  <span className="mb-1 truncate text-center text-whisper tabular-nums text-ink-faint">
+                    {t('из {0}', point.count)}
+                  </span>
                 )}
-                style={{
-                  height: `${((point.value ?? 0) / max) * 100}%`,
-                  minHeight: point.value ? 2 : 0,
-                }}
-              />
-            </button>
-          ))}
-        </div>
-        <div className="mt-1 flex gap-1 border-t border-line pt-1">
-          {points.map((point, index) => (
-            <span
-              key={point.key}
-              className="min-w-0 flex-1 truncate text-center text-whisper text-ink-faint"
-            >
-              {/* Подписи через одну, когда столбиков много: иначе они слипаются. */}
-              {points.length > 14 && index % 2 ? '' : names.key(item.by, point.key)}
-            </span>
-          ))}
+                {/* Бледнеет только столбик: подпись с ним падала ниже AA по контрасту. */}
+                <div
+                  className={cn(
+                    'w-full rounded-t-sm bg-accent transition-opacity group-hover:opacity-80',
+                    isPartial(item.by, point.key, from, to) && 'opacity-40',
+                  )}
+                  style={{
+                    height: `${((point.value ?? 0) / max) * 100}%`,
+                    minHeight: point.value ? 2 : 0,
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+          <div
+            className="mt-1 flex gap-1 border-t border-line pt-1"
+            style={scroll ? { minWidth: points.length * 28 } : undefined}
+          >
+            {points.map((point, index) => (
+              <span
+                key={point.key}
+                className="min-w-0 flex-1 truncate text-center text-whisper text-ink-faint"
+              >
+                {/* Подписи через одну, когда столбиков много: иначе они слипаются. */}
+                {points.length > 14 && index % 2 ? '' : names.key(item.by, point.key, crossesYear)}
+              </span>
+            ))}
+          </div>
         </div>
         <p className="mt-2 text-xs text-ink-soft">
           {t('Итого')}: {formatValue(item.metric, result.total)}
+          {sample && ` ${sample}`}
           {anyPartial && ` · ${t('бледные столбики попали в период не целиком')}`}
+          {anyMissing && ` · ${t('пустые недели не собраны, это не ноль')}`}
         </p>
       </div>
     );
@@ -612,17 +695,31 @@ function More({ count, all, onToggle }: { count: number; all: boolean; onToggle:
   );
 }
 
-async function drillQuery(item: Widget, from: string, to: string, key: string | null) {
+async function drillQuery(
+  item: Widget,
+  from: string,
+  to: string,
+  projectId: string,
+  key: string | null,
+  offset: number,
+) {
   const response = await fetch('/api/dashboards/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ widgets: [item], from, to, drill: { key } }),
+    body: JSON.stringify({ widgets: [item], from, to, projectId, drill: { key, offset } }),
   });
   if (!response.ok) throw new Error(String(response.status));
   return (await response.json()) as { tasks: DrillRow[]; total: number };
 }
 
-function DrillValue({ metric, value }: { metric: Metric; value: number }) {
+function DrillValue({ metric, row }: { metric: Metric; row: DrillRow }) {
+  const { value } = row;
+  if (metric === 'overdue' && row.deadline)
+    return (
+      <span className="shrink-0 text-xs tabular-nums text-danger-text">
+        {t('срок {0}', portalDay(row.deadline))}
+      </span>
+    );
   if (metric === 'hours' || metric === 'leadTime')
     return <span className="tabular-nums text-ink-soft">{formatValue(metric, value)}</span>;
   if (metric === 'onTime')
@@ -639,27 +736,48 @@ function DrillDrawer({
   drill,
   from,
   to,
+  projectId,
   names,
   onClose,
 }: {
   drill: { item: Widget; key: string | null } | null;
   from: string;
   to: string;
+  projectId: string;
   names: Names;
   onClose: () => void;
 }) {
   const [data, setData] = useState<{ tasks: DrillRow[]; total: number } | 'error'>();
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Номер открытой расшифровки: поздняя страница старой плитки не дописывается в новую.
+  const generation = useRef(0);
   useEffect(() => {
+    generation.current += 1;
     if (!drill) return;
     let cancelled = false;
-    drillQuery(drill.item, from, to, drill.key)
+    drillQuery(drill.item, from, to, projectId, drill.key, 0)
       .then((result) => !cancelled && setData(result))
       .catch(() => !cancelled && setData('error'));
     return () => {
       cancelled = true;
       setData(undefined);
     };
-  }, [drill, from, to]);
+  }, [drill, from, to, projectId]);
+  // Список дочитывается страницами: за числом 1 200 должны быть доступны все 1 200 задач.
+  const loadMore = async () => {
+    if (!drill || !data || data === 'error') return;
+    const current = generation.current;
+    setLoadingMore(true);
+    try {
+      const next = await drillQuery(drill.item, from, to, projectId, drill.key, data.tasks.length);
+      if (current === generation.current)
+        setData({ tasks: [...data.tasks, ...next.tasks], total: next.total });
+    } catch {
+      if (current === generation.current) setData('error');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
   if (!drill) return null;
   const { item, key } = drill;
   const title = item.title || METRIC_LABEL[item.metric]();
@@ -667,7 +785,7 @@ function DrillDrawer({
     <Drawer
       open
       onClose={onClose}
-      title={key === null ? title : `${title}: ${names.key(item.by, key)}`}
+      title={key === null ? title : `${title}: ${names.key(item.by, key, true)}`}
       description={describe(item, names)}
       className="w-full sm:w-[28rem]"
     >
@@ -682,11 +800,13 @@ function DrillDrawer({
           <p className="mb-2 text-xs text-ink-soft">
             {data.total > data.tasks.length
               ? t('Показаны {0} из {1}', data.tasks.length, data.total)
-              : t('Задач: {0}', data.total)}
+              : item.metric === 'hours'
+                ? t('Строк: {0}', data.total)
+                : t('Задач: {0}', data.total)}
           </p>
           {data.tasks.map((row) => (
             <Link
-              key={row.id}
+              key={`${row.id}|${row.userId}`}
               href={taskHref(row)}
               className="flex items-start gap-3 rounded-ui px-2 py-1.5 text-sm hover:bg-surface-2"
             >
@@ -696,25 +816,41 @@ function DrillDrawer({
                   {names.project(row.projectId)} · {names.user(row.userId)}
                 </span>
               </span>
-              <DrillValue metric={item.metric} value={row.value} />
+              <DrillValue metric={item.metric} row={row} />
             </Link>
           ))}
+          {data.total > data.tasks.length && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2 w-full"
+              disabled={loadingMore}
+              onClick={() => void loadMore()}
+            >
+              {t('Показать ещё {0}', Math.min(200, data.total - data.tasks.length))}
+            </Button>
+          )}
         </div>
       )}
     </Drawer>
   );
 }
 
-async function query(widgets: Widget[], from: string, to: string) {
+type Coverage = { missingWeeks: string[]; partialWeeks: string[]; collectedAt: string | null };
+
+async function query(widgets: Widget[], from: string, to: string, projectId = '') {
   const response = await fetch('/api/dashboards/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ widgets, from, to }),
+    body: JSON.stringify({ widgets, from, to, projectId }),
   });
   if (!response.ok) throw new Error(String(response.status));
   return (await response.json()) as {
     results: Record<string, WidgetResult>;
-    collectedFrom: string | null;
+    coverage: Coverage | null;
+    excludedUsers: number;
+    emptyMirror: boolean;
+    closedNoDate: number;
   };
 }
 
@@ -723,6 +859,7 @@ function Editor({
   isNew,
   from,
   to,
+  projectFilter,
   names,
   onSave,
   onClose,
@@ -731,11 +868,13 @@ function Editor({
   isNew: boolean;
   from: string;
   to: string;
+  projectFilter: string;
   names: Names;
   onSave: (item: Widget) => void;
   onClose: () => void;
 }) {
   const [item, setItem] = useState(initial);
+  const [excludedUsers, setExcludedUsers] = useState(0);
   const [preview, setPreview] = useState<WidgetResult>();
   const projects = useKanbanStore((state) => state.projects);
   const users = useKanbanStore((state) => state.users);
@@ -757,13 +896,17 @@ function Editor({
   useEffect(() => {
     let cancelled = false;
     setPreview(undefined);
-    query([{ ...widget({ metric, by, projectId, userId }), id }], from, to)
-      .then((data) => !cancelled && setPreview(data.results[id]))
+    query([{ ...widget({ metric, by, projectId, userId }), id }], from, to, projectFilter)
+      .then((data) => {
+        if (cancelled) return;
+        setPreview(data.results[id]);
+        setExcludedUsers(data.excludedUsers);
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [id, metric, by, projectId, userId, from, to]);
+  }, [id, metric, by, projectId, userId, from, to, projectFilter]);
 
   return (
     <Modal
@@ -831,12 +974,7 @@ function Editor({
             label={t('Проект')}
             value={item.projectId}
             onChange={(event) => update({ projectId: event.target.value })}
-            options={[
-              { value: '', label: t('Все проекты') },
-              ...projects
-                .filter((project) => !project.isArchived)
-                .map((project) => ({ value: project.id, label: project.name })),
-            ]}
+            options={[{ value: '', label: t('Все проекты') }, ...projectOptions(projects)]}
           />
           <SelectField
             label={item.metric === 'hours' ? t('Кто списал') : t('Исполнитель')}
@@ -869,6 +1007,11 @@ function Editor({
           </p>
           <p className="mb-3 text-xs text-ink-faint">{describe(item, names)}</p>
           <Chart item={item} result={preview} names={names} from={from} to={to} />
+          {item.metric === 'hours' && excludedUsers > 0 && (
+            <p className="mt-2 text-xs text-ink-faint">
+              {t('Служебные учётки из настроек ({0}) в часах не учитываются.', excludedUsers)}
+            </p>
+          )}
         </Card>
       </div>
     </Modal>
@@ -888,7 +1031,10 @@ function DashboardsView() {
     key: string;
     results: Record<string, WidgetResult>;
   }>();
-  const [collectedFrom, setCollectedFrom] = useState<string | null>(null);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [excludedUsers, setExcludedUsers] = useState(0);
+  const [emptyMirror, setEmptyMirror] = useState(false);
+  const [closedNoDate, setClosedNoDate] = useState(0);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Widget | null>(null);
   const [naming, setNaming] = useState<{ id: string; name: string; description: string } | null>(
@@ -917,6 +1063,9 @@ function DashboardsView() {
   const from = searchParams.get('from') || fallback.from;
   const to = searchParams.get('to') || fallback.to;
   const activeId = searchParams.get('d');
+  // Проект на весь экран, сильнее проекта виджета. Иначе для разбора одного проекта
+  // приходилось править каждый виджет, и пропущенный показывал весь портал.
+  const projectFilter = searchParams.get('project') || '';
   const active = dashboards?.find((item) => item.id === activeId) || dashboards?.[0] || null;
 
   const setParams = useCallback(
@@ -959,16 +1108,20 @@ function DashboardsView() {
       userId,
     ]),
   );
-  const requestKey = `${signature}|${from}|${to}`;
+  const requestKey = `${signature}|${from}|${to}|${projectFilter}`;
   const results = computed?.key === requestKey ? computed.results : {};
   useEffect(() => {
     if (!active?.widgets.length) return;
     let cancelled = false;
-    query(active.widgets, from, to)
+    query(active.widgets, from, to, projectFilter)
       .then((data) => {
         if (cancelled) return;
+        setError('');
         setComputed({ key: requestKey, results: data.results });
-        setCollectedFrom(data.collectedFrom);
+        setCoverage(data.coverage);
+        setExcludedUsers(data.excludedUsers);
+        setEmptyMirror(data.emptyMirror);
+        setClosedNoDate(data.closedNoDate);
       })
       .catch((reason) => {
         if (cancelled) return;
@@ -982,7 +1135,7 @@ function DashboardsView() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, from, to]);
+  }, [signature, from, to, projectFilter]);
 
   const save = async (dashboard: Dashboard) => {
     setDashboards((list) =>
@@ -1177,6 +1330,16 @@ function DashboardsView() {
             </div>
 
             {active.description && <p className="text-sm text-ink-soft">{active.description}</p>}
+            {/* Описание шаблона говорит о проекте, с которым дашборд создан: при другом
+                проекте сверху видно, по чему считаются числа сейчас. */}
+            {projectFilter && (
+              <p className="text-xs text-ink-soft">
+                {t(
+                  'Сейчас все виджеты считаются по: {0}',
+                  projectFilter === 'all' ? t('Все проекты') : names.project(projectFilter),
+                )}
+              </p>
+            )}
 
             <Card padding="none">
               <div className="flex flex-wrap items-center gap-2 p-3 text-sm">
@@ -1213,6 +1376,19 @@ function DashboardsView() {
                   className={`${toolbarControl} w-full min-w-0 sm:w-36`}
                   aria-label={t('Конечная дата периода')}
                 />
+                <SelectField
+                  size="sm"
+                  variant="boxed"
+                  className={`${toolbarSelect} w-full sm:w-56`}
+                  aria-label={t('Проект для всех виджетов')}
+                  value={projectFilter}
+                  onChange={(event) => setParams({ project: event.target.value || null })}
+                  options={[
+                    { value: '', label: t('Как в виджетах') },
+                    { value: 'all', label: t('Все проекты') },
+                    ...projectOptions(names.projects),
+                  ]}
+                />
                 <Button
                   size="sm"
                   className="sm:ml-auto"
@@ -1224,9 +1400,41 @@ function DashboardsView() {
               </div>
             </Card>
 
-            {collectedFrom && from < collectedFrom && (
+            {closedNoDate > 0 && (
               <Notice tone="warning">
-                {t('Списания в базе собраны с {0}: часы до этой даты не видны.', collectedFrom)}
+                {t(
+                  'Завершённых задач без даты закрытия: {0}. Их не отнести к периоду, в закрытые и долю в срок они не входят.',
+                  closedNoDate,
+                )}
+              </Notice>
+            )}
+            {emptyMirror && (
+              <Notice tone="warning">
+                {t('Задачи из Битрикса ещё не загружены: нули в виджетах значат «нет данных».')}
+              </Notice>
+            )}
+            {coverage?.collectedAt && (
+              <p className="text-xs text-ink-soft">
+                {t(
+                  'Часы собраны не позже {0}: списаний, сделанных после, в виджетах может не быть.',
+                  COLLECTED.format(new Date(coverage.collectedAt)),
+                )}
+              </p>
+            )}
+            {coverage && coverage.missingWeeks.length > 0 && (
+              <Notice tone="warning">
+                {t(
+                  'Списания за недели с {0} не собраны: часов за них нет, это не ноль работы.',
+                  weekList(coverage.missingWeeks),
+                )}
+              </Notice>
+            )}
+            {coverage && coverage.partialWeeks.length > 0 && (
+              <Notice tone="warning">
+                {t(
+                  'Недели с {0} собраны не полностью: часть задач Битрикс не отдал, часы занижены.',
+                  weekList(coverage.partialWeeks),
+                )}
               </Notice>
             )}
 
@@ -1270,10 +1478,15 @@ function DashboardsView() {
                             <Info className="size-3.5" strokeWidth={1.7} />
                           </button>
                         </div>
-                        <p className="truncate text-xs text-ink-faint">{describe(item, names)}</p>
+                        <p className="truncate text-xs text-ink-faint">
+                          {describe(withProject(item, projectFilter), names)}
+                        </p>
                         {hints[item.id] && (
                           <p className="mt-1.5 text-xs text-ink-soft">
                             {METRIC_HINT[item.metric]()}
+                            {item.metric === 'hours' &&
+                              excludedUsers > 0 &&
+                              ` ${t('Служебные учётки из настроек ({0}) не учитываются.', excludedUsers)}`}
                           </p>
                         )}
                       </div>
@@ -1329,7 +1542,12 @@ function DashboardsView() {
                       names={names}
                       from={from}
                       to={to}
-                      onPick={(key) => setDrill({ item, key })}
+                      onPick={(key) =>
+                        setDrill({
+                          item: withProject(item, projectFilter),
+                          key,
+                        })
+                      }
                     />
                   </Card>
                 ))}
@@ -1345,6 +1563,7 @@ function DashboardsView() {
           isNew={!active.widgets.some((other) => other.id === editing.id)}
           from={from}
           to={to}
+          projectFilter={projectFilter}
           names={names}
           onClose={() => setEditing(null)}
           onSave={(item) => {
@@ -1359,7 +1578,14 @@ function DashboardsView() {
         />
       )}
 
-      <DrillDrawer drill={drill} from={from} to={to} names={names} onClose={() => setDrill(null)} />
+      <DrillDrawer
+        drill={drill}
+        from={from}
+        to={to}
+        projectId={projectFilter}
+        names={names}
+        onClose={() => setDrill(null)}
+      />
 
       {creating && (
         <Modal open size="xl" onClose={() => setCreating(false)} title={t('Новый дашборд')}>

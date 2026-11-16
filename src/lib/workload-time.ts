@@ -24,7 +24,9 @@ async function taskEntries(memberId: string, taskId: string, start: string, end:
   if (lastError) throw lastError;
   return (Array.isArray(result) ? result : [])
     .map((item: any): TimeEntry | null => {
-      const day = dayKey(item.DATE_PLAN || item.CREATED_DATE);
+      // Та же дата, что у основного сбора: иначе одно списание попадало в разные недели
+      // в зависимости от того, какой путь сработал.
+      const day = dayKey(item.CREATED_DATE);
       if (!day || day < start || day > end) return null;
       return {
         userId: String(item.USER_ID || ''),
@@ -88,6 +90,7 @@ async function fallbackEntries(memberId: string, start: string, end: string) {
     ...new Set([...mirrored, ...recent].map((task) => String(task.id)).filter(Boolean)),
   ];
   const entries: TimeEntry[] = [];
+  let skipped = 0;
 
   for (let index = 0; index < taskIds.length; index += MAX_CONCURRENT_REQUESTS) {
     const batch = await Promise.all(
@@ -96,13 +99,14 @@ async function fallbackEntries(memberId: string, start: string, end: string) {
           return await taskEntries(memberId, taskId, start, end);
         } catch (error) {
           console.warn('[workload-time] skipped fallback task', taskId, String(error));
+          skipped += 1;
           return [];
         }
       }),
     );
     entries.push(...batch.flat());
   }
-  return entries;
+  return { entries, skipped };
 }
 
 export async function getWorkloadTime(memberId: string, start: string) {
@@ -159,6 +163,9 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
   try {
     let entries: TimeEntry[];
     let source = 'global';
+    // Пропущенные задачи запасного сбора отчёты показывают предупреждением: неделя
+    // с дырой иначе выглядела собранной целиком.
+    let skipped = 0;
     try {
       entries = await globalEntries(memberId, start, end);
     } catch (error) {
@@ -167,7 +174,7 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
         '[workload-time] global time-log query failed; using task fallback',
         String(error),
       );
-      entries = await fallbackEntries(memberId, start, end);
+      ({ entries, skipped } = await fallbackEntries(memberId, start, end));
     }
     await db.collection('workload_time_task').deleteMany({ member_id: memberId, start });
     await db.collection('workload_time_task').insertOne({
@@ -175,6 +182,7 @@ export async function refreshWorkloadTime(memberId: string, start: string, end: 
       start,
       task_id: `__${source}__`,
       entries,
+      skipped,
       updated_at: new Date(),
     });
 

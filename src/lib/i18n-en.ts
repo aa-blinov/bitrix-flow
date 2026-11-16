@@ -1087,4 +1087,119 @@ export const EN: Record<string, string> = {
   'Как пользоваться': 'How to use',
   'Как пользоваться дашбордами': 'How to use dashboards',
   Понятно: 'Got it',
+  'Задачи, созданные в выбранном периоде. Удалённые задачи не учитываются: зеркало хранит только живые.':
+    'Tasks created in the selected period. Deleted tasks are not counted: the mirror keeps only live ones.',
+  'Задачи, завершённые в выбранном периоде, по текущему состоянию: переоткрытая задача уходит из закрытых.':
+    'Tasks completed in the selected period, by their current state: a reopened task drops out of closed.',
+  'Незакрытые задачи с прошедшим сроком на сегодня, без отложенных. Период на число не влияет.':
+    'Open tasks past their deadline as of today, excluding deferred. The period does not affect the number.',
+  'Из задач со сроком, завершённых в периоде: какая часть закрыта до срока. Задачи без срока не входят, под числом видно, из скольких задач доля.':
+    'Of tasks with a deadline completed in the period: the share closed on time. Tasks without a deadline are excluded; the line below shows how many tasks the share is based on.',
+  'Медиана дней от создания до завершения для задач, закрытых в периоде: середина ряда, а не среднее.':
+    'Median days from creation to completion for tasks closed in the period: the middle value, not the average.',
+  'Часы из списаний за период, по дню списания. Списания удалённых задач не учитываются.':
+    'Hours from time logs in the period, by log date. Logs of deleted tasks are not counted.',
+  'из {0} задач со сроком': 'of {0} tasks with a deadline',
+  'по {0} задачам': 'over {0} tasks',
+  'нет данных': 'no data',
+  'пустые недели не собраны, это не ноль': 'empty weeks were not collected, they are not zero',
+  'срок {0}': 'due {0}',
+  'Строк: {0}': 'Rows: {0}',
+  'Показать ещё {0}': 'Show {0} more',
+  'Служебные учётки из настроек ({0}) в часах не учитываются.':
+    'Service accounts from settings ({0}) are excluded from hours.',
+  'Проект для всех виджетов': 'Project for all widgets',
+  'Списания за недели с {0} не собраны: часов за них нет, это не ноль работы.':
+    'Time logs for weeks starting {0} were not collected: there are no hours for them, which is not zero work.',
+  'Недели с {0} собраны не полностью: часть задач Битрикс не отдал, часы занижены.':
+    'Weeks starting {0} were collected partially: Bitrix did not return some tasks, hours are understated.',
+  'Служебные учётки из настроек ({0}) не учитываются.':
+    'Service accounts from settings ({0}) are excluded.',
+  'Факт задач с оценкой': 'Actual on estimated tasks',
+  'Часы задач без оценки': 'Hours on unestimated tasks',
+  'Списания задач без оценки, которые не вошли в факт оценённого родителя':
+    "Logs of unestimated tasks not included in an estimated parent's actual",
+  'Из них подзадачи, ч': 'Of which subtasks, h',
+  'Задачи без оценки со списаниями': 'Unestimated tasks with time logs',
+  'Все задачи со списаниями оценены': 'All tasks with time logs are estimated',
+  'Задачи, открытые сегодня, и закрытые за период; план и факт берутся за всю жизнь задачи, а не только за период. Факт это списания задачи и её подзадач без своей оценки, даже если подзадача в другом проекте; подзадача с оценкой идёт своей строкой.':
+    "Tasks open today and tasks closed in the period; plan and actual cover the task's whole life, not just the period. Actual is the time logged on the task and its unestimated subtasks, even in another project; an estimated subtask has its own row.",
+  'Задачи со сроком': 'Tasks with a deadline',
+  'Задач со сроком за период нет': 'No tasks with a deadline in the period',
+  'Опоздание: задача закрыта в периоде позже дедлайна, с точностью до минуты; неполные сутки сверх срока считаются днём. Просрочка: открытая задача с прошедшим дедлайном на сегодня, отложенные не считаются. Нажмите на плитку, чтобы оставить в таблице только её задачи.':
+    'Late: closed in the period after the deadline, to the minute; a partial day over counts as a day. Overdue: an open task past its deadline as of today, deferred excluded. Click a tile to keep only its tasks in the table.',
+  'Создано минус закрыто': 'Created minus closed',
+  'Больше нуля: приходит больше, чем уходит': 'Above zero: more comes in than goes out',
+  'Задачи периода': 'Tasks in the period',
+  'Считается по текущему состоянию задач: переоткрытая задача уходит из закрытых своей недели, удалённые не учитываются. Подзадачи считаются отдельными задачами. Нажмите на плитку, чтобы увидеть задачи за числом.':
+    "Based on the current state of tasks: a reopened task drops out of its week's closed, deleted tasks are not counted. Subtasks count as separate tasks. Click a tile to see the tasks behind the number.",
+  'Часы других классов': 'Hours of other classes',
+  'Внутренние, пресейл, прочие и нераспределённые: в долю брака не входят':
+    'Internal, presale, other and unassigned: not part of the defect share',
+  'Доля брака считается только по коммерции и браку, остальные классы показаны отдельной плиткой. Классы те же, что в аналитике часов: тег задачи, тег предка или класс проекта. «Открыть» в строке ведёт в аналитику часов за этот проект и месяц.':
+    'The defect share uses only commercial and defect hours; other classes are shown in a separate tile. Classes match hours analytics: task tag, ancestor tag or project class. "Open" in a row leads to hours analytics for that project and month.',
+  'Доля за весь период, а не за отдельную неделю': 'Share over the whole period, not a single week',
+  'Люди за период': 'People over the period',
+  'Норма: 8 ч в будний день периода, праздники и отпуска не учтены. Люди: кто списывал часы за период или за 8 недель до него, и исполнители открытых задач. Новичку и ушедшему норма начисляется за весь период: смотрите на них отдельно.':
+    'Norm: 8 h per weekday in the period, holidays and vacations not counted. People: anyone who logged time in the period or 8 weeks before it, and assignees of open tasks. Newcomers and leavers get the norm for the whole period: review them separately.',
+  'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка. Дни без движения это полные сутки с момента активности. Нажмите на плитку, чтобы оставить только её задачи.':
+    'Active tasks: everything except completed and deferred. Movement is the latest activity in Bitrix: a comment, status change or edit. Idle days are full 24-hour periods since that activity. Click a tile to keep only its tasks.',
+  'Другие задачи с часами за период': 'Other tasks with hours in the period',
+  'Других задач с часами нет': 'No other tasks with hours',
+  'В работе: открытые задачи без отложенных. Часы за период это все списания по задачам проекта, «Другие задачи» это закрытые раньше периода и отложенные. Состав строится по текущему состоянию задач: переоткрытая задача уйдёт из «Сделано».':
+    'In progress: open tasks excluding deferred. Hours in the period are all time logs on project tasks; "Other tasks" are those closed before the period and deferred ones. Built from the current state of tasks: a reopened task leaves "Done".',
+  'Закрыта в срок': 'Closed on time',
+  Открыть: 'Open',
+  'Задачи в аналитике часов': 'Tasks in hours analytics',
+  'Показать ещё {0}, осталось {1}': 'Show {0} more, {1} left',
+  'Без ответственного': 'No assignee',
+  '{0} (архив)': '{0} (archived)',
+  '{0} и ещё {1}': '{0} and {1} more',
+  'Списания за недели с {0} не собраны: часов за них в отчёте нет, это не ноль работы.':
+    'Time logs for weeks starting {0} were not collected: the report has no hours for them, which is not zero work.',
+  'Показаны задачи плитки «{0}»': 'Showing tasks of the "{0}" tile',
+  'Показать все': 'Show all',
+  'Из задач со сроком, завершённых в периоде: какая часть закрыта не позднее срока. Задачи без срока не входят, под числом видно, из скольких задач доля.':
+    'Of tasks with a deadline completed in the period: the share closed no later than the deadline. Tasks without a deadline are excluded; the line below shows how many tasks the share is based on.',
+  'задач: {0}': 'tasks: {0}',
+  'Задачи из Битрикса ещё не загружены: нули в виджетах значат «нет данных».':
+    'Tasks from Bitrix are not loaded yet: zeros in widgets mean "no data".',
+  'Часы собраны {0}: более поздних списаний в виджетах нет.':
+    'Hours collected {0}: later time logs are not in the widgets.',
+  'Доля среди закрытых в периоде задач с дедлайном, не позднее срока':
+    'Share of tasks with a deadline closed in the period, no later than the deadline',
+  'Опоздание: задача закрыта в периоде позже дедлайна, с точностью до минуты; неполные сутки сверх срока считаются днём. Просрочка: открытая задача с прошедшим дедлайном на сегодня, отложенные не считаются. «В срок» это доля среди закрытых с дедлайном. Нажмите на плитку, чтобы оставить в таблице только её задачи.':
+    'Late: closed in the period after the deadline, to the minute; a partial day over counts as a day. Overdue: an open task past its deadline as of today, deferred excluded. "On time" is the share among closed tasks with a deadline. Click a tile to keep only its tasks in the table.',
+  'Считается по текущему состоянию задач: переоткрытая задача уходит из закрытых своей недели, удалённые не учитываются. Подзадачи считаются отдельными задачами. Нажмите «Создано», «Закрыто» или медиану, чтобы увидеть задачи за числом.':
+    'Based on the current state of tasks: a reopened task drops out of its week\'s closed, deleted tasks are not counted. Subtasks count as separate tasks. Click "Created", "Closed" or the median to see the tasks behind the number.',
+  'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка. Дни без движения это полные сутки с момента активности; если активности нет, от создания. Нажмите на плитку, чтобы оставить только её задачи.':
+    'Active tasks: everything except completed and deferred. Movement is the latest activity in Bitrix: a comment, status change or edit. Idle days are full 24-hour periods since that activity, or since creation if there is none. Click a tile to keep only its tasks.',
+  '<1 мин': '<1 min',
+  '{0} мин': '{0} min',
+  'Задачи из Битрикса ещё не загружены: нули в отчёте значат «нет данных».':
+    'Tasks from Bitrix are not loaded yet: zeros in the report mean "no data".',
+  'Часы собраны {0}: более поздних списаний в отчёте нет.':
+    'Hours collected {0}: later time logs are not in the report.',
+  'Как в виджетах': 'As set in widgets',
+  'Часы собраны не позже {0}: списаний, сделанных после, в виджетах может не быть.':
+    'Hours collected no later than {0}: time logged after that may be missing from the widgets.',
+  'макс. {0}': 'max {0}',
+  'Часы собраны не позже {0}: списаний, сделанных после, в отчёте может не быть.':
+    'Hours collected no later than {0}: time logged after that may be missing from the report.',
+  'У части завершённых задач нет даты закрытия: в закрытые и в хвост на конец недели они не входят.':
+    'Some completed tasks have no close date: they are not counted in closed or in the end-of-week backlog.',
+  'из {0}': 'of {0}',
+  'Завершённых задач без даты закрытия: {0}. Их не отнести к периоду, в закрытые и долю в срок они не входят.':
+    'Completed tasks without a close date: {0}. They cannot be placed in a period and are not counted in closed or the on-time share.',
+  'В работе: открытые задачи без отложенных. Часы за период это все списания по задачам проекта, «Другие задачи» это задачи со списаниями за период, которые сейчас не в «Сделано» и не в работе: закрытые вне периода, отложенные, без даты закрытия. Состав строится по текущему состоянию задач: переоткрытая задача уйдёт из «Сделано».':
+    'In progress: open tasks excluding deferred. Hours in the period are all time logs on project tasks; "Other tasks" are tasks with time logged in the period that are currently neither done nor in progress: closed outside the period, deferred, or without a close date. Built from the current state of tasks: a reopened task leaves "Done".',
+  'Завершённых задач без даты закрытия: {0}. Их не отнести к периоду, в закрытые и в хвост на конец недели они не входят.':
+    'Completed tasks without a close date: {0}. They cannot be placed in a period and are not counted in closed or the end-of-week backlog.',
+  'Часть из 8 недель до периода не собрана: человек, списывавший только тогда, может не попасть в список.':
+    'Some of the 8 weeks before the period were not collected: a person who logged time only then may be missing from the list.',
+  'Сейчас все виджеты считаются по: {0}': 'All widgets are currently calculated for: {0}',
+  'Сводная и её итог по всем проектам; выбранный проект в детализации ниже.':
+    'The summary and its total cover all projects; the selected project is in the details below.',
+  'Часы из списаний за период, по дню списания. Проект и класс берутся по текущему состоянию задачи: перенос задачи переносит и её прошлые часы. Списания удалённых задач не учитываются.':
+    "Hours from time logs in the period, by log date. Project and class come from the task's current state: moving a task moves its past hours too. Logs of deleted tasks are not counted.",
 };

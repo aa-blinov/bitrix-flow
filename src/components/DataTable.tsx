@@ -25,6 +25,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useState } from 'react';
+import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export const dataTableFeatures = tableFeatures({
@@ -52,6 +53,11 @@ type Props<T extends RowData> = {
   numeric?: string[];
   /** Открыть все группы сразу: при выбранном проекте детализация и есть ответ. */
   expandAll?: boolean;
+  /**
+   * Строк за раз. Тысячи строк со ссылками тормозили открытие и сортировку, поэтому
+   * остаток дочитывается кнопкой; сортировка и группы считаются по всем строкам.
+   */
+  pageSize?: number;
 };
 
 export function DataTable<T extends RowData>({
@@ -63,7 +69,9 @@ export function DataTable<T extends RowData>({
   caption,
   numeric = [],
   expandAll = false,
+  pageSize = Infinity,
 }: Props<T>) {
+  const [limit, setLimit] = useState(pageSize);
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
   const [expanded, setExpanded] = useState<ExpandedState>(expandAll ? true : {});
 
@@ -80,7 +88,8 @@ export function DataTable<T extends RowData>({
 
   const align = (id: string) =>
     numeric.includes(id) ? 'whitespace-nowrap text-right tabular-nums' : 'text-left';
-  const rows = table.getRowModel().rows;
+  const allRows = table.getRowModel().rows;
+  const rows = allRows.slice(0, limit);
   const hasFooter = columns.some((column) => column.footer);
 
   return (
@@ -203,6 +212,21 @@ export function DataTable<T extends RowData>({
           </tfoot>
         ) : null}
       </table>
+      {allRows.length > rows.length && (
+        <div className="border-t border-line p-2 text-center">
+          <button
+            type="button"
+            className="min-h-9 rounded-ui px-3 text-xs text-ink-soft hover:bg-surface-2 hover:text-ink"
+            onClick={() => setLimit(limit + pageSize)}
+          >
+            {t(
+              'Показать ещё {0}, осталось {1}',
+              Math.min(pageSize, allRows.length - rows.length),
+              allRows.length - rows.length,
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

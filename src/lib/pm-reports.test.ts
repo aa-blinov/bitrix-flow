@@ -65,6 +65,29 @@ describe('план и факт', () => {
   });
 });
 
+describe('план и факт: округление и задачи без оценки', () => {
+  it('итоги по секундам, перерасход совпадает со строками, часы без оценки видны', () => {
+    const result = planFact(
+      [
+        ...Array.from({ length: 100 }, (_, index) => task(String(index + 1), { estimate: 20 })),
+        task('200', { estimate: H, spent: H + 18 }),
+        task('300', { spent: 5 * H }),
+        task('301', { parentId: '200', spent: 2 * H }),
+        task('400', { status: '6', estimate: H }),
+      ],
+      '2026-11-01',
+      '2026-11-30',
+    );
+    expect(tile(result, 'plan')).toBe((100 * 20 + 2 * H) / 3600);
+    expect(tile(result, 'overTasks')).toBe(1);
+    expect(tile(result, 'unestimated')).toBe(5);
+    expect(result.tables[1].rows.map((row) => row.taskId)).toEqual(['300']);
+    const rows = Object.fromEntries(result.tables[0].rows.map((row) => [row.taskId, row]));
+    expect(rows['200']).toMatchObject({ fact: 3 + 18 / 3600, subFact: 2, filters: 'over' });
+    expect(rows['400']).toMatchObject({ state: 'paused' });
+  });
+});
+
 describe('сроки', () => {
   it('опоздание считается по моменту дедлайна, просрочка только у активных', () => {
     const result = deadlines(
@@ -93,8 +116,32 @@ describe('сроки', () => {
     expect(tile(result, 'onTime')).toBe(0.5);
     expect(tile(result, 'overdue')).toBe(1);
     const rows = Object.fromEntries(result.tables[0].rows.map((row) => [row.taskId, row]));
-    expect(rows['1']).toMatchObject({ state: 'late', days: 2 });
-    expect(rows['4']).toMatchObject({ state: 'overdue', days: 4 });
+    expect(rows['1']).toMatchObject({ state: 'late', days: 2, filters: 'closed,late' });
+    expect(rows['2']).toMatchObject({ state: 'onTime', days: null, filters: 'closed,onTime' });
+    expect(rows['4']).toMatchObject({ state: 'overdue', days: 4, filters: 'overdue' });
+  });
+
+  it('опоздание и его дни считаются до минуты', () => {
+    const result = deadlines(
+      [
+        task('1', {
+          status: '5',
+          deadline: '2026-11-10T12:00:00+03:00',
+          closed: '2026-11-11T12:00:30+03:00',
+        }),
+        task('2', {
+          status: '5',
+          deadline: '2026-11-10T12:00:00+03:00',
+          closed: '2026-11-10T12:00:40+03:00',
+        }),
+      ],
+      '2026-11-01',
+      '2026-11-30',
+      NOW,
+    );
+    const rows = Object.fromEntries(result.tables[0].rows.map((row) => [row.taskId, row]));
+    expect(rows['1']).toMatchObject({ state: 'late', days: 1 });
+    expect(rows['2']).toMatchObject({ state: 'onTime' });
   });
 });
 
@@ -115,26 +162,77 @@ describe('поток задач', () => {
         }),
       ],
       ['2026-11-02', '2026-11-09'],
+      '2026-11-02',
+      '2026-11-15',
     );
     expect(result.tables[0].rows).toEqual([
-      { week: '2026-11-02', created: 2, closed: 1, net: 1, backlog: 2, lead: 2 },
-      { week: '2026-11-09', created: 0, closed: 1, net: -1, backlog: 1, lead: 23 },
+      { week: '2026-11-02..2026-11-08', created: 2, closed: 1, net: 1, backlog: 2, lead: 2 },
+      { week: '2026-11-09..2026-11-15', created: 0, closed: 1, net: -1, backlog: 1, lead: 23 },
     ]);
     expect(tile(result, 'lead')).toBe(12.5);
+    expect(result.tables[1].rows.map((row) => [row.taskId, row.filters, row.lead])).toEqual([
+      ['1', 'created,closed,lead', 2],
+      ['2', 'created', null],
+      ['3', 'closed,lead', 23],
+    ]);
+  });
+
+  it('крайние недели обрезаются периодом: понедельник до среды в поток не попадает', () => {
+    const result = throughput(
+      [
+        task('1', { created: '2026-11-02T10:00:00+03:00' }),
+        task('2', { created: '2026-11-04T10:00:00+03:00' }),
+        task('3', { status: '5', closed: '2026-11-07T10:00:00+03:00' }),
+      ],
+      ['2026-11-02'],
+      '2026-11-04',
+      '2026-11-06',
+    );
+    expect(result.tables[0].rows[0]).toMatchObject({
+      week: '2026-11-04..2026-11-06',
+      created: 1,
+      closed: 0,
+      backlog: 4 - 1,
+    });
+    expect(tile(result, 'created')).toBe(1);
+    expect(tile(result, 'closed')).toBe(0);
   });
 });
 
 describe('брак', () => {
   it('доля брака от коммерции и брака, прочие классы не входят', () => {
-    const result = defects([
-      { month: '2026-11', projectId: '10', hourClass: 'commercial', hours: 30 },
-      { month: '2026-11', projectId: '10', hourClass: 'defect', hours: 10 },
-      { month: '2026-11', projectId: '10', hourClass: 'internal', hours: 99 },
-    ]);
+    const result = defects(
+      [
+        { month: '2026-11', projectId: '10', hourClass: 'commercial', hours: 30 },
+        { month: '2026-11', projectId: '10', hourClass: 'defect', hours: 10 },
+        { month: '2026-11', projectId: '10', hourClass: 'internal', hours: 99 },
+      ],
+      '2026-10-15',
+      '2026-11-20',
+    );
     expect(result.tables[0].rows).toEqual([
-      { projectId: '10', month: '2026-11', commercial: 30, defect: 10, share: 0.25 },
+      {
+        projectId: '10',
+        month: '2026-11',
+        commercial: 30,
+        defect: 10,
+        share: 0.25,
+        from: '2026-11-01',
+        to: '2026-11-20',
+      },
     ]);
     expect(tile(result, 'share')).toBe(0.25);
+    expect(tile(result, 'outside')).toBe(99);
+  });
+
+  it('итог считается по точным часам, а не по сумме округлённых строк', () => {
+    const rows = ['10', '20'].map((projectId) => ({
+      month: '2026-11',
+      projectId,
+      hourClass: 'defect',
+      hours: 18 / 3600,
+    }));
+    expect(tile(defects(rows, '2026-11-01', '2026-11-30'), 'defect')).toBe(0.01);
   });
 });
 
@@ -157,11 +255,33 @@ describe('списание часов', () => {
       '2026-11-15',
       [],
     );
-    expect(result.tables[0].rows).toEqual([
-      { userId: '1', week: '2026-11-09', fact: 30, norm: 40, share: 0.75 },
-      { userId: '2', week: '2026-11-09', fact: 0, norm: 40, share: 0 },
+    expect(result.tables[1].rows).toEqual([
+      { userId: '1', week: '2026-11-09', fact: 30, norm: 40, share: 0.75, filters: 'below' },
+      { userId: '2', week: '2026-11-09', fact: 0, norm: 40, share: 0, filters: 'below' },
     ]);
     expect(tile(result, 'below')).toBe(2);
+  });
+
+  it('порог 80 % считается по секундам и за весь период', () => {
+    const almost = 32 * H - 1;
+    const result = timesheets(
+      [
+        { userId: '1', day: '2026-11-10', seconds: almost, taskId: '5' },
+        { userId: '2', day: '2026-11-03', seconds: 20 * H, taskId: '5' },
+        { userId: '2', day: '2026-11-10', seconds: 44 * H, taskId: '5' },
+      ],
+      ['1', '2'],
+      ['2026-11-02', '2026-11-09'],
+      '2026-11-09',
+      '2026-11-15',
+      [],
+    );
+    // Первая неделя вне периода: норма за неё ноль, и списания за неё не считаются.
+    expect(result.tables[0].rows).toEqual([
+      { userId: '1', fact: almost / 3600, norm: 40, share: almost / 3600 / 40, filters: 'below' },
+      { userId: '2', fact: 44, norm: 40, share: 1.1, filters: '' },
+    ]);
+    expect(tile(result, 'below')).toBe(1);
   });
 });
 
@@ -189,7 +309,6 @@ describe('зависшие задачи', () => {
         }),
       ],
       14,
-      null,
       NOW,
     );
     expect(result.tables[0].rows.map((row) => [row.taskId, row.reasons])).toEqual([
@@ -198,10 +317,27 @@ describe('зависшие задачи', () => {
       ['3', 'noDeadline'],
     ]);
     expect(result.tiles.map((item) => item.value)).toEqual([1, 1, 1, 0]);
-    expect(
-      stale([task('1', { activity: '2026-10-01T10:00:00+03:00' })], 14, 'overdue', NOW).tables[0]
-        .rows,
-    ).toEqual([]);
+    expect(result.tables[0].rows.map((row) => row.filters)).toEqual([
+      'idle',
+      'overdue',
+      'noDeadline',
+    ]);
+  });
+
+  it('задача без даты активности считается от создания, а не выпадает', () => {
+    const result = stale(
+      [
+        task('1', {
+          activity: '',
+          created: '2026-10-01T10:00:00+03:00',
+          deadline: '2026-12-01T10:00:00+03:00',
+          estimate: H,
+        }),
+      ],
+      14,
+      NOW,
+    );
+    expect(result.tables[0].rows[0]).toMatchObject({ taskId: '1', reasons: 'idle', idle: 44 });
   });
 });
 
@@ -224,9 +360,32 @@ describe('отчёт клиенту', () => {
       '2026-11-30',
     );
     expect(result.tiles.map((item) => item.value)).toEqual([1, 1, 3]);
-    expect(result.tables[2].rows).toEqual([
+    expect(result.tables[3].rows).toEqual([
       { userId: '1', hours: 2 },
       { userId: '2', hours: 1 },
+    ]);
+  });
+
+  it('отложенная не в работе, а часы по закрытой раньше задаче не теряются', () => {
+    const result = clientReport(
+      [
+        task('1', { status: '5', closed: '2026-10-20T10:00:00+03:00' }),
+        task('2', { status: '6' }),
+        task('3'),
+      ],
+      [
+        { userId: '1', day: '2026-11-04', seconds: 2 * H, taskId: '1' },
+        { userId: '1', day: '2026-11-04', seconds: H, taskId: '9', projectId: '10' },
+      ],
+      '10',
+      '2026-11-01',
+      '2026-11-30',
+    );
+    expect(tile(result, 'open')).toBe(1);
+    expect(tile(result, 'hours')).toBe(3);
+    expect(result.tables[2].rows.map((row) => [row.taskId, row.periodHours])).toEqual([
+      ['1', 2],
+      ['9', 1],
     ]);
   });
 });

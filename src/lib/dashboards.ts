@@ -52,11 +52,12 @@ export type Dashboard = {
   version: number;
 };
 
-export type Point = { key: string; value: number | null };
-export type WidgetResult = { total: number | null; points: Point[] };
+/** count у точки: из скольких задач доля или медиана этой недели. */
+export type Point = { key: string; value: number | null; count: number };
+/** count: сколько задач за долей или медианой, чтобы 100 % из одной задачи не читались как все. */
+export type WidgetResult = { total: number | null; count: number; points: Point[] };
 
 const DAY_MS = 86_400_000;
-const hours = (seconds: number) => Math.round((seconds / 3600) * 100) / 100;
 const inPeriod = (day: string, from: string, to: string) =>
   Boolean(day) && day >= from && day <= to;
 
@@ -118,7 +119,8 @@ function facts(
       .map((entry) => ({
         task: entry.taskId,
         day: entry.day,
-        project: project.get(entry.taskId) || NO_PROJECT_ID,
+        // Проект проставил загрузчик, в том числе из tasks для задачи вне зеркала.
+        project: entry.projectId || project.get(entry.taskId) || NO_PROJECT_ID,
         user: entry.userId,
         status: '',
         cls: data.classes.get(entry.taskId) || 'unassigned',
@@ -127,14 +129,16 @@ function facts(
         value: entry.seconds,
       }));
   }
-  const today = new Date(now).toLocaleDateString('en-CA');
+  // День портала, а не сервера: в контейнере UTC, и после 21:00 по Москве «сегодня» было вчера.
+  const today = new Date(now).toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
   const result: Fact[] = [];
   for (const task of data.tasks) {
     const closedDay = portalDay(task.closed);
     const base = {
       task: task.id,
       project: task.projectId || NO_PROJECT_ID,
-      user: task.responsibleId,
+      // Пустой и нулевой ответственный это одна группа «без ответственного».
+      user: task.responsibleId && task.responsibleId !== '0' ? task.responsibleId : '0',
       status: task.status,
       cls: '',
     };
@@ -150,14 +154,18 @@ function facts(
       const deadline = Date.parse(task.deadline);
       if (isActive(task) && deadline < now) result.push({ ...base, day: today, value: 1 });
     } else if (metric === 'late' || metric === 'onTime') {
-      if (!isClosed(task) || !inPeriod(closedDay, from, to) || !task.deadline) continue;
-      const late = Date.parse(task.closed) > Date.parse(task.deadline);
+      if (!isClosed(task) || !inPeriod(closedDay, from, to)) continue;
+      const deadline = Date.parse(task.deadline);
+      if (!Number.isFinite(deadline)) continue;
+      // До минуты, как в отчёте сроков: секунды в таблице не видны.
+      const late = Math.floor(Date.parse(task.closed) / 60_000) > Math.floor(deadline / 60_000);
       if (metric === 'late' && !late) continue;
       result.push({ ...base, day: closedDay, value: metric === 'late' || !late ? 1 : 0 });
     } else if (metric === 'leadTime') {
       const days = (Date.parse(task.closed) - Date.parse(task.created)) / DAY_MS;
-      if (isClosed(task) && inPeriod(closedDay, from, to) && Number.isFinite(days))
-        result.push({ ...base, day: closedDay, value: Math.max(0, days) });
+      // Закрытие раньше создания это сбой дат: в медиану не идёт, как в отчёте потока.
+      if (isClosed(task) && inPeriod(closedDay, from, to) && Number.isFinite(days) && days >= 0)
+        result.push({ ...base, day: closedDay, value: days });
     }
   }
   return result;
@@ -168,10 +176,19 @@ function reduce(metric: Metric, values: number[]): number | null {
   if (metric === 'leadTime') return median(values);
   const sum = values.reduce((total, value) => total + value, 0);
   if (metric === 'onTime') return values.length ? sum / values.length : null;
-  return metric === 'hours' ? hours(sum) : sum;
+  // Часы без округления: 10 секунд должны остаться ненулём, округляет показ.
+  return metric === 'hours' ? sum / 3600 : sum;
 }
 
-type Data = { tasks: ReportTask[]; entries: TimeEntry[]; classes: Map<string, string> };
+type Data = {
+  tasks: ReportTask[];
+  entries: TimeEntry[];
+  classes: Map<string, string>;
+  /** Недели без собранных списаний: у часов по неделям это «нет данных», а не ноль. */
+  missingWeeks?: string[];
+  /** Задачи из tasks, которых нет в зеркале: только для названий в расшифровке часов. */
+  extraTasks?: ReportTask[];
+};
 
 function scoped(widget: Widget, data: Data, from: string, to: string, now: number) {
   const by = dimensionsFor(widget.metric).includes(widget.by) ? widget.by : 'none';
@@ -195,25 +212,30 @@ export function runWidget(
     widget.metric,
     all.map((fact) => fact.value),
   );
-  if (by === 'none') return { total, points: [] };
+  const count = new Set(all.map((fact) => fact.task)).size;
+  if (by === 'none') return { total, count, points: [] };
 
   const groups = new Map<string, number[]>();
+  const tasksOf = new Map<string, Set<string>>();
   // Время идёт подряд: пустая неделя это ноль, а не дыра, иначе столбики врут о ритме.
-  if (by === 'week') for (const week of weeks(from, to)) groups.set(week, []);
-  if (by === 'month') for (const month of months(from, to)) groups.set(month, []);
+  if (by === 'week' && from <= to) for (const week of weeks(from, to)) groups.set(week, []);
+  if (by === 'month' && from <= to) for (const month of months(from, to)) groups.set(month, []);
   for (const fact of all) {
     const key = keyOf(fact, by);
+    tasksOf.set(key, (tasksOf.get(key) || new Set()).add(fact.task));
     const values = groups.get(key);
     if (values) values.push(fact.value);
     else groups.set(key, [fact.value]);
   }
+  const missing = new Set(widget.metric === 'hours' && by === 'week' ? data.missingWeeks : []);
   const points = [...groups].map(([key, values]) => ({
     key,
     // У медианы и доли пустая группа это «нет данных», а не ноль.
-    value: reduce(widget.metric, values) ?? (values.length ? 0 : null),
+    value: missing.has(key) ? null : (reduce(widget.metric, values) ?? (values.length ? 0 : null)),
+    count: tasksOf.get(key)?.size || 0,
   }));
   if (by !== 'week' && by !== 'month') points.sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
-  return { total, points };
+  return { total, count, points };
 }
 
 export type DrillRow = {
@@ -222,6 +244,7 @@ export type DrillRow = {
   projectId: string;
   userId: string;
   value: number;
+  deadline: string;
 };
 
 /** Задачи за числом или точкой графика: ПМ видит проблему и сразу идёт к ней. */
@@ -234,24 +257,37 @@ export function drillWidget(
   now = Date.now(),
 ): DrillRow[] {
   const { by, all } = scoped(widget, data, from, to, now);
-  const titles = new Map(data.tasks.map((task) => [task.id, task.title]));
+  const byId = new Map([...(data.extraTasks || []), ...data.tasks].map((task) => [task.id, task]));
   const rows = new Map<string, DrillRow>();
   for (const fact of all) {
     if (key !== null && by !== 'none' && keyOf(fact, by) !== key) continue;
-    const row = rows.get(fact.task);
-    // У часов на задачу несколько записей, у остальных метрик факт на задачу один.
+    // У часов строка это задача и человек: сумма двух людей под именем первого врала,
+    // кто сколько списал. У остальных метрик факт на задачу один.
+    const id = widget.metric === 'hours' ? `${fact.task}|${fact.user}` : fact.task;
+    const row = rows.get(id);
     if (row) row.value += fact.value;
     else
-      rows.set(fact.task, {
+      rows.set(id, {
         id: fact.task,
-        title: titles.get(fact.task) || `#${fact.task}`,
+        title: byId.get(fact.task)?.title || `#${fact.task}`,
         projectId: fact.project,
         userId: fact.user,
         value: fact.value,
+        deadline: byId.get(fact.task)?.deadline || '',
       });
   }
   const list = [...rows.values()];
-  if (widget.metric === 'hours') for (const row of list) row.value = hours(row.value);
+  // Часы строки без округления: показ округляет сам, иначе строки по 20 с давали в сумме
+  // 1 ч при итоге 0,56 ч.
+  if (widget.metric === 'hours') for (const row of list) row.value /= 3600;
+  // Наверху то, с чем ПМ идёт разбираться: самая старая просрочка, опоздания перед
+  // закрытыми в срок, у остальных самое большое значение.
+  if (widget.metric === 'overdue')
+    return list.sort(
+      (a, b) => Date.parse(a.deadline) - Date.parse(b.deadline) || Number(b.id) - Number(a.id),
+    );
+  if (widget.metric === 'onTime')
+    return list.sort((a, b) => a.value - b.value || Number(b.id) - Number(a.id));
   return list.sort((a, b) => b.value - a.value || Number(b.id) - Number(a.id));
 }
 

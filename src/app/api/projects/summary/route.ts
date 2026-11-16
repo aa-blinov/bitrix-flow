@@ -47,6 +47,10 @@ const TASK_FIELDS = [
   'CHANGED_DATE',
   'CREATED_DATE',
   'COMMENTS_COUNT',
+  // Из этого снимка заполняется пустое зеркало: без активности и ответственного отчёт
+  // «Зависшие» считал дни от создания и показывал задачи без исполнителя.
+  'ACTIVITY_DATE',
+  'RESPONSIBLE_ID',
 ];
 
 function asNumber(value: unknown) {

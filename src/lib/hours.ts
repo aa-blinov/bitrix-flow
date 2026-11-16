@@ -30,6 +30,10 @@ export type HoursReport = {
   rows: HourRow[];
   /** Понедельники недель периода, за которые списаний в базе нет совсем. */
   missingWeeks: string[];
+  /** Самый старый сбор среди недель периода: граница свежести всех часов отчёта. */
+  oldestCollectedAt: string | null;
+  /** Недели, собранные запасным путём с пропущенными задачами: часы за них занижены. */
+  partialWeeks: string[];
   /** План за период по проектам, часы: то же правило, что у сводки проектов. */
   projectPlans: Record<string, number>;
   /** Когда шедулер последний раз забирал списания из портала за этот период. */
@@ -83,7 +87,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     .collection('workload_time_task')
     .find(
       { member_id: memberId, start: { $in: weeks } },
-      { projection: { start: 1, entries: 1, updated_at: 1 } },
+      { projection: { start: 1, entries: 1, updated_at: 1, skipped: 1 } },
     )
     .toArray();
 
@@ -131,6 +135,8 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
             // Теги и название нужны предкам: класс подзадачи наследуется от родителя.
             'data.title': 1,
             'data.TITLE': 1,
+            'data.description': 1,
+            'data.DESCRIPTION': 1,
             'data.tags': 1,
             'data.TAGS': 1,
             'data.timeEstimate': 1,
@@ -170,7 +176,12 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
       String(t.id),
       mergeTaskTags(
         bitrixTaskTags(data.tags ?? data.TAGS),
-        extractTaskTags(String(data.title ?? data.TITLE ?? ''), ''),
+        // Описание тоже: тег класса в описании родителя иначе наследовался, только если у
+        // родителя были свои списания за период.
+        extractTaskTags(
+          String(data.title ?? data.TITLE ?? ''),
+          data.description ?? data.DESCRIPTION,
+        ),
       ),
     );
     const projectId = mirrorProjectId(data);
@@ -219,10 +230,56 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
       .collection('tasks')
       .find(
         { member_id: memberId, id: { $in: [...unmirrored, ...unmirrored.map(Number)] } },
-        { projection: { id: 1, groupId: 1 } },
+        { projection: { id: 1, groupId: 1, data: 1 } },
       )
       .toArray();
-    for (const doc of docs) fallback.set(String(doc.id), String(doc.groupId || '') || '0');
+    // Класс такой задачи считается по её же тегам и родителю из tasks: иначе тег брака
+    // новой задачи терялся, и часы уходили в класс проекта.
+    for (const doc of docs) {
+      const id = String(doc.id);
+      const data = doc.data || {};
+      const title = String(data.title ?? data.TITLE ?? '');
+      const ownTags = bitrixTaskTags(data.tags ?? data.TAGS);
+      fallback.set(id, String(doc.groupId || '') || '0');
+      tasks.set(id, {
+        projectId: fallback.get(id)!,
+        title,
+        ownTags,
+        tags: mergeTaskTags(ownTags, extractTaskTags(title, data.description ?? data.DESCRIPTION)),
+      });
+      if (!parents.has(id)) parents.set(id, String(data.parentId ?? data.PARENT_ID ?? ''));
+    }
+  }
+  // Предки задач со списаниями могут быть только в tasks, даже когда сама задача уже в
+  // зеркале: без них подзадача теряла класс родителя.
+  // ponytail: пять уровней вверх, глубже деревья задач не встречались.
+  for (let depth = 0; depth < 5; depth++) {
+    const missing = [...new Set([...parents.values()])].filter(
+      (id) => id && id !== '0' && !parents.has(id) && !ancestorTags.has(id),
+    );
+    if (!missing.length) break;
+    const ancestors = await db
+      .collection('tasks')
+      .find(
+        { member_id: memberId, id: { $in: [...missing, ...missing.map(Number)] } },
+        { projection: { id: 1, data: 1 } },
+      )
+      .toArray();
+    if (!ancestors.length) break;
+    for (const doc of ancestors) {
+      const data = doc.data || {};
+      parents.set(String(doc.id), String(data.parentId ?? data.PARENT_ID ?? ''));
+      ancestorTags.set(
+        String(doc.id),
+        mergeTaskTags(
+          bitrixTaskTags(data.tags ?? data.TAGS),
+          extractTaskTags(
+            String(data.title ?? data.TITLE ?? ''),
+            data.description ?? data.DESCRIPTION,
+          ),
+        ),
+      );
+    }
   }
 
   const byKey = new Map<string, HourRow>();
@@ -257,12 +314,20 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
 
   const seen = new Set(docs.map((doc) => String(doc.start)));
   const collected = docs.map((doc) => new Date(doc.updated_at).getTime()).filter(Boolean);
+  // Свежесть всего периода это самый старый сбор: в неделе, собранной раньше, нет
+  // списаний, сделанных после её сбора.
+  const oldest = docs
+    .filter((doc) => weeks.includes(String(doc.start)))
+    .map((doc) => new Date(doc.updated_at).getTime())
+    .filter(Boolean);
   return {
     rows: [...byKey.values()],
     // Будущие недели ещё не могли быть собраны, дырой их не считаем.
     missingWeeks: weeks.filter((week) => !seen.has(week) && week <= today()),
+    partialWeeks: docs.filter((doc) => Number(doc.skipped) > 0).map((doc) => String(doc.start)),
     projectPlans,
     collectedAt: collected.length ? new Date(Math.max(...collected)).toISOString() : null,
+    oldestCollectedAt: oldest.length ? new Date(Math.min(...oldest)).toISOString() : null,
     taskTags: Object.fromEntries([...tasks].map(([id, task]) => [id, task.ownTags])),
     projectClasses,
   };

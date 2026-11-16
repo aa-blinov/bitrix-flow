@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizedMemberId } from '@/lib/authorized-member';
 import { buildReport, REPORT_KINDS, type ReportKind } from '@/lib/pm-reports-data';
-import type { StaleReason } from '@/lib/pm-reports';
+import { validPeriod } from '@/lib/report-period';
 import { sessionCookie } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
   const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
@@ -17,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const query = req.nextUrl.searchParams;
   const from = query.get('from') || '';
   const to = query.get('to') || '';
-  if (!DAY.test(from) || !DAY.test(to) || from > to)
+  if (!validPeriod(from, to))
     return NextResponse.json({ error: 'INVALID_PERIOD' }, { status: 400 });
   const days = Number(query.get('days'));
   const report = await buildReport(memberId, kind as ReportKind, {
@@ -25,7 +23,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     to,
     projectId: query.get('project') || null,
     idleDays: Number.isFinite(days) && days > 0 ? days : 14,
-    reason: (query.get('reason') as StaleReason) || null,
   });
   return NextResponse.json(report);
 }
