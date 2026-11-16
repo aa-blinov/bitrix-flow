@@ -305,49 +305,6 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                     </Link>
                   );
                 })}
-                {archivedProjects.length > 0 ? (
-                  <div className="mt-2 border-t border-line pt-2">
-                    <Button
-                      variant="quiet"
-                      size="sm"
-                      onClick={() => setArchiveOpen((open) => !open)}
-                      aria-expanded={archiveOpen}
-                      className="w-full justify-start gap-1 text-left"
-                    >
-                      <ChevronDown
-                        className={`size-3 transition-transform ${archiveOpen ? 'rotate-180' : ''}`}
-                        strokeWidth={1.7}
-                      />
-                      {t('Архив (')}
-                      {archivedProjects.length})
-                    </Button>
-                    {/* Архив скрыт, пока его не открыли, и при поиске тоже: совпадения
-                        видны счётчиком на кнопке. */}
-                    {archiveOpen
-                      ? archivedProjects.map((project) => {
-                          const active = pathname === `/projects/${project.id}`;
-                          return (
-                            <Link
-                              key={project.id}
-                              href={`/projects/${project.id}`}
-                              prefetch={false}
-                              onClick={() => setMobileOpen(false)}
-                              aria-current={active ? 'page' : undefined}
-                              className={projectLinkClass(active)}
-                            >
-                              <span
-                                className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
-                                aria-hidden="true"
-                              >
-                                {getProjectInitials(project.name)}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                            </Link>
-                          );
-                        })
-                      : null}
-                  </div>
-                ) : null}
               </>
             ) : projectsFailed ? (
               <div
@@ -363,6 +320,52 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
               <div className="px-2.5 py-1.5 text-xs text-ink-faint">{t('Нет проектов')}</div>
             )}
           </div>
+          {isRehydrated && !projectsLoading && archivedProjects.length > 0 ? (
+            <div className="shrink-0 border-t border-line pt-2">
+              <Button
+                variant="quiet"
+                size="sm"
+                onClick={() => setArchiveOpen((open) => !open)}
+                aria-expanded={archiveOpen}
+                className="w-full justify-start gap-1 text-left"
+              >
+                <ChevronDown
+                  className={`size-3 transition-transform ${archiveOpen ? 'rotate-180' : ''}`}
+                  strokeWidth={1.7}
+                />
+                {t('Архив (')}
+                {archivedProjects.length})
+              </Button>
+              {/* Архив скрыт, пока его не открыли, и при поиске тоже: совпадения
+                  видны счётчиком на кнопке. Вне прокрутки списка, иначе кнопка
+                  уходила бы под сотню проектов и открытый архив вытягивал список. */}
+              {archiveOpen ? (
+                <div className="max-h-40 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
+                  {archivedProjects.map((project) => {
+                    const active = pathname === `/projects/${project.id}`;
+                    return (
+                      <Link
+                        key={project.id}
+                        href={`/projects/${project.id}`}
+                        prefetch={false}
+                        onClick={() => setMobileOpen(false)}
+                        aria-current={active ? 'page' : undefined}
+                        className={projectLinkClass(active)}
+                      >
+                        <span
+                          className="flex size-5 shrink-0 items-center justify-center rounded-ui bg-surface-2 text-[10px] font-bold text-ink-soft"
+                          aria-hidden="true"
+                        >
+                          {getProjectInitials(project.name)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </nav>
 
