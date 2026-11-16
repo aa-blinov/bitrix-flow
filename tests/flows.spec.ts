@@ -753,6 +753,8 @@ test('событие из очереди портала показывает у�
     for (let attempt = 0; attempt < 8 && !(await notes()).length; attempt++) {
       await db.collection('events_stream').insertOne({
         member_id: token?.member_id,
+        // События чата личные: SSE отдаёт их только своему человеку (в моке это id 1).
+        user_id: '1',
         event: {
           type: 'messenger',
           kind: 'add',

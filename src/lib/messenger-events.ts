@@ -4,12 +4,11 @@
 // и кладёт события в events_stream, откуда их уже раздаёт общий SSE /api/events.
 
 import { bitrixPlainText } from './bitrix-markup';
-import { getProtectedMemberId } from './authorized-member';
 import { parseMessageNodes } from './message-markdown';
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
 import { mentionsUser, pingText } from './ping';
-import { hasSubscriptions, pushConfigured, sendPush } from './push';
+import { pushConfigured, pushPeople, sendPush } from './push';
 
 export type MessengerEvent = {
   type: 'messenger';
@@ -79,9 +78,13 @@ const IDLE_UNSUBSCRIBE_MS = 90_000;
 const MAX_AGE_MS = 2 * 60_000;
 const MUTE_REFRESH_MS = 5 * 60_000;
 
+type Person = { memberId: string; userId: string };
+const personKey = (person: Person) => `${person.memberId}:${person.userId}`;
+
+// Очередь событий у каждого человека своя: подписка, offset, свой id и заглушённые чаты.
+// Читаем её его же токеном, иначе все получали бы события владельца токена портала.
 type State = {
-  timer: NodeJS.Timeout | null;
-  inFlight: boolean;
+  person: Person;
   subscribed: boolean;
   offset: number;
   lastActive: number;
@@ -94,39 +97,63 @@ type State = {
   mutedAt: number;
   mutedGeneration: number;
   seen: string[];
-  /** Есть подписки на пуши: очередь читаем и без открытых вкладок. */
-  pushWanted: boolean;
+};
+
+type Poller = {
+  timer: NodeJS.Timeout | null;
+  inFlight: boolean;
+  states: Map<string, State>;
+  /** Люди с пуш-подписками: их очередь читаем и без открытых вкладок. */
+  pushPeople: Person[];
   pushCheckedAt: number;
   pushGeneration: number;
 };
 
 declare global {
   // eslint-disable-next-line no-var
-  var __messengerEvents: State | undefined;
+  var __messengerPoller: Poller | undefined;
   // eslint-disable-next-line no-var
   var __sseSubscribers: Set<unknown> | undefined;
 }
 
-function getState(): State {
-  return (globalThis.__messengerEvents ??= {
+function poller(): Poller {
+  return (globalThis.__messengerPoller ??= {
     timer: null,
     inFlight: false,
-    subscribed: false,
-    offset: 0,
-    lastActive: 0,
-    lastOkAt: 0,
-    startedAt: 0,
-    lastError: '',
-    me: 0,
-    mutedChats: new Set(),
-    mutedAt: 0,
-    mutedGeneration: 0,
-    seen: [],
-    pushWanted: false,
+    states: new Map(),
+    pushPeople: [],
     pushCheckedAt: 0,
     pushGeneration: 0,
   });
 }
+
+function stateOf(person: Person): State {
+  const states = poller().states;
+  let state = states.get(personKey(person));
+  if (!state) {
+    state = {
+      person,
+      subscribed: false,
+      offset: 0,
+      lastActive: 0,
+      lastOkAt: 0,
+      startedAt: 0,
+      lastError: '',
+      me: Number(person.userId) || 0,
+      mutedChats: new Set(),
+      mutedAt: 0,
+      mutedGeneration: 0,
+      seen: [],
+    };
+    states.set(personKey(person), state);
+  }
+  return state;
+}
+
+type Tab = { memberId?: string; userId?: string; readyAt?: number; alerts?: boolean };
+const tabs = () => [...(globalThis.__sseSubscribers ?? [])] as Tab[];
+const tabsOf = (person: Person) =>
+  tabs().filter((tab) => tab.memberId === person.memberId && tab.userId === person.userId);
 
 // Портал присылает каждое событие дважды (по одному на каждую копию сообщения),
 // поэтому повтор нового сообщения отбрасываем: он звенел бы дважды. Правку и реакцию
@@ -141,7 +168,12 @@ function remember(state: State, keys: string[]) {
   if (state.seen.length > 300) state.seen.splice(0, state.seen.length - 300);
 }
 
-async function refreshMuted(memberId: string, state: State) {
+const as = (state: State, extra: Record<string, unknown> = {}) => ({
+  ...extra,
+  asUser: state.person.userId,
+});
+
+async function refreshMuted(state: State) {
   if (Date.now() - state.mutedAt < MUTE_REFRESH_MS) return;
   // Сбой запроса не делает пустой список актуальным на пять минут: повтор через 15 с.
   state.mutedAt = Date.now() - MUTE_REFRESH_MS + 15_000;
@@ -152,10 +184,10 @@ async function refreshMuted(memberId: string, state: State) {
     const items: any[] = [];
     for (let page = 0; page < 5; page++) {
       const result = await bx24OAuth(
-        memberId,
+        state.person.memberId,
         'im.recent.list',
         { SKIP_OPENLINES: 'Y', LIMIT: '200', OFFSET: String(page * 200) },
-        { parallel: true },
+        as(state, { parallel: true }),
       );
       // Ответ без списка не значит «заглушённых нет»: прежний кэш остаётся.
       if (!Array.isArray(result?.items)) throw new Error('BAD_RECENT_LIST');
@@ -180,19 +212,17 @@ async function refreshMuted(memberId: string, state: State) {
 
 const PUSH_CHECK_MS = 60_000;
 
-async function refreshPushWanted(state: State) {
-  if (!pushConfigured() || Date.now() - state.pushCheckedAt < PUSH_CHECK_MS) return;
-  state.pushCheckedAt = Date.now();
+async function refreshPushPeople(all: Poller) {
+  if (!pushConfigured() || Date.now() - all.pushCheckedAt < PUSH_CHECK_MS) return;
+  all.pushCheckedAt = Date.now();
   // Подписку добавили, пока шла проверка: её ответ устарел, кэш сброшен и перечитается.
-  const generation = state.pushGeneration;
+  const generation = all.pushGeneration;
   // Сбой базы не равен «подписок нет»: остаётся прежнее значение, повтор через 10 с.
   try {
-    const memberId = await getProtectedMemberId();
-    const wanted = memberId ? await hasSubscriptions(memberId) : false;
-    if (generation === state.pushGeneration) state.pushWanted = wanted;
+    const people = await pushPeople();
+    if (generation === all.pushGeneration) all.pushPeople = people;
   } catch (error) {
-    if (generation === state.pushGeneration)
-      state.pushCheckedAt = Date.now() - PUSH_CHECK_MS + 10_000;
+    if (generation === all.pushGeneration) all.pushCheckedAt = Date.now() - PUSH_CHECK_MS + 10_000;
     console.warn('[messenger-events] проверка пуш-подписок', error);
   }
 }
@@ -201,48 +231,50 @@ async function refreshPushWanted(state: State) {
 // пушей пропускала второй тик, два чтения шли с одним offset, а поздняя отписка снимала
 // подписку, которую следующий тик уже успел оформить заново.
 async function tick() {
-  const state = getState();
-  if (state.inFlight) return;
-  state.inFlight = true;
+  const all = poller();
+  if (all.inFlight) return;
+  all.inFlight = true;
   try {
-    await poll(state);
+    await refreshPushPeople(all);
+    const active = new Map<string, Person>();
+    for (const tab of tabs())
+      if (tab.memberId && tab.userId)
+        active.set(`${tab.memberId}:${tab.userId}`, { memberId: tab.memberId, userId: tab.userId });
+    for (const person of all.pushPeople) active.set(personKey(person), person);
+    // Людей опрашиваем по очереди: проход короткий, а очередь каждого читает один читатель.
+    for (const person of active.values()) await poll(stateOf(person));
+    for (const [key, state] of all.states) if (!active.has(key)) await idle(state);
   } finally {
-    state.inFlight = false;
+    all.inFlight = false;
   }
 }
 
+// Без вкладок и пушей очередь не читаем, а подписку снимаем: иначе портал копил бы
+// события до суток. Вкладка могла подключиться за время прохода: проверяем заново.
+async function idle(state: State) {
+  if (!state.subscribed || Date.now() - state.lastActive <= IDLE_UNSUBSCRIBE_MS) return;
+  if (tabsOf(state.person).length) return;
+  await bx24OAuth(
+    state.person.memberId,
+    'im.v2.Event.unsubscribe',
+    {},
+    as(state, { json: true }),
+  ).catch(() => {});
+  state.subscribed = false;
+  state.offset = 0;
+}
+
 async function poll(state: State) {
-  const clients = globalThis.__sseSubscribers?.size ?? 0;
-  // Отсчёт для health до первого await: зависшая проверка пушей тоже должна быть видна.
-  if (clients && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) state.startedAt = Date.now();
-  await refreshPushWanted(state);
-  if (!clients && !state.pushWanted) {
-    // Вкладка могла подключиться, пока проверяли пуши: перед отпиской смотрим заново.
-    const now = globalThis.__sseSubscribers?.size ?? 0;
-    if (!now && state.subscribed && Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) {
-      const memberId = await getProtectedMemberId().catch(() => null);
-      if (memberId)
-        await bx24OAuth(memberId, 'im.v2.Event.unsubscribe', {}, { json: true }).catch(() => {});
-      state.subscribed = false;
-      state.offset = 0;
-    }
-    return;
-  }
+  const { memberId, userId } = state.person;
   // Простой кончился: отсчёт для health начинается заново, а не с прошлого успеха.
   if (Date.now() - state.lastActive > IDLE_UNSUBSCRIBE_MS) state.startedAt = Date.now();
   state.lastActive = Date.now();
   try {
-    const memberId = await getProtectedMemberId();
-    if (!memberId) return;
     if (!state.subscribed) {
-      await bx24OAuth(memberId, 'im.v2.Event.subscribe', {}, { json: true });
-      const me = await bx24OAuth(memberId, 'user.current', {}, { parallel: true });
-      // Без своего id нельзя отличить свои сообщения и заглушённые чаты: проход не готов.
-      if (!(Number(me?.ID) > 0)) throw new Error('BAD_CURRENT_USER');
-      state.me = Number(me.ID);
+      await bx24OAuth(memberId, 'im.v2.Event.subscribe', {}, as(state, { json: true }));
       state.subscribed = true;
     }
-    await refreshMuted(memberId, state);
+    await refreshMuted(state);
 
     const db = await getDb();
     for (let page = 0; page < 5; page++) {
@@ -250,7 +282,7 @@ async function poll(state: State) {
         memberId,
         'im.v2.Event.get',
         { limit: 100, ...(state.offset ? { offset: state.offset } : {}) },
-        { json: true },
+        as(state, { json: true }),
       );
       // Ответ без массива событий не пустая страница: подтверждать его offset нельзя.
       if (!Array.isArray(result?.events)) throw new Error('BAD_EVENT_PAGE');
@@ -265,7 +297,8 @@ async function poll(state: State) {
         // Старое событие (после сбоя или перезапуска) всё равно раздаём: вкладки по нему
         // обновят данные. Не звенят о нём и не шлют пуш.
         if (Date.now() - Date.parse(event.at) > MAX_AGE_MS) event.stale = true;
-        docs.push({ member_id: memberId, event, created_at: new Date() });
+        // user_id: событие видит только этот человек, а не все вкладки портала.
+        docs.push({ member_id: memberId, user_id: userId, event, created_at: new Date() });
       }
       // Сначала запись, потом подтверждение: следующий запрос с offset удаляет события на
       // портале, и при сбое записи страница пропала бы. Без нового offset портал отдаст
@@ -274,32 +307,29 @@ async function poll(state: State) {
       if (docs.length) await db.collection('events_stream').insertMany(docs);
       remember(state, keys);
       if (Number(result?.nextOffset)) state.offset = Number(result.nextOffset);
-      // Открытая вкладка сама покажет уведомление; пуш нужен, когда вкладок нет.
-      // Пуш не нужен, только если событие точно покажет вкладка: она с уведомлениями и
-      // подключилась до записи (иначе её курсор уже за этим событием). Вкладок могло и не
-      // стать за время запроса к порталу, поэтому считаем заново.
-      const tabs = [...(globalThis.__sseSubscribers ?? [])].filter((raw) => {
-        const tab = raw as { readyAt?: number; alerts?: boolean };
-        return tab.alerts && (tab.readyAt ?? 0) < insertedAt;
-      }).length;
+      // Пуш не нужен, только если событие точно покажет вкладка этого человека: она с
+      // уведомлениями и подключилась до записи (иначе её курсор уже за этим событием).
+      const showing = tabsOf(state.person).filter(
+        (tab) => tab.alerts && (tab.readyAt ?? 0) < insertedAt,
+      ).length;
       for (const { event } of docs)
-        if (!tabs && event.kind === 'add' && event.authorId !== state.me)
+        if (!showing && event.kind === 'add' && event.authorId !== state.me)
           if ((!event.muted || event.mentioned) && !event.stale)
             // Сбой пуша (в том числе базы подписок) не должен ронять процесс.
-            void pushEvent(memberId, event).catch((error) => console.warn('[push]', error));
+            void pushEvent(state.person, event).catch((error) => console.warn('[push]', error));
       if (!result?.hasMore) break;
     }
     state.lastOkAt = Date.now();
     state.lastError = '';
   } catch (error) {
     state.lastError = error instanceof Error ? error.message : String(error);
-    console.warn('[messenger-events]', state.lastError);
+    console.warn('[messenger-events]', userId, state.lastError);
   }
 }
 
-function pushEvent(memberId: string, event: MessengerEvent) {
+function pushEvent(person: Person, event: MessengerEvent) {
   const { title, body } = pingText(event, { mention: 'Вас упомянули:', message: 'Сообщение' });
-  return sendPush(memberId, {
+  return sendPush(person.memberId, person.userId, {
     title,
     body,
     tag: `chat-${event.dialogId}`,
@@ -308,36 +338,48 @@ function pushEvent(memberId: string, event: MessengerEvent) {
   });
 }
 
-// Для /api/health: опрос живой, если есть открытые вкладки и последний проход был недавно.
+// Для /api/health: опрос живой, если у каждого, кому он нужен, последний проход был недавно.
+// Отдаём худшего: один сломанный токен человека тоже должен быть виден.
 export function getMessengerEventsHealth() {
-  const { lastOkAt, startedAt, lastError, pushWanted } = getState();
+  const all = poller();
+  const needed = new Set([
+    ...tabs()
+      .filter((tab) => tab.memberId && tab.userId)
+      .map((tab) => `${tab.memberId}:${tab.userId}`),
+    ...all.pushPeople.map(personKey),
+  ]);
+  let worst = { lastOkAt: Infinity, lastError: '' };
+  for (const key of needed) {
+    const state = all.states.get(key);
+    const okAt = state ? Math.max(state.lastOkAt, state.startedAt) : 0;
+    if (okAt < worst.lastOkAt) worst = { lastOkAt: okAt, lastError: state?.lastError || '' };
+  }
   return {
-    // Нужен, когда есть вкладки или пуши. Не только subscribed: если подписка падает с
-    // самого начала, subscribed так и не станет true, а сбой должен быть виден.
-    active: (globalThis.__sseSubscribers?.size ?? 0) > 0 || pushWanted,
-    lastOkAt: Math.max(lastOkAt, startedAt),
-    lastError,
+    active: needed.size > 0,
+    lastOkAt: needed.size ? worst.lastOkAt : 0,
+    lastError: worst.lastError,
   };
 }
 
 /** Звук чата переключили: список заглушённых перечитывается на следующем проходе. */
-export function invalidateMuted() {
-  const state = getState();
+export function invalidateMuted(memberId: string, userId: string) {
+  const state = poller().states.get(`${memberId}:${userId}`);
+  if (!state) return;
   state.mutedAt = 0;
   state.mutedGeneration += 1;
 }
 
 /** Подписку на пуш добавили или убрали: поллер узнает об этом на следующем проходе. */
 export function invalidatePushWanted() {
-  const state = getState();
-  state.pushCheckedAt = 0;
-  state.pushGeneration += 1;
+  const all = poller();
+  all.pushCheckedAt = 0;
+  all.pushGeneration += 1;
 }
 
 export function startMessengerEvents() {
   // В mock-режиме портала нет, а UI-тесты событий не ждут.
   if (process.env.MOCK_B24 === '1') return;
-  const state = getState();
-  if (state.timer) return;
-  state.timer = setInterval(() => void tick(), POLL_MS);
+  const all = poller();
+  if (all.timer) return;
+  all.timer = setInterval(() => void tick(), POLL_MS);
 }

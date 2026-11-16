@@ -12,6 +12,7 @@
 
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
+import { findPersonToken } from './people';
 
 const STORAGE_SCAN_LIMIT = 64;
 const SCAN_BATCH = 8;
@@ -55,18 +56,17 @@ async function bitrixGet(
 // Личная папка пользователя — туда можно класть файл, который потом
 // привязывается к задаче. Идентификатор хранилища пользователя не совпадает
 // с его id, поэтому ищем его перебором и запоминаем найденное.
-export async function resolveUploadFolder(memberId: string): Promise<string> {
+// Папка у каждого своя: файл грузит тот, кто его прикрепляет, его токеном и в его диск.
+export async function resolveUploadFolder(memberId: string, userId: string): Promise<string> {
   const db = await getDb();
-  const cached = await db.collection('upload_folders').findOne({ member_id: memberId });
+  const cached = await db
+    .collection('upload_folders')
+    .findOne({ member_id: memberId, user_id: userId });
   if (cached?.folder_id) return String(cached.folder_id);
 
-  const token = await db.collection('user_tokens').findOne({ member_id: memberId });
+  const token = await findPersonToken(memberId, userId);
   if (!token) throw new Error('Нет токена для пользователя');
   const domain = token.domain || 'eora.bitrix24.ru';
-
-  const current = await bitrixGet(domain, token.access_token, 'user.current', {});
-  const userId = String(current?.ID ?? current?.result?.ID ?? '');
-  if (!userId) throw new Error('Не удалось определить пользователя портала');
 
   // Перебор идёт небольшими батчами: портал не любит одновременных
   // запросов и часть из них остаётся без ответа.
@@ -94,7 +94,7 @@ export async function resolveUploadFolder(memberId: string): Promise<string> {
   await db
     .collection('upload_folders')
     .updateOne(
-      { member_id: memberId },
+      { member_id: memberId, user_id: userId },
       { $set: { folder_id: folderId, updated_at: new Date() } },
       { upsert: true },
     );
@@ -103,17 +103,24 @@ export async function resolveUploadFolder(memberId: string): Promise<string> {
 
 export async function uploadAndAttachTaskFile(
   memberId: string,
+  userId: string,
   taskId: string,
   file: { name: string; content: Buffer },
 ): Promise<{ id: string; name: string; size: number }> {
-  const folderId = await resolveUploadFolder(memberId);
+  const folderId = await resolveUploadFolder(memberId, userId);
+  const as = { asUser: userId };
 
   // 1. Адрес загрузки в папке пользователя.
-  const upload = await bx24OAuth(memberId, 'disk.folder.uploadfile', {
-    id: folderId,
-    name: file.name,
-    data: file.content.toString('base64'),
-  });
+  const upload = await bx24OAuth(
+    memberId,
+    'disk.folder.uploadfile',
+    {
+      id: folderId,
+      name: file.name,
+      data: file.content.toString('base64'),
+    },
+    as,
+  );
   const uploadUrl = upload?.uploadUrl;
   if (!uploadUrl) throw new Error('Портал не выдал адрес загрузки');
 
@@ -143,15 +150,15 @@ export async function uploadAndAttachTaskFile(
       memberId,
       'tasks.task.file.attach',
       { taskId: Number(taskId), fileIds: [Number(fileId)] },
-      { v3: true, json: true },
+      { v3: true, json: true, ...as },
     );
   } catch (error) {
-    await bx24OAuth(memberId, 'disk.file.delete', { id: fileId }).catch(() => {});
+    await bx24OAuth(memberId, 'disk.file.delete', { id: fileId }, as).catch(() => {});
     throw error;
   }
 
   // 4. Исходник удаляем: копия уже лежит в хранилище задачи.
-  await bx24OAuth(memberId, 'disk.file.delete', { id: fileId }).catch(() => {});
+  await bx24OAuth(memberId, 'disk.file.delete', { id: fileId }, as).catch(() => {});
 
   return { id: fileId, name: file.name, size: file.content.length };
 }

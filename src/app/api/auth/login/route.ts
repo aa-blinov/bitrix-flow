@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession, sessionCookie } from '@/lib/session';
-import { createStoredSession } from '@/lib/session-store';
+import { safeNext, startSession } from '@/lib/login-cookie';
 import { verifyPassword } from '@/lib/password';
 import { bootstrapAdmin, findUserByName, markLogin, normalizeUsername } from '@/lib/users';
 
@@ -54,8 +53,9 @@ export async function POST(request: NextRequest) {
   const user = username ? await findUserByName(username) : null;
   // Пароль проверяется и для несуществующего логина (см. verifyPassword), чтобы ответ не
   // выдавал, есть ли такая запись.
-  const passwordOk = await verifyPassword(password, user?.password_hash);
-  if (!user || !passwordOk) {
+  // Учётка, созданная входом через Битрикс, пароля не имеет: по паролю в неё не войти.
+  const passwordOk = await verifyPassword(password, user?.password_hash || undefined);
+  if (!user || !user.password_hash || !passwordOk) {
     attempt.count += 1;
     byName.count += 1;
     return NextResponse.json({ error: 'INVALID_CREDENTIALS' }, { status: 401 });
@@ -66,32 +66,6 @@ export async function POST(request: NextRequest) {
   attempts.delete(ip);
   attempts.delete(`user:${username}`);
   await markLogin(user._id);
-  const session = await createSession();
-  await createStoredSession(session, request.headers.get('user-agent'), String(user._id));
   const response = NextResponse.json({ ok: true, next: safeNext(body?.next) });
-  response.cookies.set({
-    ...sessionCookie,
-    value: session,
-    httpOnly: true,
-    sameSite: 'lax',
-    // Кука без Secure уедет и по http, поэтому в проде она всегда Secure.
-    // Исключение — локальный адрес: браузер не примет Secure-куку по http,
-    // и UI-тесты на 127.0.0.1 не смогли бы войти.
-    secure: isSecureOrigin(),
-    path: '/',
-  });
-  return response;
-}
-
-function isSecureOrigin(): boolean {
-  const appUrl = process.env.BITRIX24_APP_URL || '';
-  if (appUrl.startsWith('https://')) return true;
-  if (/^https?:\/\/(127\.0\.0\.1|localhost)/.test(appUrl)) return false;
-  return process.env.NODE_ENV === 'production';
-}
-
-function safeNext(value: unknown): string {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
-    ? value
-    : '/';
+  return startSession(response, String(user._id), request.headers.get('user-agent'));
 }

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!DIALOG_ID.test(dialogId) || !(ACTIONS as readonly string[]).includes(action))
     return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 });
 
-  return withMessenger(req, async (call) => {
+  return withMessenger(req, async (call, memberId, userId) => {
     const result =
       action === 'pin' || action === 'unpin'
         ? await call(
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Без подтверждения портала 502: клиент перечитает список, а не покажет успех.
     if (!result) return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
     // Иначе поллер ещё до пяти минут звенел бы по заглушённому чату.
-    if (action === 'mute' || action === 'unmute') invalidateMuted();
+    if (action === 'mute' || action === 'unmute') invalidateMuted(memberId, userId);
     return NextResponse.json({ ok: true });
   });
 }

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongo';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
 
 type Subscriber = {
   memberId: string;
+  /** Чья вкладка: события его переписки уходят только ему. */
+  userId: string;
   /** Курсор подписчика: до какого события ему уже отдали. */
   lastSentId: ObjectId | null;
   /** Когда курсор вкладки зафиксирован: событие, записанное раньше, ей не дойдёт. */
@@ -30,12 +32,18 @@ let pump: NodeJS.Timeout | null = null;
 const RESUME_WINDOW_MS = 5 * 60_000;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
-async function queryEvents(memberId: string, after: ObjectId | null) {
+// События задач общие на портал (без user_id), события чата личные (с user_id своего человека).
+async function queryEvents(memberId: string, userId: string, after: ObjectId | null) {
   const db = await getDb();
   return db
     .collection('events_stream')
     .find({
       member_id: memberId,
+      // Старые события чата без user_id (до токенов по людям) не отдаём никому.
+      $or: [
+        { user_id: { $exists: false }, 'event.type': { $ne: 'messenger' } },
+        { user_id: userId },
+      ],
       ...(after ? { _id: { $gt: after } } : {}),
     })
     .limit(50)
@@ -48,12 +56,14 @@ async function queryEvents(memberId: string, after: ObjectId | null) {
 async function pumpOnce() {
   const byMember = new Map<string, Subscriber[]>();
   for (const subscriber of subscribers) {
-    const list = byMember.get(subscriber.memberId) || [];
+    const key = `${subscriber.memberId}:${subscriber.userId}`;
+    const list = byMember.get(key) || [];
     list.push(subscriber);
-    byMember.set(subscriber.memberId, list);
+    byMember.set(key, list);
   }
 
-  for (const [memberId, list] of byMember) {
+  for (const list of byMember.values()) {
+    const { memberId, userId } = list[0];
     let oldest: ObjectId | null = null;
     for (const subscriber of list) {
       if (!subscriber.lastSentId) {
@@ -64,7 +74,7 @@ async function pumpOnce() {
     }
     let events: Awaited<ReturnType<typeof queryEvents>> = [];
     try {
-      events = await queryEvents(memberId, oldest);
+      events = await queryEvents(memberId, userId, oldest);
     } catch (error) {
       console.error('SSE poll error:', error);
       continue;
@@ -100,8 +110,9 @@ function ensurePump() {
 }
 
 export async function GET(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return new Response('Unauthorized', { status: 401 });
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return new Response('Unauthorized', { status: 401 });
+  const { memberId, userId } = person;
 
   const encoder = new TextEncoder();
 
@@ -145,6 +156,7 @@ export async function GET(req: NextRequest) {
       if (closed) return;
       subscriber = {
         memberId,
+        userId,
         lastSentId,
         readyAt: Date.now(),
         alerts: req.nextUrl.searchParams.get('alerts') === '1',

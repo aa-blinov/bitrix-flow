@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { digestEnabled, sendDigest } from '@/lib/digest';
 import { sessionCookie } from '@/lib/session';
 
@@ -8,7 +8,11 @@ export const dynamic = 'force-dynamic';
 // Отправить недельную сводку сейчас, чтобы проверить каналы. Адресаты только из окружения:
 // клиент не выбирает, куда писать от имени владельца токена.
 export async function POST(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  // Действие идёт токеном портала, то есть от его владельца: только администратору.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (person && person.user.role !== 'admin')
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  const memberId = person?.memberId;
   if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
   if (!digestEnabled())
     return NextResponse.json({ error: 'DIGEST_NOT_CONFIGURED' }, { status: 409 });

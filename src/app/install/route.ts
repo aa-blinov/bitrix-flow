@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
+import { getProtectedMemberId } from '@/lib/portal';
 
 const APP_URL = process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org';
 
@@ -18,6 +19,13 @@ export async function GET(req: NextRequest) {
 
   // Если есть auth - сохраняем и редиректим в приложение
   if (member_id && auth) {
+    // Адрес публичный: после первой установки он ничего не пишет. Иначе запрос со своим
+    // member_id подменил бы портал приложения (берётся самый свежий токен), а с чужим
+    // AUTH испортил бы токен фоновой синхронизации. Переустановка идёт через OAuth.
+    if (await getProtectedMemberId())
+      return NextResponse.redirect(
+        `${process.env.BITRIX24_APP_URL || 'https://bitrix-flow.duckdns.org'}/`,
+      );
     try {
       const db = await getDb();
       const realDomain = domain && !domain.includes('bitrix.info') ? domain : 'eora.bitrix24.ru';

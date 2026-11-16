@@ -4,7 +4,7 @@
 // копию в хранилище задачи; исходник после этого удаляется.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { uploadAndAttachTaskFile } from '@/lib/disk-upload';
 
@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic';
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const { memberId, userId } = person;
 
   let form: FormData;
   try {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await uploadAndAttachTaskFile(memberId, taskId, {
+    const result = await uploadAndAttachTaskFile(memberId, userId, taskId, {
       name: file.name,
       content: Buffer.from(await file.arrayBuffer()),
     });

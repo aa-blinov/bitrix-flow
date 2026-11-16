@@ -3,7 +3,8 @@ import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { bitrixErrorMessage, getPayload } from '@/lib/bitrix-payload';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
+import { findPersonToken } from '@/lib/people';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 
@@ -365,9 +366,12 @@ async function handleRequest(req: NextRequest, method: string) {
     return NextResponse.json({ result });
   }
 
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  // Правки и чтения идут токеном вошедшего человека: в Битриксе они должны быть от него,
+  // а не от владельца токена портала.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  const memberId = person?.memberId;
 
-  if (!memberId) {
+  if (!person || !memberId) {
     return NextResponse.json(
       {
         error: 'AUTHORIZATION_REQUIRED',
@@ -397,7 +401,7 @@ async function handleRequest(req: NextRequest, method: string) {
   let token;
   try {
     const db = await getDb();
-    token = await db.collection('user_tokens').findOne({ member_id: memberId });
+    token = await findPersonToken(memberId, person.userId);
   } catch (err: any) {
     return NextResponse.json({ error: 'MONGO_ERROR', message: err.message }, { status: 500 });
   }
@@ -442,7 +446,8 @@ async function handleRequest(req: NextRequest, method: string) {
       if (cached) {
         result = cached;
       } else {
-        const cacheKey = `${memberId}:${method}:${JSON.stringify(params)}`;
+        // У каждого свой ответ: user.current и права на задачи зависят от человека.
+        const cacheKey = `${memberId}:${person.userId}:${method}:${JSON.stringify(params)}`;
         result = await serverCache(
           cacheKey,
           async () => {
@@ -604,17 +609,22 @@ async function refreshToken(token: any): Promise<string | null> {
     if (data.error) return null;
 
     const db = await getDb();
-    await db.collection('user_tokens').updateOne(
-      { member_id: token.member_id },
-      {
-        $set: {
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          expires_in: data.expires_in,
-          updated_at: new Date(),
+    // Токен человека обновляется в его записи, токен портала в своей.
+    await db
+      .collection(token.user_id ? 'person_tokens' : 'user_tokens')
+      .updateOne(
+        token.user_id
+          ? { member_id: token.member_id, user_id: token.user_id }
+          : { member_id: token.member_id },
+        {
+          $set: {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expires_in: data.expires_in,
+            updated_at: new Date(),
+          },
         },
-      },
-    );
+      );
 
     // Очищаем кеш чтобы перезагрузить
     invalidateByPrefix(token.member_id);

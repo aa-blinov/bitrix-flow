@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bx24OAuth } from '@/lib/oauth-client';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 
 // Регистрирует обработчик событий в Битрикс24
 // Вызывается один раз после OAuth авторизации
 export async function POST(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  // Действие идёт токеном портала, то есть от его владельца: только администратору.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (person && person.user.role !== 'admin')
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  const memberId = person?.memberId;
   if (!memberId) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
   // Never allow a request to turn the app into an event forwarder to an
   // attacker-controlled URL. The registered target is this application only.
@@ -36,7 +40,11 @@ export async function POST(req: NextRequest) {
 
 // Получить список зарегистрированных обработчиков
 export async function GET(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  // Действие идёт токеном портала, то есть от его владельца: только администратору.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (person && person.user.role !== 'admin')
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  const memberId = person?.memberId;
   if (!memberId) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
 
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { getDb } from '@/lib/mongo';
@@ -27,10 +27,13 @@ export async function withMessenger(
       json?: boolean,
     ) => Promise<any>,
     memberId: string,
+    userId: string,
   ) => Promise<NextResponse>,
 ): Promise<NextResponse> {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
+  // Мессенджер это личная переписка: только токен самого человека, никогда портала.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
+  const { memberId } = person;
 
   const call = async (
     method: string,
@@ -41,11 +44,15 @@ export async function withMessenger(
     if (isMockEnabled()) return mockHandle(method, params as Record<string, string>);
     // Повтор POST отправил бы сообщение дважды, поэтому гонка адресов только на чтении.
     // json нужен методам im.v2.*: вложенные fields форма передать не может.
-    return bx24OAuth(memberId, method, params, { parallel: !mutation, json });
+    return bx24OAuth(memberId, method, params, {
+      parallel: !mutation,
+      json,
+      asUser: person.userId,
+    });
   };
 
   try {
-    return await run(call, memberId);
+    return await run(call, memberId, person.userId);
   } catch (error) {
     console.error('[messenger]', error);
     return NextResponse.json(

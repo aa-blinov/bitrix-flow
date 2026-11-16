@@ -3,7 +3,8 @@ import { usableAvatar } from '@/lib/utils';
 import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
+import { bx24OAuth } from '@/lib/oauth-client';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 
@@ -40,9 +41,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  const memberId = person?.memberId;
 
-  if (!memberId) {
+  if (!person || !memberId) {
     return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
   }
 
@@ -82,9 +84,10 @@ export async function GET(req: NextRequest) {
         () => callBitrix24(token, 'user.get', { ACTIVE: 'true' }),
         PROJECTS_TTL,
       ),
+      // «Я» это вошедший человек, а не владелец токена портала: его токеном и в его ключ кэша.
       serverCache(
-        `${memberId}:user:current`,
-        () => callBitrix24(token, 'user.current', {}),
+        `${memberId}:user:current:${person.userId}`,
+        () => bx24OAuth(memberId, 'user.current', {}, { parallel: true, asUser: person.userId }),
         PROJECTS_TTL,
       ),
     ]);

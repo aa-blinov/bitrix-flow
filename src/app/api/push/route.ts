@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { invalidatePushWanted } from '@/lib/messenger-events';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { pushConfigured, removeSubscription, saveSubscription, vapidPublicKey } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
+// Подписка принадлежит человеку: пуши о его переписке не уходят на чужие устройства.
 const member = (req: NextRequest) =>
-  getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
 
 // Публичный ключ нужен браузеру, чтобы оформить подписку.
 export async function GET(req: NextRequest) {
@@ -18,10 +19,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const memberId = await member(req);
-  if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
+  const person = await member(req);
+  if (!person) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
   const body = await req.json().catch(() => null);
-  const saved = await saveSubscription(memberId, body?.subscription ?? {});
+  const saved = await saveSubscription(person.memberId, person.userId, body?.subscription ?? {});
   // Вкладку могут закрыть сразу после включения: поллер не ждёт минуту до перепроверки.
   invalidatePushWanted();
   return saved
@@ -30,10 +31,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const memberId = await member(req);
-  if (!memberId) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
+  const person = await member(req);
+  if (!person) return NextResponse.json({ error: 'MEMBER_ID_REQUIRED' }, { status: 401 });
   const body = await req.json().catch(() => null);
-  if (typeof body?.endpoint === 'string') await removeSubscription(memberId, body.endpoint);
+  if (typeof body?.endpoint === 'string')
+    await removeSubscription(person.memberId, person.userId, body.endpoint);
   invalidatePushWanted();
   return NextResponse.json({ ok: true });
 }

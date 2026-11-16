@@ -15,6 +15,11 @@ export type AppUser = {
   blocked: boolean;
   created_at: Date;
   last_login_at?: Date;
+  /** Привязка к пользователю Битрикса: от его имени идут записи и мессенджер. */
+  bitrix_member_id?: string;
+  bitrix_user_id?: string;
+  /** Имя из Битрикса, для списка учётных записей. */
+  display_name?: string;
 };
 
 export type PublicUser = {
@@ -24,6 +29,8 @@ export type PublicUser = {
   blocked: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  bitrixUserId: string | null;
+  displayName: string | null;
 };
 
 const USERNAME = /^[a-z0-9][a-z0-9._@-]{1,63}$/;
@@ -47,6 +54,8 @@ export const toPublic = (user: AppUser): PublicUser => ({
   blocked: user.blocked,
   createdAt: user.created_at.toISOString(),
   lastLoginAt: user.last_login_at ? user.last_login_at.toISOString() : null,
+  bitrixUserId: user.bitrix_user_id || null,
+  displayName: user.display_name || null,
 });
 
 async function users() {
@@ -150,4 +159,62 @@ export async function audit(actor: string, action: string, target: string) {
     .insertOne({ actor, action, target, at: new Date() })
     .catch(() => {});
   console.info('[audit]', actor, action, target);
+}
+
+/**
+ * Учётка для входа через Битрикс. Порядок: уже привязанная к этому человеку; учётка, под
+ * которой сейчас вошли паролем (привязка из профиля); для владельца токена портала его
+ * прежняя админская учётка, чтобы не потерять права; иначе новая с ролью user. Кого вообще
+ * пускать, решают права приложения в самом Битриксе: OAuth пройдёт только тот, кому портал
+ * дал доступ к приложению, а заблокировать человека можно здесь же, в учётных записях.
+ */
+export async function accountForBitrix(input: {
+  memberId: string;
+  userId: string;
+  name: string;
+  portalOwner: boolean;
+  current: AppUser | null;
+}): Promise<AppUser | { error: 'ALREADY_LINKED' }> {
+  const collection = await users();
+  const link = { bitrix_member_id: input.memberId, bitrix_user_id: input.userId };
+  const linked = await collection.findOne(link);
+  if (input.current && !input.current.bitrix_user_id) {
+    if (linked && String(linked._id) !== String(input.current._id))
+      return { error: 'ALREADY_LINKED' };
+    await collection.updateOne(
+      { _id: input.current._id },
+      { $set: { ...link, display_name: input.name } },
+    );
+    return { ...input.current, ...link, display_name: input.name };
+  }
+  if (linked) {
+    await collection.updateOne({ _id: linked._id }, { $set: { display_name: input.name } });
+    return { ...linked, display_name: input.name };
+  }
+  if (input.portalOwner) {
+    const admin = await collection.findOne(
+      { role: 'admin', bitrix_user_id: { $exists: false } },
+      { sort: { created_at: 1 } },
+    );
+    if (admin) {
+      await collection.updateOne(
+        { _id: admin._id },
+        { $set: { ...link, display_name: input.name } },
+      );
+      return { ...admin, ...link, display_name: input.name };
+    }
+  }
+  const user: AppUser = {
+    _id: new ObjectId(),
+    username: `b24-${input.userId}`,
+    // Пароля нет: такая учётка входит только через Битрикс.
+    password_hash: '',
+    role: input.portalOwner ? 'admin' : 'user',
+    blocked: false,
+    created_at: new Date(),
+    ...link,
+    display_name: input.name,
+  };
+  await collection.insertOne(user);
+  return user;
 }

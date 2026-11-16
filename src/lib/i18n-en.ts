@@ -468,6 +468,25 @@ export const EN: Record<string, string> = {
   Переподключить: 'Reconnect',
   Переработка: 'Overtime',
   'Переслано в «{0}»': 'Forwarded to "{0}"',
+  'Битрикс: #{0}': 'Bitrix: #{0}',
+  'Битрикс не подключён': 'Bitrix not connected',
+  'Войти через Битрикс': 'Sign in with Bitrix',
+  'Или по паролю учётной записи. Данные откроются после подключения Битрикса.':
+    'Or with the account password. Data opens once Bitrix is connected.',
+  'Этот аккаунт Битрикса с другого портала. Войдите аккаунтом своей компании.':
+    'This Bitrix account belongs to another portal. Sign in with your company account.',
+  'Этот аккаунт Битрикса уже привязан к другой учётной записи.':
+    'This Bitrix account is already linked to another account.',
+  'Вход через Битрикс не настроен на сервере.':
+    'Sign-in with Bitrix is not configured on the server.',
+  'Битрикс не подтвердил вход. Попробуйте ещё раз.':
+    'Bitrix did not confirm the sign-in. Try again.',
+  'Подключите Битрикс': 'Connect Bitrix',
+  'Задачи, отчёты и сообщения открываются от имени вашего аккаунта Битрикса. Подключите его один раз, дальше вход будет через Битрикс.':
+    'Tasks, reports and messages open as your Bitrix account. Connect it once, then sign in with Bitrix.',
+  'Подключить Битрикс': 'Connect Bitrix',
+  'Вход прервался. Нажмите «Войти через Битрикс» ещё раз.':
+    'Sign-in was interrupted. Press "Sign in with Bitrix" again.',
   'Не удалось узнать, удалилось ли сообщение. Проверьте переписку.':
     'Could not confirm the message was deleted. Check the conversation.',
   'Не удалось узнать, сохранилась ли правка. Проверьте сообщение в переписке.':

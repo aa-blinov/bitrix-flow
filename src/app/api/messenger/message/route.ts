@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest) {
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
   if (!valid) return badRequest('BAD_MESSAGE_ID');
   if (!text || text.length > MAX_TEXT) return badRequest('BAD_TEXT');
-  return withMessenger(req, async (call, memberId) => {
+  return withMessenger(req, async (call, memberId, userId) => {
     confirmed(await call('im.message.update', { MESSAGE_ID: messageId, MESSAGE: text }, true));
     // Правку через im.message.update портал в очередь событий не кладёт (так в документации
     // im.v2), поэтому другие вкладки видели её только при полном перечитывании раз в две
@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest) {
           await getDb()
         )
           .collection('events_stream')
-          .insertOne({ member_id: memberId, event, created_at: new Date() });
+          .insertOne({ member_id: memberId, user_id: userId, event, created_at: new Date() });
       } catch (error) {
         console.warn('[messenger] событие правки не записано', error);
       }

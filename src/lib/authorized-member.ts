@@ -1,38 +1,17 @@
-import { getDb } from '@/lib/mongo';
-import { hasActiveStoredSessionById } from '@/lib/session-store';
-import { getSessionId } from '@/lib/session';
+import { getSessionPerson, type Person } from '@/lib/people';
+
+export { getProtectedMemberId } from '@/lib/portal';
 
 /**
- * This installation deliberately supports one protected portal.  The browser
- * must never be allowed to select an arbitrary OAuth record with a header or
- * query parameter: that would make it an IDOR as soon as a second portal is
- * present in the database.
+ * Портал вошедшего человека, если его учётка привязана к Битриксу этого портала.
+ * Без привязки null: данные закрыты целиком, как решено для входа через Битрикс,
+ * а не отдаются через токен портала от имени его владельца.
  */
 export async function getAuthorizedMemberId(session?: string): Promise<string | null> {
-  // Подпись проверяется всегда, запись в sessions — тоже. Раньше запись
-  // воссоздавалась на лету по живой куке: выход из системы переставал что-либо
-  // отзывать, и украденная кука работала все восемь часов до истечения.
-  const sessionId = await getSessionId(session);
-  if (!sessionId) return null;
-  const active = await hasActiveStoredSessionById(sessionId);
-  if (!active) return null;
-  return getProtectedMemberId();
+  return (await getSessionPerson(session))?.memberId ?? null;
 }
 
-/**
- * Владелец токена защищённого портала. Фоновым задачам (поллер событий чата)
- * сессия не нужна, но выбор токена должен быть тем же, что у запросов.
- */
-export async function getProtectedMemberId(): Promise<string | null> {
-  const db = await getDb();
-  const token = await db
-    .collection('user_tokens')
-    .find({
-      access_token: { $type: 'string', $ne: '' },
-      domain: { $type: 'string', $not: /^oauth\./ },
-    })
-    .sort({ updated_at: -1, installed_at: -1, _id: -1 })
-    .limit(1)
-    .next();
-  return token?.member_id ? String(token.member_id) : null;
+/** Кто действует: портал и пользователь Битрикса. Записи и мессенджер идут его токеном. */
+export async function getAuthorizedPerson(session?: string): Promise<Person | null> {
+  return getSessionPerson(session);
 }

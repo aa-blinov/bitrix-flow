@@ -4,7 +4,7 @@
 // DOWNLOAD_URL через disk.file.get (он подписан токеном) и стримим сами.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { getBitrixFileStream } from '@/lib/bitrix-request';
@@ -13,8 +13,11 @@ import { fileResponse } from '@/lib/file-response';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  // Файл скачивается правами самого человека: токеном портала любой перебором id достал бы
+  // файлы владельца токена, в том числе его личный диск.
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const { memberId } = person;
 
   const { id } = await context.params;
   if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'INVALID_ID' }, { status: 400 });
@@ -27,7 +30,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   let downloadUrl: string | undefined;
   let name = 'file';
   try {
-    const file = await bx24OAuth(memberId, method, { id });
+    const file = await bx24OAuth(memberId, method, { id }, { asUser: person.userId });
     const result = file?.result || file;
     downloadUrl = result?.DOWNLOAD_URL;
     name = result?.NAME || name;

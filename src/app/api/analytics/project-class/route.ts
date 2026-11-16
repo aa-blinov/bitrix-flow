@@ -2,7 +2,7 @@
 // словах группы, как и класс задачи: своей разметки у приложения нет. Копия в projects
 // обновляется тут же, иначе аналитика увидела бы класс только после прогрева /api/dashboard.
 import { NextRequest, NextResponse, after } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { HOUR_CLASSES, projectHourClass, withProjectClass, type HourClass } from '@/lib/hour-class';
 import { isMockEnabled } from '@/lib/mock-b24';
 import { getDb } from '@/lib/mongo';
@@ -14,8 +14,12 @@ import { sessionCookie } from '@/lib/session';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const { memberId } = person;
+  // Класс проекта меняет сам человек, и портал проверяет его права на группу. Раскладка
+  // тегов по задачам после этого идёт фоном токеном портала, как тегирование новых задач.
+  const as = { asUser: person.userId };
 
   const body = await req.json().catch(() => ({}));
   const projectId = String(body.projectId || '');
@@ -36,9 +40,12 @@ export async function POST(req: NextRequest) {
     } else {
       // Ключевые слова перечитываем из портала: копия в базе могла отстать, а
       // sonet_group.update переписывает их целиком и стёр бы чужие слова.
-      const [group] = (await bx24OAuth(memberId, 'sonet_group.get', {
-        'FILTER[ID]': projectId,
-      })) as { KEYWORDS?: string }[];
+      const [group] = (await bx24OAuth(
+        memberId,
+        'sonet_group.get',
+        { 'FILTER[ID]': projectId },
+        as,
+      )) as { KEYWORDS?: string }[];
       if (!group) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       current = group.KEYWORDS;
     }
@@ -50,7 +57,12 @@ export async function POST(req: NextRequest) {
       : [];
     if (dryRun) return NextResponse.json({ previous, hourClass, changes });
     if (!isMockEnabled())
-      await bx24OAuth(memberId, 'sonet_group.update', { GROUP_ID: projectId, KEYWORDS: keywords });
+      await bx24OAuth(
+        memberId,
+        'sonet_group.update',
+        { GROUP_ID: projectId, KEYWORDS: keywords },
+        as,
+      );
     // Задач бывают сотни, а на каждую два запроса к порталу: ответ не ждёт раскладки.
     if (hourClass && changes.length)
       after(async () => {

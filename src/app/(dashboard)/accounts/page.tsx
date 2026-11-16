@@ -22,6 +22,8 @@ type Account = {
   blocked: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  bitrixUserId: string | null;
+  displayName: string | null;
 };
 
 const WHEN = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
@@ -168,13 +170,18 @@ export default function AccountsPage() {
                 <li key={account.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 text-sm font-medium text-ink">
-                      <span className="truncate">{account.username}</span>
+                      <span className="truncate">{account.displayName || account.username}</span>
                       {account.role === 'admin' && (
                         <Badge tone="accent">{t('Администратор')}</Badge>
                       )}
                       {account.blocked && <Badge tone="danger">{t('Заблокирован')}</Badge>}
                     </p>
                     <p className="mt-0.5 text-xs text-ink-soft">
+                      {/* От чьего имени эта учётка действует в Битриксе. */}
+                      {account.bitrixUserId
+                        ? t('Битрикс: #{0}', account.bitrixUserId)
+                        : t('Битрикс не подключён')}
+                      {' · '}
                       {account.lastLoginAt
                         ? t('Вход: {0}', WHEN.format(new Date(account.lastLoginAt)))
                         : t('Ещё не входил')}

@@ -308,3 +308,16 @@ describe('pushEndpointAllowed', () => {
     expect(pushEndpointAllowed('http://fcm.googleapis.com/x')).toBe(false);
   });
 });
+
+describe('safeNext', () => {
+  it('пускает только пути этого приложения', async () => {
+    const { safeNext } = await import('./login-cookie');
+    expect(safeNext('/reports?x=1')).toBe('/reports?x=1');
+    expect(safeNext('//evil.com')).toBe('/');
+    expect(safeNext('/\\evil.com')).toBe('/');
+    expect(safeNext('/\\\\evil.com')).toBe('/');
+    expect(safeNext('https://evil.com')).toBe('/');
+    expect(safeNext('/\tevil')).toBe('/');
+    expect(safeNext(null)).toBe('/');
+  });
+});
