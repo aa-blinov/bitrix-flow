@@ -148,6 +148,7 @@ export default function TeamWorkload() {
   const [selectedActual, setSelectedActual] = useState<{ userId: string; day: string } | null>(
     null,
   );
+  const [timeTitles, setTimeTitles] = useState<Record<string, string>>({});
   const [timeError, setTimeError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [timeRefreshing, setTimeRefreshing] = useState(false);
@@ -178,6 +179,7 @@ export default function TeamWorkload() {
       if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
       setTimeRows(payload.data?.rows || []);
       setTimeDetails(payload.data?.details || []);
+      setTimeTitles(payload.titles || {});
       setTimeRefreshing(Boolean(payload.refreshing));
       setTimeError(null);
     } catch (error) {
@@ -232,13 +234,22 @@ export default function TeamWorkload() {
     const row = timeRows.find((item) => String(item.userId) === String(userId) && item.day === day);
     return row ? row.seconds / 3600 : undefined;
   };
-  const selectedEntries = selectedActual
-    ? timeDetails.filter(
-        (entry) =>
-          String(entry.userId) === String(selectedActual.userId) &&
-          entry.day === selectedActual.day,
+  // Несколько списаний на одну задачу за день сводим в строку: перечень задач, а не журнал.
+  const selectedEntries = (() => {
+    if (!selectedActual) return [];
+    const byTask = new Map<string, { taskId: string; seconds: number }>();
+    for (const entry of timeDetails) {
+      if (
+        String(entry.userId) !== String(selectedActual.userId) ||
+        entry.day !== selectedActual.day
       )
-    : [];
+        continue;
+      const known = byTask.get(entry.taskId);
+      if (known) known.seconds += entry.seconds;
+      else byTask.set(entry.taskId, { taskId: entry.taskId, seconds: entry.seconds });
+    }
+    return [...byTask.values()].sort((left, right) => right.seconds - left.seconds);
+  })();
 
   const todayKey = calendarDayKey(new Date());
   const days = useMemo(
@@ -606,7 +617,8 @@ export default function TeamWorkload() {
       >
         <div className="max-h-72 space-y-2 overflow-y-auto">
           {selectedEntries.map((entry, index) => {
-            const task = allTasks.find((item) => item.id === entry.taskId);
+            const title =
+              allTasks.find((item) => item.id === entry.taskId)?.title || timeTitles[entry.taskId];
             return (
               <button
                 key={`${entry.taskId}-${index}`}
@@ -614,10 +626,11 @@ export default function TeamWorkload() {
                 className="w-full rounded-ui border border-line p-3 text-left transition-colors duration-fast hover:bg-surface-2"
                 onClick={() => {
                   setSelectedActual(null);
-                  router.push(`/team-workload?task=${entry.taskId}`);
+                  // Карточку открывают страницы со списком задач; здесь параметр task никто не читает.
+                  router.push(`/all-tasks?task=${entry.taskId}`);
                 }}
               >
-                <p className="font-medium">{task?.title || t('Задача #{0}', entry.taskId)}</p>
+                <p className="font-medium">{title || t('Задача #{0}', entry.taskId)}</p>
                 <p className="mt-1 text-sm text-ink-soft">
                   {formatHours(entry.seconds / 3600)}
                   {t(', задача #')}
