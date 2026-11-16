@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeNext, startSession } from '@/lib/login-cookie';
+import { isMockEnabled } from '@/lib/mock-b24';
 import { verifyPassword } from '@/lib/password';
 import { bootstrapAdmin, findUserByName, markLogin, normalizeUsername } from '@/lib/users';
 
@@ -18,6 +19,9 @@ function getAttempt(ip: string) {
 }
 
 export async function POST(request: NextRequest) {
+  // Вход только через Битрикс: пароль остался для UI-тестов, где портала нет.
+  if (!isMockEnabled())
+    return NextResponse.json({ error: 'PASSWORD_LOGIN_DISABLED' }, { status: 404 });
   // X-Forwarded-For клиент подделывает: Caddy лишь дописывает реальный адрес
   // в конец списка. Берём X-Real-IP, который прокси перезаписывает сам, и
   // только как запасной вариант — последний элемент XFF.

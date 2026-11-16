@@ -1,14 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
-import { Modal } from '@/components/monos/Modal';
 import { Notice } from '@/components/monos/Notice';
-import { SelectField } from '@/components/monos/SelectField';
-import { TextField } from '@/components/monos/TextField';
 import { useConfirm } from '@/components/monos/confirm-dialog';
 import { useTaskToasts } from '@/components/monos/toast';
 import LoadingState from '@/components/LoadingState';
@@ -28,20 +24,7 @@ type Account = {
 
 const WHEN = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
 
-// Пароль без похожих символов (0/O, 1/l): его диктуют вслух и набирают руками.
-function generatePassword() {
-  const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => alphabet[byte % 54]).join(
-    '',
-  );
-}
-
 const problems: Record<string, () => string> = {
-  BAD_USERNAME: () =>
-    t('Логин: от 2 до 64 символов, латиница, цифры и . _ @ -, начинается с буквы или цифры.'),
-  PASSWORD_TOO_SHORT: () => t('Пароль короче 12 символов.'),
-  BAD_PASSWORD: () => t('Пароль не подходит.'),
-  USERNAME_TAKEN: () => t('Такой логин уже есть.'),
   SELF_LOCKOUT: () => t('Себя заблокировать, удалить или лишить прав нельзя.'),
   LAST_ADMIN: () => t('Это последний активный администратор.'),
   NOT_FOUND: () => t('Учётной записи уже нет.'),
@@ -53,11 +36,6 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [resetting, setResetting] = useState<Account | null>(null);
-  const [username, setUsername] = useState('');
-  const [role, setRole] = useState<'user' | 'admin'>('user');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -95,28 +73,6 @@ export default function AccountsPage() {
     }
   }
 
-  function openCreate() {
-    setUsername('');
-    setRole('user');
-    setPassword(generatePassword());
-    setError('');
-    setCreating(true);
-  }
-
-  async function create() {
-    if (!(await call('/api/admin/users', 'POST', { username, role, password }))) return;
-    toasts.saved(t('Учётная запись создана'));
-    setCreating(false);
-    void load();
-  }
-
-  async function resetPassword() {
-    if (!resetting || !(await call(`/api/admin/users/${resetting.id}`, 'PATCH', { password })))
-      return;
-    toasts.saved(t('Пароль сброшен, открытые сессии закрыты'));
-    setResetting(null);
-  }
-
   async function patch(account: Account, change: Record<string, unknown>, saved: string) {
     if (!(await call(`/api/admin/users/${account.id}`, 'PATCH', change))) {
       toasts.failed(t('Не удалось выполнить действие.'));
@@ -143,15 +99,11 @@ export default function AccountsPage() {
       <PageHeader
         title={t('Учётные записи')}
         description={t(
-          'Личные логины для входа в приложение: доступ к порталу остаётся на сервере',
+          'Люди, которые входили через Битрикс. Учётка создаётся сама при первом входе, здесь доступ можно закрыть или дать права администратора',
         )}
-        actions={
-          <Button size="sm" icon={<Plus size={14} strokeWidth={1.7} />} onClick={openCreate}>
-            {t('Добавить')}
-          </Button>
-        }
       />
-      <div className="mx-auto max-w-4xl p-4 lg:p-6">
+      <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
+        {error && <Notice tone="danger">{error}</Notice>}
         {forbidden ? (
           <Notice tone="danger">{t('Раздел доступен только администраторам.')}</Notice>
         ) : !accounts && loadFailed ? (
@@ -208,18 +160,6 @@ export default function AccountsPage() {
                       size="sm"
                       variant="secondary"
                       disabled={busy}
-                      onClick={() => {
-                        setPassword(generatePassword());
-                        setError('');
-                        setResetting(account);
-                      }}
-                    >
-                      {t('Сбросить пароль')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy}
                       onClick={() =>
                         void patch(
                           account,
@@ -245,90 +185,6 @@ export default function AccountsPage() {
           </Card>
         )}
       </div>
-
-      <Modal
-        open={creating}
-        onClose={() => setCreating(false)}
-        title={t('Новая учётная запись')}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setCreating(false)}>
-              {t('Отмена')}
-            </Button>
-            <Button
-              onClick={() => void create()}
-              disabled={!username.trim() || busy}
-              loading={busy}
-            >
-              {t('Создать')}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <TextField
-            variant="boxed"
-            autoFocus
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            aria-label={t('Логин')}
-            placeholder={t('Логин')}
-            autoComplete="off"
-          />
-          <TextField
-            variant="boxed"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            aria-label={t('Пароль')}
-            autoComplete="off"
-          />
-          <p className="text-xs text-ink-soft">
-            {t('Пароль виден только сейчас: скопируйте его и передайте человеку.')}
-          </p>
-          <SelectField
-            variant="boxed"
-            aria-label={t('Роль')}
-            value={role}
-            onChange={(event) => setRole(event.target.value as 'user' | 'admin')}
-            options={[
-              { value: 'user', label: t('Сотрудник') },
-              { value: 'admin', label: t('Администратор') },
-            ]}
-          />
-          {error && <Notice tone="danger">{error}</Notice>}
-        </div>
-      </Modal>
-
-      <Modal
-        open={resetting !== null}
-        onClose={() => setResetting(null)}
-        title={t('Сбросить пароль: {0}', resetting?.username ?? '')}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setResetting(null)}>
-              {t('Отмена')}
-            </Button>
-            <Button onClick={() => void resetPassword()} disabled={busy} loading={busy}>
-              {t('Сохранить')}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <TextField
-            variant="boxed"
-            autoFocus
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            aria-label={t('Пароль')}
-            autoComplete="off"
-          />
-          <p className="text-xs text-ink-soft">
-            {t('Пароль виден только сейчас: скопируйте его и передайте человеку.')}
-          </p>
-          {error && <Notice tone="danger">{error}</Notice>}
-        </div>
-      </Modal>
     </div>
   );
 }

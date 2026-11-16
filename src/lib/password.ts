@@ -11,9 +11,6 @@ const derive = (password: string, salt: Buffer) =>
     ),
   );
 
-export const MIN_PASSWORD_LENGTH = 12;
-export const MAX_PASSWORD_LENGTH = 200;
-
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
   const key = await derive(password, salt);
@@ -32,12 +29,4 @@ export async function verifyPassword(password: string, stored: string | undefine
   return (
     stored !== undefined && expected.length === actual.length && timingSafeEqual(expected, actual)
   );
-}
-
-// Пароль без неоднозначных символов (0/O, 1/l), чтобы его можно было прочитать вслух.
-const ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-export function generatePassword(length = 16): string {
-  const bytes = randomBytes(length);
-  return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('');
 }

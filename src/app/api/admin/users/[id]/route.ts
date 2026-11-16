@@ -5,7 +5,6 @@ import {
   countActiveAdmins,
   deleteUser,
   findUserById,
-  passwordProblem,
   updateUser,
   type Role,
 } from '@/lib/users';
@@ -28,14 +27,9 @@ export function PATCH(req: NextRequest, { params }: Context) {
     const target = await findUserById(id);
     if (!target) return error('NOT_FOUND', 404);
     const body = await req.json().catch(() => null);
-    const change: { blocked?: boolean; role?: Role; password?: string } = {};
+    const change: { blocked?: boolean; role?: Role } = {};
     if (typeof body?.blocked === 'boolean') change.blocked = body.blocked;
     if (body?.role === 'admin' || body?.role === 'user') change.role = body.role;
-    if (body?.password !== undefined) {
-      const problem = passwordProblem(body.password);
-      if (problem) return error(problem, 400);
-      change.password = body.password;
-    }
     const isSelf = String(target._id) === String(admin._id);
     if (isSelf && (change.blocked || change.role === 'user')) return error('SELF_LOCKOUT', 409);
     if ((change.blocked || change.role === 'user') && (await leavesNoAdmin(target)))
@@ -43,8 +37,8 @@ export function PATCH(req: NextRequest, { params }: Context) {
     if (!(await updateUser(id, change))) return error('NOTHING_TO_UPDATE', 400);
     await audit(
       admin.username,
-      Object.keys(change)
-        .map((key) => (key === 'password' ? 'password' : `${key}=${(change as any)[key]}`))
+      Object.entries(change)
+        .map(([key, value]) => `${key}=${value}`)
         .join(','),
       target.username,
     );

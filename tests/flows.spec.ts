@@ -1080,45 +1080,45 @@ test('мессенджер: задача создаётся из реплики 
   await expect(page.getByRole('dialog', { name: 'Новая задача' })).toHaveCount(0);
 });
 
-test('учётные записи: создать, заблокировать, войти нельзя, удалить', async ({
+test('учётные записи: вошедший через Битрикс виден, блокируется и удаляется', async ({
   page,
-  browser,
-  baseURL,
+  testDb,
 }) => {
+  // Учётка появляется сама при первом входе через Битрикс: кладём такую в базу.
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    const db = client.db(testDb);
+    const token = await db.collection('user_tokens').findOne({});
+    await db.collection('app_users').deleteMany({ username: 'b24-77' });
+    await db.collection('app_users').insertOne({
+      username: 'b24-77',
+      password_hash: '',
+      role: 'user',
+      blocked: false,
+      created_at: new Date(),
+      bitrix_member_id: token?.member_id,
+      bitrix_user_id: '77',
+      display_name: 'Иван Петров',
+    });
+  } finally {
+    await client.close();
+  }
+
   await page.goto('/accounts');
   await expect(page.getByRole('heading', { name: 'Учётные записи' })).toBeVisible();
-  await page.getByRole('button', { name: 'Добавить' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Новая учётная запись' });
-  await dialog.getByLabel('Логин').fill('ivan.test');
-  const password = await dialog.getByLabel('Пароль').inputValue();
-  expect(password).toHaveLength(16);
-  await dialog.getByRole('button', { name: 'Создать' }).click();
-  const row = page.getByRole('listitem').filter({ hasText: 'ivan.test' });
-  await expect(row).toBeVisible();
+  // Создавать учётки руками и задавать пароли больше нечем.
+  await expect(page.getByRole('button', { name: 'Добавить' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Сбросить пароль' })).toHaveCount(0);
+  const row = page.getByRole('listitem').filter({ hasText: 'Иван Петров' });
+  await expect(row).toContainText('Битрикс: #77');
 
-  // Новый человек входит своим паролем.
-  const login = async (pass: string) => {
-    const context = await browser.newContext({ baseURL, storageState: undefined });
-    const response = await context.request.post('/api/auth/login', {
-      data: { username: 'ivan.test', password: pass },
-    });
-    await context.close();
-    return response.status();
-  };
-  expect(await login(password)).toBe(200);
-  expect(await login('wrong-password-123')).toBe(401);
-
-  // После блокировки пароль верный, но вход закрыт.
   await row.getByRole('button', { name: 'Заблокировать' }).click();
   await expect(row.getByText('Заблокирован')).toBeVisible();
-  expect(await login(password)).toBe(403);
 
-  // Себя заблокировать нельзя.
+  // Себя заблокировать нельзя: сервер отказывает, и это видно словами.
   const me = page.getByRole('listitem').filter({ hasText: 'tester' });
   await me.getByRole('button', { name: 'Заблокировать' }).click();
-  await expect(page.getByText('Себя заблокировать, удалить или лишить прав нельзя.')).toHaveCount(
-    0,
-  );
+  await expect(page.getByText('Себя заблокировать, удалить или лишить прав нельзя.')).toBeVisible();
   await expect(me.getByText('Заблокирован')).toHaveCount(0);
 
   await row.getByRole('button', { name: 'Удалить' }).click();

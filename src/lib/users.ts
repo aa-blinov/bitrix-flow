@@ -3,7 +3,7 @@
 // или удалить одного человека, не меняя общий пароль для всех остальных.
 import { ObjectId } from 'mongodb';
 import { getDb } from './mongo';
-import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, hashPassword } from './password';
+import { hashPassword } from './password';
 
 export type Role = 'admin' | 'user';
 
@@ -33,19 +33,8 @@ export type PublicUser = {
   displayName: string | null;
 };
 
-const USERNAME = /^[a-z0-9][a-z0-9._@-]{1,63}$/;
-
 export const normalizeUsername = (value: unknown) =>
   typeof value === 'string' ? value.trim().toLowerCase() : '';
-
-export const validUsername = (value: string) => USERNAME.test(value);
-
-export function passwordProblem(password: unknown): string | null {
-  if (typeof password !== 'string') return 'BAD_PASSWORD';
-  if (password.length < MIN_PASSWORD_LENGTH) return 'PASSWORD_TOO_SHORT';
-  if (password.length > MAX_PASSWORD_LENGTH) return 'BAD_PASSWORD';
-  return null;
-}
 
 export const toPublic = (user: AppUser): PublicUser => ({
   id: String(user._id),
@@ -98,48 +87,36 @@ export async function bootstrapAdmin() {
     .catch(() => {});
 }
 
-export async function createUser(username: string, password: string, role: Role) {
-  const collection = await users();
-  const user: AppUser = {
-    _id: new ObjectId(),
-    username,
-    password_hash: await hashPassword(password),
-    role,
-    blocked: false,
-    created_at: new Date(),
-  };
-  try {
-    await collection.insertOne(user);
-  } catch {
-    return null;
-  }
-  return toPublic(user);
-}
-
 export async function countActiveAdmins() {
   return (await users()).countDocuments({ role: 'admin', blocked: false });
 }
 
-export async function updateUser(
-  id: string,
-  change: { blocked?: boolean; role?: Role; password?: string },
-) {
+export async function updateUser(id: string, change: { blocked?: boolean; role?: Role }) {
   const set: Partial<AppUser> = {};
   if (change.blocked !== undefined) set.blocked = change.blocked;
   if (change.role) set.role = change.role;
-  if (change.password) set.password_hash = await hashPassword(change.password);
   if (!Object.keys(set).length || !ObjectId.isValid(id)) return false;
   const result = await (await users()).updateOne({ _id: new ObjectId(id) }, { $set: set });
-  // Блокировка, смена пароля и понижение роли действуют сразу: открытые сессии закрываются.
-  if (result.matchedCount && (change.blocked || change.password || change.role === 'user'))
+  // Блокировка и понижение роли действуют сразу: открытые сессии закрываются.
+  if (result.matchedCount && (change.blocked || change.role === 'user'))
     await revokeUserSessions(id);
   return result.matchedCount > 0;
 }
 
 export async function deleteUser(id: string) {
   if (!ObjectId.isValid(id)) return false;
+  const user = await (await users()).findOne({ _id: new ObjectId(id) });
   const result = await (await users()).deleteOne({ _id: new ObjectId(id) });
-  if (result.deletedCount) await revokeUserSessions(id);
+  if (result.deletedCount) {
+    await revokeUserSessions(id);
+    // Вместе с учёткой уходит и доступ в портал от имени человека: его токен и устройства.
+    if (user?.bitrix_user_id) {
+      const db = await getDb();
+      const person = { member_id: user.bitrix_member_id, user_id: user.bitrix_user_id };
+      await db.collection('person_tokens').deleteMany(person);
+      await db.collection('push_subscriptions').deleteMany(person);
+    }
+  }
   return result.deletedCount > 0;
 }
 
