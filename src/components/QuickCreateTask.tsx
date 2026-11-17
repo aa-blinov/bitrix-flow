@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useKanbanStore } from '@/store/kanban';
 import { Button } from '@/components/monos/Button';
+import { DateField } from '@/components/monos/DateField';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
 import { TextArea } from '@/components/monos/TextArea';
@@ -144,11 +145,10 @@ export default function QuickCreateTask({ defaultProjectId, initial, onClose }: 
               options={users.map((user) => ({ value: user.id, label: user.name }))}
             />
           </div>
-          <TextField
+          <DateField
             variant="boxed"
-            type="date"
             value={deadline}
-            onChange={(event) => setDeadline(event.target.value)}
+            onChange={setDeadline}
             aria-label={t('Дедлайн')}
           />
         </div>

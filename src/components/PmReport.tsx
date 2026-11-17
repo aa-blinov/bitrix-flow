@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Download } from 'lucide-react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '@/components/monos/Button';
+import { DateField } from '@/components/monos/DateField';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
@@ -947,26 +948,20 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                     { value: 'three', label: t('3 месяца') },
                   ]}
                 />
-                <TextField
-                  type="date"
+                <DateField
                   variant="boxed"
                   size="sm"
                   value={from}
-                  max={to}
-                  onChange={(event) =>
-                    event.target.value && setParams({ from: event.target.value })
-                  }
-                  className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+                  onChange={(value) => value && setParams({ from: value })}
+                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
                   aria-label={t('Начальная дата периода')}
                 />
-                <TextField
-                  type="date"
+                <DateField
                   variant="boxed"
                   size="sm"
                   value={to}
-                  min={from}
-                  onChange={(event) => event.target.value && setParams({ to: event.target.value })}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+                  onChange={(value) => value && setParams({ to: value })}
+                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
                   aria-label={t('Конечная дата периода')}
                 />
               </>

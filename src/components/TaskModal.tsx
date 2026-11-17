@@ -34,6 +34,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { Avatar } from '@/components/monos/Avatar';
+import { DateField } from '@/components/monos/DateField';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
@@ -1421,14 +1422,14 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <Calendar size={12} strokeWidth={1.7} /> {t('Дедлайн')}
                     </p>
                     {editingField === 'deadline' ? (
-                      <TextField
+                      <DateField
                         variant="boxed"
-                        type="datetime-local"
+                        withTime
                         value={toLocalInputValue(task.dueDate, 'datetime')}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           void handleUpdateField(
                             'deadline',
-                            event.target.value ? new Date(event.target.value).toISOString() : '',
+                            value ? new Date(value).toISOString() : '',
                           )
                         }
                         onBlur={() => setEditingField(null)}

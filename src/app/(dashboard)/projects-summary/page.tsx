@@ -5,6 +5,7 @@ import { useKanbanStore } from '@/store/kanban';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Users } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
+import { DateField } from '@/components/monos/DateField';
 import { Button } from '@/components/monos/Button';
 import RefreshButton from '@/components/RefreshButton';
 import { Card } from '@/components/monos/Card';
@@ -49,6 +50,8 @@ const hours = (value: number) => t('{0} ч', HOURS_FORMAT.format(value));
 export default function ProjectsSummaryPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [query, setQuery] = useState('');
+  // Проекты без задач на сводке только шумят: 7 нулевых строк прятали три рабочих.
+  const [showEmpty, setShowEmpty] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   // Пересборка идёт на сервере в фоне: признак приходит с ответом и переживает перезагрузку.
@@ -119,12 +122,34 @@ export default function ProjectsSummaryPage() {
     }, 1200);
   }, [load]);
   useSSE(memberId, refreshFromEvent);
-  const shown = useMemo(
+  const matching = useMemo(
     () =>
       projects.filter((project) =>
         project.name.toLocaleLowerCase('ru').includes(query.toLocaleLowerCase('ru')),
       ),
     [projects, query],
+  );
+  const emptyCount = matching.filter((project) => project.taskCount === 0).length;
+  // Что просрочено и горит, то выше: сводку открывают за этим.
+  const shown = useMemo(
+    () =>
+      matching
+        .filter((project) => showEmpty || query || project.taskCount > 0)
+        .sort(
+          (a, b) =>
+            b.overdue - a.overdue ||
+            b.inProgress - a.inProgress ||
+            a.name.localeCompare(b.name, 'ru'),
+        ),
+    [matching, showEmpty, query],
+  );
+  const totals = useMemo(
+    () => ({
+      overdue: shown.reduce((sum, project) => sum + project.overdue, 0),
+      overdueProjects: shown.filter((project) => project.overdue > 0).length,
+      inProgress: shown.reduce((sum, project) => sum + project.inProgress, 0),
+    }),
+    [shown],
   );
 
   const statusBadges = (project: ProjectSummary) => (
@@ -352,27 +377,25 @@ export default function ProjectsSummaryPage() {
                 <label htmlFor="summary-date-from" className="text-ink-soft">
                   {t('с')}
                 </label>
-                <TextField
+                <DateField
                   id="summary-date-from"
-                  type="date"
                   variant="boxed"
                   size="sm"
                   value={fromDate}
-                  onChange={(event) => setFromDate(event.target.value)}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+                  onChange={setFromDate}
+                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
                   aria-label={t('Начальная дата периода')}
                 />
                 <label htmlFor="summary-date-to" className="text-ink-soft">
                   {t('по')}
                 </label>
-                <TextField
+                <DateField
                   id="summary-date-to"
-                  type="date"
                   variant="boxed"
                   size="sm"
                   value={toDate}
-                  onChange={(event) => setToDate(event.target.value)}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+                  onChange={setToDate}
+                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
                   aria-label={t('Конечная дата периода')}
                 />
               </div>
@@ -401,6 +424,36 @@ export default function ProjectsSummaryPage() {
               {t('Сбросить')}
             </Button>
           </div>
+          {!isLoading && !error ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-3 py-2 text-sm">
+              <span className="text-ink-soft">
+                {t('Просрочено:')}{' '}
+                <span
+                  className={`font-bold tabular-nums ${totals.overdue > 0 ? 'text-danger-text' : 'text-ink'}`}
+                >
+                  {totals.overdue}
+                </span>
+                {totals.overdueProjects > 0 ? ` ${t('в проектах:')} ${totals.overdueProjects}` : ''}
+              </span>
+              <span className="text-ink-soft">
+                {t('В работе:')}{' '}
+                <span className="font-bold tabular-nums text-ink">{totals.inProgress}</span>
+              </span>
+              {emptyCount > 0 || showEmpty ? (
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  className="sm:ml-auto"
+                  aria-pressed={showEmpty}
+                  onClick={() => setShowEmpty((value) => !value)}
+                >
+                  {showEmpty
+                    ? t('Скрыть проекты без задач')
+                    : t('Показать проекты без задач ({0})', emptyCount)}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {refreshError && !error ? (
             <p className="px-6 pt-4 text-sm text-danger-text">{refreshError}</p>
           ) : null}

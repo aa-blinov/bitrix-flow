@@ -6,12 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, X } from 'lucide-react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '@/components/monos/Button';
+import { DateField } from '@/components/monos/DateField';
 import RefreshButton from '@/components/RefreshButton';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { SelectField } from '@/components/monos/SelectField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
-import { TextField } from '@/components/monos/TextField';
 import { toolbarControl } from '@/components/monos/toolbar';
 import { DataTable, type DataTableFeatures } from '@/components/DataTable';
 import { DetailTree, PivotCards, type MobilePivotRow } from '@/components/HoursMobile';
@@ -746,24 +746,20 @@ function HoursAnalyticsView() {
               ]}
             />
             <span className="text-ink-soft">{t('Период:')}</span>
-            <TextField
-              type="date"
+            <DateField
               variant="boxed"
               size="sm"
               value={from}
-              max={to}
-              onChange={(event) => event.target.value && setParams({ from: event.target.value })}
-              className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+              onChange={(value) => value && setParams({ from: value })}
+              className={`${toolbarControl} w-full min-w-0 sm:w-40`}
               aria-label={t('Начальная дата периода')}
             />
-            <TextField
-              type="date"
+            <DateField
               variant="boxed"
               size="sm"
               value={to}
-              min={from}
-              onChange={(event) => event.target.value && setParams({ to: event.target.value })}
-              className={`${toolbarControl} w-full min-w-0 sm:w-36`}
+              onChange={(value) => value && setParams({ to: value })}
+              className={`${toolbarControl} w-full min-w-0 sm:w-40`}
               aria-label={t('Конечная дата периода')}
             />
             {projectFilter ? (

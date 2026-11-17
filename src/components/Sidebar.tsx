@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/monos/Button';
+import { DateField } from '@/components/monos/DateField';
 import { Checkbox } from '@/components/monos/Checkbox';
 import { Drawer } from '@/components/monos/Drawer';
 import { IconButton } from '@/components/monos/IconButton';
@@ -538,20 +539,17 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             hint={t('Разделяйте слова запятыми.')}
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextField
+            <DateField
               label={t('Дата начала')}
               variant="boxed"
-              type="date"
               value={projectStartDate}
-              onChange={(event) => setProjectStartDate(event.target.value)}
+              onChange={setProjectStartDate}
             />
-            <TextField
+            <DateField
               label={t('Дата окончания')}
               variant="boxed"
-              type="date"
               value={projectFinishDate}
-              min={projectStartDate || undefined}
-              onChange={(event) => setProjectFinishDate(event.target.value)}
+              onChange={setProjectFinishDate}
             />
           </div>
           <div className="flex flex-col gap-3 rounded-ui border border-line p-3">

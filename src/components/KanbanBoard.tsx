@@ -26,8 +26,18 @@ import { convertBxTask } from '@/store/kanban';
 import TaskModal from './TaskModal';
 import RefreshButton from '@/components/RefreshButton';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Filter, Calendar, Timer, AlignLeft, Search, MoveHorizontal } from 'lucide-react';
+import {
+  Plus,
+  Filter,
+  Calendar,
+  Timer,
+  AlignLeft,
+  Search,
+  MoveHorizontal,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { Avatar } from '@/components/monos/Avatar';
+import { DateField } from '@/components/monos/DateField';
 import { Badge, type Tone } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
@@ -395,6 +405,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   }
 
   const showFilters = useKanbanStore((state) => state.filtersPanelOpen);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreWrap = moreOpen ? 'contents' : 'max-sm:hidden sm:contents';
   const setShowFilters = useKanbanStore((state) => state.setFiltersPanelOpen);
   const [activePreset, setActivePreset] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -630,19 +642,21 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             «Добавить задачу» без всякого намёка — переносим строки. */}
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3 lg:overflow-x-auto lg:overflow-y-hidden">
           {toolbar}
-          <SelectField
-            value={kanbanSort}
-            onChange={(event) => setKanbanSort(event.target.value as KanbanSort)}
-            options={[
-              { value: 'urgency', label: t('По срочности') },
-              { value: 'updated', label: t('По обновлению') },
-              { value: 'deadline', label: t('По дедлайну') },
-              { value: 'title', label: t('По названию') },
-            ]}
-            variant="boxed"
-            className={`${toolbarSelect} w-40 shrink-0`}
-            aria-label={t('Сортировка задач')}
-          />
+          <div className={moreWrap}>
+            <SelectField
+              value={kanbanSort}
+              onChange={(event) => setKanbanSort(event.target.value as KanbanSort)}
+              options={[
+                { value: 'urgency', label: t('По срочности') },
+                { value: 'updated', label: t('По обновлению') },
+                { value: 'deadline', label: t('По дедлайну') },
+                { value: 'title', label: t('По названию') },
+              ]}
+              variant="boxed"
+              className={`${toolbarSelect} w-40 shrink-0`}
+              aria-label={t('Сортировка задач')}
+            />
+          </div>
           <SearchField
             value={taskSearch}
             onChange={(value) => setTaskSearch(value)}
@@ -651,14 +665,28 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             className="w-48 shrink-0"
           />
           <div className="flex shrink-0 flex-wrap items-center gap-2 max-lg:max-w-full lg:ml-auto lg:flex-nowrap">
-            <RefreshButton
-              className={toolbarControl}
-              onRefresh={async () => {
-                const { loadTasks, selectedProjectId: project } = useKanbanStore.getState();
-                await loadTasks(project ?? undefined);
-                if (useKanbanStore.getState().error) throw new Error('refresh failed');
-              }}
-            />
+            <div className={moreWrap}>
+              <RefreshButton
+                className={toolbarControl}
+                onRefresh={async () => {
+                  const { loadTasks, selectedProjectId: project } = useKanbanStore.getState();
+                  await loadTasks(project ?? undefined);
+                  if (useKanbanStore.getState().error) throw new Error('refresh failed');
+                }}
+              />
+            </div>
+            {/* Сортировка, обновление и фаза на телефоне за одной кнопкой: четыре ряда
+                контролов отнимали у доски половину экрана. */}
+            <Button
+              variant="quiet"
+              size="md"
+              className={`${toolbarControl} sm:hidden`}
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((open) => !open)}
+              icon={<SlidersHorizontal size={14} strokeWidth={1.7} />}
+            >
+              {t('Ещё')}
+            </Button>
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'primary' : 'quiet'}
               size="md"
@@ -677,7 +705,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             <Button
               variant="secondary"
               size="md"
-              className={toolbarControl}
+              className={`${toolbarControl} ${moreOpen ? '' : 'max-sm:hidden'}`}
               onClick={() => setShowStageDialog(true)}
               icon={<Plus size={14} strokeWidth={1.7} />}
             >
@@ -1023,13 +1051,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 { value: 'high', label: t('Высокий') },
               ]}
             />
-            <TextField
+            <DateField
               label={t('Дедлайн')}
-              type="datetime-local"
+              withTime
               value={newTask.deadline}
-              onChange={(event) =>
-                setNewTask((item) => ({ ...item, deadline: event.target.value }))
-              }
+              onChange={(value) => setNewTask((item) => ({ ...item, deadline: value }))}
             />
             <TextField
               label={t('Оценка, часы')}

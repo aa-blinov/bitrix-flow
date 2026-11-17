@@ -252,8 +252,15 @@ body {
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Движение уходит, а смена состояния остаётся: короткое проявление вместо мгновенного
+     щелчка. Обнулённые переходы делали тосты, меню и подсветку фокуса резкими вспышками. */
+  *,
+  *::before,
+  *::after {
+    transition-duration: 80ms !important;
   }
 
   /* Крутилка сообщает о ходе загрузки — её оставляем, иначе экран выглядит

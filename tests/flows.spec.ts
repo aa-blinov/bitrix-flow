@@ -120,6 +120,27 @@ test('задачу «Ждёт контроля» принимают через a
   await expect.poll(() => called).toEqual(['approve']);
 });
 
+test('сводка прячет проекты без задач, а даты вводятся как ДД.ММ.ГГГГ', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'таблица сводки рисуется на десктопе');
+  await page.goto('/projects-summary');
+  await settle(page);
+  const table = page.getByRole('table');
+  await expect(table.getByRole('link', { name: 'Разработка API v2' })).toBeVisible();
+  await expect(table.getByRole('link', { name: 'Аналитика' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Показать проекты без задач/ }).click();
+  await expect(table.getByRole('link', { name: 'Аналитика' })).toBeVisible();
+
+  const from = page.getByLabel('Начальная дата периода');
+  await from.fill('15032026');
+  await expect(from).toHaveValue('15.03.2026');
+  await from.fill('31022026');
+  await from.blur();
+  // Несуществующая дата не принимается: поле возвращается к последней верной.
+  await expect(from).toHaveValue('15.03.2026');
+});
+
 test('перенос в другой проект не закрывает карточку', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);

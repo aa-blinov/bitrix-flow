@@ -50,6 +50,7 @@ import {
   Pencil,
   Bookmark,
   CheckCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -64,6 +65,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Badge } from '@/components/monos/Badge';
+import { DateField } from '@/components/monos/DateField';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { Checkbox } from '@/components/monos/Checkbox';
@@ -402,7 +404,7 @@ function SortableVisibleColumn({
     >
       <button
         type="button"
-        className="cursor-grab touch-none px-1 text-ink-faint transition-colors duration-fast hover:text-ink active:cursor-grabbing"
+        className="cursor-grab touch-none px-1 text-ink-faint max-sm:min-h-11 max-sm:px-2 transition-colors duration-fast hover:text-ink active:cursor-grabbing"
         aria-label={t('Изменить порядок поля {0}', COLUMN_LABELS[column])}
         {...attributes}
         {...listeners}
@@ -509,7 +511,7 @@ const EditableTitle = memo(function EditableTitle({
               type="button"
               onClick={() => openTask(task.id)}
               onDoubleClick={() => setEditing(true)}
-              className="min-w-0 flex-1 truncate rounded-ui px-1 py-1 text-left text-sm font-medium transition-colors duration-fast hover:bg-surface hover:underline"
+              className={`min-w-0 flex-1 truncate rounded-ui px-1 py-1 text-left text-sm font-medium transition-colors duration-fast hover:bg-surface hover:underline max-sm:min-h-11 ${task.status === 'done' ? 'line-through' : ''}`}
               title={task.title}
             >
               {title}
@@ -539,7 +541,7 @@ const EditableTitle = memo(function EditableTitle({
           {task.parentId && (
             <button
               type="button"
-              className="transition-colors duration-fast hover:text-ink hover:underline"
+              className="transition-colors duration-fast hover:text-ink hover:underline max-sm:min-h-11"
               onClick={() => openTask(task.parentId!)}
             >
               {t('↳ Подзадача #')}
@@ -693,19 +695,20 @@ const FieldControls = memo(function FieldControls({
     />
   );
   const deadline = (
-    <TextField
+    <DateField
       aria-label={t('Дедлайн')}
-      type="date"
       size="sm"
       variant="underline"
       value={inputDate(task.dueDate)}
       // Дата без времени Битрикс читает как полночь в поясе портала (+05:00) —
       // по Москве это 22:00 прошлого дня. Сохраняем время прежнего дедлайна
       // (или 19:00 по местному, если его не было) и шлём полный ISO.
-      onChange={(event) =>
-        edit('deadline', dateWithKeptTime(event.target.value, task.dueDate), t('Дедлайн'))
+      onChange={(value) => edit('deadline', dateWithKeptTime(value, task.dueDate), t('Дедлайн'))}
+      title={
+        task.dueDate
+          ? `${needsDeadlineAttention(task) ? `${t('Просрочено')}: ` : ''}${formatBitrixDateTime(task.dueDate)}`
+          : undefined
       }
-      title={task.dueDate ? formatBitrixDateTime(task.dueDate) : undefined}
       className={t(
         'w-full min-w-0 {0} {1}',
         cellFieldClass,
@@ -979,6 +982,8 @@ export default function TaskGrid({
   const assigneeFilter = filters.assignee;
   const projectFilter = filters.project;
   const isMobile = useIsMobile();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreWrap = moreOpen ? 'contents' : 'max-sm:hidden sm:contents';
   const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const [groupBy, setGroupBy] = useState<GroupBy>(
     isGroupBy(linkState.group) ? linkState.group : initialGroupBy,
@@ -1350,7 +1355,7 @@ export default function TaskGrid({
       type="button"
       onClick={() => toggleGroup(group.key)}
       aria-expanded={!collapsedGroups.has(group.key)}
-      className="flex w-full items-center gap-1.5 text-left font-medium text-ink"
+      className="flex w-full items-center gap-1.5 text-left font-medium text-ink max-sm:min-h-11"
     >
       {collapsedGroups.has(group.key) ? (
         <ChevronRight className="size-4 shrink-0" strokeWidth={1.7} />
@@ -1778,7 +1783,7 @@ export default function TaskGrid({
           type="button"
           onClick={(event) => toggleSort(key, event.shiftKey)}
           title={t('Сортировать. Shift+клик — добавить вторым уровнем')}
-          className="flex h-8 w-full items-center gap-1 px-2 text-left text-whisper font-bold uppercase tracking-widest text-ink-faint transition-colors duration-fast hover:text-ink"
+          className="flex h-8 w-full items-center gap-1 px-2 text-left text-whisper max-sm:h-11 font-bold uppercase tracking-widest text-ink-faint transition-colors duration-fast hover:text-ink"
         >
           <span className="truncate">{label}</span>
           {/* Треугольник набора: видно, что колонка сортируется, даже по цвету. */}
@@ -1878,34 +1883,36 @@ export default function TaskGrid({
                 {title ?? t('Задачи проекта')}
               </h2>
             )}
-            {viewScope && (
-              <Menu
-                label={t('Вид')}
-                align="start"
-                items={[
-                  { label: t('По умолчанию'), onSelect: () => applyView('default') },
-                  ...views.map((view) => ({
-                    label: view.name,
-                    onSelect: () => applyView(view.id),
-                  })),
-                  { label: '', separator: true },
-                  { label: t('Сохранить текущий вид'), onSelect: () => setSaveViewOpen(true) },
-                ]}
-                trigger={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className={`${toolbarControl} aria-expanded:bg-surface aria-expanded:text-ink`}
-                    icon={<Bookmark size={14} strokeWidth={1.7} />}
-                  >
-                    {/* Раньше тут было голое «По умолчанию» — не догадаться, что это
+            <div className={moreWrap}>
+              {viewScope && (
+                <Menu
+                  label={t('Вид')}
+                  align="start"
+                  items={[
+                    { label: t('По умолчанию'), onSelect: () => applyView('default') },
+                    ...views.map((view) => ({
+                      label: view.name,
+                      onSelect: () => applyView(view.id),
+                    })),
+                    { label: '', separator: true },
+                    { label: t('Сохранить текущий вид'), onSelect: () => setSaveViewOpen(true) },
+                  ]}
+                  trigger={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className={`${toolbarControl} aria-expanded:bg-surface aria-expanded:text-ink`}
+                      icon={<Bookmark size={14} strokeWidth={1.7} />}
+                    >
+                      {/* Раньше тут было голое «По умолчанию» — не догадаться, что это
                         меню сохранённых видов. */}
-                    {t('Вид:')}{' '}
-                    {views.find((view) => view.id === activeViewId)?.name || t('по умолчанию')}
-                  </Button>
-                }
-              />
-            )}
+                      {t('Вид:')}{' '}
+                      {views.find((view) => view.id === activeViewId)?.name || t('по умолчанию')}
+                    </Button>
+                  }
+                />
+              )}
+            </div>
             <TextField
               type="search"
               variant="boxed"
@@ -1919,99 +1926,117 @@ export default function TaskGrid({
               // На телефоне поиск — первая строка панели, а не третья после вида.
               className={`${toolbarControl} w-full max-sm:order-first sm:w-56 lg:w-auto lg:min-w-72 lg:flex-1 xl:max-w-[32rem] [&_input]:h-full`}
             />
-            {loadPage && <RefreshButton onRefresh={refreshPage} className={toolbarControl} />}
+            <div className={moreWrap}>
+              {loadPage && <RefreshButton onRefresh={refreshPage} className={toolbarControl} />}
+              <Button
+                variant="secondary"
+                size="sm"
+                className={toolbarControl}
+                onClick={() => void exportCsv()}
+                title={t('Выгрузить в CSV все задачи по текущим фильтрам')}
+                icon={<Download size={14} strokeWidth={1.7} />}
+              >
+                <span className="hidden sm:inline">CSV</span>
+              </Button>
+              <Popover
+                placement="bottom"
+                trigger={
+                  <Button variant="secondary" size="sm" className={toolbarControl}>
+                    {t('Поля')}
+                  </Button>
+                }
+              >
+                <div className="w-full">
+                  <p className="px-1 py-1 text-xs font-bold uppercase tracking-widest text-ink-faint">
+                    {t('Перетащите, чтобы изменить порядок')}
+                  </p>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={({ active, over }) => {
+                      if (over && active.id !== over.id)
+                        reorderColumns(String(active.id), String(over.id));
+                    }}
+                  >
+                    <SortableContext
+                      items={orderedVisibleColumns}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {orderedVisibleColumns.map((column) => (
+                        <SortableVisibleColumn
+                          key={column}
+                          column={column}
+                          onToggle={toggleColumn}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                  {hiddenColumns.length > 0 && <Separator className="my-1" />}
+                  {hiddenColumns.map((column) => (
+                    <label
+                      key={column}
+                      className="flex min-h-8 cursor-pointer items-center gap-2 rounded-ui px-1 text-sm text-ink-soft hover:text-ink"
+                    >
+                      <Checkbox
+                        checked={false}
+                        onChange={(event) => toggleColumn(column, event.currentTarget.checked)}
+                        ariaLabel={COLUMN_LABELS[column]}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{COLUMN_LABELS[column]}</span>
+                    </label>
+                  ))}
+                </div>
+              </Popover>
+              <SelectField
+                size="sm"
+                variant="boxed"
+                aria-label={t('Группировка')}
+                value={groupBy}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  if (isGroupBy(value)) setGroupBy(value);
+                }}
+                /* По проекту — только там, где в списке несколько проектов. */
+                options={GROUP_BY_OPTIONS.filter(
+                  (option) => showProject || option.value !== 'project',
+                )}
+                className={`${toolbarSelect} w-40 [&_select]:h-full`}
+              />
+              {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
+              <SelectField
+                size="sm"
+                variant="boxed"
+                aria-label={t('Сортировка')}
+                value={`${sorts[0]?.key || 'updated'}:${sorts[0]?.direction || 'desc'}`}
+                onChange={(event) => {
+                  const [key, direction] = event.currentTarget.value.split(':');
+                  setSorts([{ key: key as SortKey, direction: direction as Sort['direction'] }]);
+                }}
+                options={(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
+                  { value: `${column}:desc`, label: `${COLUMN_LABELS[column]} ↓` },
+                  { value: `${column}:asc`, label: `${COLUMN_LABELS[column]} ↑` },
+                ])}
+                className={`${toolbarSelect} w-48 md:hidden [&_select]:h-full`}
+              />
+            </div>
+            {/* Закрытые задачи в ежедневном списке мешают: переключатель всегда на
+                виду, а не последним пунктом в меню «+ Фильтр». */}
+            {/* На телефоне вид, обновление, CSV, поля, группировка и сортировка уходят за
+                одну кнопку: пять рядов контролов съедали треть первого экрана. */}
             <Button
               variant="secondary"
               size="sm"
-              className={toolbarControl}
-              onClick={() => void exportCsv()}
-              title={t('Выгрузить в CSV все задачи по текущим фильтрам')}
-              icon={<Download size={14} strokeWidth={1.7} />}
+              className={`${toolbarControl} sm:hidden max-sm:-order-1`}
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((open) => !open)}
+              icon={<SlidersHorizontal size={14} strokeWidth={1.7} />}
             >
-              <span className="hidden sm:inline">CSV</span>
+              {t('Ещё')}
             </Button>
-            <Popover
-              placement="bottom"
-              trigger={
-                <Button variant="secondary" size="sm" className={toolbarControl}>
-                  {t('Поля')}
-                </Button>
-              }
-            >
-              <div className="w-full">
-                <p className="px-1 py-1 text-xs font-bold uppercase tracking-widest text-ink-faint">
-                  {t('Перетащите, чтобы изменить порядок')}
-                </p>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={({ active, over }) => {
-                    if (over && active.id !== over.id)
-                      reorderColumns(String(active.id), String(over.id));
-                  }}
-                >
-                  <SortableContext
-                    items={orderedVisibleColumns}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {orderedVisibleColumns.map((column) => (
-                      <SortableVisibleColumn key={column} column={column} onToggle={toggleColumn} />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-                {hiddenColumns.length > 0 && <Separator className="my-1" />}
-                {hiddenColumns.map((column) => (
-                  <label
-                    key={column}
-                    className="flex min-h-8 cursor-pointer items-center gap-2 rounded-ui px-1 text-sm text-ink-soft hover:text-ink"
-                  >
-                    <Checkbox
-                      checked={false}
-                      onChange={(event) => toggleColumn(column, event.currentTarget.checked)}
-                      ariaLabel={COLUMN_LABELS[column]}
-                    />
-                    <span className="min-w-0 flex-1 truncate">{COLUMN_LABELS[column]}</span>
-                  </label>
-                ))}
-              </div>
-            </Popover>
-            <SelectField
-              size="sm"
-              variant="boxed"
-              aria-label={t('Группировка')}
-              value={groupBy}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (isGroupBy(value)) setGroupBy(value);
-              }}
-              /* По проекту — только там, где в списке несколько проектов. */
-              options={GROUP_BY_OPTIONS.filter(
-                (option) => showProject || option.value !== 'project',
-              )}
-              className={`${toolbarSelect} w-40 [&_select]:h-full`}
-            />
-            {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
-            <SelectField
-              size="sm"
-              variant="boxed"
-              aria-label={t('Сортировка')}
-              value={`${sorts[0]?.key || 'updated'}:${sorts[0]?.direction || 'desc'}`}
-              onChange={(event) => {
-                const [key, direction] = event.currentTarget.value.split(':');
-                setSorts([{ key: key as SortKey, direction: direction as Sort['direction'] }]);
-              }}
-              options={(Object.keys(COLUMN_LABELS) as ColumnKey[]).flatMap((column) => [
-                { value: `${column}:desc`, label: `${COLUMN_LABELS[column]} ↓` },
-                { value: `${column}:asc`, label: `${COLUMN_LABELS[column]} ↑` },
-              ])}
-              className={`${toolbarSelect} w-48 md:hidden [&_select]:h-full`}
-            />
-            {/* Закрытые задачи в ежедневном списке мешают: переключатель всегда на
-                виду, а не последним пунктом в меню «+ Фильтр». */}
             <Button
               variant={hideDone ? 'primary' : 'secondary'}
               size="sm"
-              className={toolbarControl}
+              className={`${toolbarControl} max-sm:-order-1`}
               aria-pressed={hideDone}
               onClick={() => setFilterValue('hideDone', hideDone ? 'off' : 'on')}
               icon={<CheckCheck size={14} strokeWidth={1.7} />}
@@ -2024,7 +2049,7 @@ export default function TaskGrid({
             <Button
               variant={showFilters || activeFilterCount > 0 ? 'primary' : 'secondary'}
               size="sm"
-              className={toolbarControl}
+              className={`${toolbarControl} max-sm:-order-1`}
               onClick={() => setShowFilters(!showFilters)}
               icon={<Filter size={14} strokeWidth={1.7} />}
             >
@@ -2176,13 +2201,7 @@ export default function TaskGrid({
                       }
                       className={`max-w-full min-w-0 overflow-hidden p-4 ${
                         contextTaskIds.has(task.id) ? 'opacity-60' : ''
-                      } ${
-                        task.status === 'done'
-                          ? 'bg-surface-2 text-ink-faint'
-                          : needsDeadlineAttention(task)
-                            ? 'bg-warning/10'
-                            : ''
-                      }`}
+                      } ${task.status === 'done' ? 'text-ink-faint' : ''}`}
                     >
                       <div className="flex items-start gap-2">
                         {/* Галка обычного размера, но область касания — 40px:
@@ -2232,7 +2251,7 @@ export default function TaskGrid({
                         <button
                           type="button"
                           onClick={() => openTask(task.id)}
-                          className="min-w-0 flex-1 text-left"
+                          className={`min-w-0 flex-1 text-left max-sm:min-h-11 ${task.status === 'done' ? 'line-through' : ''}`}
                           style={{
                             paddingLeft:
                               groupBy === 'hierarchy'
@@ -2405,13 +2424,7 @@ export default function TaskGrid({
                           // перекрашивало всю таблицу (~200мс на событие).
                           className={`[content-visibility:auto] [contain-intrinsic-size:auto_44px] hover:bg-surface ${
                             contextTaskIds.has(task.id) ? 'opacity-60' : ''
-                          } ${
-                            task.status === 'done'
-                              ? 'bg-surface-2 text-ink-faint'
-                              : needsDeadlineAttention(task)
-                                ? 'bg-warning/10 hover:bg-warning/15'
-                                : ''
-                          }`}
+                          } ${task.status === 'done' ? 'text-ink-faint' : ''}`}
                         >
                           <GridCell>
                             <Checkbox

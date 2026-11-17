@@ -81,9 +81,23 @@ function getInstallHtml(domain: string) {
       --accent: #2f595b;
       --success: #55550e;
       --radius: 6px;
+      --shadow: rgba(0,0,0,0.03);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #282828;
+        --surface: #3c3836;
+        --surface-2: #504945;
+        --ink: #ebdbb2;
+        --ink-soft: #bdae93;
+        --line: #504945;
+        --accent: #8ec07c;
+        --success: #b8bb26;
+        --shadow: rgba(0,0,0,0.3);
+      }
     }
     body { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); color: var(--ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 20px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 40px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); max-width: 480px; width: 100%; text-align: center; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 40px; box-shadow: 0 1px 2px var(--shadow); max-width: 480px; width: 100%; text-align: center; }
     .icon { width: 64px; height: 64px; margin: 0 auto 20px; background: var(--surface-2); color: var(--ink); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; }
     .icon svg { width: 32px; height: 32px; fill: currentColor; }
     h1 { margin: 0 0 8px; font-size: 24px; color: var(--ink); }
