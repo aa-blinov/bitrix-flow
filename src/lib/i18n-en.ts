@@ -435,6 +435,8 @@ export const EN: Record<string, string> = {
   'Открыть меню': 'Open the menu',
   'Открыть проект': 'Open the project',
   Отложить: 'Postpone',
+  Принять: 'Accept',
+  'Вернуть на доработку': 'Send back for rework',
   Отмена: 'Cancel',
   Отменить: 'Undo',
   'Отменить запись': 'Cancel recording',

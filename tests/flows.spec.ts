@@ -83,6 +83,43 @@ test('новую задачу можно завершить, не начиная
   await expect(dialog.getByRole('button', { name: 'Завершить', exact: true })).toBeVisible();
 });
 
+test('задачу «Ждёт контроля» принимают через approve, а не complete', async ({ page }) => {
+  await page.route('**/api/bitrix/tasks.task.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          task: {
+            id: '107',
+            title: 'Обновить зависимости',
+            status: '4',
+            action: { approve: true, disapprove: true, complete: true },
+          },
+        },
+      },
+    }),
+  );
+  // Статус приходит из списка, а не из карточки: подменяем его там.
+  await page.route('**/api/tasks/all**', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    for (const task of body.tasks ?? [])
+      if (String(task.id ?? task.ID) === '107') task.status = '4';
+    await route.fulfill({ json: body });
+  });
+  const called: string[] = [];
+  page.on('request', (request) => {
+    const match = /tasks\.task\.(approve|disapprove|complete)/.exec(request.url());
+    if (match) called.push(match[1]);
+  });
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Обновить зависимости' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('button', { name: 'Вернуть на доработку' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Принять' }).click();
+  await expect.poll(() => called).toEqual(['approve']);
+});
+
 test('перенос в другой проект не закрывает карточку', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);

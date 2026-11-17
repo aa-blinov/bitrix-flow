@@ -888,13 +888,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       if (field === 'status') {
         if (value === 'in_progress') await bxRunTaskStatusAction(id, 'start');
         else if (value === 'deferred') await bxRunTaskStatusAction(id, 'defer');
-        else if (value === 'done') await bxRunTaskStatusAction(id, 'complete');
+        else if (value === 'done')
+          // Задачу «Ждёт контроля» постановщик принимает, а не завершает.
+          await bxRunTaskStatusAction(id, previous.status === 'testing' ? 'approve' : 'complete');
         else if (value === 'new')
           // Из «Готово» и «Отложена» в «Новая» Битрикс возвращает через renew,
           // pause — только из «В работе».
           await bxRunTaskStatusAction(
             id,
-            previous.status === 'done' || previous.status === 'deferred' ? 'renew' : 'pause',
+            previous.status === 'testing'
+              ? 'disapprove'
+              : previous.status === 'done' || previous.status === 'deferred'
+                ? 'renew'
+                : 'pause',
           );
         else if (value === 'testing') await bxUpdateStatus(id, '2', '-4');
       }

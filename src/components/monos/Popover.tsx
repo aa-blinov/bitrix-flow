@@ -16,6 +16,8 @@ export type PopoverProps = {
    */
   align?: 'start' | 'end';
   className?: string;
+  /** Для самой панели: ширина и отступы, если списку внутри нужны свои. */
+  panelClassName?: string;
   children?: React.ReactNode;
 };
 
@@ -54,6 +56,7 @@ export function Popover({
   placement = 'bottom',
   align = 'start',
   className,
+  panelClassName,
   children,
 }: PopoverProps) {
   const controlled = open !== undefined;
@@ -210,6 +213,7 @@ export function Popover({
             'w-72',
             POSITIONS[actualPlacement],
             alignClass,
+            panelClassName,
           )}
         >
           {children}

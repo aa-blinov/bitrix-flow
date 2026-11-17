@@ -117,6 +117,8 @@ export default function Notifications({
       placement={placement}
       align={align}
       className={className}
+      // Панель по умолчанию в 288 px с полями: список шириной 320 внутри неё обрезался справа.
+      panelClassName="w-80 max-h-none overflow-y-visible p-0"
       trigger={
         <IconButton label={t('Уведомления')} variant="ghost" size="sm" className="relative">
           <Bell size={16} strokeWidth={1.7} />
@@ -128,12 +130,12 @@ export default function Notifications({
         </IconButton>
       }
     >
-      <div className="w-80">
+      <div>
         <p className="px-3 py-2.5 text-xs uppercase tracking-widest text-ink-faint">
           {t('История изменений')}
         </p>
         <Separator />
-        <div className="max-h-96 overflow-y-auto p-1">
+        <div className="max-h-[min(24rem,calc(100dvh-14rem))] overflow-y-auto p-1">
           {items.length ? (
             items.map((item) => {
               // Проект в событии есть не всегда (883 записи из 3870 без него),

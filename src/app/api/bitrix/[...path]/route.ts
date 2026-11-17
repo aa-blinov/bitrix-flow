@@ -133,6 +133,9 @@ const MUTATION_METHODS = new Set([
   'tasks.task.defer',
   'tasks.task.complete',
   'tasks.task.renew',
+  // «Ждёт контроля»: постановщик принимает задачу или возвращает на доработку.
+  'tasks.task.approve',
+  'tasks.task.disapprove',
   'tasks.task.delete',
   'sonet_group.create',
   'sonet_group.update',
@@ -246,6 +249,9 @@ const ALLOWED_METHODS = new Set([
   'tasks.task.defer',
   'tasks.task.complete',
   'tasks.task.renew',
+  // «Ждёт контроля»: постановщик принимает задачу или возвращает на доработку.
+  'tasks.task.approve',
+  'tasks.task.disapprove',
   'tasks.task.delete',
   'tasks.task.chat.message.send',
   'task.stages.get',

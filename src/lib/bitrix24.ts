@@ -668,7 +668,8 @@ export async function fetchTaskTimeLog(taskId: string): Promise<Bx24TimeEntry[]>
   }
 }
 
-export type BitrixTaskStatusAction = 'start' | 'pause' | 'defer' | 'complete' | 'renew';
+export type BitrixTaskStatusAction =
+  'start' | 'pause' | 'defer' | 'complete' | 'renew' | 'approve' | 'disapprove';
 
 export async function runTaskStatusAction(
   taskId: string,

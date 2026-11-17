@@ -733,6 +733,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             )}
             {task.status === 'testing' && (
               <>
+                {can('approve') && (
+                  <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
+                    {t('Принять')}
+                  </Button>
+                )}
+                {can('disapprove') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'new')}
+                  >
+                    {t('Вернуть на доработку')}
+                  </Button>
+                )}
                 {can('defer') && (
                   <Button
                     variant="secondary"
@@ -742,7 +756,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     {t('Отложить')}
                   </Button>
                 )}
-                {can('complete') && (
+                {can('complete') && !can('approve') && (
                   <Button size="sm" onClick={() => void handleUpdateField('status', 'done')}>
                     {t('Завершить')}
                   </Button>

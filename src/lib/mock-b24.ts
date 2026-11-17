@@ -817,6 +817,8 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'tasks.task.defer':
     case 'tasks.task.complete':
     case 'tasks.task.renew':
+    case 'tasks.task.approve':
+    case 'tasks.task.disapprove':
     case 'tasks.task.update': {
       // Подтверждаем правку, но данные не меняем: мок живёт весь прогон
       // UI-тестов, и перенос задачи в одном тесте сдвинул бы снимки остальных.
