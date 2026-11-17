@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from 'react';
 import { convertBxTask } from '@/store/kanban';
+import { fetchTaskById } from '@/lib/bitrix24';
 import TaskModal from './TaskModal';
 import RefreshButton from '@/components/RefreshButton';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -274,6 +275,78 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const stageKey = allStages.map((stage) => stage.id).join(',');
   const [stagePages, setStagePages] = useState<Record<string, KanbanStagePage>>({});
   const stageRequestVersion = useRef(0);
+  // Колонки доски живут в локальном состоянии, поэтому правки из карточки (фаза, статус,
+  // срок) они сами не видят. Переносим изменение из стора и перекладываем задачу в новую колонку.
+  const storeTasks = useKanbanStore((s) => s.allTasks);
+  const applyTaskChange = useCallback((next: BxTask) => {
+    setStagePages((current) => {
+      const source = Object.entries(current).find(([, page]) =>
+        page.tasks.some((task) => task.id === next.id),
+      );
+      if (!source) return current;
+      const [sourceId, sourcePage] = source;
+      const old = sourcePage.tasks.find((task) => task.id === next.id)!;
+      const targetId =
+        old.stageId === next.stageId
+          ? sourceId
+          : Object.keys(current).find((id) => id === next.stageId) || sourceId;
+      if (targetId === sourceId) {
+        return {
+          ...current,
+          [sourceId]: {
+            ...sourcePage,
+            tasks: sourcePage.tasks.map((task) =>
+              task.id === next.id ? { ...task, ...next, stageId: task.stageId } : task,
+            ),
+          },
+        };
+      }
+      const target = current[targetId];
+      return {
+        ...current,
+        [sourceId]: {
+          ...sourcePage,
+          tasks: sourcePage.tasks.filter((task) => task.id !== next.id),
+          total: Math.max(0, sourcePage.total - 1),
+        },
+        [targetId]: { ...target, tasks: [next, ...target.tasks], total: target.total + 1 },
+      };
+    });
+  }, []);
+  useEffect(() => {
+    const byId = new Map(storeTasks.map((task) => [task.id, task]));
+    for (const page of Object.values(stagePages)) {
+      for (const task of page.tasks) {
+        const fresh = byId.get(task.id);
+        if (!fresh || fresh === task) continue;
+        const changed =
+          (fresh.stageId !== task.stageId && fresh.stageId in stagePages) ||
+          fresh.status !== task.status ||
+          fresh.title !== task.title ||
+          fresh.priority !== task.priority ||
+          fresh.dueDate !== task.dueDate ||
+          fresh.assigneeId !== task.assigneeId;
+        if (!changed) continue;
+        applyTaskChange(fresh);
+        // Портал сам двигает задачу по системным фазам при смене статуса (в работу, завершена):
+        // стор этого не знает, поэтому спрашиваем актуальную фазу.
+        if (fresh.status !== task.status && fresh.stageId === task.stageId) {
+          void fetchTaskById(task.id)
+            .then((raw) => {
+              const stageId = convertBxTask(raw).stageId;
+              if (stageId === fresh.stageId) return;
+              // Пишем и в стор, иначе сравнение выше вернёт задачу в старую колонку.
+              const patch = (item: BxTask) => (item.id === task.id ? { ...item, stageId } : item);
+              useKanbanStore.setState((state) => ({
+                tasks: state.tasks.map(patch),
+                allTasks: state.allTasks.map(patch),
+              }));
+            })
+            .catch(() => {});
+        }
+      }
+    }
+  }, [storeTasks, stagePages, applyTaskChange]);
   // Задачи без фазы (stageId «0») в списке фаз проекта отсутствуют, поэтому
   // отдельным запросом их не достать: без этого они молча пропадали с доски.
   // Запрашиваем их вместе с системной фазой «Новые» — ровно туда их и

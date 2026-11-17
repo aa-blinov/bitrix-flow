@@ -267,6 +267,42 @@ test('доска проекта раскладывает задачи по ко�
   await expect(page).toHaveScreenshot('board.png', { mask: [page.locator('time')] });
 });
 
+test('фаза, сменённая в карточке, сразу переносит задачу на доске', async ({ page }) => {
+  await page.route('**/api/bitrix/tasks.task.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          task: {
+            id: '101',
+            title: 'Перевести справочники на GraphQL',
+            status: '2',
+            groupId: '10',
+            stageId: '100',
+            action: { start: true, complete: true },
+          },
+        },
+      },
+    }),
+  );
+  await page.goto('/projects/10');
+  await settle(page);
+  const title = 'Перевести справочники на GraphQL';
+  await page.getByRole('heading', { name: title, level: 3 }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await choose(page, dialog.getByRole('combobox', { name: 'Фаза задачи' }), '102');
+  const target = 'На ревью';
+  await page.keyboard.press('Escape');
+  const column = page
+    .getByRole('heading', { name: target, level: 2 })
+    .locator('xpath=ancestor::*[.//h3][1]');
+  await expect(column.getByRole('heading', { name: title, level: 3 })).toBeVisible();
+  const backlog = page
+    .getByRole('heading', { name: 'Бэклог', level: 2 })
+    .locator('xpath=ancestor::*[.//h3][1]');
+  await expect(backlog.getByRole('heading', { name: title, level: 3 })).toHaveCount(0);
+});
+
 test(
   'мессенджер: диалоги делятся по вкладкам, сообщение уходит',
   { tag: '@mobile' },
