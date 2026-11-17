@@ -59,6 +59,30 @@ test('кнопки статуса задачи пропускает прокси
   }
 });
 
+test('новую задачу можно завершить, не начиная', async ({ page }) => {
+  // Битрикс сам решает, что доступно: у «Новой» он отдаёт complete, и кнопка должна быть.
+  await page.route('**/api/bitrix/tasks.task.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          task: {
+            id: '107',
+            title: 'Обновить зависимости',
+            status: '2',
+            action: { start: true, complete: true, defer: true },
+          },
+        },
+      },
+    }),
+  );
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Обновить зависимости' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('button', { name: 'Начать' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Завершить', exact: true })).toBeVisible();
+});
+
 test('перенос в другой проект не закрывает карточку', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);

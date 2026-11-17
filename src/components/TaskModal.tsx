@@ -692,6 +692,16 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     {t('Отложить')}
                   </Button>
                 )}
+                {/* Битрикс закрывает и «Новую» минуя «В работе»: права берём из него же. */}
+                {can('complete') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateField('status', 'done')}
+                  >
+                    {t('Завершить')}
+                  </Button>
+                )}
               </>
             )}
             {task.status === 'in_progress' && (
