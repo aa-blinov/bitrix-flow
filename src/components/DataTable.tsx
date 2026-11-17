@@ -5,6 +5,7 @@
 // разметку и цвета даём мы, поэтому палитра, обе темы и t() работают как везде,
 // а у AG Grid группировка только в платной версии и тема своя.
 import { ChevronRight, ChevronUp } from 'lucide-react';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import {
   aggregationFn_max,
   aggregationFn_sum,
@@ -71,6 +72,7 @@ export function DataTable<T extends RowData>({
   expandAll = false,
   pageSize = Infinity,
 }: Props<T>) {
+  const fade = useScrollFade<HTMLDivElement>([data.length]);
   const [limit, setLimit] = useState(pageSize);
   const [sorting, setSorting] = useState<SortingState>(initialSorting);
   const [expanded, setExpanded] = useState<ExpandedState>(expandAll ? true : {});
@@ -93,7 +95,10 @@ export function DataTable<T extends RowData>({
   const hasFooter = columns.some((column) => column.footer);
 
   return (
-    <div className="w-full overflow-x-auto rounded-ui border border-line">
+    <div
+      ref={fade.ref}
+      className={`w-full overflow-x-auto rounded-ui border border-line ${fade.className}`}
+    >
       <table className="w-full border-collapse text-sm text-ink">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 z-10 bg-canvas">

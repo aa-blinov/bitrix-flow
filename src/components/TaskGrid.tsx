@@ -80,6 +80,7 @@ import { toolbarControl, toolbarPanel, toolbarSelect } from '@/components/monos/
 import { useIsMobile } from '@/hooks/useIsMobile';
 import QuickCreateTask from '@/components/QuickCreateTask';
 import RefreshButton from '@/components/RefreshButton';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import { useTaskToasts } from '@/components/monos/toast';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import TaskFilterBar from '@/components/TaskFilterBar';
@@ -1381,23 +1382,7 @@ export default function TaskGrid({
         : 'max-h-[calc(100dvh-28rem)]';
   const tableScrollClass =
     tableHeightClass === 'max-h-none' ? 'overflow-x-auto' : 'overflow-auto overscroll-contain';
-  // Колонок больше, чем влезает: без затухания у правого края таблица выглядит обрезанной по ошибке.
-  const tableScrollRef = useRef<HTMLDivElement | null>(null);
-  const [moreRight, setMoreRight] = useState(false);
-  useEffect(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    const update = () => setMoreRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    if (el.firstElementChild) observer.observe(el.firstElementChild);
-    return () => {
-      el.removeEventListener('scroll', update);
-      observer.disconnect();
-    };
-  }, [isMobile, serverPageReady, tasks.length]);
+  const tableFade = useScrollFade<HTMLDivElement>([isMobile, serverPageReady, tasks.length]);
   const visiblePageCount = loadPage
     ? totalPageCount
     : !hasNarrowingFilter && totalCount
@@ -2359,8 +2344,8 @@ export default function TaskGrid({
           )}
           {!isMobile && serverPageReady && tasks.length > 0 && (
             <div
-              ref={tableScrollRef}
-              className={`px-4 sm:px-6 ${tableScrollClass} ${tableHeightClass} ${moreRight ? '[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]' : ''}`}
+              ref={tableFade.ref}
+              className={`px-4 sm:px-6 ${tableScrollClass} ${tableHeightClass} ${tableFade.className}`}
             >
               <table className="w-full min-w-max table-fixed border-collapse text-left text-sm text-ink">
                 <colgroup>

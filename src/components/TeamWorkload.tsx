@@ -21,6 +21,7 @@ import PageHeader from '@/components/PageHeader';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/monos/Button';
 import RefreshButton from '@/components/RefreshButton';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import { Card } from '@/components/monos/Card';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
@@ -220,6 +221,7 @@ export default function TeamWorkload() {
     };
   }, [selectedProjectId, weekStartKey]);
 
+  const fade = useScrollFade<HTMLDivElement>([Boolean(summary)]);
   const refreshActualTime = async () => {
     setTimeRefreshing(true);
     try {
@@ -454,25 +456,27 @@ export default function TeamWorkload() {
                 busy={timeRefreshing}
                 onRefresh={refreshActualTime}
               />
-              <IconButton
-                label={t('Предыдущая неделя')}
-                variant="outline"
-                size="md"
-                onClick={() => setWeekStart((current) => addDays(current, -7))}
-              >
-                <ChevronLeft className="size-4" strokeWidth={1.7} />
-              </IconButton>
-              <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>
-                {t('Сегодня')}
-              </Button>
-              <IconButton
-                label={t('Следующая неделя')}
-                variant="outline"
-                size="md"
-                onClick={() => setWeekStart((current) => addDays(current, 7))}
-              >
-                <ChevronRight className="size-4" strokeWidth={1.7} />
-              </IconButton>
+              <div className="flex shrink-0 items-center gap-2">
+                <IconButton
+                  label={t('Предыдущая неделя')}
+                  variant="outline"
+                  size="md"
+                  onClick={() => setWeekStart((current) => addDays(current, -7))}
+                >
+                  <ChevronLeft className="size-4" strokeWidth={1.7} />
+                </IconButton>
+                <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+                  {t('Сегодня')}
+                </Button>
+                <IconButton
+                  label={t('Следующая неделя')}
+                  variant="outline"
+                  size="md"
+                  onClick={() => setWeekStart((current) => addDays(current, 7))}
+                >
+                  <ChevronRight className="size-4" strokeWidth={1.7} />
+                </IconButton>
+              </div>
             </div>
           </div>
 
@@ -489,7 +493,7 @@ export default function TeamWorkload() {
           ) : !summary ? (
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
-            <div className="overflow-x-auto">
+            <div ref={fade.ref} className={`overflow-x-auto ${fade.className}`}>
               <div className="min-w-[1090px]">
                 <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line bg-surface-2 text-sm">
                   <div className="px-4 py-3 font-medium">{t('Исполнитель')}</div>
