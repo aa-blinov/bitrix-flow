@@ -1192,8 +1192,9 @@ function TaskCard({
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={onClick}
       // Колонка держит до 50 карточек, а видно от силы шесть: content-visibility
-      // позволяет браузеру не отрисовывать то, что за пределами экрана.
-      className={`group/card cursor-pointer border-transparent p-3 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] hover:border-line-strong hover:shadow-lift ${
+      // позволяет браузеру не отрисовывать то, что за пределами экрана. Он же обрезает всё,
+      // что вылезает за карточку, поэтому с открытым меню фазы включаем показ целиком.
+      className={`group/card cursor-pointer border-transparent p-3 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] has-[[aria-expanded=true]]:[content-visibility:visible] hover:border-line-strong hover:shadow-lift ${
         isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-surface-2 text-ink-soft' : ''
       }`}
     >
