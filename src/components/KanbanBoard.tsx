@@ -113,6 +113,20 @@ function formatDeadline(dateStr: string | undefined): string {
 
 type KanbanStagePage = { tasks: BxTask[]; total: number; loading: boolean };
 const KANBAN_PAGE_SIZE = 50;
+const SHOWN_FIELDS = [
+  'stageId',
+  'status',
+  'title',
+  'priority',
+  'dueDate',
+  'assigneeId',
+  'assigneeName',
+  'assigneeAvatar',
+  'estimate',
+  'actualTime',
+  'tags',
+  'accompliceIds',
+] as const satisfies readonly (keyof BxTask)[];
 
 export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const {
@@ -278,7 +292,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // Колонки доски живут в локальном состоянии, поэтому правки из карточки (фаза, статус,
   // срок) они сами не видят. Переносим изменение из стора и перекладываем задачу в новую колонку.
   const storeTasks = useKanbanStore((s) => s.allTasks);
-  const applyTaskChange = useCallback((next: BxTask) => {
+  const applyTaskChange = useCallback((next: Partial<BxTask> & { id: string }) => {
     setStagePages((current) => {
       const source = Object.entries(current).find(([, page]) =>
         page.tasks.some((task) => task.id === next.id),
@@ -296,7 +310,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           [sourceId]: {
             ...sourcePage,
             tasks: sourcePage.tasks.map((task) =>
-              task.id === next.id ? { ...task, ...next, stageId: task.stageId } : task,
+              task.id === next.id ? ({ ...task, ...next, stageId: task.stageId } as BxTask) : task,
             ),
           },
         };
@@ -309,7 +323,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           tasks: sourcePage.tasks.filter((task) => task.id !== next.id),
           total: Math.max(0, sourcePage.total - 1),
         },
-        [targetId]: { ...target, tasks: [next, ...target.tasks], total: target.total + 1 },
+        [targetId]: {
+          ...target,
+          tasks: [{ ...old, ...next } as BxTask, ...target.tasks],
+          total: target.total + 1,
+        },
       };
     });
   }, []);
@@ -319,15 +337,17 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       for (const task of page.tasks) {
         const fresh = byId.get(task.id);
         if (!fresh || fresh === task) continue;
-        const changed =
-          (fresh.stageId !== task.stageId && fresh.stageId in stagePages) ||
-          fresh.status !== task.status ||
-          fresh.title !== task.title ||
-          fresh.priority !== task.priority ||
-          fresh.dueDate !== task.dueDate ||
-          fresh.assigneeId !== task.assigneeId;
-        if (!changed) continue;
-        applyTaskChange(fresh);
+        // Только то, что рисует карточка доски: остальное в списке и в сторе устроено по-разному
+        // (подзадачи, комментарии), и затирать его нельзя.
+        const patch: Partial<BxTask> & { id: string } = { id: task.id };
+        for (const key of SHOWN_FIELDS) {
+          const value = fresh[key];
+          if (value !== undefined && JSON.stringify(value) !== JSON.stringify(task[key]))
+            Object.assign(patch, { [key]: value });
+        }
+        if (patch.stageId && !(patch.stageId in stagePages)) delete patch.stageId;
+        if (Object.keys(patch).length === 1) continue;
+        applyTaskChange(patch);
         // Портал сам двигает задачу по системным фазам при смене статуса (в работу, завершена):
         // стор этого не знает, поэтому спрашиваем актуальную фазу.
         if (fresh.status !== task.status && fresh.stageId === task.stageId) {
