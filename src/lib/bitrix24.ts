@@ -911,6 +911,13 @@ export async function updateTaskResult(resultId: string, text: string): Promise<
   await bx24('tasks.task.result.update', { resultId, text });
 }
 
+export async function deleteTask(taskId: string): Promise<void> {
+  await bx24('tasks.task.delete', { taskId });
+  await cacheInvalidateByPrefix('tasks:');
+  await cacheInvalidateByPrefix('subtasks:');
+  await taskInvalidate(taskId);
+}
+
 export async function deleteTaskResult(resultId: string): Promise<void> {
   await bx24('tasks.task.result.delete', { resultId });
 }

@@ -48,6 +48,7 @@ import { SelectField } from '@/components/monos/SelectField';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import { useToast } from '@/components/monos/toast';
+import { useConfirm } from '@/components/monos/confirm-dialog';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { toLocalInputValue } from '@/lib/utils';
 import LoadingState from '@/components/LoadingState';
@@ -125,6 +126,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     addTaskResult,
     updateTaskResult,
     deleteTaskResult,
+    deleteTask,
     addTimeEntry,
     updateTimeEntry,
     deleteTimeEntry,
@@ -152,6 +154,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       addTaskResult: s.addTaskResult,
       updateTaskResult: s.updateTaskResult,
       deleteTaskResult: s.deleteTaskResult,
+      deleteTask: s.deleteTask,
       addTimeEntry: s.addTimeEntry,
       updateTimeEntry: s.updateTimeEntry,
       deleteTimeEntry: s.deleteTimeEntry,
@@ -357,6 +360,23 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [task.id, actionsVersion]);
 
   const can = (action: string) => allowedActions?.[action] === true;
+
+  const confirm = useConfirm();
+  const removeTask = async () => {
+    const ok = await confirm({
+      title: t('Удалить задачу «{0}»?', task.title),
+      description: t('Задача удалится в Битриксе у всех, вернуть её будет нельзя.'),
+      confirmLabel: t('Удалить'),
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteTask(task.id);
+      onClose();
+    } catch (error) {
+      setFieldError(error instanceof Error ? error.message : t('Не удалось удалить задачу'));
+    }
+  };
 
   const handleUpdateField = async (field: string, value: any) => {
     // Пока статус меняется, кнопки статуса прячем: права ещё старые.
@@ -797,6 +817,16 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             >
               <Pencil size={14} strokeWidth={1.7} />
             </IconButton>
+            {can('remove') && (
+              <IconButton
+                label={t('Удалить задачу')}
+                variant="ghost"
+                size="sm"
+                onClick={() => void removeTask()}
+              >
+                <Trash2 size={14} strokeWidth={1.7} />
+              </IconButton>
+            )}
             <IconButton label={t('Закрыть задачу')} variant="ghost" size="sm" onClick={onClose}>
               <X size={16} strokeWidth={1.7} />
             </IconButton>

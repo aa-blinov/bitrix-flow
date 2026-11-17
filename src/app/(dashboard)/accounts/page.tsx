@@ -170,9 +170,12 @@ export default function AccountsPage() {
                     >
                       {account.role === 'admin' ? t('Снять права') : t('Сделать администратором')}
                     </Button>
+                    {/* Необратимое действие отделено и красное: в одном ряду с «Заблокировать»
+                        его легко нажать вместо соседа. */}
                     <Button
                       size="sm"
-                      variant="secondary"
+                      variant="danger"
+                      className="sm:ml-4"
                       disabled={busy}
                       onClick={() => void remove(account)}
                     >

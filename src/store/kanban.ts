@@ -32,6 +32,7 @@ import {
   addTaskResult as bxAddTaskResult,
   updateTaskResult as bxUpdateTaskResult,
   deleteTaskResult as bxDeleteTaskResult,
+  deleteTask as bxDeleteTask,
   addTimeEntry as bxAddTime,
   updateTimeEntry as bxUpdateTime,
   deleteTimeEntry as bxDeleteTime,
@@ -172,6 +173,7 @@ interface KanbanStore {
   addTaskResult: (taskId: string, text: string) => Promise<void>;
   updateTaskResult: (taskId: string, resultId: string, text: string) => Promise<void>;
   deleteTaskResult: (taskId: string, resultId: string) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   addTimeEntry: (taskId: string, hours: number, description: string) => void;
   attachFile: (taskId: string, file: File) => Promise<void>;
   updateTimeEntry: (
@@ -1108,6 +1110,16 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       }
       throw error;
     }
+  },
+
+  // Задача исчезает из списков только после ответа портала: удаление необратимо, и
+  // оптимистичное скрытие без отката показало бы «удалённую» задачу, которая осталась.
+  deleteTask: async (taskId) => {
+    await bxDeleteTask(taskId);
+    set((state) => ({
+      tasks: state.tasks.filter((task) => task.id !== taskId),
+      allTasks: state.allTasks.filter((task) => task.id !== taskId),
+    }));
   },
 
   deleteTaskResult: async (taskId, resultId) => {

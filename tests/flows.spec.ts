@@ -141,6 +141,41 @@ test('сводка прячет проекты без задач, а даты в
   await expect(from).toHaveValue('15.03.2026');
 });
 
+test('задачу можно удалить из карточки после подтверждения', async ({ page }) => {
+  await page.route('**/api/bitrix/tasks.task.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          task: {
+            id: '107',
+            title: 'Обновить зависимости',
+            status: '2',
+            action: { remove: true },
+          },
+        },
+      },
+    }),
+  );
+  const deleted: string[] = [];
+  await page.route('**/api/bitrix/tasks.task.delete**', (route) => {
+    deleted.push(route.request().postData() ?? '');
+    return route.fulfill({ json: { result: true } });
+  });
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Обновить зависимости' }).first().click();
+  const dialog = page.getByRole('dialog', { name: /Обновить зависимости/ });
+  await dialog.getByRole('button', { name: 'Удалить задачу' }).click();
+  // Отмена ничего не удаляет.
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Отмена' }).click();
+  expect(deleted).toEqual([]);
+  await dialog.getByRole('button', { name: 'Удалить задачу' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect.poll(() => deleted.length).toBe(1);
+  expect(deleted[0]).toContain('taskId=107');
+  await expect(page.getByRole('dialog', { name: /Обновить зависимости/ })).toHaveCount(0);
+});
+
 test('перенос в другой проект не закрывает карточку', async ({ page }) => {
   await page.goto('/all-tasks');
   await settle(page);

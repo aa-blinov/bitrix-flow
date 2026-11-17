@@ -436,6 +436,11 @@ export const EN: Record<string, string> = {
   'Открыть проект': 'Open the project',
   Отложить: 'Postpone',
   Принять: 'Accept',
+  'Удалить задачу «{0}»?': 'Delete task "{0}"?',
+  'Задача удалится в Битриксе у всех, вернуть её будет нельзя.':
+    'The task will be deleted in Bitrix for everyone and cannot be restored.',
+  'Не удалось удалить задачу': 'Could not delete the task',
+  'Удалить задачу': 'Delete task',
   Ещё: 'More',
   'в проектах:': 'in projects:',
   'В работе:': 'In progress:',
