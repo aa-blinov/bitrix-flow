@@ -37,7 +37,7 @@ export function Breadcrumbs({
               {item.href && !isLast ? (
                 <a
                   href={item.href}
-                  className="min-w-0 truncate rounded-ui px-0.5 transition-colors duration-fast hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  className="min-w-0 truncate rounded-ui px-0.5 max-sm:-my-3.5 max-sm:py-3.5 transition-colors duration-fast hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 >
                   {item.label}
                 </a>

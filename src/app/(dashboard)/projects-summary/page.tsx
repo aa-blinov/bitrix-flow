@@ -155,21 +155,30 @@ export default function ProjectsSummaryPage() {
   const statusBadges = (project: ProjectSummary) => (
     <div className="flex flex-wrap gap-x-3 gap-y-1">
       {project.overdue > 0 ? (
-        <Link href={`/projects/${project.id}?view=grid&status=overdue`}>
+        <Link
+          className="max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+          href={`/projects/${project.id}?view=grid&status=overdue`}
+        >
           <Badge tone="danger">
             {t('Просрочено:')} {project.overdue}
           </Badge>
         </Link>
       ) : null}
       {project.inProgress > 0 ? (
-        <Link href={`/projects/${project.id}?view=grid&status=active`}>
+        <Link
+          className="max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+          href={`/projects/${project.id}?view=grid&status=active`}
+        >
           <Badge tone="accent">
             {project.inProgress} {t('в работе')}
           </Badge>
         </Link>
       ) : null}
       {project.noDeadline > 0 ? (
-        <Link href={`/projects/${project.id}?view=grid&status=no_deadline`}>
+        <Link
+          className="max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+          href={`/projects/${project.id}?view=grid&status=no_deadline`}
+        >
           <Badge tone="neutral">
             {project.noDeadline} {t('без срока')}
           </Badge>
@@ -373,7 +382,7 @@ export default function ProjectsSummaryPage() {
             </div>
             <div className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
               <span className="shrink-0 text-ink-soft">{t('Период:')}</span>
-              <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 sm:w-auto">
+              <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-1 sm:w-auto sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
                 <label htmlFor="summary-date-from" className="text-ink-soft">
                   {t('с')}
                 </label>
@@ -468,7 +477,7 @@ export default function ProjectsSummaryPage() {
                   <article key={project.id} className="space-y-3 py-3">
                     <div>
                       <Link
-                        className="font-medium leading-snug hover:underline"
+                        className="inline-block py-3 font-medium leading-snug hover:underline md:py-0"
                         href={`/projects/${project.id}`}
                       >
                         {project.name}

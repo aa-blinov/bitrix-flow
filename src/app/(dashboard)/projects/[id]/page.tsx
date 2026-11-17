@@ -272,13 +272,13 @@ export default function ProjectPage() {
     <div className="min-h-screen overflow-x-clip bg-canvas" suppressHydrationWarning>
       {/* Project Header */}
       <div className="border-b border-line bg-canvas">
-        <div className="px-4 pt-3 pb-2 lg:px-6">
+        <div className="px-4 pt-3 pb-2 max-sm:pt-0 max-sm:pb-0 lg:px-6">
           <div className="flex items-center gap-1 overflow-x-auto text-xs text-ink-faint scrollbar-hide">
             <Button
               variant="quiet"
               size="sm"
               onClick={() => router.push('/')}
-              className="h-auto min-h-0 max-sm:min-h-0 px-0 py-0 text-xs"
+              className="h-auto min-h-0 max-sm:min-h-11 px-0 py-0 text-xs"
             >
               {t('Главная')}
             </Button>
@@ -302,7 +302,8 @@ export default function ProjectPage() {
                   variant="quiet"
                   size="sm"
                   onClick={() => setMembersOpen(true)}
-                  className="h-auto min-h-0 max-sm:min-h-0 gap-1 px-0 py-0 text-sm"
+                  // Область касания 44px без роста строки: поля добираются отрицательным отступом.
+                  className="h-auto min-h-0 max-sm:-my-3 max-sm:min-h-11 gap-1 px-0 py-0 text-sm"
                   icon={<Users size={14} strokeWidth={1.7} />}
                 >
                   {currentProject.membersCount || 0}{' '}
