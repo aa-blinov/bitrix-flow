@@ -496,7 +496,9 @@ export default function TeamWorkload() {
             <div ref={fade.ref} className={`overflow-x-auto ${fade.className}`}>
               <div className="min-w-[1090px]">
                 <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line bg-surface-2 text-sm">
-                  <div className="px-4 py-3 font-medium">{t('Исполнитель')}</div>
+                  <div className="z-[2] border-r border-line bg-surface-2 px-4 py-3 font-medium sm:sticky sm:left-0">
+                    {t('Исполнитель')}
+                  </div>
                   {days.map((day, index) => (
                     <div
                       key={calendarDayKey(day)}
@@ -536,7 +538,8 @@ export default function TeamWorkload() {
                       key={assignee.id}
                       className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line last:border-b-0"
                     >
-                      <div className="flex min-w-0 items-center gap-2 px-4 py-3">
+                      {/* Имя стоит на месте при прокрутке дней: иначе в узком окне не видно, чья строка. */}
+                      <div className="z-[2] flex min-w-0 items-center gap-2 border-r border-line bg-surface px-4 py-3 sm:sticky sm:left-0">
                         <UserAvatar user={assignee} />
                         <div className="min-w-0">
                           {/* Имя обрезается колонкой — полное показываем подсказкой. */}

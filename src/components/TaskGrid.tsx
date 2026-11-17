@@ -1770,12 +1770,21 @@ export default function TaskGrid({
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
   };
+  // Название и галка остаются на месте при прокрутке вбок: без них в широкой таблице
+  // непонятно, чья это строка. Только пока название первое, иначе оно не слева.
+  const pinTitle = orderedVisibleColumns[0] === 'title';
+  const pinBox = 'sticky left-0 z-[5] bg-canvas group-hover/row:bg-surface';
+  const pinTitleCell =
+    'sticky left-16 z-[5] border-r border-line bg-canvas group-hover/row:bg-surface';
   const sortableHead = (key: SortKey, label: string) => {
     const direction = sortDirection(key);
     return (
       <GridHead
         key={key}
-        className="relative p-0"
+        className={cn(
+          'relative p-0',
+          key === 'title' && pinTitle && 'sticky left-16 z-20 border-r border-line',
+        )}
         style={{ width: columnWidths[key] }}
         ariaSort={direction ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
       >
@@ -2364,11 +2373,11 @@ export default function TaskGrid({
           {!isMobile && serverPageReady && tasks.length > 0 && (
             <div
               ref={tableFade.ref}
-              className={`px-4 sm:px-6 ${tableScrollClass} ${tableHeightClass} ${tableFade.className}`}
+              className={`${tableScrollClass} ${tableHeightClass} ${tableFade.className}`}
             >
               <table className="w-full min-w-max table-fixed border-collapse text-left text-sm text-ink">
                 <colgroup>
-                  <col className="w-10" />
+                  <col className="w-16" />
                   {orderedVisibleColumns.map((column) => (
                     <col key={column} style={{ width: columnWidths[column] }} />
                   ))}
@@ -2376,7 +2385,9 @@ export default function TaskGrid({
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-canvas">
                   <tr className="border-b border-line">
-                    <GridHead className="w-10 px-2 py-1.5">
+                    <GridHead
+                      className={cn('w-16 pr-2 pl-6 py-1.5', pinTitle && 'sticky left-0 z-20')}
+                    >
                       <Checkbox
                         checked={
                           pageTasks.length > 0 &&
@@ -2410,9 +2421,11 @@ export default function TaskGrid({
                         <tr className="bg-surface-2 hover:bg-surface-2">
                           <td
                             colSpan={tableColumnCount}
-                            className="border-b border-line px-2 py-1 text-sm font-medium text-ink"
+                            className="border-b border-line pr-2 pl-6 py-1 text-sm font-medium text-ink"
                           >
-                            {groupHeader(group)}
+                            {/* Заголовок группы тянется на всю ширину таблицы: без sticky он уезжал
+                                за край вместе с колонками. */}
+                            <div className="sticky left-6 w-fit">{groupHeader(group)}</div>
                           </td>
                         </tr>
                       )}
@@ -2422,11 +2435,11 @@ export default function TaskGrid({
                           // content-visibility даёт браузеру пропускать отрисовку
                           // строк за экраном: без него наведение на строку
                           // перекрашивало всю таблицу (~200мс на событие).
-                          className={`[content-visibility:auto] [contain-intrinsic-size:auto_44px] hover:bg-surface ${
+                          className={`group/row [content-visibility:auto] [contain-intrinsic-size:auto_44px] hover:bg-surface ${
                             contextTaskIds.has(task.id) ? 'opacity-60' : ''
                           } ${task.status === 'done' ? 'text-ink-faint' : ''}`}
                         >
-                          <GridCell>
+                          <GridCell className={cn('pl-6', pinTitle && pinBox)}>
                             <Checkbox
                               checked={selectedIds.has(task.id)}
                               onChange={() => toggleSelected(task.id)}
@@ -2436,7 +2449,10 @@ export default function TaskGrid({
                           {orderedVisibleColumns.map((column) => {
                             if (column === 'title') {
                               return (
-                                <GridCell key={column}>
+                                <GridCell
+                                  key={column}
+                                  className={pinTitle ? pinTitleCell : undefined}
+                                >
                                   <EditableTitle
                                     task={task}
                                     tree={
@@ -2547,52 +2563,54 @@ export default function TaskGrid({
                         <tr>
                           <td
                             colSpan={tableColumnCount}
-                            className="border-b border-line px-2 py-1.5"
+                            className="border-b border-line pr-2 pl-6 py-1.5"
                           >
-                            {addingStageId === group.key ? (
-                              <TextField
-                                autoFocus
-                                value={newTaskTitle}
-                                onChange={(event) => setNewTaskTitle(event.target.value)}
-                                onBlur={() => {
-                                  setAddingStageId(null);
-                                  setNewTaskTitle('');
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter' && newTaskTitle.trim()) {
-                                    // Битрикс отклоняет задачу без исполнителя; диалоговое
-                                    // создание подставляет currentUser сам, а эта строка нет.
-                                    createTask({
-                                      title: newTaskTitle.trim(),
-                                      responsibleId: currentUserId,
-                                      stageId: group.key,
-                                    }).catch((error) =>
-                                      gridToasts.failed(t('Задачу не создали'), error),
-                                    );
-                                    setNewTaskTitle('');
-                                    setAddingStageId(null);
-                                  }
-                                  if (event.key === 'Escape') {
+                            <div className="sticky left-6 w-fit">
+                              {addingStageId === group.key ? (
+                                <TextField
+                                  autoFocus
+                                  value={newTaskTitle}
+                                  onChange={(event) => setNewTaskTitle(event.target.value)}
+                                  onBlur={() => {
                                     setAddingStageId(null);
                                     setNewTaskTitle('');
-                                  }
-                                }}
-                                placeholder={t('Название новой задачи')}
-                                aria-label={t('Название новой задачи')}
-                                size="sm"
-                                variant="underline"
-                                className="w-full max-w-md"
-                              />
-                            ) : (
-                              <Button
-                                variant="quiet"
-                                size="sm"
-                                className="text-ink-faint"
-                                onClick={() => setAddingStageId(group.key)}
-                              >
-                                {t('+ Добавить задачу')}
-                              </Button>
-                            )}
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && newTaskTitle.trim()) {
+                                      // Битрикс отклоняет задачу без исполнителя; диалоговое
+                                      // создание подставляет currentUser сам, а эта строка нет.
+                                      createTask({
+                                        title: newTaskTitle.trim(),
+                                        responsibleId: currentUserId,
+                                        stageId: group.key,
+                                      }).catch((error) =>
+                                        gridToasts.failed(t('Задачу не создали'), error),
+                                      );
+                                      setNewTaskTitle('');
+                                      setAddingStageId(null);
+                                    }
+                                    if (event.key === 'Escape') {
+                                      setAddingStageId(null);
+                                      setNewTaskTitle('');
+                                    }
+                                  }}
+                                  placeholder={t('Название новой задачи')}
+                                  aria-label={t('Название новой задачи')}
+                                  size="sm"
+                                  variant="underline"
+                                  className="w-full max-w-md"
+                                />
+                              ) : (
+                                <Button
+                                  variant="quiet"
+                                  size="sm"
+                                  className="text-ink-faint"
+                                  onClick={() => setAddingStageId(group.key)}
+                                >
+                                  {t('+ Добавить задачу')}
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )}

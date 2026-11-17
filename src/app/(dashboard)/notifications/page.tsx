@@ -189,11 +189,11 @@ export default function NotificationsPage() {
       />
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
         {/* Лента за все проекты длинная: фильтр по проекту и типу события. */}
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <SelectField
             size="sm"
             variant="boxed"
-            className={`${toolbarSelect} w-56`}
+            className={`${toolbarSelect} w-full sm:w-56`}
             aria-label={t('Проект')}
             value={projectFilter}
             onChange={(event) => changeFilter(() => setProjectFilter(event.target.value))}
@@ -207,7 +207,7 @@ export default function NotificationsPage() {
           <SelectField
             size="sm"
             variant="boxed"
-            className={`${toolbarSelect} w-44`}
+            className={`${toolbarSelect} w-full sm:w-44`}
             aria-label={t('Тип события')}
             value={typeFilter}
             onChange={(event) => changeFilter(() => setTypeFilter(event.target.value))}
