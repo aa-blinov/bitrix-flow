@@ -570,6 +570,17 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     setDragOverColumn(null);
   };
 
+  // Доска держит задачи колонок у себя, а в сторе их может не быть: тогда перенос молча
+  // ничего не делал. Сначала подгружаем задачу, как при перетаскивании.
+  const moveCardToStage = async (taskId: string, stageId: string) => {
+    try {
+      await loadTaskById(taskId);
+      await moveTaskToStage(taskId, stageId);
+    } catch {
+      toast({ title: t('Не удалось перенести задачу'), tone: 'danger' });
+    }
+  };
+
   const handleDrop = async (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
     if (draggedTask) {
@@ -967,7 +978,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                       onDragStart={handleDragStart}
                       stages={allStages}
-                      onMoveToStage={(taskId, stageId) => void moveTaskToStage(taskId, stageId)}
+                      onMoveToStage={(taskId, stageId) => void moveCardToStage(taskId, stageId)}
                       onClick={() => {
                         // Сначала полная задача: карточке нужны права на действия
                         // и теги. Открывать раньше — значит перечитывать её
@@ -1043,7 +1054,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
                     onDragStart={handleDragStart}
                     stages={allStages}
-                    onMoveToStage={(taskId, stageId) => void moveTaskToStage(taskId, stageId)}
+                    onMoveToStage={(taskId, stageId) => void moveCardToStage(taskId, stageId)}
                     onClick={() => openTask(task.id)}
                     isDragging={draggedTask === task.id}
                   />
