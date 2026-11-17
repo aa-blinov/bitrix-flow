@@ -76,6 +76,13 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const closeMobile = () => setMobileOpen(false);
   const pathname = usePathname();
+  // Активный проект может лежать ниже видимой части длинного списка: подводим его в поле зрения.
+  const projectListRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    projectListRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [pathname, projects.length]);
   const router = useRouter();
   const [navOrder, setNavOrder] = useNavOrder();
   const chatUnread = useChatAlerts();
@@ -229,7 +236,10 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             aria-label={t('Поиск по проектам')}
             className="mb-2"
           />
-          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1">
+          <div
+            ref={projectListRef}
+            className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1"
+          >
             {!isRehydrated ? null : projectsLoading ? (
               <LoadingState className="min-h-24 bg-transparent" />
             ) : sortedProjects.length > 0 ? (

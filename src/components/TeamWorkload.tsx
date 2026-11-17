@@ -10,7 +10,6 @@ import {
   ClipboardList,
   Clock3,
   Download,
-  RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
 import { downloadCsv } from '@/lib/csv';
@@ -21,6 +20,7 @@ import TaskModal from '@/components/TaskModal';
 import PageHeader from '@/components/PageHeader';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/monos/Button';
+import RefreshButton from '@/components/RefreshButton';
 import { Card } from '@/components/monos/Card';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
@@ -222,11 +222,17 @@ export default function TeamWorkload() {
 
   const refreshActualTime = async () => {
     setTimeRefreshing(true);
-    await fetch('/api/workload/time', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start: weekStartKey, end: weekEndKey }),
-    });
+    try {
+      const response = await fetch('/api/workload/time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: weekStartKey, end: weekEndKey }),
+      });
+      if (!response.ok) throw new Error('refresh failed');
+    } catch (reason) {
+      setTimeRefreshing(false);
+      throw reason;
+    }
   };
 
   useEffect(() => {
@@ -441,20 +447,13 @@ export default function TeamWorkload() {
                 className="w-52 shrink-0"
                 aria-label={t('Проект')}
               />
-              <Button
-                variant="secondary"
-                onClick={() => void refreshActualTime()}
-                disabled={timeRefreshing}
-                icon={
-                  <RefreshCw
-                    className={timeRefreshing ? 'animate-spin' : ''}
-                    size={14}
-                    strokeWidth={1.7}
-                  />
-                }
-              >
-                {t('Обновить факт')}
-              </Button>
+              <RefreshButton
+                label={t('Обновить факт')}
+                title={t('Забрать свежие списания из Битрикса')}
+                doneText={t('Обновление запущено')}
+                busy={timeRefreshing}
+                onRefresh={refreshActualTime}
+              />
               <IconButton
                 label={t('Предыдущая неделя')}
                 variant="outline"

@@ -14,12 +14,24 @@ const MIN_SPIN_MS = 600;
 export default function RefreshButton({
   onRefresh,
   className,
+  label,
+  title,
+  doneText,
+  busy: externalBusy = false,
 }: {
   /** Должна завершиться, когда новые данные уже на экране, и отклониться при ошибке. */
   onRefresh: () => Promise<void>;
   className?: string;
+  /** Подпись видна всегда. Без неё текст есть только на широком экране, иначе строка инструментов переносится. */
+  label?: string;
+  title?: string;
+  /** Сообщение об успехе: для фонового сбора «список обновлён» было бы неправдой. */
+  doneText?: string;
+  /** Фоновое обновление уже идёт (после перезагрузки страницы тоже): кнопка крутится и не нажимается. */
+  busy?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [ownBusy, setBusy] = useState(false);
+  const busy = ownBusy || externalBusy;
   const toast = useToast();
 
   const click = async () => {
@@ -31,7 +43,7 @@ export default function RefreshButton({
       await new Promise((resolve) =>
         setTimeout(resolve, Math.max(0, MIN_SPIN_MS - (Date.now() - started))),
       );
-      toast({ title: t('Список обновлён'), tone: 'success', durationMs: 2000 });
+      toast({ title: doneText ?? t('Список обновлён'), tone: 'success', durationMs: 2000 });
     } catch {
       toast({
         title: t('Не удалось обновить'),
@@ -49,12 +61,14 @@ export default function RefreshButton({
       size="sm"
       loading={busy}
       onClick={() => void click()}
-      aria-label={t('Обновить список')}
-      title={t('Загрузить свежие данные')}
+      aria-label={label ?? t('Обновить список')}
+      title={title ?? t('Загрузить свежие данные')}
       className={className}
       icon={<RefreshCw size={14} strokeWidth={1.7} />}
     >
-      <span className="hidden 2xl:inline">{busy ? t('Обновляем…') : t('Обновить')}</span>
+      <span className={label ? undefined : 'hidden 2xl:inline'}>
+        {busy ? t('Обновляем…') : (label ?? t('Обновить'))}
+      </span>
     </Button>
   );
 }

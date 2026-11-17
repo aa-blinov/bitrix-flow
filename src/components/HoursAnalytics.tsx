@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Download, RefreshCw, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '@/components/monos/Button';
+import RefreshButton from '@/components/RefreshButton';
 import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { SelectField } from '@/components/monos/SelectField';
@@ -229,7 +230,7 @@ function HoursAnalyticsView() {
     const timer = window.setInterval(() => void load(true), 3000);
     return () => window.clearInterval(timer);
   }, [report?.refreshing, load]);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     setStarting(true);
     setStartError('');
     try {
@@ -247,10 +248,12 @@ function HoursAnalyticsView() {
         );
       }
       await load(true);
+      return true;
     } catch (reason) {
       setStartError(
         reason instanceof Error ? reason.message : t('Не удалось забрать свежие часы из Битрикса'),
       );
+      return false;
     } finally {
       setStarting(false);
     }
@@ -716,22 +719,15 @@ function HoursAnalyticsView() {
             >
               <span className="hidden sm:inline">CSV</span>
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void refresh()}
-              disabled={isLoading || refreshing}
+            <RefreshButton
+              label={t('Обновить')}
               title={t('Забрать свежие списания из Битрикса')}
-              icon={
-                <RefreshCw
-                  className={isLoading || refreshing ? 'animate-spin' : ''}
-                  size={14}
-                  strokeWidth={1.7}
-                />
-              }
-            >
-              {t('Обновить')}
-            </Button>
+              doneText={t('Обновление запущено')}
+              busy={isLoading || refreshing}
+              onRefresh={async () => {
+                if (!(await refresh())) throw new Error('refresh failed');
+              }}
+            />
           </div>
         }
       />

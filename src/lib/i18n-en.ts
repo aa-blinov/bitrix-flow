@@ -409,6 +409,7 @@ export const EN: Record<string, string> = {
   'Обзор проектов, задач и сроков': 'Overview of projects, tasks and deadlines',
   Обновить: 'Refresh',
   'Обновить факт': 'Refresh actuals',
+  'Обновление запущено': 'Refresh started',
   Обновлена: 'Updated',
   Обычный: 'Normal',
   'Он потеряет доступ к задачам проекта в Битрикс24.':

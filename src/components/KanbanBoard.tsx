@@ -650,7 +650,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             label={t('Поиск задач на доске')}
             className="w-48 shrink-0"
           />
-          <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-lg:max-w-full lg:ml-auto lg:flex-nowrap">
             <RefreshButton
               className={toolbarControl}
               onRefresh={async () => {

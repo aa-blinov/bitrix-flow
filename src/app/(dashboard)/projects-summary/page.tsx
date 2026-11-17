@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useKanbanStore } from '@/store/kanban';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, RefreshCw, Users } from 'lucide-react';
+import { Download, Users } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
+import RefreshButton from '@/components/RefreshButton';
 import { Card } from '@/components/monos/Card';
 import { Progress } from '@/components/monos/Progress';
 import { SelectField } from '@/components/monos/SelectField';
@@ -66,10 +67,10 @@ export default function ProjectsSummaryPage() {
   // потому что выход по !memberId не снимал флаг.
   const memberId = useKanbanStore((state) => state.memberId);
   const load = useCallback(
-    async (force = false, silent = false) => {
+    async (force = false, silent = false): Promise<boolean> => {
       if (!memberId) {
         setIsLoading(false);
-        return;
+        return false;
       }
       if (!silent) setIsLoading(true);
       setError('');
@@ -94,8 +95,10 @@ export default function ProjectsSummaryPage() {
             void load(false, true);
           }, 3000);
         }
+        return true;
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : t('Не удалось получить сводку'));
+        return false;
       } finally {
         setIsLoading(false);
       }
@@ -305,21 +308,14 @@ export default function ProjectsSummaryPage() {
             >
               <span className="hidden sm:inline">CSV</span>
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void load(true)}
-              disabled={isLoading || refreshing}
-              icon={
-                <RefreshCw
-                  className={isLoading || refreshing ? 'animate-spin' : ''}
-                  size={14}
-                  strokeWidth={1.7}
-                />
-              }
-            >
-              {t('Обновить')}
-            </Button>
+            <RefreshButton
+              label={t('Обновить')}
+              doneText={t('Обновление запущено')}
+              busy={isLoading || refreshing}
+              onRefresh={async () => {
+                if (!(await load(true))) throw new Error('refresh failed');
+              }}
+            />
           </div>
         }
       />
