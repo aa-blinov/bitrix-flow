@@ -7,8 +7,7 @@ import { bitrixPlainText } from './bitrix-markup';
 import { parseMessageNodes } from './message-markdown';
 import { getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
-import { mentionsUser, pingText } from './ping';
-import { pushConfigured, pushPeople, sendPush } from './push';
+import { mentionsUser } from './ping';
 
 export type MessengerEvent = {
   type: 'messenger';
@@ -104,9 +103,6 @@ type Poller = {
   inFlight: boolean;
   states: Map<string, State>;
   /** Люди с пуш-подписками: их очередь читаем и без открытых вкладок. */
-  pushPeople: Person[];
-  pushCheckedAt: number;
-  pushGeneration: number;
 };
 
 declare global {
@@ -121,9 +117,6 @@ function poller(): Poller {
     timer: null,
     inFlight: false,
     states: new Map(),
-    pushPeople: [],
-    pushCheckedAt: 0,
-    pushGeneration: 0,
   });
 }
 
@@ -210,23 +203,6 @@ async function refreshMuted(state: State) {
   }
 }
 
-const PUSH_CHECK_MS = 60_000;
-
-async function refreshPushPeople(all: Poller) {
-  if (!pushConfigured() || Date.now() - all.pushCheckedAt < PUSH_CHECK_MS) return;
-  all.pushCheckedAt = Date.now();
-  // Подписку добавили, пока шла проверка: её ответ устарел, кэш сброшен и перечитается.
-  const generation = all.pushGeneration;
-  // Сбой базы не равен «подписок нет»: остаётся прежнее значение, повтор через 10 с.
-  try {
-    const people = await pushPeople();
-    if (generation === all.pushGeneration) all.pushPeople = people;
-  } catch (error) {
-    if (generation === all.pushGeneration) all.pushCheckedAt = Date.now() - PUSH_CHECK_MS + 10_000;
-    console.warn('[messenger-events] проверка пуш-подписок', error);
-  }
-}
-
 // Проход занимает флаг до первого await и держит его до конца: иначе медленная проверка
 // пушей пропускала второй тик, два чтения шли с одним offset, а поздняя отписка снимала
 // подписку, которую следующий тик уже успел оформить заново.
@@ -235,12 +211,10 @@ async function tick() {
   if (all.inFlight) return;
   all.inFlight = true;
   try {
-    await refreshPushPeople(all);
     const active = new Map<string, Person>();
     for (const tab of tabs())
       if (tab.memberId && tab.userId)
         active.set(`${tab.memberId}:${tab.userId}`, { memberId: tab.memberId, userId: tab.userId });
-    for (const person of all.pushPeople) active.set(personKey(person), person);
     // Людей опрашиваем по очереди: проход короткий, а очередь каждого читает один читатель.
     for (const person of active.values()) await poll(stateOf(person));
     for (const [key, state] of all.states) if (!active.has(key)) await idle(state);
@@ -303,20 +277,9 @@ async function poll(state: State) {
       // Сначала запись, потом подтверждение: следующий запрос с offset удаляет события на
       // портале, и при сбое записи страница пропала бы. Без нового offset портал отдаст
       // её снова, а повтор отсечёт seen.
-      const insertedAt = Date.now();
       if (docs.length) await db.collection('events_stream').insertMany(docs);
       remember(state, keys);
       if (Number(result?.nextOffset)) state.offset = Number(result.nextOffset);
-      // Пуш не нужен, только если событие точно покажет вкладка этого человека: она с
-      // уведомлениями и подключилась до записи (иначе её курсор уже за этим событием).
-      const showing = tabsOf(state.person).filter(
-        (tab) => tab.alerts && (tab.readyAt ?? 0) < insertedAt,
-      ).length;
-      for (const { event } of docs)
-        if (!showing && event.kind === 'add' && event.authorId !== state.me)
-          if ((!event.muted || event.mentioned) && !event.stale)
-            // Сбой пуша (в том числе базы подписок) не должен ронять процесс.
-            void pushEvent(state.person, event).catch((error) => console.warn('[push]', error));
       if (!result?.hasMore) break;
     }
     state.lastOkAt = Date.now();
@@ -327,17 +290,6 @@ async function poll(state: State) {
   }
 }
 
-function pushEvent(person: Person, event: MessengerEvent) {
-  const { title, body } = pingText(event, { mention: 'Вас упомянули:', message: 'Сообщение' });
-  return sendPush(person.memberId, person.userId, {
-    title,
-    body,
-    tag: `chat-${event.dialogId}`,
-    url: `/messenger?dialog=${encodeURIComponent(event.dialogId)}`,
-    urgent: event.mentioned,
-  });
-}
-
 // Для /api/health: опрос живой, если у каждого, кому он нужен, последний проход был недавно.
 // Отдаём худшего: один сломанный токен человека тоже должен быть виден.
 export function getMessengerEventsHealth() {
@@ -346,7 +298,6 @@ export function getMessengerEventsHealth() {
     ...tabs()
       .filter((tab) => tab.memberId && tab.userId)
       .map((tab) => `${tab.memberId}:${tab.userId}`),
-    ...all.pushPeople.map(personKey),
   ]);
   let worst = { lastOkAt: Infinity, lastError: '' };
   for (const key of needed) {
@@ -367,13 +318,6 @@ export function invalidateMuted(memberId: string, userId: string) {
   if (!state) return;
   state.mutedAt = 0;
   state.mutedGeneration += 1;
-}
-
-/** Подписку на пуш добавили или убрали: поллер узнает об этом на следующем проходе. */
-export function invalidatePushWanted() {
-  const all = poller();
-  all.pushCheckedAt = 0;
-  all.pushGeneration += 1;
 }
 
 export function startMessengerEvents() {

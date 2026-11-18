@@ -6,9 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CHAT_OPEN_EVENT,
   CHAT_READ_EVENT,
-  chatNotifyEnabled,
   showChatNotification,
-  syncPush,
   useDebounced,
   useMessengerEvents,
 } from '@/components/messenger/realtime';
@@ -59,10 +57,13 @@ export function useChatAlerts() {
   }, [fetchCounters]);
   const refresh = useDebounced(fetchCounters, 1000);
 
-  // Подписку на пуш подтверждаем при каждой загрузке: браузер мог её сбросить, а сервер
-  // удалить как мёртвую.
+  // Пуши убрали, а service worker остался в браузерах прежних посетителей: снимаем
+  // регистрацию и подписку, чтобы значок «впилюченного SW» не копился.
   useEffect(() => {
-    if (chatNotifyEnabled()) void syncPush(true);
+    void navigator.serviceWorker
+      ?.getRegistrations?.()
+      .then((list) => Promise.all(list.map((reg) => reg.unregister())))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

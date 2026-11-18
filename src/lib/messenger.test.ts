@@ -295,20 +295,6 @@ describe('isTransportFailure', () => {
   });
 });
 
-describe('pushEndpointAllowed', () => {
-  it('пускает только push-сервисы браузеров, а не внутренние адреса', async () => {
-    const { pushEndpointAllowed } = await import('./push');
-    expect(pushEndpointAllowed('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
-    expect(pushEndpointAllowed('https://web.push.apple.com/QW')).toBe(true);
-    expect(pushEndpointAllowed('https://wns2-par02p.notify.windows.com/w/?token=1')).toBe(true);
-    expect(pushEndpointAllowed('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true);
-    expect(pushEndpointAllowed('https://127.0.0.1/hook')).toBe(false);
-    expect(pushEndpointAllowed('https://fcm.googleapis.com.evil.io/x')).toBe(false);
-    expect(pushEndpointAllowed('https://fcm.googleapis.com:8443/x')).toBe(false);
-    expect(pushEndpointAllowed('http://fcm.googleapis.com/x')).toBe(false);
-  });
-});
-
 describe('safeNext', () => {
   it('пускает только пути этого приложения', async () => {
     const { safeNext } = await import('./login-cookie');

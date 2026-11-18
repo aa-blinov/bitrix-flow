@@ -472,8 +472,6 @@ export default function Messenger() {
   async function toggleNotify() {
     const next = await setChatNotify(!notifyOn);
     setNotifyOn(next);
-    if (!next && !notifyOn)
-      setError(t('Браузер не разрешил уведомления: включите их в настройках сайта.'));
   }
 
   // Новый диалог с человеком или созданная группа появятся в списке портала

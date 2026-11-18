@@ -32,11 +32,9 @@ export const CHAT_NOTIFY_KEY = 'bitrix-flow-chat-notify';
 
 function readAlertsFlag() {
   try {
-    return (
-      localStorage.getItem(CHAT_NOTIFY_KEY) === '1' &&
-      typeof Notification !== 'undefined' &&
-      Notification.permission === 'granted'
-    );
+    // Пушей в браузер больше нет, но флаг alerts продолжает экономить фоновым вкладкам
+    // лишние события чата в SSE.
+    return localStorage.getItem(CHAT_NOTIFY_KEY) === '1';
   } catch {
     return false;
   }
