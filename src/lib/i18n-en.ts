@@ -210,6 +210,7 @@ export const EN: Record<string, string> = {
   'Статусы проектов': 'Project statuses',
   'Добавить статус': 'Add status',
   'Не удалось получить историю': 'Failed to load the history',
+  'Переименовать фазу {0}': 'Rename stage {0}',
   'Не удалось загрузить историю статуса': 'Failed to load the status history',
   'Неделя с {0} собрана с пропусками: часть списаний могла не доехать, цифры занижены.':
     'The week of {0} was collected with gaps: some entries may be missing, numbers are understated.',
@@ -266,6 +267,8 @@ export const EN: Record<string, string> = {
   'Изменение задачи': 'Task change',
   'Изменение не сохранилось': 'The change was not saved',
   'Изменений пока нет': 'No changes yet',
+  'Не удалось загрузить уведомления': 'Failed to load notifications',
+  'Чат задачи {0}': 'Task chat of {0}',
   Изменения: 'Changes',
   'Изменения задач': 'Task changes',
   'Изменения задач и комментарии из Битрикс24 появятся здесь.':
@@ -586,6 +589,8 @@ export const EN: Record<string, string> = {
     'Plan by due dates: task count and hours per assignee',
   'План, факт и операционный статус по задачам проектов':
     'Plan, actuals and operational status of project tasks',
+  'План, факт и операционный статус по задачам проектов — за всё время':
+    'Plan, actuals and operational status of project tasks — all time',
   'План, ч': 'Plan, h',
   'План, ч:': 'Plan, h:',
   'План, часы': 'Plan, hours',
@@ -904,6 +909,8 @@ export const EN: Record<string, string> = {
   Люди: 'People',
   'без тега': 'no tag',
   'Данные на {0}': 'Data as of {0}',
+  'Списаний за выбранный период нет: измените период или фильтры.':
+    'No hours logged for the selected period: change the period or filters.',
   Месяцы: 'Months',
   Классы: 'Classes',
   'Детализация часов': 'Hours breakdown',

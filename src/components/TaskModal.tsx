@@ -197,6 +197,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [timeHours, setTimeHours] = useState(1);
   const [timeDesc, setTimeDesc] = useState('');
   const [editingField, setEditingField] = useState<string | null>(null);
+  // Пока изменение уходит в портал, подложка и Escape модалку не закрывают: blur
+  // при клике в подложку отправляет правку, и закрытие на середине её роняло бы.
+  const [mutating, setMutating] = useState(0);
   const [editValue, setEditValue] = useState('');
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
@@ -381,6 +384,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const handleUpdateField = async (field: string, value: any) => {
     // Пока статус меняется, кнопки статуса прячем: права ещё старые.
     if (field === 'status') setAllowedActions(null);
+    setMutating((count) => count + 1);
     try {
       setFieldError(null);
       await updateTaskField(task.id, field, value);
@@ -389,6 +393,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       setFieldError(error instanceof Error ? error.message : t('Не удалось сохранить изменения'));
     } finally {
       if (field === 'status') setActionsVersion((version) => version + 1);
+      setMutating((count) => count - 1);
     }
   };
 
@@ -660,10 +665,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         title={task.title}
         size="xl"
         showClose={false}
-        closeOnBackdrop={false}
+        closeOnBackdrop={!mutating}
         // Пока открыт диалог о чужой задаче в работе, Escape закрывает его,
         // а не всю карточку.
-        closeOnEscape={!focusConflict}
+        closeOnEscape={!focusConflict && !mutating}
         className="max-w-none lg:max-w-[60rem]"
       >
         {fieldError && (

@@ -325,11 +325,17 @@ export default function ProjectsSummaryPage() {
       ]),
     ]);
 
+  const datesEmpty = !fromDate && !toDate;
   return (
     <div className="min-h-screen bg-canvas pb-12">
       <PageHeader
         title={t('Сводка по проектам')}
-        description={t('План, факт и операционный статус по задачам проектов')}
+        description={
+          // Без дат sums идут по всему периоду: подпись отделяет их от «списаний нет».
+          datesEmpty
+            ? t('План, факт и операционный статус по задачам проектов — за всё время')
+            : t('План, факт и операционный статус по задачам проектов')
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button

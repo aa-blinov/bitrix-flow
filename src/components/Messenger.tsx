@@ -107,6 +107,7 @@ export default function Messenger() {
   // Чаты с портала по тому же запросу: список диалогов знает только последние.
   const [found, setFound] = useState<Dialog[]>([]);
   const [foundFailed, setFoundFailed] = useState(false);
+  const [searching, setSearching] = useState(false);
   const realtime = useRealtime();
 
   useEffect(() => {
@@ -286,12 +287,13 @@ export default function Messenger() {
 
   useEffect(() => {
     const needle = query.trim();
-    // Чаты прошлого запроса не должны оставаться нажимаемыми под новым.
-    setFound([]);
     if (needle.length < 2) {
+      setFound([]);
+      setFoundFailed(false);
       return;
     }
     const controller = new AbortController();
+    setSearching(true);
     const timer = window.setTimeout(() => {
       fetch(`/api/messenger/find?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
         .then((response) => (response.ok ? response.json() : Promise.reject()))
@@ -304,11 +306,13 @@ export default function Messenger() {
           if (failure?.name === 'AbortError') return;
           setFound([]);
           setFoundFailed(true);
-        });
+        })
+        .finally(() => setSearching(false));
     }, 400);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
+      setSearching(false);
     };
   }, [query]);
 
@@ -323,6 +327,7 @@ export default function Messenger() {
   const active = dialogs?.find((dialog) => dialog.id === activeId);
 
   // Диалога из адреса нет на первой странице списка: спрашиваем портал о нём отдельно.
+  const portalFound = found.filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id));
   const missing = Boolean(activeId && dialogs && !dialogs.some((dialog) => dialog.id === activeId));
   useEffect(() => {
     if (!missing) return;
@@ -552,6 +557,34 @@ export default function Messenger() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
+            {searching && (
+              <p className="px-3 py-2 text-xs text-ink-faint" role="status" aria-live="polite">
+                {t('Поиск…')}
+              </p>
+            )}
+            {portalFound.length > 0 && (
+              <div className="border-b border-line">
+                <p className="px-3 pt-3 pb-1 text-xs uppercase tracking-widest text-ink-soft">
+                  {t('Найдено на портале')}
+                </p>
+                <ul aria-label={t('Найдено на портале')}>
+                  {portalFound.map((chat) => (
+                    <li key={chat.id}>
+                      <button
+                        type="button"
+                        onClick={() => openDialog(chat)}
+                        className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                      >
+                        <Avatar name={chat.title} src={chat.avatar} size="md" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                          {chat.title}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {dialogs === null ? (
               error ? null : (
                 <LoadingState className="min-h-40 bg-transparent" />
@@ -672,32 +705,6 @@ export default function Messenger() {
                   'Поиск чатов на портале не выполнился. Измените запрос, чтобы попробовать ещё раз.',
                 )}
               </p>
-            )}
-            {found.filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id)).length >
-              0 && (
-              <div className="border-t border-line">
-                <p className="px-3 pt-3 pb-1 text-xs uppercase tracking-widest text-ink-soft">
-                  {t('Найдено на портале')}
-                </p>
-                <ul aria-label={t('Найдено на портале')}>
-                  {found
-                    .filter((chat) => !dialogs?.some((dialog) => dialog.id === chat.id))
-                    .map((chat) => (
-                      <li key={chat.id}>
-                        <button
-                          type="button"
-                          onClick={() => openDialog(chat)}
-                          className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
-                        >
-                          <Avatar name={chat.title} src={chat.avatar} size="md" />
-                          <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                            {chat.title}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </div>
             )}
             {paging?.hasMore && (
               // Метка конца списка: когда она попадает в окно, подгружается следующая страница.

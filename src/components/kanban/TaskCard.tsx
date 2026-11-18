@@ -1,4 +1,4 @@
-import { AlignLeft, Calendar, MoveHorizontal, Timer } from 'lucide-react';
+import { AlignLeft, Calendar, MessageSquareText, MoveHorizontal, Timer } from 'lucide-react';
 import { PRIORITY_LABELS, BxTask } from '@/types/bitrix';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge, type Tone } from '@/components/monos/Badge';
@@ -7,6 +7,7 @@ import { Chip } from '@/components/monos/Chip';
 import { IconButton } from '@/components/monos/IconButton';
 import { Menu } from '@/components/monos/Menu';
 import { extractTaskTags } from '@/lib/task-tags';
+import Link from 'next/link';
 import { dateFormat, t } from '@/lib/i18n';
 
 // Форматтеры один раз на модуль: toLocale*String строит новый на каждый
@@ -190,6 +191,18 @@ export function TaskCard({
               <span aria-hidden>☐</span>
               {completedSubtasks}/{totalSubtasks}
             </span>
+          )}
+          {/* Чат задачи есть почти у каждой: из переписки на карточку возвращаются,
+              а в обратную сторону путь искали по вкладке «Задачи» мессенджера. */}
+          {task.chatId && (
+            <Link
+              href={`/messenger?dialog=chat${task.chatId}`}
+              onClick={(event) => event.stopPropagation()}
+              className="flex items-center gap-1 hover:text-ink"
+              aria-label={t('Чат задачи {0}', task.title)}
+            >
+              <MessageSquareText size={12} strokeWidth={1.7} />
+            </Link>
           )}
         </div>
 

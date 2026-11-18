@@ -504,7 +504,9 @@ export default function TeamWorkload() {
             <LoadingState className="min-h-80 bg-transparent" />
           ) : (
             <div ref={fade.ref} className={`overflow-x-auto ${fade.className}`}>
-              <div className="min-w-[1090px]">
+              {/* На телефоне сетка уже: дня хватает и на 90px, а «итоги» прячем в
+                  скролл, иначе календарь тянет экран минимум на 1090px. */}
+              <div className="max-sm:min-w-[720px] min-w-[1090px]">
                 <div className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line bg-surface-2 text-sm">
                   <div className="z-[2] border-r border-line bg-surface-2 px-4 py-3 font-medium sm:sticky sm:left-0">
                     {t('Исполнитель')}
@@ -527,10 +529,12 @@ export default function TeamWorkload() {
                       ) : null}
                     </div>
                   ))}
-                  <div className="border-l border-line px-2 py-3 text-center font-medium">
+                  {/* Итоги видны на широком экране: на телефоне семь дней и так
+                      не влезают, а итоги дня дублирует модалка списаний. */}
+                  <div className="max-sm:hidden border-l border-line px-2 py-3 text-center font-medium">
                     {t('Без срока')}
                   </div>
-                  <div className="border-l border-line px-2 py-3 text-center font-medium">
+                  <div className="max-sm:hidden border-l border-line px-2 py-3 text-center font-medium">
                     {t('Просрочено')}
                   </div>
                 </div>
@@ -546,7 +550,7 @@ export default function TeamWorkload() {
                   return (
                     <div
                       key={assignee.id}
-                      className="grid grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line last:border-b-0"
+                      className="grid max-sm:grid-cols-[minmax(150px,1.5fr)_repeat(7,minmax(64px,1fr))] grid-cols-[minmax(210px,1.5fr)_repeat(7,minmax(90px,1fr))_minmax(115px,1fr)_minmax(115px,1fr)] border-b border-line last:border-b-0"
                     >
                       {/* Имя стоит на месте при прокрутке дней: иначе в узком окне не видно, чья строка. */}
                       <div className="z-[2] flex min-w-0 items-center gap-2 border-r border-line bg-surface px-4 py-3 sm:sticky sm:left-0">
@@ -593,8 +597,8 @@ export default function TeamWorkload() {
                         return (
                           <button
                             type="button"
+                            className={`m-1 min-h-16 max-sm:hidden rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? FILLED_CELL : EMPTY_CELL}`}
                             onClick={() => bucket.count && openTaskList(assignee.id, 'no_deadline')}
-                            className={`m-1 min-h-16 rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? FILLED_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>
@@ -606,7 +610,7 @@ export default function TeamWorkload() {
                           <button
                             type="button"
                             onClick={() => bucket.count && openTaskList(assignee.id, 'overdue')}
-                            className={`m-1 min-h-16 rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? OVERDUE_CELL : EMPTY_CELL}`}
+                            className={`m-1 min-h-16 max-sm:hidden rounded-ui border px-1 py-2 text-center transition-colors duration-fast ${bucket.count ? OVERDUE_CELL : EMPTY_CELL}`}
                           >
                             <WorkloadValue count={bucket.count} hours={bucket.hours} />
                           </button>

@@ -71,14 +71,23 @@ export default function Notifications({
   const loadTasks = useKanbanStore((state) => state.loadTasks);
   const memberId = useKanbanStore((state) => state.memberId);
 
+  const [historyFailed, setHistoryFailed] = useState(false);
+
   const loadHistory = useCallback(async () => {
     if (!memberId) return;
-    const response = await fetch(`/api/notifications?member_id=${encodeURIComponent(memberId)}`, {
-      headers: { 'X-Member-Id': memberId },
-    });
-    if (!response.ok) return;
-    const data = await response.json();
-    setItems(data.notifications || []);
+    try {
+      const response = await fetch(`/api/notifications?member_id=${encodeURIComponent(memberId)}`, {
+        headers: { 'X-Member-Id': memberId },
+      });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setItems(data.notifications || []);
+      setHistoryFailed(false);
+    } catch {
+      // Поповер скажет о сбое вместо «изменений нет», а при открытии окно
+      // отметит прочитанным только после загрузки.
+      setHistoryFailed(true);
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -142,7 +151,9 @@ export default function Notifications({
       open={open}
       onOpenChange={(value) => {
         setOpen(value);
-        if (value) markAsSeen();
+        // Отмечаем прочитанным только после того, как история реально загрузилась:
+        // иначе при сбое сети бейдж обнуляется, а список показывает старое.
+        if (value) void loadHistory().then(markAsSeen);
       }}
       placement={placement}
       align={align}
@@ -223,7 +234,7 @@ export default function Notifications({
             })
           ) : (
             <p className="px-3 py-8 text-center text-xs text-ink-faint">
-              {t('Изменений пока нет')}
+              {historyFailed ? t('Не удалось загрузить уведомления') : t('Изменений пока нет')}
             </p>
           )}
         </div>

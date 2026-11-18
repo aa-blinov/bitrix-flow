@@ -864,6 +864,12 @@ function HoursAnalyticsView() {
 
         {classError ? <Notice tone="danger">{classError}</Notice> : null}
         {refreshError ? <Notice tone="danger">{refreshError}</Notice> : null}
+        {/* Пустой отчёт не отличим от долгой загрузки: говорим словами. */}
+        {report && rows.length === 0 ? (
+          <Notice tone="neutral">
+            {t('Списаний за выбранный период нет: измените период или фильтры.')}
+          </Notice>
+        ) : null}
 
         {error ? (
           <Notice tone="danger">{error}</Notice>

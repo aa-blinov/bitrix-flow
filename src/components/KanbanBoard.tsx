@@ -27,7 +27,7 @@ import { fetchTaskById, type Bx24Stage } from '@/lib/bitrix24';
 import TaskModal from './TaskModal';
 import RefreshButton from '@/components/RefreshButton';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Filter, Search, SlidersHorizontal } from 'lucide-react';
+import { Pencil, Plus, Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { DateField } from '@/components/monos/DateField';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
@@ -744,7 +744,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <header className="sticky top-0 z-10 overflow-x-clip border-b border-line bg-canvas px-4 py-4 sm:px-6">
         {/* На узком экране скрытый горизонтальный скролл прятал «Фильтр» и
             «Добавить задачу» без всякого намёка — переносим строки. */}
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3 lg:overflow-x-auto lg:overflow-y-hidden">
+        {/* Второй ряд контролов на 1366px дешевле спрятанного скролла: правые
+            кнопки иначе уезжали за край без единого намёка. */}
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:gap-3">
           {toolbar}
           <div className={moreWrap}>
             <SelectField
@@ -905,7 +907,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           if (topScrollRef.current)
             topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        className="flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
+        className="flex-1 snap-x snap-proximity overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
       >
         <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
           {allStages.map((stage) => {
@@ -955,6 +957,17 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       {stage.name}
                     </h2>
                   )}
+                  <IconButton
+                    label={t('Переименовать фазу {0}', stage.name)}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingStageId(stage.id);
+                      setEditingStageTitle(stage.name);
+                    }}
+                  >
+                    <Pencil size={14} strokeWidth={1.7} />
+                  </IconButton>
                   <span className="text-xs text-ink-faint">
                     {colTasks.length}
                     {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
