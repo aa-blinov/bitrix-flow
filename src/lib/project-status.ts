@@ -65,7 +65,7 @@ export function toIsoDate(value: unknown): string {
   if (!raw) return '';
   const parsed = new Date(raw);
   if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-  const match = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const match = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/);
   if (!match) return '';
   return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`).toISOString();
 }

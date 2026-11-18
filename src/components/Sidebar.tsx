@@ -176,7 +176,7 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     try {
-      localStorage.removeItem('bitrix-kanban');
+      localStorage.removeItem('bitrix-kanban-cache');
       localStorage.removeItem('bitrix_member_id');
       sessionStorage.clear();
     } catch {}
