@@ -745,6 +745,7 @@ function HoursAnalyticsView() {
     ]);
 
   const missing = report?.missingWeeks ?? [];
+  const partial = report?.partialWeeks ?? [];
 
   return (
     <div className="min-h-screen bg-canvas pb-12">
@@ -827,7 +828,12 @@ function HoursAnalyticsView() {
             ) : null}
             {report?.collectedAt ? (
               <span className="text-xs text-ink-faint sm:ml-auto">
-                {t('Данные на {0}', COLLECTED.format(new Date(report.collectedAt)))}
+                {/* Свежесть всего периода определяет самый старый сбор: более свежая дата
+                    обещала бы данные, которых в старых неделях нет. */}
+                {t(
+                  'Данные на {0}',
+                  COLLECTED.format(new Date(report.oldestCollectedAt || report.collectedAt)),
+                )}
               </span>
             ) : null}
           </div>
@@ -840,6 +846,18 @@ function HoursAnalyticsView() {
               missing.length,
               missing[0],
               missing[missing.length - 1],
+            )}
+          </Notice>
+        ) : null}
+
+        {partial.length > 0 ? (
+          <Notice tone="warning">
+            {t(
+              partial.length === 1
+                ? 'Неделя с {0} собрана с пропусками: часть списаний могла не доехать, цифры занижены.'
+                : 'Недели с {0} по {1} собраны с пропусками: часть списаний могла не доехать, цифры занижены.',
+              partial[0],
+              partial[partial.length - 1],
             )}
           </Notice>
         ) : null}

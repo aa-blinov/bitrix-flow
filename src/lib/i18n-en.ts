@@ -210,6 +210,11 @@ export const EN: Record<string, string> = {
   'Статусы проектов': 'Project statuses',
   'Добавить статус': 'Add status',
   'Не удалось получить историю': 'Failed to load the history',
+  'Не удалось загрузить историю статуса': 'Failed to load the status history',
+  'Неделя с {0} собрана с пропусками: часть списаний могла не доехать, цифры занижены.':
+    'The week of {0} was collected with gaps: some entries may be missing, numbers are understated.',
+  'Недели с {0} по {1} собраны с пропусками: часть списаний могла не доехать, цифры занижены.':
+    'Weeks from {0} to {1} were collected with gaps: some entries may be missing, numbers are understated.',
   История: 'History',
   'История статуса': 'Status history',
   'Правок пока не было': 'No changes yet',

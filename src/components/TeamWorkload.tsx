@@ -60,7 +60,12 @@ function calendarDayKey(date: Date) {
 
 const HOURS_FORMAT = numberFormat({ maximumFractionDigits: 1 });
 
+// Меньше 0,1 ч идут минутами, как в PM-отчёте: 2-3 минуты выглядели «0 ч».
 function formatHours(hours: number) {
+  if (hours > 0 && hours < 0.1) {
+    const minutes = Math.round(hours * 60);
+    return minutes < 1 ? t('<1 мин') : t('{0} мин', minutes);
+  }
   return hours % 1 === 0 ? t('{0} ч', hours) : t('{0} ч', HOURS_FORMAT.format(hours));
 }
 
@@ -177,9 +182,12 @@ export default function TeamWorkload() {
   const loadActualTime = async () => {
     const week = weekStartKey;
     try {
-      const response = await fetch(`/api/workload/time?start=${week}`, {
-        cache: 'no-store',
-      });
+      const response = await fetch(
+        `/api/workload/time?start=${week}&project=${encodeURIComponent(selectedProjectId)}`,
+        {
+          cache: 'no-store',
+        },
+      );
       const payload = await response.json();
       if (week !== currentWeekRef.current) return;
       if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
@@ -198,7 +206,9 @@ export default function TeamWorkload() {
   useEffect(() => {
     setTimeRows([]);
     void loadActualTime();
-  }, [weekStartKey]);
+    // selectedProjectId влияет и на факт: сервер фильтрует списания по проекту.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStartKey, selectedProjectId]);
 
   // Счётчики ячеек приходят с сервера по всему зеркалу задач — теми же
   // фильтрами, что применит /all-tasks при клике.
@@ -620,7 +630,7 @@ export default function TeamWorkload() {
             ? t(
                 '{0}, {1}',
                 assignees.find((user) => user.id === selectedActual.userId)?.name || 'Сотрудник',
-                selectedActual.day,
+                DAY_FORMATTER.format(new Date(`${selectedActual.day}T12:00:00`)),
               )
             : ''
         }

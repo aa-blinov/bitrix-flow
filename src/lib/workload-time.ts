@@ -4,7 +4,7 @@ import { portalDay } from './planned-hours';
 
 const MAX_CONCURRENT_REQUESTS = 2;
 
-type TimeEntry = { userId: string; day: string; seconds: number; taskId: string };
+export type TimeEntry = { userId: string; day: string; seconds: number; taskId: string };
 
 const dayKey = (value: unknown) => portalDay(value) || null;
 

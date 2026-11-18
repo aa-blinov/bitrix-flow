@@ -115,6 +115,9 @@ export default function ProjectStatusPage() {
         if (!response.ok) throw new Error(t('Не удалось получить историю'));
         setTimeline(data.timeline || []);
       } catch {
+        // Ошибка видна в интерфейсе, а не «правок не было»: пустой таймлайн вводит в заблуждение.
+        setSaveError(t('Не удалось загрузить историю статуса'));
+        setTimeline([]);
         setTimeline([]);
       } finally {
         setTimelineLoading(false);
@@ -409,6 +412,8 @@ export default function ProjectStatusPage() {
       >
         {timelineLoading ? (
           <LoadingState />
+        ) : saveError ? (
+          <p className="text-sm text-danger-text">{saveError}</p>
         ) : timeline.length ? (
           <ol className="flex flex-col gap-3">
             {timeline.map((entry, index) => (

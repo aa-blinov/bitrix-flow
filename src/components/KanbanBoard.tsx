@@ -45,6 +45,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import { type KanbanSort } from '@/lib/kanban-sort';
 import { t } from '@/lib/i18n';
+import { pluralRu } from '@/lib/utils';
 import { TaskCard } from '@/components/kanban/TaskCard';
 import { InlineAddForm } from '@/components/kanban/InlineAddForm';
 
@@ -518,7 +519,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
     // ponytail: dev-only — silent in prod, noisy when something is misconfigured.
     console.warn(
-      t('[kanban] {0} задач(а) вне известных стадий — проверь task.stages.get', orphanTasks.length),
+      `[kanban] ${orphanTasks.length} ${pluralRu(orphanTasks.length, ['задача', 'задачи', 'задач'])} вне известных стадий — проверь task.stages.get`,
     );
   }
 
