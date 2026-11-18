@@ -88,16 +88,21 @@ export default function Notifications({
 
   const onEvent = useCallback(
     (event: Notice) => {
-      setItems((current) => {
-        if (event.id) {
-          const incomingId = String(event.id);
-          if (current.some((item) => String(item.id) === incomingId)) return current;
-        }
-        return [
-          { ...event, id: event.id || `${event.createdAt || Date.now()}-${event.type}` },
-          ...current,
-        ].slice(0, 50);
-      });
+      // Служебные сигналы синка (tasks-changed из events_stream) приходят без
+      // title/message: в ленте им не место, но перечитывать список задач нужно.
+      const isNotice = typeof event.title === 'string' && typeof event.message === 'string';
+      if (isNotice) {
+        setItems((current) => {
+          if (event.id) {
+            const incomingId = String(event.id);
+            if (current.some((item) => String(item.id) === incomingId)) return current;
+          }
+          return [
+            { ...event, id: event.id || `${event.createdAt || Date.now()}-${event.type}` },
+            ...current,
+          ].slice(0, 50);
+        });
+      }
       if (selectedProjectId && TASK_LIST_EVENTS.has(String(event.type))) {
         void loadTasks(selectedProjectId, true);
       }

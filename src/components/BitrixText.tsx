@@ -103,13 +103,15 @@ export default function BitrixText({
   className,
   markdown = false,
 }: {
-  text: string;
+  text?: string;
   className?: string;
   markdown?: boolean;
 }) {
+  // text приходит из событий портала и бывает undefined — парсер ждёт строку.
+  const source = typeof text === 'string' ? text : '';
   return (
     <span className={cn('whitespace-pre-wrap wrap-anywhere', className)}>
-      {render(markdown ? parseMessageNodes(text) : parseBitrixNodes(text))}
+      {render(markdown ? parseMessageNodes(source) : parseBitrixNodes(source))}
     </span>
   );
 }

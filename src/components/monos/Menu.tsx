@@ -81,9 +81,11 @@ export function Menu({
   portal = false,
 }: MenuProps) {
   const [open, setOpen] = React.useState(false);
-  const [portalPos, setPortalPos] = React.useState<{ left: number; top: number | null; bottom: number | null } | null>(
-    null,
-  );
+  const [portalPos, setPortalPos] = React.useState<{
+    left: number;
+    top: number | null;
+    bottom: number | null;
+  } | null>(null);
   const anchor = React.useRef<HTMLDivElement | null>(null);
   const menuEl = React.useRef<HTMLDivElement | null>(null);
   const triggerEl = React.useRef<HTMLElement | null>(null);
@@ -310,10 +312,7 @@ export function Menu({
 
       {open && portal
         ? (typeof document !== 'undefined' &&
-            createPortal(
-              <div data-ui-portal="">{popoverNode}</div>,
-              document.body,
-            )) ||
+            createPortal(<div data-ui-portal="">{popoverNode}</div>, document.body)) ||
           null
         : open
           ? popoverNode
