@@ -51,10 +51,13 @@ export async function POST(req: NextRequest) {
     }
     const previous = projectHourClass(current);
     keywords = withProjectClass(current, hourClass);
-    // Снятый класс проекта теги задач не трогает: разметка остаётся как была.
-    const changes = hourClass
-      ? await planProjectClassTags(memberId, projectId, hourClass, previous)
-      : [];
+    // По умолчанию смена действует с сегодняшнего дня и историю не трогает: классы
+    // старых задач считаются по периодам. Переразметка задним числом — только по
+    // явному backfill (dryRun показывает план, apply пишет теги в портал).
+    const changes =
+      body.backfill === true && hourClass
+        ? await planProjectClassTags(memberId, projectId, hourClass, previous)
+        : [];
     if (dryRun) return NextResponse.json({ previous, hourClass, changes });
     if (!isMockEnabled())
       await bx24OAuth(
@@ -80,6 +83,14 @@ export async function POST(req: NextRequest) {
   await db
     .collection('projects')
     .updateOne({ member_id: memberId, id: projectId }, { $set: { keywords } });
+  // Смена класса не перезаписывает, а добавляет период: резолвинг задач идёт по дате
+  // создания задачи, уборка или смена тоже должна обрубить старый класс с этой минуты.
+  await db.collection('project_class_periods').insertOne({
+    member_id: memberId,
+    projectId,
+    hourClass,
+    since: new Date().toISOString(),
+  });
   invalidateByPrefix(`${memberId}:`);
   return NextResponse.json({ keywords });
 }

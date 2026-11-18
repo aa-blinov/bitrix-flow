@@ -3,8 +3,10 @@
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
 import { getDb } from './mongo';
 import {
+  classAt,
   projectHourClass,
   resolveWithParents,
+  type ClassPeriod,
   type HourClass,
   type HourClassOrUnassigned,
   type HourClassSource,
@@ -42,6 +44,8 @@ export type HoursReport = {
   taskTags: Record<string, string[]>;
   /** Класс по умолчанию у проектов, где он выбран: тег часы-* в ключевых словах группы. */
   projectClasses: Record<string, HourClass>;
+  /** С какой минуты действует текущий класс проекта, для подписи в интерфейсе. */
+  projectClassSince: Record<string, string>;
   /** Идёт сбор списаний из портала за этот период (ответ GET, а не loadHours). */
   refreshing?: boolean;
   /** Последний сбор за часть недель периода упал. */
@@ -117,6 +121,9 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
             'data.group': 1,
             'data.groupId': 1,
             'data.GROUP_ID': 1,
+            // Период класса проекта выбирается по дате создания задачи.
+            'data.createdDate': 1,
+            'data.CREATED_DATE': 1,
           },
         },
       )
@@ -166,6 +173,33 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     if (hourClass) projectClasses[String(project.id)] = hourClass;
   }
 
+  // Периоды смен класса: задача без своего тега получает класс, действовавший при её
+  // создании, поэтому смена класса класс старых задач не переписывает. Проекты, у
+  // которых класс стоит в ключевых словах, а периодов в зеркале ещё нет (разметка из
+  // прежних версий), получают период с начала времён: так их история считается по
+  // старому правилу, пока класс не сменят первый раз.
+  const periodDocs = await db
+    .collection('project_class_periods')
+    .find({ member_id: memberId })
+    .toArray();
+  const periodsByProject = new Map<string, ClassPeriod[]>();
+  for (const doc of periodDocs) {
+    const projectId = String(doc.projectId);
+    if (!periodsByProject.has(projectId)) periodsByProject.set(projectId, []);
+    periodsByProject
+      .get(projectId)!
+      .push({ hourClass: doc.hourClass ?? null, since: String(doc.since || '') });
+  }
+  const projectClassSince: Record<string, string> = {};
+  for (const [projectId, periods] of periodsByProject) {
+    periods.sort((a, b) => (a.since < b.since ? -1 : a.since > b.since ? 1 : 0));
+    const latest = periods[periods.length - 1];
+    if (latest?.hourClass) projectClassSince[projectId] = latest.since;
+  }
+  for (const [projectId, hourClass] of Object.entries(projectClasses))
+    if (!periodsByProject.has(projectId))
+      periodsByProject.set(projectId, [{ hourClass, since: '' }]);
+
   const planTasks = new Map<string, PlanTask[]>();
   const parents = new Map<string, string>();
   const ancestorTags = new Map<string, string[]>();
@@ -203,7 +237,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
 
   const tasks = new Map<
     string,
-    { projectId: string; title: string; tags: string[]; ownTags: string[] }
+    { projectId: string; title: string; tags: string[]; ownTags: string[]; created: string | null }
   >();
   for (const t of mirror) {
     const data = t.data || {};
@@ -216,6 +250,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         bitrixTaskTags(data.tags ?? data.TAGS),
         extractTaskTags(title, data.description ?? data.DESCRIPTION),
       ),
+      created: String(data.createdDate ?? data.CREATED_DATE ?? '') || null,
     });
   }
 
@@ -246,6 +281,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
         title,
         ownTags,
         tags: mergeTaskTags(ownTags, extractTaskTags(title, data.description ?? data.DESCRIPTION)),
+        created: String(data.createdDate ?? data.CREATED_DATE ?? '') || null,
       });
       if (!parents.has(id)) parents.set(id, String(data.parentId ?? data.PARENT_ID ?? ''));
     }
@@ -292,7 +328,9 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
       taskId,
       (id) => tasks.get(id)?.tags ?? ancestorTags.get(id),
       (id) => parents.get(id) || '',
-      projectClasses[projectId],
+      // Класс проекта действует с даты: у задачи берём класс, действовавший при её
+      // создании; без даты создания — текущий класс проекта.
+      classAt(periodsByProject.get(projectId), task?.created ?? null),
     );
     const month = e.day.slice(0, 7);
     const key = `${month}|${taskId}|${e.userId}`;
@@ -330,5 +368,6 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     oldestCollectedAt: oldest.length ? new Date(Math.min(...oldest)).toISOString() : null,
     taskTags: Object.fromEntries([...tasks].map(([id, task]) => [id, task.ownTags])),
     projectClasses,
+    projectClassSince,
   };
 }

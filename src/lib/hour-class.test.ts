@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classAt,
   projectHourClass,
   resolveHourClass,
   resolveWithParents,
   withProjectClass,
+  type ClassPeriod,
 } from './hour-class';
 
 describe('resolveHourClass', () => {
@@ -88,5 +90,30 @@ describe('project keywords', () => {
     expect(projectHourClass('часы-брак,часы-прочее')).toBeNull();
     expect(withProjectClass('клиент, часы-брак', 'commercial')).toBe('клиент,часы-коммерция');
     expect(withProjectClass('клиент,часы-брак', null)).toBe('клиент');
+  });
+});
+
+describe('classAt: класс проекта по дате изменения', () => {
+  const periods: ClassPeriod[] = [
+    { hourClass: 'commercial', since: '' },
+    { hourClass: 'internal', since: '2026-01-15T10:00:00.000Z' },
+    { hourClass: null, since: '2026-02-01T09:00:00.000Z' },
+  ];
+
+  it('takes the class that was in effect when the task was created', () => {
+    expect(classAt(periods, '2025-06-01T00:00:00.000Z')).toBe('commercial');
+    expect(classAt(periods, '2026-01-20T00:00:00.000Z')).toBe('internal');
+    // После уборки класса новые задачи в «нераспределено», старые — как были.
+    expect(classAt(periods, '2026-02-02T00:00:00.000Z')).toBeNull();
+  });
+
+  it('falls back to the current class without a creation date', () => {
+    expect(classAt(periods, null)).toBeNull();
+    const withoutClear = periods.slice(0, 2);
+    expect(classAt(withoutClear, null)).toBe('internal');
+  });
+
+  it('returns nothing when the project never had a class', () => {
+    expect(classAt(undefined, '2026-01-01T00:00:00.000Z')).toBeNull();
   });
 });

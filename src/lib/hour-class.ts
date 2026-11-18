@@ -72,6 +72,28 @@ export function projectHourClass(keywords: unknown): HourClass | null {
   return hourClass === UNASSIGNED ? null : hourClass;
 }
 
+/**
+ * Класс по умолчанию действует «с даты»: смена не переписывает прошлое, а старые задачи
+ * остаются в классе, который был на момент их создания. Периоды лежат в зеркале
+ * (project_class_periods), ключевые слова группы несут только текущий класс.
+ */
+export type ClassPeriod = { hourClass: HourClass | null; since: string };
+
+/**
+ * Класс проекта, действовавший в момент создания задачи. Момент неизвестен (у снимка
+ * зеркала может не быть даты) — берём класс, действующий сейчас. Пустой список значит
+ * «класс проекту ещё не назначали».
+ */
+export function classAt(periods: ClassPeriod[] | undefined, momentIso: string | null) {
+  if (!periods?.length) return null;
+  let latest: ClassPeriod | undefined;
+  for (const period of periods) if (!latest || period.since >= latest.since) latest = period;
+  if (!momentIso) return latest?.hourClass ?? null;
+  let applicable: ClassPeriod | undefined;
+  for (const period of periods) if (period.since <= momentIso) applicable = period;
+  return applicable?.hourClass ?? null;
+}
+
 /** Ключевые слова проекта с новым классом: остальные слова сохраняются. */
 export function withProjectClass(keywords: unknown, hourClass: HourClass | null): string {
   const keep = String(keywords || '')

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Download, X } from 'lucide-react';
+import { Download, History, X } from 'lucide-react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '@/components/monos/Button';
 import { DateField } from '@/components/monos/DateField';
@@ -19,6 +19,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
+// Дата одной строкой на уровне модуля: язык известен только после монтирования.
+const SINCE_FORMAT = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
 import {
   HOUR_CLASS_TAG,
   HOUR_CLASSES,
@@ -341,7 +343,16 @@ function HoursAnalyticsView() {
   // Класс проекта закрывает все его задачи без своего тега: размечать остаётся только
   // исключения. «Не выбран» возвращает проект к ручной разметке задач.
   const assignProjectClass = useCallback(
-    async (projectId: string, cls: HourClass | null) => {
+    async (projectId: string, cls: HourClass | null, options?: { backfill?: boolean }) => {
+      if (
+        !options &&
+        !window.confirm(
+          t(
+            'Класс будет действовать с сегодняшнего дня, часы старых задач не перепишутся. Продолжить?',
+          ),
+        )
+      )
+        return;
       setSavingTask(`project:${projectId}`);
       setClassError('');
       // Как и у задачи, класс проекта виден сразу. Он достаётся строкам без своего
@@ -371,7 +382,7 @@ function HoursAnalyticsView() {
         const response = await fetch('/api/analytics/project-class', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, hourClass: cls }),
+          body: JSON.stringify({ projectId, hourClass: cls, backfill: options?.backfill === true }),
         });
         if (!response.ok) throw new Error();
       } catch {
@@ -383,27 +394,59 @@ function HoursAnalyticsView() {
     },
     [load],
   );
+  // Разовая переразметка задним числом: класс из выпадашки уже стоит, меняются только
+  // теги задач, размеченных прошлой сменой класса.
+  const backfillProjectClass = useCallback(
+    (projectId: string, cls: HourClass | null) => {
+      if (!cls) return;
+      if (!window.confirm(t('Переразметить задачи проекта старым правилом, задним числом?')))
+        return;
+      void assignProjectClass(projectId, cls, { backfill: true });
+    },
+    [assignProjectClass],
+  );
   const projectClassSelect = useCallback(
     (projectId: string, project: string) =>
       projectId === NO_PROJECT_ID ? null : (
-        <SelectField
-          size="sm"
-          variant="boxed"
-          className="w-full"
-          aria-label={t('Класс проекта {0}', project)}
-          title={t('Задачи проекта без своего тега получают этот класс')}
-          disabled={savingTask === `project:${projectId}`}
-          value={report?.projectClasses?.[projectId] || ''}
-          options={[
-            { value: '', label: t('Класс не выбран') },
-            ...HOUR_CLASSES.map((cls) => ({ value: cls, label: CLASS_INFO[cls].label() })),
-          ]}
-          onChange={(event) =>
-            void assignProjectClass(projectId, (event.target.value as HourClass) || null)
-          }
-        />
+        <div className="flex w-full items-center gap-1">
+          <SelectField
+            size="sm"
+            variant="boxed"
+            className="w-full"
+            aria-label={t('Класс проекта {0}', project)}
+            title={
+              report?.projectClassSince?.[projectId]
+                ? t(
+                    'Действует с {0}; задачи до этой даты остаются в прежнем классе',
+                    SINCE_FORMAT.format(new Date(report.projectClassSince[projectId])),
+                  )
+                : t('Задачи проекта без своего тега получают этот класс')
+            }
+            disabled={savingTask === `project:${projectId}`}
+            value={report?.projectClasses?.[projectId] || ''}
+            options={[
+              { value: '', label: t('Класс не выбран') },
+              ...HOUR_CLASSES.map((cls) => ({ value: cls, label: CLASS_INFO[cls].label() })),
+            ]}
+            onChange={(event) =>
+              void assignProjectClass(projectId, (event.target.value as HourClass) || null)
+            }
+          />
+          {report?.projectClasses?.[projectId] ? (
+            <button
+              type="button"
+              aria-label={t('Разметить задачи проекта этим классом задним числом')}
+              title={t('Разметить задачи проекта этим классом задним числом')}
+              className="text-ink-soft hover:text-ink"
+              disabled={savingTask === `project:${projectId}`}
+              onClick={() => backfillProjectClass(projectId, report.projectClasses[projectId])}
+            >
+              <History size={14} />
+            </button>
+          ) : null}
+        </div>
       ),
-    [assignProjectClass, savingTask, report],
+    [assignProjectClass, backfillProjectClass, savingTask, report],
   );
 
   const projectName = useCallback(

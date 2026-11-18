@@ -930,6 +930,14 @@ export const EN: Record<string, string> = {
   'Класс проекта {0}': 'Class of project {0}',
   'Задачи проекта без своего тега получают этот класс':
     'Project tasks without their own tag get this class',
+  'Класс будет действовать с сегодняшнего дня, часы старых задач не перепишутся. Продолжить?':
+    "The class will apply from today; hours of older tasks won't be rewritten. Continue?",
+  'Переразметить задачи проекта старым правилом, задним числом?':
+    'Retag the project tasks retroactively, the old way?',
+  'Действует с {0}; задачи до этой даты остаются в прежнем классе':
+    'In effect since {0}; tasks created before that date keep the previous class',
+  'Разметить задачи проекта этим классом задним числом':
+    'Retag the project tasks with this class retroactively',
   'Класс не выбран': 'No class',
   Закрыта: 'Closed',
   'План и факт': 'Plan vs actual',
