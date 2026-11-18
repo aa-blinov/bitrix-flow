@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Scale,
   CalendarDays,
+  ClipboardList,
   ChevronRight,
   ChartNoAxesColumn,
   PanelsTopLeft,
@@ -102,6 +103,14 @@ export const NAV_ITEMS = [
     section: 'reports',
     get label() {
       return t('Сводка проектов');
+    },
+  },
+  {
+    href: '/project-status',
+    icon: ClipboardList,
+    section: 'reports',
+    get label() {
+      return t('Статусы проектов');
     },
   },
   {

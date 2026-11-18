@@ -168,3 +168,25 @@ for (const mode of MODES) {
     },
   );
 }
+
+test('статусы проектов: таблица, правка и таймлайн', async ({ page }) => {
+  await page.goto('/project-status');
+  await settle(page);
+  // Две сеянные записи должны быть отрисованы с проектами из того же сида.
+  await expect(page.getByText('БСПБ', { exact: true })).toBeVisible();
+  await expect(page.getByText('Разработка API v2').first()).toBeVisible();
+  await expect(page.getByText('Додо Пицца', { exact: true })).toBeVisible();
+
+  // Правка: меняем статус проекта 10 и сохраняем — запись сразу в таблице.
+  const row = page.locator('tr', { hasText: 'Разработка API v2' });
+  await row.getByRole('button', { name: 'Правка' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(dialog).toBeHidden();
+
+  // Таймлайн: сеянная история статуса читается из зеркала.
+  await row.getByRole('button', { name: 'История' }).click();
+  await expect(page.getByText('История статуса')).toBeVisible();
+  await expect(page.getByText('Не оформлен → В работе')).toBeVisible();
+});

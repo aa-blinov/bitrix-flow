@@ -96,6 +96,8 @@ for (const dbName of dbNames) {
     'events_stream',
     'cache',
     'workload_time_task',
+    'project_status',
+    'project_status_history',
   ]) {
     await db.collection(name).deleteMany({});
   }
@@ -185,6 +187,51 @@ for (const dbName of dbNames) {
       updated_at: new Date('2026-03-08T23:00:00Z'),
     })),
   );
+
+  // Статусы проектов прода: две заполненные записи и один пустой проект,
+  // чтобы в таблице были и ссылка на редактирование, и без пустых мест всё не выглядело.
+  await db.collection('project_status').insertMany([
+    {
+      projectId: '10',
+      client: 'БСПБ',
+      status: 'В работе',
+      goal: 'Перевести публичный API на GraphQL',
+      state: 'Схема подписок согласована, лимиты в проверке',
+      step: 'Согласовать лимиты запросов',
+      stepDeadline: new Date('2026-03-20T00:00:00.000Z'),
+      risk: 'Задержка согласования лимитов у банка',
+      ownerId: '1',
+      updatedAt: new Date('2026-03-02T09:00:00.000Z'),
+    },
+    {
+      projectId: '11',
+      client: 'Додо Пицца',
+      status: 'Под угрозой',
+      goal: 'Запустить осеннюю кампанию без сдвига сроков',
+      state: 'Креативы утверждены, бюджет на согласовании',
+      step: 'Свести бюджет кампании',
+      stepDeadline: new Date('2026-03-19T00:00:00.000Z'),
+      risk: 'Бюджет не согласован, сроки под угрозой',
+      ownerId: '3',
+      updatedAt: new Date('2026-03-02T09:00:00.000Z'),
+    },
+  ]);
+
+  // Таймлайн правок статуса: две записи, чтобы окно истории не было пустым.
+  await db.collection('project_status_history').insertMany([
+    {
+      projectId: '10',
+      memberId: '1',
+      changes: [{ field: 'Статус', from: 'Не оформлен', to: 'В работе' }],
+      at: new Date('2026-02-24T09:00:00.000Z'),
+    },
+    {
+      projectId: '11',
+      memberId: '3',
+      changes: [{ field: 'Статус', from: 'В работе', to: 'Под угрозой' }],
+      at: new Date('2026-02-27T09:00:00.000Z'),
+    },
+  ]);
 
   console.log(`[seed] база ${dbName}: задач ${TASKS.length}, проектов ${PROJECTS.length}`);
 }
