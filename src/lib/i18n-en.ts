@@ -479,6 +479,7 @@ export const EN: Record<string, string> = {
   'Переименовать пункт': 'Rename the item',
   'Переместить в фазу': 'Move to phase',
   'Переместить задачу {0}': 'Move task {0}',
+  'Открыть задачу {0}': 'Open task {0}',
   'Перенос «{0}» отменён.': 'Moving "{0}" cancelled.',
   Переписка: 'Conversation',
   Переподключить: 'Reconnect',

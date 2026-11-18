@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
-import { PRIORITY_LABELS, STATUS_LABELS, BxTask, Bx24User } from '@/types/bitrix';
+import { STATUS_LABELS, BxTask } from '@/types/bitrix';
 import TaskFilterBar from '@/components/TaskFilterBar';
 import {
   EMPTY_FILTERS,
@@ -23,30 +23,18 @@ import {
   type ReactNode,
 } from 'react';
 import { convertBxTask } from '@/store/kanban';
-import { fetchTaskById } from '@/lib/bitrix24';
+import { fetchTaskById, type Bx24Stage } from '@/lib/bitrix24';
 import TaskModal from './TaskModal';
 import RefreshButton from '@/components/RefreshButton';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  Plus,
-  Filter,
-  Calendar,
-  Timer,
-  AlignLeft,
-  Search,
-  MoveHorizontal,
-  SlidersHorizontal,
-} from 'lucide-react';
-import { Avatar } from '@/components/monos/Avatar';
+import { Plus, Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { DateField } from '@/components/monos/DateField';
-import { Badge, type Tone } from '@/components/monos/Badge';
+import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
-import { Chip } from '@/components/monos/Chip';
 import { Drawer } from '@/components/monos/Drawer';
 import { EmptyState } from '@/components/monos/EmptyState';
 import { IconButton } from '@/components/monos/IconButton';
-import { Menu } from '@/components/monos/Menu';
 import { Modal } from '@/components/monos/Modal';
 import { SearchField } from '@/components/monos/SearchField';
 import { SelectField } from '@/components/monos/SelectField';
@@ -56,8 +44,9 @@ import { TextField } from '@/components/monos/TextField';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import LoadingState from '@/components/LoadingState';
 import { type KanbanSort } from '@/lib/kanban-sort';
-import { extractTaskTags } from '@/lib/task-tags';
-import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
+import { TaskCard } from '@/components/kanban/TaskCard';
+import { InlineAddForm } from '@/components/kanban/InlineAddForm';
 
 // Панель над доской: контролы набора — 44px на телефоне и 36px на мыши.
 // Ниже 36px мышь промахивается, а палец по 32px не попадает.
@@ -78,41 +67,22 @@ function getStageDotColor(hex: string): string {
   return colors[hex?.toLowerCase()] || 'bg-ink-muted';
 }
 
-// Приоритет — это состояние, а не украшение: цвет приходит из ролей набора.
-const PRIORITY_TONES: Record<string, { tone: Tone; className: string }> = {
-  low: { tone: 'neutral', className: 'bg-surface-2' },
-  medium: { tone: 'neutral', className: 'bg-surface-2' },
-  high: { tone: 'warning', className: 'bg-warning/10' },
-  critical: { tone: 'danger', className: 'bg-danger/10' },
-};
-
-// Форматтеры один раз на модуль: toLocale*String строит новый на каждый
-// вызов, а formatDeadline зовётся на каждую карточку доски.
-const DAY_MONTH = dateFormat({ month: 'short', day: 'numeric' });
-const WEEKDAY = dateFormat({ weekday: 'short' });
-const HOUR_MINUTE = dateFormat({ hour: '2-digit', minute: '2-digit' });
-
-function formatDeadline(dateStr: string | undefined): string {
-  if (!dateStr) return '';
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    let day = DAY_MONTH.format(date);
-    if (diff === 0) day = t('Сегодня');
-    else if (diff === 1) day = t('Завтра');
-    else if (diff === -1) day = t('Вчера');
-    else if (diff > 1 && diff < 7) day = WEEKDAY.format(date);
-    else if (diff < 0 && diff > -7) day = WEEKDAY.format(date);
-
-    return `${day}, ${HOUR_MINUTE.format(date)}`;
-  } catch {
-    return '';
-  }
-}
-
-type KanbanStagePage = { tasks: BxTask[]; total: number; loading: boolean };
-const KANBAN_PAGE_SIZE = 50;
+type KanbanStagePage = { tasks: BxTask[]; total: number; loading: boolean; next: number | null };
+const KANBAN_OFFSET_STEP = '50';
+// Фолбэк для проектов без настроенных фаз: константа на модуль, чтобы ссылка
+// на массив не менялась при каждом рендере доски.
+const DEFAULT_STAGES: Bx24Stage[] = [
+  { id: '0', name: 'New', color: '47d1e2', sort: 0, systemType: 'NEW', entityId: '' },
+  {
+    id: 'in_progress',
+    name: 'In Progress',
+    color: '75d900',
+    sort: 200,
+    systemType: 'PROCESS',
+    entityId: '',
+  },
+  { id: 'done', name: 'Done', color: 'ff5752', sort: 999, systemType: 'SUCCESS', entityId: '' },
+];
 const SHOWN_FIELDS = [
   'stageId',
   'status',
@@ -128,9 +98,24 @@ const SHOWN_FIELDS = [
   'accompliceIds',
 ] as const satisfies readonly (keyof BxTask)[];
 
+// Поля в SHOWN_FIELDS — примитивы плюс два массива строк, поэтому хватает
+// строгого сравнения и поэлементной проверки массивов. Прежнее
+// JSON.stringify на каждое поле каждой задачи — это лишний парсинг строк
+// на каждое изменение любой задачи в сторе.
+function sameFieldValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, index) => item === b[index])
+    );
+  }
+  return a === b;
+}
+
 export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const {
-    tasks,
     stages,
     selectedProjectId,
     moveTaskToStage,
@@ -152,7 +137,6 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     loadTaskById,
   } = useKanbanStore(
     useShallow((s) => ({
-      tasks: s.tasks,
       stages: s.stages,
       selectedProjectId: s.selectedProjectId,
       moveTaskToStage: s.moveTaskToStage,
@@ -224,18 +208,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
   const [kanbanSort, setKanbanSort] = useState<KanbanSort>('urgency');
   // Добавляем дефолтные системные стадии
-  const defaultStages = [
-    { id: '0', name: 'New', color: '47d1e2', sort: 0, systemType: 'NEW', entityId: '' },
-    {
-      id: 'in_progress',
-      name: 'In Progress',
-      color: '75d900',
-      sort: 200,
-      systemType: 'PROCESS',
-      entityId: '',
-    },
-    { id: 'done', name: 'Done', color: 'ff5752', sort: 999, systemType: 'SUCCESS', entityId: '' },
-  ];
+  const defaultStages = DEFAULT_STAGES;
   // Project stages from Bitrix24 are authoritative. The generic columns are
   // only a fallback for projects that do not have task stages configured —
   // и только после ответа task.stages.get: иначе доска успевала нарисоваться
@@ -342,7 +315,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         const patch: Partial<BxTask> & { id: string } = { id: task.id };
         for (const key of SHOWN_FIELDS) {
           const value = fresh[key];
-          if (value !== undefined && JSON.stringify(value) !== JSON.stringify(task[key]))
+          if (value !== undefined && !sameFieldValue(value, task[key]))
             Object.assign(patch, { [key]: value });
         }
         if (patch.stageId && !(patch.stageId in stagePages)) delete patch.stageId;
@@ -383,7 +356,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const loadStagePage = useCallback(
     async (
       stageId: string,
-      page: number,
+      offset: number,
       replace = false,
       requestVersion = stageRequestVersion.current,
       excludeStageIds = '',
@@ -395,6 +368,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           tasks: current[stageId]?.tasks || [],
           total: current[stageId]?.total || 0,
           loading: true,
+          next: current[stageId]?.next ?? null,
         },
       }));
       // В фильтре стадий может быть несколько значений: «Новые» забирает ещё и
@@ -403,8 +377,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       const params = new URLSearchParams({
         // Те же параметры, что шлёт список: фильтры общие, значит и запрос один.
         ...filterQueryParams(taskFilters),
-        page: String(page),
-        limit: String(KANBAN_PAGE_SIZE),
+        // Offset вместо page: после переносов задачи уходят между колонками и
+        // арифметика «задач / 50 + 1» просит не ту страницу, а offset отдаёт
+        // сервер сам (nextOffset) — дубли и пропуски не тянутся.
+        offset: String(offset),
+        limit: KANBAN_OFFSET_STEP,
         projectId: selectedProjectId,
         stageId: stageParam,
         query: deferredSearch,
@@ -438,6 +415,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   ],
               total: Number(data.total) || 0,
               loading: false,
+              // Доверяем границе сервера, а не подсчёту на клиенте: локальные
+              // оптимистичные переносы сбивают счётчик задач в колонке.
+              next: data.nextOffset ?? null,
             },
           };
         });
@@ -445,7 +425,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         if (requestVersion !== stageRequestVersion.current) return;
         setStagePages((current) => ({
           ...current,
-          [stageId]: { ...(current[stageId] || { tasks: [], total: 0 }), loading: false },
+          [stageId]: {
+            ...(current[stageId] || { tasks: [], total: 0, next: null }),
+            loading: false,
+          },
         }));
       }
     },
@@ -460,8 +443,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     // запрос задач без фазы, а сверху — колонка «Без фазы» для фазы, которой
     // доска не знает.
     const requests = [
-      ...stageQueries.map((item) => loadStagePage(item.columnId, 1, true, requestVersion)),
-      loadStagePage(REST_STAGES_COLUMN, 1, true, requestVersion, restStageIds),
+      ...stageQueries.map((item) => loadStagePage(item.columnId, 0, true, requestVersion)),
+      loadStagePage(REST_STAGES_COLUMN, 0, true, requestVersion, restStageIds),
     ];
     // Снимаем спиннер по первому ответу, а не по последнему: доска рисуется
     // сразу, остальные колонки наполняются по мере готовности.
@@ -489,6 +472,19 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // filteredTasks они уже учтены, поэтому фильтр по неизвестной фазе их
   // тоже находит.
   const knownStageIds = new Set(allStages.map((stage) => stage.id));
+  // Раскладка задач по колонкам один раз на изменение списка, а не фильтр
+  // в каждой колонке на каждый рендер доски.
+  const tasksByStage = useMemo(() => {
+    const map = new Map<string, BxTask[]>();
+    for (const task of filteredTasks) {
+      const id = displayedStageId(task);
+      const list = map.get(id);
+      if (list) list.push(task);
+      else map.set(id, [task]);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- displayedStageId зависит только от newStageId
+  }, [filteredTasks, newStageId]);
   const orphanTasks = filteredTasks.filter((task) => !knownStageIds.has(displayedStageId(task)));
   if (orphanTasks.length > 0 && process.env.NODE_ENV !== 'production') {
     // ponytail: dev-only — silent in prod, noisy when something is misconfigured.
@@ -536,7 +532,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       : null,
   );
   const currentProject = projects.find((p) => p.id === selectedProjectId);
-  const avatarByUserId = new Map(users.map((user) => [user.id, user.icon]));
+  const avatarByUserId = useMemo(() => new Map(users.map((user) => [user.id, user.icon])), [users]);
 
   if (!selectedProjectId) {
     return (
@@ -581,42 +577,16 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     }
   };
 
+  // Колонку перестраивает эффект синхронизации со стором: оптимистичная правка
+  // moveTaskToStage уходит в стор, эффект перекладывает задачу между колонками
+  // и правит счётчики. Здесь только чистим drag-состояние — и до запроса, а не
+  // после: при отказе портала карточка не должна оставаться полупрозрачной.
   const handleDrop = async (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
-    if (draggedTask) {
-      const taskId = draggedTask;
-      await loadTaskById(taskId);
-      await moveTaskToStage(taskId, stageId);
-      setStagePages((current) => {
-        const moved = Object.values(current)
-          .flatMap((item) => item.tasks)
-          .find((task) => task.id === taskId);
-        if (!moved) return current;
-        const sourceStageId = Object.entries(current).find(([, item]) =>
-          item.tasks.some((task) => task.id === taskId),
-        )?.[0];
-        if (!sourceStageId || sourceStageId === stageId) return current;
-        const next = Object.fromEntries(
-          Object.entries(current).map(([id, item]) => [
-            id,
-            {
-              ...item,
-              tasks: item.tasks.filter((task) => task.id !== taskId),
-              total: id === sourceStageId ? Math.max(0, item.total - 1) : item.total,
-            },
-          ]),
-        );
-        const destination = next[stageId] || { tasks: [], total: 0, loading: false };
-        next[stageId] = {
-          ...destination,
-          tasks: [{ ...moved, stageId }, ...destination.tasks],
-          total: destination.total + 1,
-        };
-        return next;
-      });
-      setDraggedTask(null);
-      setDragOverColumn(null);
-    }
+    const taskId = draggedTask;
+    setDraggedTask(null);
+    setDragOverColumn(null);
+    if (taskId) await moveCardToStage(taskId, stageId);
   };
 
   const handleAddTask = async () => {
@@ -631,7 +601,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         stageId: newTask.stageId || undefined,
       });
       if (created) {
-        void loadStagePage(newTask.stageId || newStageId || '0', 1, true);
+        void loadStagePage(newTask.stageId || newStageId || '0', 0, true);
         setNewTask({
           title: '',
           description: '',
@@ -659,7 +629,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       priority: data.priority,
       stageId,
     });
-    if (created) void loadStagePage(stageId, 1, true);
+    if (created) void loadStagePage(stageId, 0, true);
     return !!created;
   };
 
@@ -909,7 +879,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       >
         <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
           {allStages.map((stage) => {
-            const colTasks = filteredTasks.filter((task) => displayedStageId(task) === stage.id);
+            const colTasks = tasksByStage.get(stage.id) || [];
             const isDragOver = dragOverColumn === stage.id;
 
             return (
@@ -1004,20 +974,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       onCancel={() => setInlineAddStage(null)}
                     />
                   )}
-                  {(stagePages[stage.id]?.tasks.length || 0) <
-                    (stagePages[stage.id]?.total || 0) && (
+                  {(stagePages[stage.id]?.next ?? null) !== null && (
                     <Button
                       variant="quiet"
                       size="md"
                       full
                       disabled={stagePages[stage.id]?.loading}
-                      onClick={() =>
-                        void loadStagePage(
-                          stage.id,
-                          Math.floor((stagePages[stage.id]?.tasks.length || 0) / KANBAN_PAGE_SIZE) +
-                            1,
-                        )
-                      }
+                      onClick={() => void loadStagePage(stage.id, stagePages[stage.id]?.next || 0)}
                     >
                       {stagePages[stage.id]?.loading ? t('Загружаем…') : t('Показать ещё')}
                     </Button>
@@ -1031,15 +994,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             <Card
               padding="none"
               className="w-[20rem] flex-shrink-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
-              onDragOver={(e) => handleDragOver(e, 'orphan')}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => {
-                // Drop into fallback column: just keep current stage, but the
-                // task is still visible so it can be edited/moved properly.
-                e.preventDefault();
-                setDraggedTask(null);
-                setDragOverColumn(null);
-              }}
+              // Колонка без фазы не принимает перенос: сбрасывать фазу (stageId «0»)
+              // REST Битрикса здесь нельзя (см. moveTaskToProject), и дроп вхолостую
+              // выглядел бы как сработавший перенос.
             >
               <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
                 <div className="w-2 h-2 rounded-full bg-ink-muted" />
@@ -1059,8 +1016,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     isDragging={draggedTask === task.id}
                   />
                 ))}
-                {(stagePages[REST_STAGES_COLUMN]?.tasks.length || 0) <
-                  (stagePages[REST_STAGES_COLUMN]?.total || 0) && (
+                {(stagePages[REST_STAGES_COLUMN]?.next ?? null) !== null && (
                   <Button
                     variant="quiet"
                     size="md"
@@ -1069,9 +1025,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     onClick={() =>
                       void loadStagePage(
                         REST_STAGES_COLUMN,
-                        Math.floor(
-                          (stagePages[REST_STAGES_COLUMN]?.tasks.length || 0) / KANBAN_PAGE_SIZE,
-                        ) + 1,
+                        stagePages[REST_STAGES_COLUMN]?.next || 0,
                         false,
                         stageRequestVersion.current,
                         restStageIds,
@@ -1192,250 +1146,5 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
       {selectedTask && <TaskModal task={selectedTask} onClose={closeTask} />}
     </div>
-  );
-}
-
-function InlineAddForm({
-  onSubmit,
-  onCancel,
-  users,
-  defaultAssigneeId,
-}: {
-  onSubmit: (data: { title: string; assigneeId: string; priority: string }) => Promise<boolean>;
-  onCancel: () => void;
-  users: Bx24User[];
-  defaultAssigneeId?: string;
-}) {
-  const [title, setTitle] = useState('');
-  const [assigneeId, setAssigneeId] = useState(defaultAssigneeId || '');
-  const [priority, setPriority] = useState('medium');
-  const [submitting, setSubmitting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const submit = async () => {
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    setSubmitting(true);
-    const ok = await onSubmit({ title: trimmed, assigneeId, priority });
-    setSubmitting(false);
-    if (ok) {
-      setTitle('');
-      inputRef.current?.focus();
-    }
-  };
-
-  return (
-    <div className="rounded-ui border border-line bg-canvas p-2 shadow-rest">
-      <TextField
-        ref={inputRef}
-        variant="boxed"
-        size="sm"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            void submit();
-          }
-          if (e.key === 'Escape') onCancel();
-        }}
-        placeholder={t('Название задачи…')}
-        aria-label={t('Название задачи')}
-        disabled={submitting}
-      />
-      <div className="mt-2 flex items-center gap-1">
-        <SelectField
-          value={assigneeId || 'unassigned'}
-          onChange={(event) =>
-            setAssigneeId(event.target.value === 'unassigned' ? '' : event.target.value)
-          }
-          options={[
-            { value: 'unassigned', label: t('Без исполнителя') },
-            ...users.map((u) => ({ value: u.id, label: u.name })),
-          ]}
-          size="sm"
-          disabled={submitting}
-          className="min-w-0 flex-1"
-          aria-label={t('Исполнитель')}
-        />
-        <SelectField
-          value={priority}
-          onChange={(event) => setPriority(event.target.value)}
-          options={[
-            { value: 'low', label: t('Низкий') },
-            { value: 'medium', label: t('Обычный') },
-            { value: 'high', label: t('Высокий') },
-          ]}
-          size="sm"
-          className="w-24"
-          aria-label={t('Приоритет')}
-        />
-      </div>
-      <div className="mt-2 flex items-center justify-end gap-1">
-        <Button size="md" variant="quiet" onClick={onCancel} disabled={submitting}>
-          {t('Отмена')}
-        </Button>
-        <Button size="md" onClick={() => void submit()} disabled={!title.trim() || submitting}>
-          {submitting ? '…' : t('Создать')}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function TaskCard({
-  task,
-  avatarUrl,
-  onDragStart,
-  onClick,
-  isDragging,
-  stages,
-  onMoveToStage,
-}: {
-  task: BxTask;
-  avatarUrl?: string;
-  onDragStart: (e: React.DragEvent, id: string) => void;
-  onClick: () => void;
-  isDragging: boolean;
-  stages: Array<{ id: string; name: string }>;
-  onMoveToStage: (taskId: string, stageId: string) => void;
-}) {
-  const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
-  const priorityTone = PRIORITY_TONES[task.priority] || PRIORITY_TONES.medium;
-  const taskTags = task.tags?.length ? task.tags : extractTaskTags(task.title, task.description);
-  const isCompleted = task.status === 'done';
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
-  const dueDate = formatDeadline(task.dueDate);
-  const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
-  const totalSubtasks = task.subtasks?.length || 0;
-  // «Обычный» стоит почти на всех задачах: чип на каждой карточке — шум, а не
-  // сигнал. Показываем только отличие от нормы.
-  const showPriority = task.priority !== 'medium';
-  const hasChips = showPriority || taskTags.length > 0 || Boolean(task.parentId);
-
-  return (
-    <Card
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id)}
-      onClick={onClick}
-      // Колонка держит до 50 карточек, а видно от силы шесть: content-visibility
-      // позволяет браузеру не отрисовывать то, что за пределами экрана. Он же обрезает всё,
-      // что вылезает за карточку, поэтому с открытым меню фазы включаем показ целиком.
-      className={`group/card cursor-pointer border-transparent p-3 transition-colors [contain-intrinsic-size:auto_132px] [content-visibility:auto] has-[[aria-expanded=true]]:[content-visibility:visible] hover:border-line-strong hover:shadow-lift ${
-        isDragging ? 'opacity-40 rotate-1' : isCompleted ? 'bg-surface-2 text-ink-soft' : ''
-      }`}
-    >
-      {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
-          фазу можно выбрать и списком. */}
-      <div
-        className="absolute right-2 top-2 z-10 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-within:opacity-100"
-        // Клик по меню не должен открывать карточку.
-        onClick={(event) => event.stopPropagation()}
-      >
-        <Menu
-          label={t('Переместить в фазу')}
-          align="end"
-          width="auto"
-          items={stages.map((stage) => ({
-            value: stage.id,
-            label: stage.name,
-            disabled: stage.id === task.stageId,
-            onSelect: () => onMoveToStage(task.id, stage.id),
-          }))}
-          trigger={
-            <IconButton
-              label={t('Переместить задачу {0}', task.title)}
-              variant="ghost"
-              size="sm"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <MoveHorizontal className="size-4" strokeWidth={1.7} />
-            </IconButton>
-          }
-        />
-      </div>
-      {hasChips && (
-        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-1 pr-6">
-          {showPriority && (
-            <Badge
-              tone={priorityTone.tone}
-              className={`shrink-0 whitespace-nowrap rounded-ui px-1.5 py-0.5 ${priorityTone.className}`}
-            >
-              {priority.label}
-            </Badge>
-          )}
-          {taskTags.slice(0, 3).map((tag) => (
-            <Chip key={tag} title={tag} className="max-w-28">
-              {tag}
-            </Chip>
-          ))}
-          {taskTags.length > 3 && <Chip>+{taskTags.length - 3}</Chip>}
-          {task.parentId && <Chip tone="accent">{t('Подзадача')}</Chip>}
-        </div>
-      )}
-
-      {/* Title and description indicator share one row so the icon never changes card height. */}
-      <div className={`mb-2 flex items-start gap-1 ${hasChips ? '' : 'pr-6'}`}>
-        <h3
-          className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
-            isCompleted ? 'text-ink-soft line-through' : 'text-ink'
-          }`}
-        >
-          {task.title}
-        </h3>
-        {task.description && (
-          <AlignLeft className="mt-0.5 shrink-0 text-ink-faint" size={14} strokeWidth={1.7} />
-        )}
-      </div>
-
-      {/* Meta footer — в узких колонках (224px) «План + Факт» не помещаются
-          в одну строку с дедлайном и аватаром. Перенос строк и truncate у
-          дедлайна/оценки чинят наложение, не ломая внешний вид на широких. */}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
-          <span
-            className={`flex min-w-0 items-center gap-1 ${isOverdue ? 'text-danger-text font-medium' : ''}`}
-          >
-            <Calendar size={12} strokeWidth={1.7} className="shrink-0" />
-            <span className="truncate">{dueDate || t('Без срока')}</span>
-          </span>
-          {(task.estimate > 0 || task.actualTime > 0) && (
-            <span className="flex items-center gap-1">
-              <Timer size={12} strokeWidth={1.7} className="shrink-0" />
-              <span className="truncate">
-                {task.estimate > 0 && t('План {0} ч', task.estimate)}
-                {task.estimate > 0 && task.actualTime > 0 && ', '}
-                {task.actualTime > 0 && t('Факт {0} ч', task.actualTime)}
-              </span>
-            </span>
-          )}
-          {totalSubtasks > 0 && (
-            <span className="flex items-center gap-1">
-              <span aria-hidden>☐</span>
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          )}
-        </div>
-
-        {task.assigneeName && (
-          <AssigneeAvatar
-            key={avatarUrl || 'no-avatar'}
-            name={task.assigneeName}
-            avatarUrl={avatarUrl}
-          />
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function AssigneeAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
-  return (
-    <span title={name} className="inline-flex shrink-0">
-      <Avatar name={name} src={avatarUrl} size="xs" />
-    </span>
   );
 }

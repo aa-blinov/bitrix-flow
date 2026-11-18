@@ -287,7 +287,13 @@ test('фаза, сменённая в карточке, сразу перено�
   await page.goto('/projects/10');
   await settle(page);
   const title = 'Перевести справочники на GraphQL';
-  await page.getByRole('heading', { name: title, level: 3 }).click();
+  // Клик по карточке это кнопка-оверлей «Открыть задачу»: заголовок h3 лежит
+  // под ней, и клик по «heading» перехватывается кнопкой.
+  await page
+    .getByRole('button', { name: `Открыть задачу ${title}` })
+    .or(page.getByRole('heading', { name: title, level: 3 }))
+    .first()
+    .click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await choose(page, dialog.getByRole('combobox', { name: 'Фаза задачи' }), '102');
