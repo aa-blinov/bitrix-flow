@@ -454,6 +454,35 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     if (!requests.length) reveal();
     requests.forEach((request) => void request.then(reveal).catch(reveal));
   }, [loadStagePage, selectedProjectId, stageKey, stageSignature]);
+
+  // Событие портала (SSE → tasksVersion): зеркало в Mongo уже обновлено,
+  // доска тихо перечитывает свои колонки. Без этого правки с портала не
+  // доезжали до доски вовсе — колонки жили только на локальных правках,
+  // до смены фильтров. Дебаунс склеивает пачку событий в одну перечитку,
+  // доска не мигает: колонки замещаются по месту, без сброса в спиннер.
+  const tasksVersion = useKanbanStore((s) => s.tasksVersion);
+  const loadedVersionRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (loadedVersionRef.current === null) {
+      // Первый рендер: колонки уже грузит основной эффект, события не ждём.
+      loadedVersionRef.current = tasksVersion;
+      return;
+    }
+    if (loadedVersionRef.current === tasksVersion) return;
+    loadedVersionRef.current = tasksVersion;
+    if (!selectedProjectId || !stageKey) return;
+    const timer = window.setTimeout(() => {
+      const requestVersion = ++stageRequestVersion.current;
+      const request = (stageId: string, excludeStageIds = '') =>
+        loadStagePage(stageId, 0, true, requestVersion, excludeStageIds);
+      void Promise.all([
+        ...stageQueries.map((item) => request(item.columnId)),
+        request(REST_STAGES_COLUMN, restStageIds),
+      ]);
+    }, 500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restStageIds/Stable подписи stageQueries описаны stageKey
+  }, [tasksVersion, selectedProjectId, stageKey]);
   const filteredTasks = useMemo(
     () => Object.values(stagePages).flatMap((stage) => stage.tasks),
     [stagePages],
