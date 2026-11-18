@@ -9,7 +9,7 @@ import { Separator } from '@/components/monos/Separator';
 import Link from 'next/link';
 import { useSSE } from '@/hooks/useSSE';
 import { useKanbanStore } from '@/store/kanban';
-import { t } from '@/lib/i18n';
+import { t, dateFormat, relativeFormat } from '@/lib/i18n';
 
 type Notice = {
   id: string;
@@ -36,6 +36,24 @@ function icon(type: string) {
 // меняет, а перезагрузка списка стирала бы комментарии в открытой карточке:
 // они лежат в чате Bitrix, в списке их нет.
 const TASK_LIST_EVENTS = new Set(['task_added', 'task_updated', 'task_deleted', 'tasks-changed']);
+
+const TIMESTAMP = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
+const RELATIVE = relativeFormat({ numeric: 'auto' });
+
+// Свежие события показываем относительно («5 минут назад»), для старости
+// больше недели точность не нужна — возвращаем полную дату.
+function relativeTime(iso?: string): string | null {
+  if (!iso) return null;
+  const time = new Date(iso).getTime();
+  if (!Number.isFinite(time)) return null;
+  const diff = Math.round((time - Date.now()) / 1000);
+  const abs = Math.abs(diff);
+  if (abs < 60) return RELATIVE.format(diff, 'second');
+  if (abs < 3600) return RELATIVE.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return RELATIVE.format(Math.round(diff / 3600), 'hour');
+  if (abs < 7 * 86400) return RELATIVE.format(Math.round(diff / 86400), 'day');
+  return TIMESTAMP.format(new Date(time));
+}
 
 export default function Notifications({
   placement = 'bottom',
@@ -68,6 +86,13 @@ export default function Notifications({
     const saved = Number(localStorage.getItem(`bitrix-notifications-seen:${memberId}`));
     setSeenAt(Number.isFinite(saved) && saved > 0 ? saved : Date.now());
   }, [memberId]);
+
+  // История нужна сразу после монтирования: до первого открытия окна бейдж
+  // непрочитанных считается по пустому списку, и колокольчик молчит.
+  useEffect(() => {
+    if (!memberId) return;
+    void loadHistory();
+  }, [loadHistory, memberId]);
 
   useEffect(() => {
     if (!open || !memberId) return;
@@ -151,14 +176,30 @@ export default function Notifications({
                   ? `/projects/${item.projectId}?task=${encodeURIComponent(item.taskId)}`
                   : `/all-tasks?task=${encodeURIComponent(item.taskId)}`
                 : null;
+              const createdAt = item.created_at || item.createdAt;
+              const timestamp = new Date(createdAt || 0).getTime();
+              const unread = Number.isFinite(timestamp) && timestamp > seenAt;
               const row = (
                 <>
                   <span className="mt-0.5">{icon(item.type)}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-ink">{item.title}</p>
+                    <p className="flex items-center gap-1.5 font-bold text-ink">
+                      {unread && (
+                        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-info" />
+                      )}
+                      <span className="min-w-0 truncate">{item.title}</span>
+                    </p>
                     <p className="line-clamp-2 text-xs text-ink-soft">
                       <BitrixText text={item.message} />
                     </p>
+                    {createdAt && (
+                      <time
+                        dateTime={createdAt}
+                        className="mt-0.5 block text-[11px] text-ink-faint"
+                      >
+                        {relativeTime(createdAt)}
+                      </time>
+                    )}
                   </div>
                 </>
               );
@@ -167,12 +208,15 @@ export default function Notifications({
                   key={item.id}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className="flex gap-2 rounded-ui px-2 py-2.5 text-sm transition-colors duration-fast hover:bg-surface"
+                  className={`flex gap-2 rounded-ui px-2 py-2.5 text-sm transition-colors duration-fast hover:bg-surface ${unread ? 'bg-surface' : ''}`}
                 >
                   {row}
                 </Link>
               ) : (
-                <div key={item.id} className="flex gap-2 rounded-ui px-2 py-2.5 text-sm">
+                <div
+                  key={item.id}
+                  className={`flex gap-2 rounded-ui px-2 py-2.5 text-sm ${unread ? 'bg-surface' : ''}`}
+                >
                   {row}
                 </div>
               );
