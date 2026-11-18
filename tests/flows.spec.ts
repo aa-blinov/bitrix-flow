@@ -1005,7 +1005,8 @@ test('событие из очереди портала звенит внутр�
   // SSE отдаёт только события новее своего курсора, а курсор ставится при подключении:
   // запись, сделанная раньше, потерялась бы, поэтому повторяем с новым номером сообщения.
   const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
-  const chimes = () => page.evaluate(() => (window as unknown as { __chimes: () => number }).__chimes());
+  const chimes = () =>
+    page.evaluate(() => (window as unknown as { __chimes: () => number }).__chimes());
   try {
     const db = client.db(testDb);
     const token = await db.collection('user_tokens').findOne({});
