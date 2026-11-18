@@ -118,6 +118,9 @@ export function TaskCard({
           trigger={
             <IconButton
               label={t('Переместить задачу {0}', task.title)}
+              // Подсказка без полного названия: строка длиннее двух слов и хвост
+              // с переносами только мешает; полное имя и так видно на карточке.
+              tooltipText={t('Переместить в фазу')}
               variant="ghost"
               size="sm"
               onClick={(event) => event.stopPropagation()}
