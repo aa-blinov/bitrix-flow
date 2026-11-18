@@ -98,6 +98,7 @@ for (const dbName of dbNames) {
     'workload_time_task',
     'project_status',
     'project_status_history',
+    'project_class_periods',
   ]) {
     await db.collection(name).deleteMany({});
   }

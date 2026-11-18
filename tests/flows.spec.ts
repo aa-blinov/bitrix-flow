@@ -965,19 +965,37 @@ test('мессенджер: набор текста шлёт сигнал «пе
   expect(signals[0]).toEqual({ dialogId: '2' });
 });
 
-test('событие из очереди портала показывает уведомление браузера', async ({ page, testDb }) => {
+test('событие из очереди портала звенит внутри приложения', async ({ page, testDb }) => {
   await page.addInitScript(() => {
-    const notes: string[][] = [];
-    (window as unknown as { __notes: string[][] }).__notes = notes;
-    class FakeNotification {
-      static permission = 'granted';
-      onclick: (() => void) | null = null;
-      constructor(title: string, options: { body?: string }) {
-        notes.push([title, options.body || '']);
+    // Пушей в браузер больше нет: сигнал — звук (AudioContext) внутри приложения.
+    let chimes = 0;
+    class FakeAudioContext {
+      currentTime = 0;
+      destination = {};
+      resume() {
+        chimes += 1;
       }
-      close() {}
+      createOscillator() {
+        return {
+          frequency: { value: 0 },
+          connect: () => ({}),
+          start: () => {},
+          stop: () => {},
+        };
+      }
+      createGain() {
+        return {
+          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          connect: (node: unknown) => node,
+        };
+      }
     }
-    (window as unknown as { Notification: unknown }).Notification = FakeNotification;
+    const scope = window as unknown as {
+      AudioContext: unknown;
+      __chimes: () => number;
+    };
+    scope.AudioContext = FakeAudioContext;
+    scope.__chimes = () => chimes;
     localStorage.setItem('bitrix-flow-chat-notify', '1');
   });
   await page.goto('/');
@@ -987,11 +1005,11 @@ test('событие из очереди портала показывает у�
   // SSE отдаёт только события новее своего курсора, а курсор ставится при подключении:
   // запись, сделанная раньше, потерялась бы, поэтому повторяем с новым номером сообщения.
   const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
-  const notes = () => page.evaluate(() => (window as unknown as { __notes: string[][] }).__notes);
+  const chimes = () => page.evaluate(() => (window as unknown as { __chimes: () => number }).__chimes());
   try {
     const db = client.db(testDb);
     const token = await db.collection('user_tokens').findOne({});
-    for (let attempt = 0; attempt < 8 && !(await notes()).length; attempt++) {
+    for (let attempt = 0; attempt < 8 && !(await chimes()); attempt++) {
       await db.collection('events_stream').insertOne({
         member_id: token?.member_id,
         // События чата личные: SSE отдаёт их только своему человеку (в моке это id 1).
@@ -1016,9 +1034,8 @@ test('событие из очереди портала показывает у�
   } finally {
     await client.close();
   }
-  await expect.poll(notes).toContainEqual(['Дмитрий Соколов', 'Посмотришь ревью?']);
+  await expect.poll(chimes).toBeGreaterThanOrEqual(1);
 });
-
 test('мессенджер: у файлов видны имена, голосовое подписано и ускоряется', async ({ page }) => {
   const chat = await openDmitry(page);
   await expect(chat.getByText('фото.jpg · 5 КБ')).toBeVisible();
@@ -1392,6 +1409,9 @@ test(
         .collection('task_mirror')
         .updateMany({ 'data.group.id': '12' }, { $set: { 'data.tags': [] } });
       await db.collection('projects').updateMany({ id: '12' }, { $unset: { keywords: '' } });
+      // Память о сменах класса — тоже часть сида: мобильный проект наследует базу
+      // после десктопного, и без сброса периодов класс считался бы «с начала времён».
+      await db.collection('project_class_periods').deleteMany({ projectId: '12' });
     } finally {
       await client.close();
     }
@@ -1455,8 +1475,8 @@ test(
     await unassigned.click();
     await expect(page).not.toHaveURL(/class=/);
 
-    // Класс проекта раскладывается тегом на задачи без своего тега. Снятый класс проекта
-    // теги не стирает: класс уже лежит на задачах в Битриксе.
+    // Класс проекта действует «с даты»: смена идёт после подтверждения в диалоге.
+    page.on('dialog', (dialog) => void dialog.accept());
     const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
     const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
     await choose(page, backlogClass, 'internal');

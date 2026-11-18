@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
   // dryRun показывает, какие задачи получат тег, ничего не записывая.
   const dryRun = body.dryRun === true;
   const db = await getDb();
+  // Класс до смены нужен и после try: от него зависит, с какого момента начнёт
+  // действовать новый период (первый класс и_replace замены живут с разных дат).
+  let previous: HourClass | null = null;
   let keywords: string;
   try {
     let current: unknown;
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
       if (!group) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       current = group.KEYWORDS;
     }
-    const previous = projectHourClass(current);
+    previous = projectHourClass(current);
     keywords = withProjectClass(current, hourClass);
     // По умолчанию смена действует с сегодняшнего дня и историю не трогает: классы
     // старых задач считаются по периодам. Переразметка задним числом — только по
@@ -85,12 +88,36 @@ export async function POST(req: NextRequest) {
     .updateOne({ member_id: memberId, id: projectId }, { $set: { keywords } });
   // Смена класса не перезаписывает, а добавляет период: резолвинг задач идёт по дате
   // создания задачи, уборка или смена тоже должна обрубить старый класс с этой минуты.
-  await db.collection('project_class_periods').insertOne({
-    member_id: memberId,
-    projectId,
-    hourClass,
-    since: new Date().toISOString(),
-  });
+  // Первый класс проекта — не смена: он действует и на существующие задачи, поэтому
+  // начинается «с начала времён», иначе назначение класса не дало бы видимого эффекта.
+  const hasPeriods =
+    (await db.collection('project_class_periods').countDocuments({
+      member_id: memberId,
+      projectId,
+    })) > 0;
+  const periods = db.collection('project_class_periods');
+  if (hasPeriods) {
+    await periods.insertOne({
+      member_id: memberId,
+      projectId,
+      hourClass,
+      since: new Date().toISOString(),
+    });
+  } else if (previous && previous !== hourClass) {
+    // Первый период пишем, а в ключевых словах уже стоял другой класс: значит смена
+    // всё-таки есть — старый класс действует с начала времён, новый с этой минуты.
+    await periods.insertOne({ member_id: memberId, projectId, hourClass: previous, since: '' });
+    await periods.insertOne({
+      member_id: memberId,
+      projectId,
+      hourClass,
+      since: new Date().toISOString(),
+    });
+  } else {
+    // Первый класс проекта — не смена: он действует и на существующие задачи,
+    // поэтому начинается «с начала времён», иначе назначение не дало бы эффекта.
+    await periods.insertOne({ member_id: memberId, projectId, hourClass, since: '' });
+  }
   invalidateByPrefix(`${memberId}:`);
   return NextResponse.json({ keywords });
 }
