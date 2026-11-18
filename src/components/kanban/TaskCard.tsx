@@ -97,11 +97,15 @@ export function TaskCard({
       {/* Перенос карточки: HTML5 drag&drop не работает на тач-экранах, поэтому
           фазу можно выбрать и списком. */}
       <div
-        className="absolute right-2 top-2 z-10 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-within:opacity-100"
+        className="absolute right-2 top-2 z-10 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100"
         // Клик по меню не должен открывать карточку.
         onClick={(event) => event.stopPropagation()}
       >
         <Menu
+          // Выпадашка рисуется порталом: колонка — скролл-контейнер, и обычный
+          // absolute-поповер обрезался её низом, когда меню открывалось
+          // на карточке из нижней части длинной колонки.
+          portal
           label={t('Переместить в фазу')}
           align="end"
           width="auto"
