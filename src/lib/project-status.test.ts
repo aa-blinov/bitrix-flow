@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FIELD_LABELS,
+  buildFieldMap,
   elementCode,
   elementFields,
   mapStatusElement,
   validateStatusPayload,
 } from './project-status';
+
+// Карта поля по названию, как её строит buildFieldMap с портала.
+const fieldMap = Object.fromEntries(
+  Object.values(FIELD_LABELS).map((label) => [label, `PROPERTY_${label.replace(/\s/g, '_')}`]),
+) as Record<string, string>;
 
 describe('validateStatusPayload', () => {
   it('принимает корректный payload', () => {
@@ -34,18 +41,21 @@ describe('validateStatusPayload', () => {
 
 describe('mapStatusElement', () => {
   it('маппит поля элемента списка', () => {
-    const status = mapStatusElement({
-      PROPERTY_PROJECT_ID: '10',
-      PROPERTY_CLIENT: 'БСПБ',
-      PROPERTY_STATUS: 'Ждёт договора',
-      PROPERTY_STEP_DEADLINE: '20.11.2026',
-    });
+    const status = mapStatusElement(
+      {
+        PROPERTY_ID_проекта: '10',
+        PROPERTY_Клиент: 'БСПБ',
+        PROPERTY_Статус: 'Ждёт договора',
+        PROPERTY_Срок_шага: '20.11.2026',
+      },
+      fieldMap,
+    );
     expect(status).toMatchObject({ projectId: '10', client: 'БСПБ', status: 'Ждёт договора' });
     expect(status?.stepDeadline).toBe('2026-11-20T00:00:00.000Z');
   });
 
   it('элемент без проекта не попадает в сводку', () => {
-    expect(mapStatusElement({}) === null).toBe(true);
+    expect(mapStatusElement({}, fieldMap) === null).toBe(true);
   });
 });
 
@@ -57,12 +67,11 @@ describe('elementCode', () => {
 
 describe('elementFields', () => {
   it('дата уходит в формате портала', () => {
-    const fields = elementFields(
-      validateStatusPayload({
-        projectId: '10',
-        stepDeadline: '2026-11-20T00:00:00.000Z',
-      }),
-    );
-    expect(fields.PROPERTY_STEP_DEADLINE).toBe('20.11.2026');
+    const values = validateStatusPayload({
+      projectId: '10',
+      stepDeadline: '2026-11-20T00:00:00.000Z',
+    });
+    const fields = elementFields(values, fieldMap);
+    expect(fields[fieldMap['Срок шага']]).toBe('20.11.2026');
   });
 });

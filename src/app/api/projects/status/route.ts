@@ -9,12 +9,14 @@ type TokenRef = { access_token: string; domain: string };
 import {
   STATUS_LIST_CODE,
   STATUS_LIST_TYPE_ID,
+  buildFieldMap,
   ensureStatusList,
   elementCode,
   elementFields,
   mapStatusElement,
   validateStatusPayload,
   type ProjectStatus,
+  type StatusFieldMap,
 } from '@/lib/project-status';
 
 // Один агрегированный запрос на открытие сводки: списки REST отдают все
@@ -29,23 +31,29 @@ async function listElements(token: TokenRef, method: string, params: Record<stri
 
 // Адресация элемента по IBLOCK_ID: lists.element.get принимает его или код
 // списка, но поиск по коду надёжнее — ID свежесозданного списка не кешируем.
-async function findIblockId(token: TokenRef): Promise<string | null> {
+async function findIblock(
+  token: TokenRef,
+): Promise<{ id: string; fieldMap: StatusFieldMap } | null> {
   const lists = await listElements(token, 'lists.get', { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID });
+  // У списков REST ключ кода — CODE, на старых порталах встречается IBLOCK_CODE.
   const list = (lists || []).find(
     (item: any) => item?.IBLOCK_CODE === STATUS_LIST_CODE || item?.CODE === STATUS_LIST_CODE,
   );
-  return list ? String(list.ID || list.IBLOCK_ID || '') : null;
+  if (!list) return null;
+  const iblockId = String(list.ID || list.IBLOCK_ID || '');
+  const fieldMap = await buildFieldMap((method, params) => listElements(token, method, params));
+  return { id: iblockId, fieldMap };
 }
 
 async function fetchStatuses(token: TokenRef): Promise<ProjectStatus[]> {
-  const iblockId = await findIblockId(token);
-  if (!iblockId) return [];
+  const iblock = await findIblock(token);
+  if (!iblock) return [];
   const elements = await listElements(token, 'lists.element.get', {
     IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
-    IBLOCK_ID: iblockId,
+    IBLOCK_ID: iblock.id,
   });
   return (elements || [])
-    .map((element: Record<string, unknown>) => mapStatusElement(element))
+    .map((element: Record<string, unknown>) => mapStatusElement(element, iblock.fieldMap))
     .filter(Boolean) as ProjectStatus[];
 }
 
@@ -195,29 +203,32 @@ export async function PUT(req: NextRequest) {
     if (!token?.access_token || !token.domain)
       return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
     await ensureStatusList((method, params) => listElements(token, method, params as any));
-    const iblockId = await findIblockId(token);
-    if (!iblockId) throw new Error('STATUS_LIST_MISSING');
+    const iblock = await findIblock(token);
+    if (!iblock) throw new Error('STATUS_LIST_MISSING');
     const code = elementCode(values.projectId);
     const existing = await listElements(token, 'lists.element.get', {
       IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
-      IBLOCK_ID: iblockId,
+      IBLOCK_ID: iblock.id,
       ELEMENT_CODE: code,
     });
     // Мутация ровно одна за запрос (правило одиночных мутаций): сначала
     // ищем элемент, потом по результату update или add.
     const payload = {
       IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
-      IBLOCK_ID: iblockId,
+      IBLOCK_ID: iblock.id,
       ELEMENT_CODE: code,
     };
     if (existing && existing.length) {
       await listElements(token, 'lists.element.update', {
         ...payload,
         ELEMENT_ID: String(existing[0].ID),
-        FIELDS: elementFields(values),
+        FIELDS: elementFields(values, iblock.fieldMap),
       });
     } else {
-      await listElements(token, 'lists.element.add', { ...payload, FIELDS: elementFields(values) });
+      await listElements(token, 'lists.element.add', {
+        ...payload,
+        FIELDS: elementFields(values, iblock.fieldMap),
+      });
     }
     const before = (await readMirror()).find((row) => row.projectId === values.projectId) || null;
     await appendHistory(memberId, before, record);

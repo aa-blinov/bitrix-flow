@@ -28,47 +28,78 @@ export type ProjectStatus = {
   updatedAt: string;
 };
 
-// Коды свойств списка: создавать их можно и руками в портале — коды ниже
-// связаны с добавлением полей в ensureStatusList.
-const PROPERTY_CODES = {
-  client: 'PROPERTY_CLIENT',
-  status: 'PROPERTY_STATUS',
-  goal: 'PROPERTY_GOAL',
-  state: 'PROPERTY_STATE',
-  step: 'PROPERTY_STEP',
-  stepDeadline: 'PROPERTY_STEP_DEADLINE',
-  risk: 'PROPERTY_RISK',
-  owner: 'PROPERTY_OWNER',
-  project: 'PROPERTY_PROJECT_ID',
+// Списки REST создают свойства с системными кодами PROPERTY_<id>: назвать
+// поле своими кодом нельзя. Карта строится по названию поля — она же даёт
+// коды для записи.
+export type StatusFieldMap = Record<string, string>; // название поля -> FIELD_ID
+
+export const FIELD_LABELS = {
+  client: 'Клиент',
+  status: 'Статус',
+  goal: 'Цель',
+  state: 'Текущее состояние',
+  step: 'Ближайший шаг',
+  stepDeadline: 'Срок шага',
+  risk: 'Главный риск',
+  owner: 'Ответственный сейчас',
+  project: 'ID проекта',
 } as const;
 
-// Битрикс возвращает даты как 'дд.мм.гггг' — приводим к ISO, чтобы фронт
-// не зависел от локали портала.
-function toIsoDate(value: unknown): string {
+export async function buildFieldMap(
+  call: (method: string, params: Record<string, unknown>) => Promise<any>,
+): Promise<StatusFieldMap> {
+  const fields = await call('lists.field.get', {
+    IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
+  });
+  const map: StatusFieldMap = {};
+  for (const field of Object.values(fields || {}) as any[]) {
+    if (field?.NAME && field?.FIELD_ID && !map[field.NAME]) map[field.NAME] = field.FIELD_ID;
+  }
+  return map;
+}
+
+// Строку 15.11.2026 и прочие локальные форматы Битрикса приводим к ISO:
+// фронт не должен зависеть от настроек портала.
+export function toIsoDate(value: unknown): string {
   const raw = String(value || '').trim();
   if (!raw) return '';
   const parsed = new Date(raw);
   if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-  // Ожидаемый формат Битрикса, но на всякий случай парсим вручную.
   const match = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (!match) return '';
   return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`).toISOString();
 }
 
-export function mapStatusElement(element: Record<string, unknown>): ProjectStatus | null {
+// Значение свойства приходит вложенным ({<id>: value}) или плоским.
+function propertyValue(fields: Record<string, unknown>, fieldId: string): string {
+  if (!fieldId) return '';
+  const raw = fields[fieldId];
+  if (raw === undefined || raw === null) return '';
+  if (typeof raw === 'object') {
+    const own = Object.values(raw as Record<string, unknown>)[0];
+    return own === undefined || own === null ? '' : String(own);
+  }
+  return String(raw);
+}
+
+export function mapStatusElement(
+  element: Record<string, unknown>,
+  map: StatusFieldMap,
+): ProjectStatus | null {
   const fields = (element.fields || element.FIELDS || element) as Record<string, unknown>;
-  const projectId = String(fields[PROPERTY_CODES.project] ?? fields.PROJECT_ID ?? '').trim();
-  if (!projectId || projectId === '0') return null;
+  const projectId =
+    propertyValue(fields, map[FIELD_LABELS.project]) || String(fields.NAME ?? '').trim();
+  if (!projectId || projectId === '0' || projectId === 'unknown') return null;
   return {
     projectId,
-    client: String(fields[PROPERTY_CODES.client] ?? '').trim(),
-    status: String(fields[PROPERTY_CODES.status] ?? '').trim(),
-    goal: String(fields[PROPERTY_CODES.goal] ?? '').trim(),
-    state: String(fields[PROPERTY_CODES.state] ?? '').trim(),
-    step: String(fields[PROPERTY_CODES.step] ?? '').trim(),
-    stepDeadline: toIsoDate(fields[PROPERTY_CODES.stepDeadline]),
-    risk: String(fields[PROPERTY_CODES.risk] ?? '').trim(),
-    ownerId: String(fields[PROPERTY_CODES.owner] ?? '').trim(),
+    client: propertyValue(fields, map[FIELD_LABELS.client]),
+    status: propertyValue(fields, map[FIELD_LABELS.status]),
+    goal: propertyValue(fields, map[FIELD_LABELS.goal]),
+    state: propertyValue(fields, map[FIELD_LABELS.state]),
+    step: propertyValue(fields, map[FIELD_LABELS.step]),
+    stepDeadline: toIsoDate(propertyValue(fields, map[FIELD_LABELS.stepDeadline])),
+    risk: propertyValue(fields, map[FIELD_LABELS.risk]),
+    ownerId: propertyValue(fields, map[FIELD_LABELS.owner]),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -79,9 +110,20 @@ export function elementCode(projectId: string) {
   return `project-${projectId}`;
 }
 
+export type StatusPayload = {
+  projectId: string;
+  client: string;
+  status: string;
+  goal: string;
+  state: string;
+  step: string;
+  stepDeadline: string;
+  risk: string;
+  ownerId: string;
+};
+
 // Ключ формы — что вводит пользователь. Валидация отсекает неизвестные статусы
-// и слишком длинные тексты: REST портала про них рассказывает подробно, но
-// отказ лучше ловить до запроса.
+// и слишком длинные тексты: отказ лучше ловить до запроса в портал.
 export function validateStatusPayload(input: unknown): StatusPayload {
   if (typeof input !== 'object' || input === null) throw new Error('VALIDATION_FAILED');
   const body = input as Record<string, unknown>;
@@ -105,110 +147,106 @@ export function validateStatusPayload(input: unknown): StatusPayload {
   };
 }
 
-export type StatusPayload = {
-  projectId: string;
-  client: string;
-  status: string;
-  goal: string;
-  state: string;
-  step: string;
-  stepDeadline: string;
-  risk: string;
-  ownerId: string;
-};
-
 // Формат даты для списков REST — дд.мм.гггг.
 function toPortalDate(iso: string) {
   return iso ? iso.slice(0, 10).split('-').reverse().join('.') : '';
 }
 
-export function elementFields(values: StatusPayload) {
+export function elementFields(values: StatusPayload, map: StatusFieldMap) {
   return {
     NAME: values.projectId,
-    [PROPERTY_CODES.project]: values.projectId,
-    [PROPERTY_CODES.client]: values.client,
-    [PROPERTY_CODES.status]: values.status,
-    [PROPERTY_CODES.goal]: values.goal,
-    [PROPERTY_CODES.state]: values.state,
-    [PROPERTY_CODES.step]: values.step,
-    [PROPERTY_CODES.stepDeadline]: toPortalDate(values.stepDeadline),
-    [PROPERTY_CODES.risk]: values.risk,
-    [PROPERTY_CODES.owner]: values.ownerId,
+    [map[FIELD_LABELS.project]]: values.projectId,
+    [map[FIELD_LABELS.client]]: values.client,
+    [map[FIELD_LABELS.status]]: values.status,
+    [map[FIELD_LABELS.goal]]: values.goal,
+    [map[FIELD_LABELS.state]]: values.state,
+    [map[FIELD_LABELS.step]]: values.step,
+    [map[FIELD_LABELS.stepDeadline]]: toPortalDate(values.stepDeadline),
+    [map[FIELD_LABELS.risk]]: values.risk,
+    [map[FIELD_LABELS.owner]]: values.ownerId,
   };
 }
 
 // Список и поля создаются один раз за жизнь процесса: у установленного
-// приложения список может быть уже создан руками, лишних вызовов не делаем.
+// приложения список уже может быть создан руками, лишних вызовов не делаем.
 let listEnsured = false;
 
 type BitrixCall = (method: string, params: Record<string, unknown>) => Promise<any>;
 
-const enumListValues = (code: string) =>
-  code === PROPERTY_CODES.status ? STATUS_OPTIONS.map((option) => ({ VALUE: option })) : [];
-
+// Статусы списков REST: TYPE 'S' строка, 'N' число. USER_TYPE порталом на этой
+// установке игнорируется (возвращает false), поэтому дата и ответственный —
+// тоже строки: приложение приводить форматы само.
 const FIELD_DEFS = [
-  [PROPERTY_CODES.client, 'string', 'Клиент'],
-  [PROPERTY_CODES.status, 'L', 'Статус'],
-  [PROPERTY_CODES.goal, 'text', 'Цель'],
-  [PROPERTY_CODES.state, 'text', 'Текущее состояние'],
-  [PROPERTY_CODES.step, 'text', 'Ближайший шаг'],
-  [PROPERTY_CODES.stepDeadline, 'date', 'Срок шага'],
-  [PROPERTY_CODES.risk, 'text', 'Главный риск'],
-  [PROPERTY_CODES.owner, 'S:UserID', 'Ответственный сейчас'],
-  [PROPERTY_CODES.project, 'string', 'ID проекта'],
-].map(([code, userType, title]) => ({
-  code,
-  userType,
-  title,
-  list:
-    userType === 'L'
-      ? enumListValues(code).map((item, index) => ({ ...item, SORT: String((index + 1) * 100) }))
-      : undefined,
-}));
+  { code: 'CLIENT', type: 'S', name: FIELD_LABELS.client },
+  { code: 'STATUS', type: 'S', name: FIELD_LABELS.status },
+  { code: 'GOAL', type: 'S', name: FIELD_LABELS.goal, rows: true },
+  { code: 'STATE', type: 'S', name: FIELD_LABELS.state, rows: true },
+  { code: 'STEP', type: 'S', name: FIELD_LABELS.step, rows: true },
+  { code: 'STEP_DEADLINE', type: 'S', name: FIELD_LABELS.stepDeadline },
+  { code: 'RISK', type: 'S', name: FIELD_LABELS.risk, rows: true },
+  { code: 'OWNER', type: 'S', name: FIELD_LABELS.owner },
+  { code: 'PROJECT_ID', type: 'N', name: FIELD_LABELS.project },
+];
+
+async function ensureFields(
+  call: BitrixCall,
+  typeParams: Record<string, unknown>,
+  iblockId: string,
+): Promise<void> {
+  const existing = await call('lists.field.get', { ...typeParams, IBLOCK_ID: iblockId });
+  const byName = new Map<string, string>();
+  for (const field of Object.values(existing || {}) as any[]) {
+    if (field?.NAME) byName.set(String(field.NAME), String(field.FIELD_ID));
+  }
+  for (const def of FIELD_DEFS) {
+    if (byName.has(def.name)) continue;
+    try {
+      // ERROR_SAVE_FIELD в ответе — ложная тревога этой установки: свойство
+      // при этом сохраняется. Проверяем не по ответу, а по фактическому
+      // набору полей на следующем чтении.
+      await call('lists.field.add', {
+        ...typeParams,
+        IBLOCK_ID: iblockId,
+        FIELDS: {
+          NAME: def.name,
+          FIELD_NAME: def.code,
+          TYPE: def.type,
+          IS_REQUIRED: 'N',
+          LIST_COLUMN_SHOW: 'Y',
+          ...(def.rows ? { SETTINGS: { ROW_COUNT: 3, COL_COUNT: 40 } } : {}),
+        },
+      });
+    } catch (error) {
+      console.warn(`[project-status] поле ${def.code} не создалось:`, error);
+    }
+  }
+}
 
 export async function ensureStatusList(call: BitrixCall): Promise<void> {
   if (listEnsured) return;
   try {
-    const lists = await call('lists.get', { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID });
+    const typeParams = { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID };
+    const lists = await call('lists.get', typeParams);
+    // У списков REST ключ кода — CODE, на старых порталах встречается IBLOCK_CODE.
     const known = (lists || []).find(
-      (item: any) => item?.IBLOCK_CODE === STATUS_LIST_CODE || item?.CODE === STATUS_LIST_CODE,
+      (item: any) => item?.CODE === STATUS_LIST_CODE || item?.IBLOCK_CODE === STATUS_LIST_CODE,
     );
     let iblockId = known?.ID || known?.IBLOCK_ID;
     if (!iblockId) {
+      // Название списка передаётся внутри FIELDS: на верхнем уровне портал
+      // отвечает «Required parameter NAME is missing».
       await call('lists.add', {
-        IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
+        ...typeParams,
         IBLOCK_CODE: STATUS_LIST_CODE,
-        IBLOCK_TITLE: STATUS_LIST_TITLE,
+        FIELDS: { NAME: STATUS_LIST_TITLE },
       });
-      const created = await call('lists.get', { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID });
+      const created = await call('lists.get', typeParams);
       const found = (created || []).find(
-        (item: any) => item?.IBLOCK_CODE === STATUS_LIST_CODE || item?.CODE === STATUS_LIST_CODE,
+        (item: any) => item?.CODE === STATUS_LIST_CODE || item?.IBLOCK_CODE === STATUS_LIST_CODE,
       );
       iblockId = found?.ID || found?.IBLOCK_ID;
     }
-    if (iblockId) {
-      const existing = await call('lists.field.get', { IBLOCK_ID: String(iblockId) });
-      const have = new Set(Object.keys(existing || {}).map((code) => code.toUpperCase()));
-      for (const field of FIELD_DEFS) {
-        if (have.has(field.code.toUpperCase())) continue;
-        try {
-          await call('lists.field.add', {
-            IBLOCK_ID: String(iblockId),
-            FIELDS: {
-              FIELD_NAME: field.code,
-              USER_TYPE: field.userType,
-              EDIT_FORM_LABEL: field.title,
-              LIST_COLUMN_SHOW: 'Y',
-              ...(field.list ? { LIST: field.list } : {}),
-            },
-          });
-        } catch (error) {
-          // Поле могло быть создано руками с другим типом: чтению это не мешает,
-          // а дублировать попытки в каждом запросе смысла нет.
-          console.warn(`[project-status] поле ${field.code} не создалось:`, error);
-        }
-      }
-    }
+    if (iblockId) await ensureFields(call, typeParams, String(iblockId));
     listEnsured = true;
   } catch (error) {
     console.warn('[project-status] список статусов не создался:', error);
