@@ -43,7 +43,8 @@ function noticeLabel(type: string) {
 }
 
 const NOTICE_DATE = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
-const PAGE_SIZE = 50;
+// Столько же отдаёт сервер за страницу (потолок), выше не поднять без правки API.
+const PAGE_SIZE = 200;
 
 const TYPE_OPTIONS = [
   {
