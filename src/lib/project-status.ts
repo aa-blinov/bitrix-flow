@@ -193,7 +193,11 @@ async function ensureFields(
   typeParams: Record<string, unknown>,
   iblockId: string,
 ): Promise<void> {
-  const existing = await call('lists.field.get', { ...typeParams, IBLOCK_ID: iblockId });
+  const existing = await call('lists.field.get', {
+    ...typeParams,
+    IBLOCK_ID: iblockId,
+    IBLOCK_CODE: STATUS_LIST_CODE,
+  });
   const byName = new Map<string, string>();
   for (const field of Object.values(existing || {}) as any[]) {
     if (field?.NAME) byName.set(String(field.NAME), String(field.FIELD_ID));
@@ -207,6 +211,7 @@ async function ensureFields(
       await call('lists.field.add', {
         ...typeParams,
         IBLOCK_ID: iblockId,
+        IBLOCK_CODE: STATUS_LIST_CODE,
         FIELDS: {
           NAME: def.name,
           FIELD_NAME: def.code,

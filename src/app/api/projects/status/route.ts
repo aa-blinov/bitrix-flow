@@ -51,6 +51,7 @@ async function fetchStatuses(token: TokenRef): Promise<ProjectStatus[]> {
   const elements = await listElements(token, 'lists.element.get', {
     IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
     IBLOCK_ID: iblock.id,
+    IBLOCK_CODE: STATUS_LIST_CODE,
   });
   return (elements || [])
     .map((element: Record<string, unknown>) => mapStatusElement(element, iblock.fieldMap))
@@ -209,6 +210,7 @@ export async function PUT(req: NextRequest) {
     const existing = await listElements(token, 'lists.element.get', {
       IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
       IBLOCK_ID: iblock.id,
+      IBLOCK_CODE: STATUS_LIST_CODE,
       ELEMENT_CODE: code,
     });
     // Мутация ровно одна за запрос (правило одиночных мутаций): сначала
@@ -216,6 +218,7 @@ export async function PUT(req: NextRequest) {
     const payload = {
       IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
       IBLOCK_ID: iblock.id,
+      IBLOCK_CODE: STATUS_LIST_CODE,
       ELEMENT_CODE: code,
     };
     if (existing && existing.length) {
