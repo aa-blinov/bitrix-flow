@@ -2,6 +2,7 @@
 import Sidebar from '@/components/Sidebar';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import ConnectionStatus from '@/components/ConnectionStatus';
+import UpdateNotice from '@/components/UpdateNotice';
 import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -75,6 +76,7 @@ export default function DashboardShell({
           перекрывает последнюю карточку списка. */}
       <KeyboardShortcuts />
       <ConnectionStatus />
+      <UpdateNotice />
       <main className="min-h-screen pb-20 lg:pb-0 lg:pl-64">{children}</main>
     </div>
   );

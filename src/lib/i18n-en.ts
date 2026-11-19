@@ -544,6 +544,7 @@ export const EN: Record<string, string> = {
   'Подключить Битрикс': 'Connect Bitrix',
   'Профиль и настройки': 'Profile and settings',
   'Обновить список': 'Refresh the list',
+  'Вышла новая версия приложения': 'A new version is available',
   'Загрузить свежие данные': 'Load fresh data',
   'Обновляем…': 'Refreshing…',
   'Список обновлён': 'List refreshed',
