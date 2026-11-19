@@ -9,9 +9,9 @@ export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const SIZES: Record<ModalSize, string> = {
   sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-2xl',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
 };
 
 let counter = 0;

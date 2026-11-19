@@ -317,7 +317,9 @@ export default function ProjectStatusPage() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing?.projectId ? projectName(editing.projectId) : t('Новый статус проекта')}
-        size="lg"
+        // Форма из десяти полей в две колонки: в узком окне она не влезала
+        // в экран без прокрутки.
+        size="xl"
         footer={
           <div className="flex items-center justify-end gap-2">
             {saveError && <p className="mr-auto text-sm text-danger-text">{saveError}</p>}
