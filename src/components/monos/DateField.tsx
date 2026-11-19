@@ -91,7 +91,9 @@ export function DateField({
   };
 
   return (
-    <div className={cn('relative', className)}>
+    // self-start: в grid/flex-строках ячейка тянется по соседям (например,
+    // textarea), и прижатый к низу календарь уезжал под своё поле.
+    <div className={cn('relative self-start', className)}>
       <TextField
         {...props}
         size={size}

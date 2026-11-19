@@ -2022,7 +2022,7 @@ export default function TaskGrid({
                 options={GROUP_BY_OPTIONS.filter(
                   (option) => showProject || option.value !== 'project',
                 )}
-                className={`${toolbarSelect} w-40 [&_select]:h-full`}
+                className={`${toolbarSelect} w-40 [&_button]:h-full`}
               />
               {/* Сортировка живёт в заголовках таблицы, а на телефоне её нет */}
               <SelectField
@@ -2038,7 +2038,7 @@ export default function TaskGrid({
                   { value: `${column}:desc`, label: `${COLUMN_LABELS[column]} ↓` },
                   { value: `${column}:asc`, label: `${COLUMN_LABELS[column]} ↑` },
                 ])}
-                className={`${toolbarSelect} w-48 md:hidden [&_select]:h-full`}
+                className={`${toolbarSelect} w-48 md:hidden [&_button]:h-full`}
               />
             </div>
             {/* Закрытые задачи в ежедневном списке мешают: переключатель всегда на
@@ -2110,7 +2110,7 @@ export default function TaskGrid({
                   if (event.currentTarget.value) applyBulk('assigneeId', event.currentTarget.value);
                 }}
                 options={users.map((user) => ({ value: user.id, label: user.name }))}
-                className={`${toolbarSelect} w-44 [&_select]:h-full`}
+                className={`${toolbarSelect} w-44 [&_button]:h-full`}
               />
               <SelectField
                 size="sm"
@@ -2126,7 +2126,7 @@ export default function TaskGrid({
                   { value: 'in_progress', label: t('В работе') },
                   { value: 'done', label: t('Готово') },
                 ]}
-                className={`${toolbarSelect} w-40 [&_select]:h-full`}
+                className={`${toolbarSelect} w-40 [&_button]:h-full`}
               />
               <Button variant="quiet" size="sm" onClick={() => setSelectedIds(new Set())}>
                 {t('Снять выбор')}

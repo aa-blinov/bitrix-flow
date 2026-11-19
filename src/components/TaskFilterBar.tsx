@@ -145,6 +145,9 @@ export default function TaskFilterBar({
         onOpenChange={(open) => {
           if (!open) setDrill(null);
         }}
+        // Список полей помещается целиком: из-за стандартных полей и паддинга
+        // панель при тех же строках вылезала за max-h и получала скролл.
+        panelClassName="max-h-[min(36rem,calc(100dvh-6rem))] p-2"
         trigger={
           <Button
             variant="secondary"
