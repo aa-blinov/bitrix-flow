@@ -911,7 +911,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             if (!colTasks.length && !hasMore) return null;
 
             return (
-              <Card key={stage.id} padding="none" className="bg-surface-2">
+              <Card key={stage.id} padding="none" data-stage={stage.id} className="bg-surface-2">
                 <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
                   <div
                     className={`h-2 w-2 shrink-0 rounded-full ${
@@ -1007,6 +1007,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
               <Card
                 key={stage.id}
                 padding="none"
+                // data-stage:_tests целились в колонку хрупким xpath-предком;
+                // после скрытия закрытых пустая колонка теряла h3 и предок
+                // вылезал на всю доску.
+                data-stage={stage.id}
                 className={`w-[20rem] shrink-0 snap-start bg-surface-2 lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
                   isDragOver ? 'border-accent bg-accent/10' : ''
                 }`}
@@ -1125,6 +1129,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
           {orphanTasks.length > 0 && (
             <Card
               padding="none"
+              data-stage="0"
               className="w-[20rem] flex-shrink-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
               // Колонка без фазы не принимает перенос: сбрасывать фазу (stageId «0»)
               // REST Битрикса здесь нельзя (см. moveTaskToProject), и дроп вхолостую

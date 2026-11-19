@@ -195,8 +195,15 @@ test('перенос в другой проект не закрывает кар
   await expect(page).toHaveURL(/\/all-tasks/);
 });
 
-test('фильтр по исполнителю сужает список и ставит чип', { tag: '@mobile' }, async ({ page }) => {
+test('фильтр по исполнителю сузает список и ставит чип', { tag: '@mobile' }, async ({ page }) => {
   await page.goto('/all-tasks');
+  await settle(page);
+  // Задачам исполнителя теперь дефолтом скрывают закрытые: снимаем «Только
+  // активные», иначе список у Марии пустой и сужать нечего.
+  await page
+    .getByRole('button', { name: /Только активные|Активные/ })
+    .first()
+    .click();
   await settle(page);
   // Панель фильтров: кнопка «Фильтры» открывает её, дальше — «Фильтр» со
   // списком полей и значения с галочками. В наборе @monos/ui меню состоит
@@ -299,13 +306,17 @@ test('фаза, сменённая в карточке, сразу перено�
   await choose(page, dialog.getByRole('combobox', { name: 'Фаза задачи' }), '102');
   const target = 'На ревью';
   await page.keyboard.press('Escape');
-  const column = page
-    .getByRole('heading', { name: target, level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+  // Колонка по data-stage: хрупкий предок [.//h3] вылезал из опустевшей
+  // колонки (закрытые скрыты) на уровень всей доски.
+  const columnFor = (name: string, level?: 2 | 3) =>
+    page.locator('[data-stage]').filter({ has: page.getByRole('heading', { name, level }) });
+  const column = columnFor(target, 2);
   await expect(column.getByRole('heading', { name: title, level: 3 })).toBeVisible();
+  // Только колонка, а не вся доска: у опустевшего «Бэклога» (закрытые
+  // скрыты) предок по h3 вылезал на уровень контейнера.
   const backlog = page
-    .getByRole('heading', { name: 'Бэклог', level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+    .locator('[data-stage]')
+    .filter({ has: page.getByRole('heading', { name: 'Бэклог', level: 2 }) });
   await expect(backlog.getByRole('heading', { name: title, level: 3 })).toHaveCount(0);
 });
 
@@ -338,13 +349,17 @@ test('перетаскивание на доске переносит задач
       .getByRole('heading', { name: target, level: 2 })
       .locator('xpath=ancestor::*[.//h3 or contains(@class,"min-h")][1]'),
   );
-  const column = page
-    .getByRole('heading', { name: target, level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+  // Колонка по data-stage: хрупкий предок [.//h3] вылезал из опустевшей
+  // колонки (закрытые скрыты) на уровень всей доски.
+  const columnFor = (name: string, level?: 2 | 3) =>
+    page.locator('[data-stage]').filter({ has: page.getByRole('heading', { name, level }) });
+  const column = columnFor(target, 2);
   await expect(column.getByRole('heading', { name: title, level: 3 })).toBeVisible();
+  // Только колонка, а не вся доска: у опустевшего «Бэклога» (закрытые
+  // скрыты) предок по h3 вылезал на уровень контейнера.
   const backlog = page
-    .getByRole('heading', { name: 'Бэклог', level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+    .locator('[data-stage]')
+    .filter({ has: page.getByRole('heading', { name: 'Бэклог', level: 2 }) });
   await expect(backlog.getByRole('heading', { name: title, level: 3 })).toHaveCount(0);
 });
 
@@ -371,13 +386,17 @@ test('кнопка переноса на карточке доски перен�
   const target = 'На ревью';
   await page.getByRole('button', { name: `Переместить задачу ${title}` }).click();
   await page.getByRole('menuitem', { name: target }).click();
-  const column = page
-    .getByRole('heading', { name: target, level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+  // Колонка по data-stage: хрупкий предок [.//h3] вылезал из опустевшей
+  // колонки (закрытые скрыты) на уровень всей доски.
+  const columnFor = (name: string, level?: 2 | 3) =>
+    page.locator('[data-stage]').filter({ has: page.getByRole('heading', { name, level }) });
+  const column = columnFor(target, 2);
   await expect(column.getByRole('heading', { name: title, level: 3 })).toBeVisible();
+  // Только колонка, а не вся доска: у опустевшего «Бэклога» (закрытые
+  // скрыты) предок по h3 вылезал на уровень контейнера.
   const backlog = page
-    .getByRole('heading', { name: 'Бэклог', level: 2 })
-    .locator('xpath=ancestor::*[.//h3][1]');
+    .locator('[data-stage]')
+    .filter({ has: page.getByRole('heading', { name: 'Бэклог', level: 2 }) });
   await expect(backlog.getByRole('heading', { name: title, level: 3 })).toHaveCount(0);
 });
 

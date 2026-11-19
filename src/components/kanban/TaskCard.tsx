@@ -189,7 +189,10 @@ export function TaskCard({
           {totalSubtasks > 0 && (
             <span className="flex items-center gap-1">
               <span aria-hidden>☐</span>
-              {completedSubtasks}/{totalSubtasks}
+              {/* Один узел, иначе в flex-строке «2 / 2» рвётся переносом. */}
+              <span className="whitespace-nowrap">
+                {completedSubtasks}/{totalSubtasks}
+              </span>
             </span>
           )}
           {/* Чат задачи есть почти у каждой: из переписки на карточку возвращаются,
