@@ -347,7 +347,9 @@ export default function ProjectStatusPage() {
         </Card>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Тот же боковой отступ, что у шапки и списков задач: без него
+              панель фильтров и таблица прилипали к краю окна. */}
+          <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6">
             <Switch checked={onlyLatest} onChange={setOnlyLatest} className="text-sm">
               {t('Только последние')}
             </Switch>
@@ -392,7 +394,7 @@ export default function ProjectStatusPage() {
               </Button>
             )}
           </div>
-          <Card padding="none">
+          <Card padding="none" className="mx-4 sm:mx-6 mb-6">
             <Table
               columns={columns}
               rows={visibleRows as unknown as Record<string, unknown>[]}
