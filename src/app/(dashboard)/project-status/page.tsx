@@ -195,6 +195,38 @@ export default function ProjectStatusPage() {
     [statuses, projectKey],
   );
 
+  // Фильтры для статусов клиентам: на созвоне нужен один клиент и только
+  // его актуальная запись, без истории и чужих проектов.
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterClient, setFilterClient] = useState('all');
+  const clients = useMemo(
+    () =>
+      [...new Set(statuses.map((row) => row.client).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, 'ru'),
+      ),
+    [statuses],
+  );
+  const [onlyLatest, setOnlyLatest] = useState(true);
+  const visibleRows = useMemo(() => {
+    let rowsFiltered = rows.filter(
+      (row) =>
+        (filterProject === 'all' || row.projectId === filterProject) &&
+        (filterClient === 'all' || row.client === filterClient),
+    );
+    if (onlyLatest) {
+      // У проекта может быть несколько записей в списке (правки создавали
+      // новые элементы): оставляем самую свежую по updatedAt.
+      const latest = new Map<string, ProjectStatusRow>();
+      for (const row of rowsFiltered) {
+        const current = latest.get(row.projectId);
+        if (!current || +new Date(row.updatedAt || 0) > +new Date(current.updatedAt || 0))
+          latest.set(row.projectId, row);
+      }
+      rowsFiltered = [...latest.values()];
+    }
+    return rowsFiltered;
+  }, [rows, filterProject, filterClient, onlyLatest]);
+
   const asRow = (row: Record<string, unknown>) => row as unknown as ProjectStatusRow;
 
   const columns: TableColumn[] = [
@@ -303,14 +335,66 @@ export default function ProjectStatusPage() {
           <p className="p-4 text-sm text-danger-text">{error}</p>
         </Card>
       ) : (
-        <Card padding="none">
-          <Table
-            columns={columns}
-            rows={rows as unknown as Record<string, unknown>[]}
-            rowKey={(row) => asRow(row).projectId}
-            emptyLabel={t('Статусы ещё не заведены — добавьте первый')}
-          />
-        </Card>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={onlyLatest ? 'primary' : 'secondary'}
+              size="sm"
+              aria-pressed={onlyLatest}
+              onClick={() => setOnlyLatest((value) => !value)}
+            >
+              {t('Только последние')}
+            </Button>
+            <SelectField
+              size="sm"
+              variant="boxed"
+              aria-label={t('Проект')}
+              value={filterProject}
+              onChange={(event) => setFilterProject(event.target.value)}
+              options={[
+                { value: 'all', label: t('Все проекты') },
+                ...statuses
+                  .map((row) => row.projectId)
+                  .filter((id, index, all) => all.indexOf(id) === index)
+                  .map((id) => ({ value: id, label: projectName(id) })),
+              ]}
+              className="w-56"
+            />
+            <SelectField
+              size="sm"
+              variant="boxed"
+              aria-label={t('Клиент')}
+              value={filterClient}
+              onChange={(event) => setFilterClient(event.target.value)}
+              options={[
+                { value: 'all', label: t('Все клиенты') },
+                ...clients.map((client) => ({ value: client, label: client })),
+              ]}
+              className="w-48"
+            />
+            {(filterProject !== 'all' || filterClient !== 'all' || !onlyLatest) && (
+              <Button
+                variant="quiet"
+                size="sm"
+                onClick={() => {
+                  setFilterProject('all');
+                  setFilterClient('all');
+                  setOnlyLatest(true);
+                }}
+              >
+                {t('Сбросить')}
+              </Button>
+            )}
+          </div>
+          <Card padding="none">
+            <Table
+              columns={columns}
+              rows={visibleRows as unknown as Record<string, unknown>[]}
+              rowKey={(row) => asRow(row).projectId}
+              emptyLabel={t('Статусы ещё не заведены — добавьте первый')}
+            />
+          </Card>
+        </>
       )}
 
       <Modal
