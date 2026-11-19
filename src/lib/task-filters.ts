@@ -59,7 +59,7 @@ export const EMPTY_FILTERS: FilterValues = {
   changed: 'all',
   overrun: 'off',
   kind: 'all',
-  hideDone: 'off',
+  hideDone: 'on',
 };
 
 /** Значения мультиполя хранятся строкой «a,b,c» — так же уходят на сервер. */

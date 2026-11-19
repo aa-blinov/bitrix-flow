@@ -40,11 +40,11 @@ describe('filterQueryParams', () => {
     });
   });
 
-  it('пустые фильтры уходят как all', () => {
+  it('пустые фильтры уходят как all, закрытые по умолчанию спрятаны', () => {
     const params = filterQueryParams(EMPTY_FILTERS);
-    expect(params.hideDone).toBe('false');
+    expect(params.hideDone).toBe('true');
     expect(params.overrun).toBe('false');
-    expect(new Set(Object.values(params))).toEqual(new Set(['all', 'false']));
+    expect(new Set(Object.values(params))).toEqual(new Set(['all', 'true', 'false']));
   });
 });
 
@@ -94,9 +94,13 @@ describe('viewFilters', () => {
 
 describe('фильтры в ссылке', () => {
   it('туда и обратно без потерь, пишутся только отличия', () => {
-    const values = { ...EMPTY_FILTERS, status: 'active', assignee: '9,15', hideDone: 'on' };
+    const values = { ...EMPTY_FILTERS, status: 'active', assignee: '9,15', hideDone: 'off' };
     const encoded = encodeFiltersParam(values);
-    expect(encoded).toBe('status:active;assignee:9,15;hideDone:on');
+    expect(encoded).toBe('status:active;assignee:9,15;hideDone:off');
+    // hideDone:'on' — теперь умолчание, в ссылке пишутся только отличия.
+    expect(
+      encodeFiltersParam({ ...EMPTY_FILTERS, status: 'active', assignee: '9,15', hideDone: 'on' }),
+    ).toBe('status:active;assignee:9,15');
     expect({ ...EMPTY_FILTERS, ...decodeFiltersParam(encoded) }).toEqual(values);
     expect(encodeFiltersParam(EMPTY_FILTERS)).toBe('');
   });
