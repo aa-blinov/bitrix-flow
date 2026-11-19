@@ -1897,7 +1897,9 @@ export default function TaskGrid({
       >
         {/* Те же отступы, что у панели доски, иначе при переключении вида
               навбар перескакивает на другую высоту. */}
-        <div className="sticky top-0 z-10 gap-2 rounded-none border-0 border-b border-line bg-canvas px-4 py-4 sm:px-6">
+        {/* z-30: выше sticky-шапки таблицы (z-10/z-20), иначе выпадашки из
+            тулбара — фильтры, «Поля» — рисовались под её строками. */}
+        <div className="sticky top-0 z-30 gap-2 rounded-none border-0 border-b border-line bg-canvas px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-2">
             {toolbarLeading}
             {title !== null && (

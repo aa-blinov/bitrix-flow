@@ -37,6 +37,9 @@ const POSITIONS: Record<'top' | 'bottom' | 'left' | 'right', string> = {
   right: 'left-full ml-2',
 };
 
+// Зазор между триггером и панелью.
+const GAP = 8;
+
 const OPPOSITE: Record<'top' | 'bottom' | 'left' | 'right', 'top' | 'bottom' | 'left' | 'right'> = {
   top: 'bottom',
   bottom: 'top',
@@ -101,19 +104,35 @@ export function Popover({
   }, [close, isOpen, setOpen]);
 
   // Места сверху или снизу может не хватить — тогда панель переворачивается.
+  // Если не хватает с обеих сторон, панель остаётся на более просторной
+  // стороне и ограничивается её высотой: раньше переворот уносил панель
+  // целиком за экран (фильтры у верхней строки таблицы).
+  const [clampHeight, setClampHeight] = React.useState<number | null>(null);
   React.useEffect(() => {
     if (!isOpen) {
       setFlipped(false);
+      setClampHeight(null);
       return;
     }
     const trigger = triggerNode();
     const panel = panelEl.current;
     if (!trigger || !panel) return;
     const rect = trigger.getBoundingClientRect();
-    if (placement === 'bottom') {
-      setFlipped(rect.bottom + panel.offsetHeight + 8 > window.innerHeight);
-    } else if (placement === 'top') {
-      setFlipped(rect.top - panel.offsetHeight - 8 < 0);
+    if (placement === 'bottom' || placement === 'top') {
+      const below = window.innerHeight - rect.bottom - GAP;
+      const above = rect.top - GAP;
+      const wanted = panel.offsetHeight;
+      const preferred: 'bottom' | 'top' =
+        placement === 'bottom'
+          ? below >= above
+            ? 'bottom'
+            : 'top'
+          : above >= below
+            ? 'top'
+            : 'bottom';
+      setFlipped(preferred !== placement);
+      const space = preferred === 'bottom' ? below : above;
+      setClampHeight(space < wanted ? space : null);
     } else if (placement === 'left') {
       setFlipped(rect.left - panel.offsetWidth - 8 < 0);
     } else {
@@ -208,6 +227,7 @@ export function Popover({
           id={panelId}
           role="dialog"
           tabIndex={-1}
+          style={clampHeight ? { maxHeight: clampHeight } : undefined}
           className={cn(
             'animate-fade-in absolute z-menu max-h-[min(24rem,calc(100dvh-6rem))] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-ui border border-line bg-canvas p-4 shadow-overlay',
             'w-72',
