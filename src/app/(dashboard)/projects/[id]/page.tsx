@@ -220,8 +220,11 @@ export default function ProjectPage() {
 
   async function removeMember(userId: string) {
     if (!currentProject) return;
+    const userName = users.find((user) => user.id === userId)?.name;
     const agreed = await confirm({
-      title: t('Удалить участника из проекта?'),
+      title: userName
+        ? t('Удалить участника {0} из проекта?', userName)
+        : t('Удалить участника из проекта?'),
       description: t('Он потеряет доступ к задачам проекта в Битрикс24.'),
       confirmLabel: t('Удалить'),
       destructive: true,

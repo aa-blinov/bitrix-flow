@@ -153,7 +153,7 @@ export default function NotificationsPage() {
   async function clearHistory() {
     if (!items.length) return;
     const agreed = await confirm({
-      title: t('Очистить историю уведомлений?'),
+      title: t('Очистить все уведомления ({0})?', String(items.length)),
       description: t('Записи удалятся безвозвратно, сами задачи в Битриксе не изменятся.'),
       confirmLabel: t('Очистить'),
       destructive: true,

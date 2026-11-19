@@ -2137,6 +2137,13 @@ export default function TaskGrid({
           )}
         </div>
         <div className="min-h-72 p-0">
+          {/* Смена фильтров и подгрузка меняют список без перезагрузки:
+              живая область объявляет итог, иначе скринридер молчит. */}
+          <p role="status" aria-live="polite" className="sr-only">
+            {serverPageReady
+              ? t('Показано задач: {0}', String(effectiveTotal ?? tasks.length))
+              : ''}
+          </p>
           {!serverPageReady && !serverPageError && (
             <LoadingState className="min-h-72 bg-transparent" />
           )}
