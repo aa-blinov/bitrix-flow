@@ -134,7 +134,8 @@ export default function Notifications({
           return [
             { ...event, id: event.id || `${event.createdAt || Date.now()}-${event.type}` },
             ...current,
-          ].slice(0, 50);
+            // Потолок держит память и DOM колокольчика: как страница уведомлений.
+          ].slice(0, 200);
         });
       }
       if (selectedProjectId && TASK_LIST_EVENTS.has(String(event.type))) {
