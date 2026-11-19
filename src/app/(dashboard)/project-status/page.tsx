@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Clock3, Pencil } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
@@ -8,6 +9,7 @@ import { Card } from '@/components/monos/Card';
 import { DateField } from '@/components/monos/DateField';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
+import { Switch } from '@/components/monos/Switch';
 import { Table, type TableColumn } from '@/components/monos/Table';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
@@ -195,10 +197,20 @@ export default function ProjectStatusPage() {
     [statuses, projectKey],
   );
 
-  // Фильтры для статусов клиентам: на созвоне нужен один клиент и только
-  // его актуальная запись, без истории и чужих проектов.
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterClient, setFilterClient] = useState('all');
+  // Фильтры живут в адресе страницы: ссылку с одним проектом или клиентом
+  // можно показать коллеге, а «только последние» переживает перезагрузку.
+  const searchParams = useSearchParams();
+  const [onlyLatest, setOnlyLatest] = useState(searchParams.get('history') !== '1');
+  const [filterProject, setFilterProject] = useState(searchParams.get('project') || 'all');
+  const [filterClient, setFilterClient] = useState(searchParams.get('client') || 'all');
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterProject !== 'all') params.set('project', filterProject);
+    if (filterClient !== 'all') params.set('client', filterClient);
+    if (!onlyLatest) params.set('history', '1');
+    const query = params.toString();
+    window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+  }, [filterProject, filterClient, onlyLatest]);
   const clients = useMemo(
     () =>
       [...new Set(statuses.map((row) => row.client).filter(Boolean))].sort((a, b) =>
@@ -206,7 +218,6 @@ export default function ProjectStatusPage() {
       ),
     [statuses],
   );
-  const [onlyLatest, setOnlyLatest] = useState(true);
   const visibleRows = useMemo(() => {
     let rowsFiltered = rows.filter(
       (row) =>
@@ -337,14 +348,9 @@ export default function ProjectStatusPage() {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={onlyLatest ? 'primary' : 'secondary'}
-              size="sm"
-              aria-pressed={onlyLatest}
-              onClick={() => setOnlyLatest((value) => !value)}
-            >
+            <Switch checked={onlyLatest} onChange={setOnlyLatest} className="text-sm">
               {t('Только последние')}
-            </Button>
+            </Switch>
             <SelectField
               size="sm"
               variant="boxed"
