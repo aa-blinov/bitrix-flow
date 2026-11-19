@@ -334,17 +334,15 @@ export default function ProjectStatusPage() {
       >
         {editing && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <SelectField
-                label={t('Проект')}
-                options={projects.map((project) => ({
-                  value: String(project.id),
-                  label: project.name || `${t('Проект')} #${project.id}`,
-                }))}
-                value={editing.projectId}
-                onChange={(event) => setEditing({ ...editing, projectId: event.target.value })}
-              />
-            </div>
+            <SelectField
+              label={t('Проект')}
+              options={projects.map((project) => ({
+                value: String(project.id),
+                label: project.name || `${t('Проект')} #${project.id}`,
+              }))}
+              value={editing.projectId}
+              onChange={(event) => setEditing({ ...editing, projectId: event.target.value })}
+            />
             <TextField
               label={t('Клиент')}
               value={editing.client}
@@ -357,25 +355,29 @@ export default function ProjectStatusPage() {
               placeholder={t('Выберите статус')}
               onChange={(event) => setEditing({ ...editing, status: event.target.value })}
             />
+            <SelectField
+              label={t('Ответственный сейчас')}
+              options={users.map((user) => ({ value: String(user.id), label: user.name }))}
+              value={editing.ownerId}
+              placeholder={t('Выберите ответственного')}
+              onChange={(event) => setEditing({ ...editing, ownerId: event.target.value })}
+            />
             <TextArea
-              className="sm:col-span-2"
               label={t('Цель')}
               value={editing.goal}
               rows={3}
               onChange={(value) => setEditing({ ...editing, goal: value.target.value })}
             />
             <TextArea
-              className="sm:col-span-2"
               label={t('Текущее состояние')}
               value={editing.state}
               rows={3}
               onChange={(value) => setEditing({ ...editing, state: value.target.value })}
             />
             <TextArea
-              className="sm:col-span-2"
               label={t('Ближайший шаг')}
               value={editing.step}
-              rows={2}
+              rows={3}
               onChange={(value) => setEditing({ ...editing, step: value.target.value })}
             />
             <DateField
@@ -384,18 +386,10 @@ export default function ProjectStatusPage() {
               onChange={(value) => setEditing({ ...editing, stepDeadline: value })}
             />
             <TextArea
-              className="sm:col-span-2"
               label={t('Главный риск')}
               value={editing.risk}
-              rows={2}
+              rows={3}
               onChange={(value) => setEditing({ ...editing, risk: value.target.value })}
-            />
-            <SelectField
-              label={t('Ответственный сейчас')}
-              options={users.map((user) => ({ value: String(user.id), label: user.name }))}
-              value={editing.ownerId}
-              placeholder={t('Выберите ответственного')}
-              onChange={(event) => setEditing({ ...editing, ownerId: event.target.value })}
             />
             {editing.updatedAt && (
               <p className="self-end text-xs text-ink-faint">
