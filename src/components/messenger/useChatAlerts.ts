@@ -17,7 +17,8 @@ const COUNTERS_POLL_MS = 60_000;
 // Живёт в боковой панели, поэтому работает на любой странице приложения.
 export function useChatAlerts() {
   const router = useRouter();
-  const [unread, setUnread] = useState(0);
+  // null — счётчик ещё не отвечал: в меню вместо него заглушка, а не «всё прочитано».
+  const [unread, setUnread] = useState<number | null>(null);
   const me = useRef(0);
 
   // Запросы счётчика идут по одному: при медленном портале ответ «последнего

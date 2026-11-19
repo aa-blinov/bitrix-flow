@@ -44,6 +44,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/monos/Badge';
+import { Skeleton } from '@/components/monos/Skeleton';
 import { t } from '@/lib/i18n';
 
 // Строка навигации остаётся кодом приложения: это продуктовый паттерн, а не
@@ -278,7 +279,7 @@ function SortableNavLink({
   item: (typeof NAV_ITEMS)[number];
   pathname: string;
   onNavigate: () => void;
-  badge?: number;
+  badge?: number | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.href,
@@ -306,7 +307,13 @@ function SortableNavLink({
     >
       <Icon size={16} strokeWidth={1.7} />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {badge !== undefined && badge > 0 ? <Badge tone="neutral">{badge}</Badge> : null}
+      {badge === null ? (
+        // Счётчик ещё не отвечал: пульс вместо пустоты, иначе кажется, что
+        // непрочитанных нет, а потом число «вдруг» появляется.
+        <Skeleton width="1.75rem" height="1.1rem" rounded="full" />
+      ) : badge !== undefined && badge > 0 ? (
+        <Badge tone="neutral">{badge}</Badge>
+      ) : null}
     </Link>
   );
 }
@@ -329,7 +336,7 @@ export default function SortableNav({
   onReorder: (order: string[]) => void;
   pathname: string;
   onNavigate: () => void;
-  badges?: Record<string, number>;
+  badges?: Record<string, number | null>;
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
