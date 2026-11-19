@@ -273,26 +273,35 @@ export default function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate text-sm font-medium text-ink">{project.name}</h2>
                       <div className="mt-0.5 flex items-center gap-3 text-xs text-ink-soft">
-                        <span>
-                          {project.taskCount > 0
-                            ? t(
-                                '{0} {1}',
-                                project.taskCount,
-                                pluralRu(project.taskCount, ['задача', 'задачи', 'задач']),
-                              )
-                            : t('Нет задач')}
-                        </span>
-                        {project.overdue > 0 && (
-                          <span className="font-medium text-danger-text">
-                            {t('Просрочено:')} {project.overdue}
-                          </span>
+                        {/* Пока серверная статистика не пришла, локальный счётчик
+                            по первой странице задач врал («Нет задач» у проекта
+                            с 30 задачами). До ответа показываем заглушку. */}
+                        {stats ? (
+                          <>
+                            <span>
+                              {project.taskCount > 0
+                                ? t(
+                                    '{0} {1}',
+                                    project.taskCount,
+                                    pluralRu(project.taskCount, ['задача', 'задачи', 'задач']),
+                                  )
+                                : t('Нет задач')}
+                            </span>
+                            {project.overdue > 0 && (
+                              <span className="font-medium text-danger-text">
+                                {t('Просрочено:')} {project.overdue}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <Skeleton width="7rem" height="0.85rem" />
                         )}
                       </div>
                     </div>
 
                     {/* Пустая полоса у проекта без задач — шум: место держим, рисуем только при задачах. */}
                     <div className="hidden w-48 items-center gap-3 md:flex">
-                      {project.taskCount > 0 && (
+                      {stats && project.taskCount > 0 && (
                         <>
                           <Progress
                             value={progressPercent}
