@@ -40,7 +40,9 @@ const SIZES: Record<'sm' | 'md' | 'lg', string> = {
  */
 const PROGRESS_CSS = `
 .ui-progress-fill {
-  transition: width var(--ui-duration-base) ease;
+  width: 100%;
+  transform-origin: left;
+  transition: transform var(--ui-duration-base) ease;
 }
 .ui-progress-indeterminate {
   position: absolute;
@@ -64,6 +66,7 @@ const PROGRESS_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .ui-progress-fill {
     transition: none;
+    transform: none;
   }
   .ui-progress-indeterminate {
     width: 100%;
@@ -119,7 +122,7 @@ export function Progress({
       ) : (
         <span
           className={cn('block h-full rounded-ui', TONES[tone] || TONES.accent, 'ui-progress-fill')}
-          style={{ width: `${percent}%` }}
+          style={{ transform: `scaleX(${Math.max(0, Math.min(100, percent || 0)) / 100})` }}
         />
       )}
     </div>
