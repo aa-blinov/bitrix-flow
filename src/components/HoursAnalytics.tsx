@@ -903,9 +903,7 @@ function HoursAnalyticsView() {
                     title={CLASS_INFO[cls].hint()}
                   >
                     <p className="text-xs text-ink-soft">{CLASS_INFO[cls].label()}</p>
-                    <p className={cn("mt-1", FONT.metric)}>
-                      {t('{0} ч', fmt(hours))}
-                    </p>
+                    <p className={cn('mt-1', FONT.metric)}>{t('{0} ч', fmt(hours))}</p>
                     <p
                       className={cn(
                         'text-xs tabular-nums',

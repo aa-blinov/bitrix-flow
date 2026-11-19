@@ -1103,7 +1103,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                 const content = (
                   <>
                     <p className="text-xs text-ink-soft">{tile.label()}</p>
-                    <p className={cn("mt-1", FONT.metric)}>
+                    <p className={cn('mt-1', FONT.metric)}>
                       {value?.value === null || value?.value === undefined
                         ? '—'
                         : tile.kind === 'hours'

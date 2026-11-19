@@ -428,12 +428,7 @@ export default function TeamWorkload() {
               strokeWidth={1.7}
             />
             <div>
-              <p
-                className={cn(
-                  FONT.metric,
-                  overdueCount > 0 && 'text-danger-text',
-                )}
-              >
+              <p className={cn(FONT.metric, overdueCount > 0 && 'text-danger-text')}>
                 {overdueCount}
               </p>
               <p className="text-sm text-ink-soft">

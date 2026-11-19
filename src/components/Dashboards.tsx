@@ -517,9 +517,7 @@ function Chart({ item, result, names, from, to: picked, onPick }: ChartProps) {
         : '';
   if (item.view === 'number' || item.by === 'none') {
     const value = (
-      <span className={FONT.metricLarge}>
-        {formatValue(item.metric, result.total)}
-      </span>
+      <span className={FONT.metricLarge}>{formatValue(item.metric, result.total)}</span>
     );
     return (
       <div>
