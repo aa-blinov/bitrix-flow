@@ -11,7 +11,9 @@ let cachedVersion: string | null = null;
 export async function GET() {
   try {
     if (!cachedVersion) {
-      cachedVersion = (await readFile(path.join(process.cwd(), '.next', 'BUILD_ID'), 'utf8')).trim();
+      cachedVersion = (
+        await readFile(path.join(process.cwd(), '.next', 'BUILD_ID'), 'utf8')
+      ).trim();
     }
     return NextResponse.json({ version: cachedVersion });
   } catch {
