@@ -37,6 +37,7 @@ import { Avatar } from '@/components/monos/Avatar';
 import { DateField } from '@/components/monos/DateField';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
+import { Spinner } from '@/components/monos/Spinner';
 import { Card } from '@/components/monos/Card';
 import { Checkbox } from '@/components/monos/Checkbox';
 import { Chip } from '@/components/monos/Chip';
@@ -1802,7 +1803,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 onClick={() => void handleAddResult()}
                 disabled={!taskResultText.trim() || isSendingResult}
                 className="h-9 shrink-0 gap-2"
-                icon={<ClipboardCheck size={16} strokeWidth={1.7} />}
+                icon={
+                  isSendingResult ? (
+                    <Spinner size="md" />
+                  ) : (
+                    <ClipboardCheck size={16} strokeWidth={1.7} />
+                  )
+                }
                 aria-label={t('Сохранить результат')}
               >
                 <span className="hidden sm:inline">{t('Сохранить')}</span>
@@ -1913,7 +1920,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                 onClick={() => void handleAddComment()}
                 disabled={!comment.trim() || isSendingComment}
                 className="h-9 shrink-0 gap-2"
-                icon={<Send size={16} strokeWidth={1.7} />}
+                icon={
+                  isSendingComment ? <Spinner size="md" /> : <Send size={16} strokeWidth={1.7} />
+                }
                 // На узком экране остаётся одна иконка — подпись нужна вслух.
                 aria-label={t('Отправить комментарий')}
               >

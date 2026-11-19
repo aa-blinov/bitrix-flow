@@ -209,7 +209,7 @@ export function Popover({
           role="dialog"
           tabIndex={-1}
           className={cn(
-            'absolute z-menu max-h-[min(24rem,calc(100dvh-6rem))] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-ui border border-line bg-canvas p-4 shadow-overlay',
+            'animate-fade-in absolute z-menu max-h-[min(24rem,calc(100dvh-6rem))] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-ui border border-line bg-canvas p-4 shadow-overlay',
             'w-72',
             POSITIONS[actualPlacement],
             alignClass,

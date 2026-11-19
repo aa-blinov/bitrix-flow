@@ -573,7 +573,7 @@ export default function Messenger() {
                       <button
                         type="button"
                         onClick={() => openDialog(chat)}
-                        className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                        className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-surface-2"
                       >
                         <Avatar name={chat.title} src={chat.avatar} size="md" />
                         <span className="min-w-0 flex-1 truncate text-sm text-ink">

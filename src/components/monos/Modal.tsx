@@ -151,12 +151,12 @@ export function Modal({
           type="button"
           tabIndex={-1}
           aria-label={closeLabel}
-          className="absolute inset-0 h-full w-full cursor-default bg-black/20 backdrop-blur-sm"
+          className="animate-fade-in absolute inset-0 h-full w-full cursor-default bg-black/20 backdrop-blur-sm"
           onClick={onClose}
         />
       ) : (
         <div
-          className="absolute inset-0 h-full w-full bg-black/20 backdrop-blur-sm"
+          className="animate-fade-in absolute inset-0 h-full w-full bg-black/20 backdrop-blur-sm"
           aria-hidden="true"
         />
       )}
@@ -168,7 +168,7 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'relative z-10 max-h-[calc(100dvh-4rem)] w-full overflow-y-auto rounded-ui border border-line bg-canvas p-6 text-ink shadow-overlay outline-none sm:p-8',
+          'animate-slide-up relative z-10 max-h-[calc(100dvh-4rem)] w-full overflow-y-auto rounded-ui border border-line bg-canvas p-6 text-ink shadow-overlay outline-none sm:p-8',
           SIZES[size],
           className,
         )}
