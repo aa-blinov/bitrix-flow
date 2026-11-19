@@ -412,22 +412,25 @@ export default function ProjectStatusPage() {
           <p className="text-sm text-danger-text">{saveError}</p>
         ) : timeline.length ? (
           <ol className="flex flex-col gap-3">
-            {timeline.map((entry, index) => (
-              <li key={index} className="border-l-2 border-line pl-3">
-                <p className="text-xs text-ink-faint">
-                  {UPDATED_FORMAT.format(new Date(entry.at))} — {memberName(entry.memberId)}
-                </p>
-                <ul className="mt-1 text-sm">
-                  {entry.changes.map((change, changeIndex) => (
-                    <li key={changeIndex}>
-                      <span className="font-medium">{change.field}: </span>
-                      {change.from && <span className="text-ink-soft">{change.from} → </span>}
-                      <span className="text-ink">{change.to}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+            {/* Новые записи сверху — вне зависимости от порядка ответа API. */}
+            {[...timeline]
+              .sort((a, b) => +new Date(b.at) - +new Date(a.at))
+              .map((entry, index) => (
+                <li key={index} className="border-l-2 border-line pl-3">
+                  <p className="text-xs text-ink-faint">
+                    {UPDATED_FORMAT.format(new Date(entry.at))} — {memberName(entry.memberId)}
+                  </p>
+                  <ul className="mt-1 text-sm">
+                    {entry.changes.map((change, changeIndex) => (
+                      <li key={changeIndex}>
+                        <span className="font-medium">{change.field}: </span>
+                        {change.from && <span className="text-ink-soft">{change.from} → </span>}
+                        <span className="text-ink">{change.to}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
           </ol>
         ) : (
           <p className="text-sm text-ink-soft">{t('Правок пока не было')}</p>
