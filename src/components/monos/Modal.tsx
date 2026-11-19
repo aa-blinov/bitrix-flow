@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { FONT, PAD } from '@/components/monos/scale';
 import { IconButton } from './IconButton';
 import { t } from '@/lib/i18n';
 
@@ -168,7 +169,8 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'animate-slide-up relative z-10 max-h-[calc(100dvh-4rem)] w-full overflow-y-auto rounded-ui border border-line bg-canvas p-6 text-ink shadow-overlay outline-none sm:p-8',
+          'animate-slide-up relative z-10 max-h-[calc(100dvh-4rem)] w-full overflow-y-auto rounded-ui border border-line bg-canvas text-ink shadow-overlay outline-none',
+          PAD.dialog,
           SIZES[size],
           className,
         )}
@@ -194,7 +196,7 @@ export function Modal({
         ) : null}
 
         {title ? (
-          <h2 id={titleId} className="pr-10 text-lg font-bold tracking-tight">
+          <h2 id={titleId} className={cn('pr-10', FONT.dialogTitle)}>
             {title}
           </h2>
         ) : null}

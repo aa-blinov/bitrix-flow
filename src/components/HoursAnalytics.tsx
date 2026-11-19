@@ -32,6 +32,7 @@ import { updateTaskFull } from '@/lib/bitrix24';
 import { tagKey } from '@/lib/task-tags';
 import type { HourRow, HoursReport } from '@/lib/hours';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { FONT } from '@/components/monos/scale';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
@@ -902,7 +903,7 @@ function HoursAnalyticsView() {
                     title={CLASS_INFO[cls].hint()}
                   >
                     <p className="text-xs text-ink-soft">{CLASS_INFO[cls].label()}</p>
-                    <p className="mt-1 text-xl font-semibold tabular-nums text-ink">
+                    <p className={cn("mt-1", FONT.metric)}>
                       {t('{0} ч', fmt(hours))}
                     </p>
                     <p

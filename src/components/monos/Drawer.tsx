@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { FONT, PAD } from '@/components/monos/scale';
 import { IconButton } from './IconButton';
 import { t } from '@/lib/i18n';
 
@@ -162,7 +163,8 @@ export function Drawer({
           className={cn(
             'ui-drawer absolute inset-y-0',
             side === 'left' ? 'left-0 border-r' : 'right-0 border-l',
-            'w-full overflow-y-auto border-line bg-canvas p-6 text-ink shadow-overlay outline-none',
+            'w-full overflow-y-auto border-line bg-canvas text-ink shadow-overlay outline-none',
+            PAD.dialog,
             'max-w-md',
             className,
           )}
@@ -187,7 +189,7 @@ export function Drawer({
           </IconButton>
 
           {title ? (
-            <h2 id={titleId} className="pr-10 text-lg font-bold tracking-tight">
+            <h2 id={titleId} className={cn('pr-10', FONT.dialogTitle)}>
               {title}
             </h2>
           ) : null}

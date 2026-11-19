@@ -23,6 +23,7 @@ import { Notice } from '@/components/monos/Notice';
 import { Skeleton } from '@/components/monos/Skeleton';
 import { Button } from '@/components/monos/Button';
 import { t } from '@/lib/i18n';
+import { FONT } from '@/components/monos/scale';
 
 const DASHBOARDS_INTRO_KEY = 'bitrix-flow-dashboards-intro';
 
@@ -366,7 +367,7 @@ function StatCard({
           </p>
           <p
             className={cn(
-              'text-2xl font-semibold tabular-nums',
+              FONT.metric,
               lit ? 'text-warning-text' : 'text-ink',
               value === 0 && 'text-ink-faint',
             )}

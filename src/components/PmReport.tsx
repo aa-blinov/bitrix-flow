@@ -22,6 +22,7 @@ import PageHeader from '@/components/PageHeader';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { downloadCsv } from '@/lib/csv';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { FONT } from '@/components/monos/scale';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import type { Cell, ReportRow } from '@/lib/pm-reports';
 import type { ReportKind, ReportResponse } from '@/lib/pm-reports-data';
@@ -1102,7 +1103,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                 const content = (
                   <>
                     <p className="text-xs text-ink-soft">{tile.label()}</p>
-                    <p className="mt-1 text-xl font-semibold tabular-nums text-ink">
+                    <p className={cn("mt-1", FONT.metric)}>
                       {value?.value === null || value?.value === undefined
                         ? '—'
                         : tile.kind === 'hours'

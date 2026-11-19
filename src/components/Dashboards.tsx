@@ -59,6 +59,7 @@ import {
   type WidgetResult,
 } from '@/lib/dashboards';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { FONT } from '@/components/monos/scale';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
@@ -516,7 +517,7 @@ function Chart({ item, result, names, from, to: picked, onPick }: ChartProps) {
         : '';
   if (item.view === 'number' || item.by === 'none') {
     const value = (
-      <span className="text-3xl font-semibold tabular-nums text-ink">
+      <span className={FONT.metricLarge}>
         {formatValue(item.metric, result.total)}
       </span>
     );

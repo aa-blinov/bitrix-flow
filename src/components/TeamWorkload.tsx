@@ -27,6 +27,7 @@ import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
+import { FONT } from '@/components/monos/scale';
 
 type WorkloadBucket = { userId: string; count: number; hours: number };
 type WorkloadSummary = {
@@ -396,7 +397,7 @@ export default function TeamWorkload() {
           <Card className="flex items-center gap-3">
             <ClipboardList className="size-5 shrink-0 text-accent" strokeWidth={1.7} />
             <div>
-              <p className="text-2xl font-bold tabular-nums">{weekTotals.count}</p>
+              <p className={FONT.metric}>{weekTotals.count}</p>
               <p className="text-sm text-ink-soft">
                 {taskLabel(weekTotals.count)} {t('со сроком на этой неделе')}
               </p>
@@ -405,14 +406,14 @@ export default function TeamWorkload() {
           <Card className="flex items-center gap-3">
             <Clock3 className="size-5 shrink-0 text-accent" strokeWidth={1.7} />
             <div>
-              <p className="text-2xl font-bold tabular-nums">{formatHours(weekTotals.hours)}</p>
+              <p className={FONT.metric}>{formatHours(weekTotals.hours)}</p>
               <p className="text-sm text-ink-soft">{t('план на этой неделе')}</p>
             </div>
           </Card>
           <Card className="flex items-center gap-3">
             <CalendarOff className="size-5 shrink-0 text-ink-faint" strokeWidth={1.7} />
             <div>
-              <p className="text-2xl font-bold tabular-nums">{noDeadlineCount}</p>
+              <p className={FONT.metric}>{noDeadlineCount}</p>
               <p className="text-sm text-ink-soft">
                 {taskLabel(noDeadlineCount)} {t('без срока')}
               </p>
@@ -429,7 +430,7 @@ export default function TeamWorkload() {
             <div>
               <p
                 className={cn(
-                  'text-2xl font-bold tabular-nums',
+                  FONT.metric,
                   overdueCount > 0 && 'text-danger-text',
                 )}
               >
