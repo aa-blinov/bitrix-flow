@@ -120,10 +120,21 @@ export async function planProjectClassTags(
 }
 
 /**
- * Запись тегов в портал по одной задаче. Перед записью теги перечитываются из портала:
- * tasks.task.update заменяет список целиком, и тег, поставленный после снимка зеркала,
- * иначе пропал бы. Зеркало обновляем сразу, не дожидаясь события об изменении.
+ * Запись тегов в портал батчами. Портал не даёт нормального bulk-update задач, но
+ * умеет batch: до 50 команд за один вызов. Порядок прежний — сначала свежие теги
+ * задачи (tasks.task.update заменяет список целиком, и тег, поставленный после
+ * снимка зеркала, иначе пропал бы), затем запись принятых; чтение и запись идут
+ * пакетами, поэтому сотни задач — единицы вызовов, а не сотни. Зеркало обновляем
+ * сразу, не дожидаясь события об изменении.
  */
+const BATCH_SIZE = 40;
+
+const chunk = <T>(list: T[], size: number): T[][] => {
+  const parts: T[][] = [];
+  for (let i = 0; i < list.length; i += size) parts.push(list.slice(i, i + size));
+  return parts;
+};
+
 export async function applyClassTags(
   memberId: string,
   changes: TagChange[],
@@ -135,45 +146,98 @@ export async function applyClassTags(
   const db = await getDb();
   const failed: string[] = [];
   let done = 0;
-  // ponytail: задачи по одной; на сотнях задач это минуты, батч tasks.task.update если станет мешать.
-  for (const change of changes) {
+  for (const pack of chunk(changes, BATCH_SIZE)) {
+    if (isMockEnabled()) {
+      // Мок-режим: портал недоступен, зеркало становится по плану.
+      await writeMirror(db, memberId, pack, next);
+      done += pack.length;
+      continue;
+    }
     try {
-      let tags = change.to;
-      if (!isMockEnabled()) {
-        const fresh = await bx24OAuth(
-          memberId,
-          'tasks.task.get',
-          { taskId: change.taskId, 'select[0]': 'ID', 'select[1]': 'TAGS' },
-          { asUser },
-        );
-        const current = bitrixTaskTags((fresh?.task || fresh)?.tags);
+      // Свежие теги: по-прежнему пакетом, одной пачкой на весь набор.
+      const getCmd: Record<string, string> = {};
+      pack.forEach((change, index) => {
+        getCmd[`g${index}`] = `tasks.task.get?taskId=${change.taskId}&select[]=ID&select[]=TAGS`;
+      });
+      const fresh = await bx24OAuth(
+        memberId,
+        'batch',
+        { halt: 0, cmd: getCmd },
+        { asUser, json: true },
+      );
+      const freshResult = fresh?.result?.result || {};
+
+      // Решения по свежим тегам: конфликт и «чужой» тег не трогаем — правила те же,
+      // что и в po-одиночном пути, только решённые задачи уезжают вторым батчем.
+      const updateCmd: Record<string, string> = {};
+      const decided: Array<{ change: TagChange; tags: string[] }> = [];
+      pack.forEach((change, index) => {
+        const freshTask = freshResult[`g${index}`];
+        const current = bitrixTaskTags((freshTask?.task || freshTask)?.tags);
         const own = resolveHourClass(current);
-        if (own.conflict) continue;
+        if (own.conflict) return;
         if (own.hourClass !== UNASSIGNED && !(own.hourClass === previous && previous !== next))
-          continue;
-        tags = withClassTag(current, next);
-        // Массив тегов уходит только JSON-телом: формой со строкой fields портал отвечает
-        // «Should be value of type array».
-        await bx24OAuth(
+          return;
+        const tags = withClassTag(current, next);
+        updateCmd[`u${decided.length}`] =
+          `tasks.task.update?taskId=${change.taskId}&fields=${encodeURIComponent(
+            JSON.stringify({ TAGS: tags }),
+          )}`;
+        decided.push({ change, tags });
+      });
+
+      if (Object.keys(updateCmd).length) {
+        const updated = await bx24OAuth(
           memberId,
-          'tasks.task.update',
-          { taskId: change.taskId, fields: { TAGS: tags } },
-          { json: true, asUser },
+          'batch',
+          { halt: 0, cmd: updateCmd },
+          { asUser, json: true },
         );
+        // Ошибки команд батча лежат в result.result_error по ключу команды: задача с
+        // ошибкой не валит соседние, но и не считается сделанной.
+        const errors = updated?.result?.result_error || {};
+        for (const [index, { change, tags }] of decided.entries()) {
+          const key = `u${index}`;
+          if (errors[key]) {
+            console.warn('[project-class-tags]', change.taskId, errors[key]);
+            failed.push(change.taskId);
+          } else {
+            await db.collection('task_mirror').updateOne(
+              { member_id: memberId, id: change.taskId },
+              {
+                $set: {
+                  'data.tags': Object.fromEntries(tags.map((title, i) => [i, { title }])),
+                },
+              },
+            );
+            done += 1;
+          }
+        }
       }
-      await db
-        .collection('task_mirror')
-        .updateOne(
-          { member_id: memberId, id: change.taskId },
-          { $set: { 'data.tags': Object.fromEntries(tags.map((title, i) => [i, { title }])) } },
-        );
-      done += 1;
     } catch (error) {
-      console.warn('[project-class-tags]', change.taskId, error);
-      failed.push(change.taskId);
+      console.warn('[project-class-tags] batch', error);
+      for (const change of pack) failed.push(change.taskId);
     }
   }
   return { done, failed };
+}
+
+// Мок-режим без портала: зеркало правим по плану, как раньше делали в одиночном пути.
+async function writeMirror(
+  db: Awaited<ReturnType<typeof getDb>>,
+  memberId: string,
+  pack: TagChange[],
+  next: HourClass,
+) {
+  for (const change of pack) {
+    const tags = withClassTag(change.to, next);
+    await db
+      .collection('task_mirror')
+      .updateOne(
+        { member_id: memberId, id: change.taskId },
+        { $set: { 'data.tags': Object.fromEntries(tags.map((title, i) => [i, { title }])) } },
+      );
+  }
 }
 
 /** Новая задача в проекте с классом сразу получает его тег. */

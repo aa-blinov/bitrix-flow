@@ -3,6 +3,7 @@ import { Bx24User, BxFile, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/type
 import { convertBxTask, useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   X,
@@ -1825,9 +1826,19 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
               <MessageSquare size={14} strokeWidth={1.7} className="text-ink-faint" />{' '}
               {t('Комментарии')}
             </h3>
-            <Badge tone="neutral" className="tabular-nums">
-              {task.comments.length}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {task.chatId && (
+                <Link
+                  href={`/messenger?dialog=chat${task.chatId}`}
+                  className="text-xs text-ink-soft transition-colors duration-fast hover:text-ink hover:underline"
+                >
+                  {t('Обсудить в чате')}
+                </Link>
+              )}
+              <Badge tone="neutral" className="tabular-nums">
+                {task.comments.length}
+              </Badge>
+            </div>
           </div>
           <div
             ref={commentsRef}

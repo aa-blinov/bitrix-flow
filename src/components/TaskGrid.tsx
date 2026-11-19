@@ -33,6 +33,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import Link from 'next/link';
 import {
   ChevronDown,
   ChevronRight,
@@ -51,6 +52,7 @@ import {
   Bookmark,
   CheckCheck,
   SlidersHorizontal,
+  MessageSquareText,
 } from 'lucide-react';
 import { BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
 import { isDueThisWeek, needsDeadlineAttention } from '@/lib/task-urgency';
@@ -538,6 +540,17 @@ const EditableTitle = memo(function EditableTitle({
           >
             #{task.id}
           </a>
+          {/* Чат обсуждения задачи: из переписки в карточку возвращаются, здесь — прямой путь обратно. */}
+          {task.chatId && (
+            <Link
+              href={`/messenger?dialog=chat${task.chatId}`}
+              className="flex items-center gap-1 transition-colors duration-fast hover:text-ink"
+              onClick={(event) => event.stopPropagation()}
+              aria-label={t('Чат задачи {0}', String(task.id))}
+            >
+              <MessageSquareText size={12} strokeWidth={1.7} />
+            </Link>
+          )}
           {task.parentId && (
             <button
               type="button"

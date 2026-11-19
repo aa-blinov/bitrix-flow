@@ -1476,14 +1476,20 @@ test(
     await unassigned.click();
     await expect(page).not.toHaveURL(/class=/);
 
-    // Класс проекта действует «с даты»: смена идёт после подтверждения в диалоге.
-    page.on('dialog', (dialog) => void dialog.accept());
+    // Класс проекта действует «с даты»: смена идёт после подтверждения в набором диалоге.
+    const confirm = page.getByRole('alertdialog');
+    const confirmChange = async () => {
+      await confirm.getByRole('button', { name: 'Продолжить' }).click();
+      await expect(confirm).toHaveCount(0);
+    };
     const backlogClass = page.getByRole('combobox', { name: 'Класс проекта Внутренний бэклог' });
     const internal = page.getByRole('button', { name: /Внутренняя разработка/ }).first();
     await choose(page, backlogClass, 'internal');
+    await confirmChange();
     await expect(internal).toContainText('3,5 ч');
     await expect(unassigned).toContainText('0 ч');
     await choose(page, backlogClass, '');
+    await confirmChange();
     await expect(internal).toContainText('3,5 ч');
     await expect(unassigned).toContainText('0 ч');
 

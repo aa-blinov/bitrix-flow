@@ -35,6 +35,7 @@ import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/store/kanban';
+import { useConfirm } from '@/components/monos/confirm-dialog';
 
 const ALL_CLASSES: HourClassOrUnassigned[] = [...HOUR_CLASSES, UNASSIGNED];
 
@@ -342,15 +343,18 @@ function HoursAnalyticsView() {
 
   // Класс проекта закрывает все его задачи без своего тега: размечать остаётся только
   // исключения. «Не выбран» возвращает проект к ручной разметке задач.
+  const confirm = useConfirm();
   const assignProjectClass = useCallback(
     async (projectId: string, cls: HourClass | null, options?: { backfill?: boolean }) => {
       if (
         !options &&
-        !window.confirm(
-          t(
-            'Класс будет действовать с сегодняшнего дня, часы старых задач не перепишутся. Продолжить?',
+        !(await confirm({
+          title: t('Сменить класс проекта?'),
+          description: t(
+            'Класс будет действовать с сегодняшнего дня, часы старых задач не перепишутся.',
           ),
-        )
+          confirmLabel: t('Продолжить'),
+        }))
       )
         return;
       setSavingTask(`project:${projectId}`);
@@ -399,8 +403,13 @@ function HoursAnalyticsView() {
   const backfillProjectClass = useCallback(
     (projectId: string, cls: HourClass | null) => {
       if (!cls) return;
-      if (!window.confirm(t('Переразметить задачи проекта старым правилом, задним числом?')))
-        return;
+      void confirm({
+        title: t('Переразметить задачи проекта задним числом?'),
+        description: t(
+          'Теги задач, размеченных прошлой сменой класса, переписываются в Битриксе. Ручная разметка не трогается.',
+        ),
+        confirmLabel: t('Разметить'),
+      }).then((ok) => ok && void assignProjectClass(projectId, cls, { backfill: true }));
       void assignProjectClass(projectId, cls, { backfill: true });
     },
     [assignProjectClass],

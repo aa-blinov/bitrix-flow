@@ -26,9 +26,10 @@ export default function ThemeSwitcher({ children }: { children?: React.ReactNode
         <SegmentedControl
           size="sm"
           label={t('Режим оформления')}
-          value={mode}
-          onChange={(value) => setMode(value === 'dark' ? 'dark' : 'light')}
+          value={mode === 'auto' ? 'auto' : mode}
+          onChange={(value) => setMode(value as 'light' | 'dark' | 'auto')}
           options={[
+            { value: 'auto', label: t('Системная') },
             { value: 'light', label: t('Светлая') },
             { value: 'dark', label: t('Тёмная') },
           ]}

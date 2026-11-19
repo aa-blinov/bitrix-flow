@@ -20,6 +20,7 @@ import PageHeader from '@/components/PageHeader';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import LoadingState from '@/components/LoadingState';
 import { Notice } from '@/components/monos/Notice';
+import { Skeleton } from '@/components/monos/Skeleton';
 import { Button } from '@/components/monos/Button';
 import { t } from '@/lib/i18n';
 
@@ -361,7 +362,9 @@ function StatCard({
               value === 0 && 'text-ink-faint',
             )}
           >
-            {value ?? '—'}
+            {/* Пока статистика не пришла — пульсирующая заглушка вместо
+                прочерка: прочерк читался как «здесь точно ноль». */}
+            {value === undefined ? <Skeleton width="3rem" height="1.75rem" /> : value}
           </p>
         </div>
       </Card>

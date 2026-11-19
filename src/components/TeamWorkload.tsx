@@ -163,6 +163,8 @@ export default function TeamWorkload() {
   const [timeError, setTimeError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [timeRefreshing, setTimeRefreshing] = useState(false);
+  // Граница свежести факта: показываем у кнопки, чтобы «0 ч» читался как «нет данных».
+  const [timeUpdatedAt, setTimeUpdatedAt] = useState('');
   const [summary, setSummary] = useState<WorkloadSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
@@ -192,6 +194,7 @@ export default function TeamWorkload() {
       if (week !== currentWeekRef.current) return;
       if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
       setTimeRows(payload.data?.rows || []);
+      setTimeUpdatedAt(payload.data?.updatedAt || '');
       setTimeDetails(payload.data?.details || []);
       setTimeTitles(payload.titles || {});
       setTimeRefreshing(Boolean(payload.refreshing));
@@ -461,7 +464,11 @@ export default function TeamWorkload() {
               />
               <RefreshButton
                 label={t('Обновить факт')}
-                title={t('Забрать свежие списания из Битрикса')}
+                title={
+                  timeUpdatedAt
+                    ? `${t('Забрать свежие списания из Битрикса')} · ${t('Данные на {0}', DAY_FORMATTER.format(new Date(timeUpdatedAt)))}`
+                    : t('Забрать свежие списания из Битрикса')
+                }
                 doneText={t('Обновление запущено')}
                 busy={timeRefreshing}
                 onRefresh={refreshActualTime}

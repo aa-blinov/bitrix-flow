@@ -900,8 +900,97 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       {(!boardReady || (isLoading && !filteredTasks.length)) && (
         <LoadingState className="min-h-72 flex-1 bg-transparent" />
       )}
+      {/* На телефоне горизонтальный скролл колонок неудобен: показываем
+          вертикальные секции по фазам, перенос — из меню карточки. */}
+      {isMobile && boardReady && (!isLoading || filteredTasks.length > 0) && (
+        <div className="flex-1 space-y-3 overflow-y-auto bg-canvas px-4 py-4">
+          {allStages.map((stage) => {
+            const colTasks = tasksByStage.get(stage.id) || [];
+            const hasMore = (stagePages[stage.id]?.next ?? null) !== null;
+            const isRest = stage.id === REST_STAGES_COLUMN;
+            if (!colTasks.length && !hasMore) return null;
+
+            return (
+              <Card key={stage.id} padding="none" className="bg-surface-2">
+                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                  <div
+                    className={`h-2 w-2 shrink-0 rounded-full ${
+                      isRest ? 'bg-ink-muted' : getStageDotColor(stage.color)
+                    }`}
+                  />
+                  <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                    {isRest ? t('Остальные фазы') : stage.name}
+                  </h2>
+                  <span className="text-xs text-ink-faint">
+                    {colTasks.length}
+                    {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
+                  </span>
+                </div>
+                <div className="space-y-1.5 p-2">
+                  {colTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
+                      onDragStart={handleDragStart}
+                      isDragging={draggedTask === task.id}
+                      stages={allStages}
+                      onMoveToStage={(taskId, stageId) => void moveCardToStage(taskId, stageId)}
+                      onClick={() => void openTask(task.id)}
+                    />
+                  ))}
+                  {hasMore && (
+                    <Button
+                      variant="quiet"
+                      size="md"
+                      full
+                      disabled={stagePages[stage.id]?.loading}
+                      onClick={() =>
+                        void (isRest
+                          ? loadStagePage(
+                              REST_STAGES_COLUMN,
+                              stagePages[REST_STAGES_COLUMN]?.next || 0,
+                              false,
+                              stageRequestVersion.current,
+                              restStageIds,
+                            )
+                          : loadStagePage(stage.id, stagePages[stage.id]?.next || 0))
+                      }
+                    >
+                      {stagePages[stage.id]?.loading ? t('Загружаем…') : t('Показать ещё')}
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+          {orphanTasks.length > 0 && (
+            <Card padding="none" className="border-dashed bg-surface-2 opacity-80">
+              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <div className="h-2 w-2 rounded-full bg-ink-muted" />
+                <h2 className="flex-1 text-sm font-bold text-ink">{t('Без фазы')}</h2>
+                <span className="text-xs text-ink-faint">{orphanTasks.length}</span>
+              </div>
+              <div className="space-y-1.5 p-2">
+                {orphanTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    avatarUrl={task.assigneeAvatar || avatarByUserId.get(task.assigneeId || '')}
+                    onDragStart={handleDragStart}
+                    isDragging={draggedTask === task.id}
+                    stages={allStages}
+                    onMoveToStage={(taskId, stageId) => void moveCardToStage(taskId, stageId)}
+                    onClick={() => void openTask(task.id)}
+                  />
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
       <div
-        hidden={!boardReady || (isLoading && !filteredTasks.length)}
+        hidden={!boardReady || (isLoading && !filteredTasks.length) || isMobile}
         ref={boardScrollRef}
         onScroll={(event) => {
           if (topScrollRef.current)

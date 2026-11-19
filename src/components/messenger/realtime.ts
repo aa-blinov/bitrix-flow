@@ -146,6 +146,11 @@ export function showChatNotification(
 function notify(event: MessengerEvent, _onClick: () => void) {
   // Уведомления могли выключить за время ожидания других вкладок.
   if (!chatNotifyEnabled()) return;
+  // Режим «только упоминания»: обычные сообщения молча попадают в значок.
+  try {
+    if (localStorage.getItem('bitrix-flow-chat-notify-mode') === 'mentions' && !event.mentioned)
+      return;
+  } catch {}
   // Внутри приложения виден значок непрочитанных, поэтому сигнал здесь — только звук.
   chime(event.mentioned);
 }

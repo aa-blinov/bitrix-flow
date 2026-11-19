@@ -50,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 const parts = saved.split(':');
                 if (parts[0] && parts[0] !== 'mode') theme = parts[0];
                 if (parts[1] === 'dark' || parts[1] === 'light') mode = parts[1];
+                // 'auto' и старые записи без режима остаются системными.
                 else if (saved === 'dark' || saved === 'light') mode = saved;
               }
               const el = document.documentElement;

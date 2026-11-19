@@ -34,7 +34,8 @@ export const THEME_LABELS: Record<ThemeName, string> = {
 };
 
 export type ThemeName = (typeof THEME_NAMES)[number];
-export type ThemeMode = 'light' | 'dark';
+// auto — следить за системной темой: менять data-mode на лету вместе с ОС.
+export type ThemeMode = 'light' | 'dark' | 'auto';
 
 const STORAGE_KEY = 'bitrix-flow-theme';
 const DEFAULT_THEME: ThemeName = 'gruvbox';
@@ -57,25 +58,25 @@ function isThemeName(value: string): value is ThemeName {
 function readStored(): { theme: ThemeName; mode: ThemeMode } {
   const fallback = {
     theme: DEFAULT_THEME,
-    mode: 'dark' as ThemeMode,
+    mode: 'auto' as ThemeMode,
   };
   if (typeof window === 'undefined') return fallback;
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (!saved) {
-      return {
-        theme: DEFAULT_THEME,
-        mode: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-      };
+      // Без сохранённого режима живём по системе; хранится он как «auto».
+      return { theme: DEFAULT_THEME, mode: 'auto' };
     }
     const [rawTheme, rawMode] = saved.split(':');
     const theme = isThemeName(rawTheme) ? rawTheme : DEFAULT_THEME;
     const mode: ThemeMode =
-      rawMode === 'dark' || rawMode === 'light'
-        ? rawMode
-        : saved === 'dark' || saved === 'light'
-          ? saved
-          : 'light';
+      rawMode === 'auto'
+        ? 'auto'
+        : rawMode === 'dark' || rawMode === 'light'
+          ? rawMode
+          : saved === 'dark' || saved === 'light'
+            ? saved
+            : 'auto';
     return { theme, mode };
   } catch {
     return fallback;
@@ -85,7 +86,15 @@ function readStored(): { theme: ThemeName; mode: ThemeMode } {
 function apply(theme: ThemeName, mode: ThemeMode) {
   const root = document.documentElement;
   root.setAttribute('data-theme', theme);
-  root.setAttribute('data-mode', mode);
+  // Авто-режим хранится в хранилище, а на html ставится конкретный режим:
+  // CSS знает только light/dark.
+  root.setAttribute('data-mode', mode === 'auto' ? systemMode() : mode);
+}
+
+function systemMode(): 'light' | 'dark' {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -99,6 +108,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setState(readStored());
   }, []);
+
+  // В авто-режиме ОС меняет тему днём: перекрашиваем вкладку без перезагрузки.
+  useEffect(() => {
+    if (state.mode !== 'auto') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => apply(state.theme, 'auto');
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, [state.mode, state.theme]);
 
   const setTheme = useCallback((theme: ThemeName) => {
     setState((current) => {
@@ -114,6 +132,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setMode = useCallback((mode: ThemeMode) => {
+    if (mode === 'auto') {
+      setState((current) => {
+        apply(current.theme, 'auto');
+        try {
+          window.localStorage.setItem(STORAGE_KEY, `${current.theme}:auto`);
+        } catch {}
+        return { ...current, mode: 'auto' };
+      });
+      return;
+    }
     setState((current) => {
       const next: { theme: ThemeName; mode: ThemeMode } = { ...current, mode };
       apply(next.theme, next.mode);

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellOff, Ellipsis, Pin, SquarePen } from 'lucide-react';
+import { Bell, BellOff, BellRing, Ellipsis, Pin, SquarePen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -104,6 +104,8 @@ export default function Messenger() {
   const lastActive = useRef('');
   const moreRef = useRef<HTMLDivElement>(null);
   const [notifyOn, setNotifyOn] = useState(false);
+  // Упоминания звенят всегда отдельно: их пропустить страшнее, чем услышать лишний звон.
+  const [notifyMode, setNotifyMode] = useState<'all' | 'mentions'>('all');
   // Чаты с портала по тому же запросу: список диалогов знает только последние.
   const [found, setFound] = useState<Dialog[]>([]);
   const [foundFailed, setFoundFailed] = useState(false);
@@ -112,6 +114,10 @@ export default function Messenger() {
 
   useEffect(() => {
     setNotifyOn(chatNotifyEnabled());
+    try {
+      const mode = localStorage.getItem('bitrix-flow-chat-notify-mode');
+      if (mode === 'mentions' || mode === 'all') setNotifyMode(mode);
+    } catch {}
     // Адрес с номером диалога (ссылка уведомления или обновление страницы) главнее
     // последнего открытого диалога, который хранится в браузере.
     let dialog = new URLSearchParams(window.location.search).get('dialog');
@@ -479,6 +485,13 @@ export default function Messenger() {
     setNotifyOn(next);
   }
 
+  function setNotifySoundMode(mode: 'all' | 'mentions') {
+    try {
+      localStorage.setItem('bitrix-flow-chat-notify-mode', mode);
+    } catch {}
+    setNotifyMode(mode);
+  }
+
   // Новый диалог с человеком или созданная группа появятся в списке портала
   // только после первого сообщения, поэтому до тех пор держим их заготовкой.
   const openDialog = useCallback(
@@ -524,19 +537,60 @@ export default function Messenger() {
                 onChange={setQuery}
                 className="min-w-0 flex-1"
               />
-              <IconButton
-                label={notifyOn ? t('Отключить уведомления') : t('Включить уведомления')}
-                variant="outline"
-                size="md"
-                pressed={notifyOn}
-                onClick={() => void toggleNotify()}
-              >
-                {notifyOn ? (
-                  <Bell className="size-4" strokeWidth={1.7} />
-                ) : (
-                  <BellOff className="size-4" strokeWidth={1.7} />
-                )}
-              </IconButton>
+              <Menu
+                portal
+                align="end"
+                width="auto"
+                label={t('Режим уведомлений')}
+                trigger={
+                  <IconButton
+                    label={notifyOn ? t('Режим уведомлений') : t('Включить уведомления')}
+                    variant="outline"
+                    size="md"
+                    pressed={notifyOn}
+                    onClick={() => void toggleNotify()}
+                  >
+                    {notifyOn ? (
+                      notifyMode === 'mentions' ? (
+                        <BellRing className="size-4" strokeWidth={1.7} />
+                      ) : (
+                        <Bell className="size-4" strokeWidth={1.7} />
+                      )
+                    ) : (
+                      <BellOff className="size-4" strokeWidth={1.7} />
+                    )}
+                  </IconButton>
+                }
+                items={[
+                  ...(notifyOn
+                    ? [
+                        {
+                          value: 'all',
+                          label: t('Звенеть на все сообщения'),
+                          disabled: notifyMode === 'all',
+                          onSelect: () => setNotifySoundMode('all'),
+                        },
+                        {
+                          value: 'mentions',
+                          label: t('Звенеть только на упоминания'),
+                          disabled: notifyMode === 'mentions',
+                          onSelect: () => setNotifySoundMode('mentions'),
+                        },
+                        {
+                          value: 'off',
+                          label: t('Выключить уведомления'),
+                          onSelect: () => void toggleNotify(),
+                        },
+                      ]
+                    : [
+                        {
+                          value: 'on',
+                          label: t('Включить уведомления'),
+                          onSelect: () => void toggleNotify(),
+                        },
+                      ]),
+                ]}
+              />
               <IconButton
                 label={t('Новый чат')}
                 variant="outline"
