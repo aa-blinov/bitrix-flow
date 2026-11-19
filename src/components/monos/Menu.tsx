@@ -86,6 +86,28 @@ export function Menu({
     top: number | null;
     bottom: number | null;
   } | null>(null);
+  // Меню у правого края или низа окна сдвигается внутрь: размер известен
+  // только после отрисовки, поэтому коррекция идёт вторым проходом.
+  const [fit, setFit] = React.useState({ dx: 0, dy: 0 });
+
+  React.useEffect(() => {
+    if (!open) {
+      setFit({ dx: 0, dy: 0 });
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      const menu = menuEl.current;
+      if (!menu) return;
+      const rect = menu.getBoundingClientRect();
+      let dx = 0;
+      let dy = 0;
+      if (rect.right > window.innerWidth - 8) dx = window.innerWidth - 8 - rect.right;
+      if (rect.left + dx < 8) dx = 8 - rect.left;
+      if (rect.bottom > window.innerHeight - 8) dy = window.innerHeight - 8 - rect.bottom;
+      setFit((current) => (current.dx === dx && current.dy === dy ? current : { dx, dy }));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, items]);
   const anchor = React.useRef<HTMLDivElement | null>(null);
   const menuEl = React.useRef<HTMLDivElement | null>(null);
   const triggerEl = React.useRef<HTMLElement | null>(null);
@@ -263,11 +285,16 @@ export function Menu({
               left: portalPos.left,
               top: portalPos.top ?? undefined,
               bottom: portalPos.bottom ?? undefined,
-              // align=end выравнивает по правому краю триггера: знаем ширину
-              // только после отрисовки, поэтому сдвигаем на 100% своей ширины.
-              transform: align === 'end' ? 'translateX(-100%)' : undefined,
+              // align=end выравнивает по правому краю триггера: ширину меню
+              // знаем только после отрисовки. Коррекция fit докладывается
+              // первой, чтобы сдвиг внутрь экрана не затирал этот выравнивающий.
+              transform: `translate(${fit.dx}px, ${fit.dy}px)${
+                align === 'end' ? ' translateX(-100%)' : ''
+              }`,
             }
-          : undefined
+          : fit.dx || fit.dy
+            ? { marginLeft: fit.dx, marginTop: fit.dy }
+            : undefined
       }
       onKeyDown={onMenuKeyDown}
     >
