@@ -19,6 +19,7 @@ import { SelectField } from '@/components/monos/SelectField';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
+import { Skeleton } from '@/components/monos/Skeleton';
 import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
 import { t } from '@/lib/i18n';
 
@@ -66,6 +67,7 @@ export default function ProjectPage() {
     isRehydrated,
     updateProject,
     users,
+    isLoading,
   } = useKanbanStore(
     useShallow((s) => ({
       projects: s.projects,
@@ -77,6 +79,7 @@ export default function ProjectPage() {
       isRehydrated: s.isRehydrated,
       updateProject: s.updateProject,
       users: s.users,
+      isLoading: s.isLoading,
     })),
   );
 
@@ -158,15 +161,21 @@ export default function ProjectPage() {
     estimateHours: 0,
     actualHours: 0,
   });
+  // Нули до ответа читались как «в проекте правда 0 задач»: до ответа — заглушка.
+  const [statsLoaded, setStatsLoaded] = useState(false);
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
+    setStatsLoaded(false);
     void fetch(`/api/tasks/stats?projectId=${encodeURIComponent(projectId)}`)
       .then((response) => response.json())
       .then((data) => {
         if (!cancelled && data && typeof data.total === 'number') setStats(data);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setStatsLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -248,6 +257,15 @@ export default function ProjectPage() {
   }
 
   if (!currentProject) {
+    // Пока список проектов ещё грузится, «не найден» — ложь: показаем загрузку,
+    // а не тупик с кнопкой «На главную».
+    if (isLoading && projects.length === 0) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-canvas">
+          <LoadingState className="w-full max-w-md bg-transparent" />
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="text-center">
@@ -313,23 +331,29 @@ export default function ProjectPage() {
                     t('участников'),
                   ])}
                 </Button>
-                <span>
-                  {t('Задач:')} {stats.total}
-                </span>
-                <span className="text-success-text">
-                  {t('Завершено:')} {completedTasks}
-                </span>
-                {/* Сигналы — в той же строке, что и счётчики: отдельной строкой
-                    мелким шрифтом просрочка читалась как сноска. */}
-                {overdueTasks > 0 && (
-                  <span className="font-medium text-danger-text">
-                    {t('Просрочено:')} {overdueTasks}
-                  </span>
-                )}
-                {unassignedTasks > 0 && (
-                  <span>
-                    {t('Без исполнителя:')} {unassignedTasks}
-                  </span>
+                {statsLoaded ? (
+                  <>
+                    <span>
+                      {t('Задач:')} {stats.total}
+                    </span>
+                    <span className="text-success-text">
+                      {t('Завершено:')} {completedTasks}
+                    </span>
+                    {/* Сигналы — в той же строке, что и счётчики: отдельной строкой
+                        мелким шрифтом просрочка читалась как сноска. */}
+                    {overdueTasks > 0 && (
+                      <span className="font-medium text-danger-text">
+                        {t('Просрочено:')} {overdueTasks}
+                      </span>
+                    )}
+                    {unassignedTasks > 0 && (
+                      <span>
+                        {t('Без исполнителя:')} {unassignedTasks}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <Skeleton width="14rem" height="0.9rem" />
                 )}
               </div>
             </div>
@@ -339,13 +363,25 @@ export default function ProjectPage() {
                 <div className="text-center">
                   <p className="text-xs text-ink-faint">{t('План')}</p>
                   <p className="font-bold">
-                    {totalEstimate.toFixed(1)} {t('ч')}
+                    {statsLoaded ? (
+                      <>
+                        {totalEstimate.toFixed(1)} {t('ч')}
+                      </>
+                    ) : (
+                      <Skeleton width="3.5rem" height="1rem" />
+                    )}
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-ink-faint">{t('Факт')}</p>
                   <p className="font-bold">
-                    {totalActual.toFixed(1)} {t('ч')}
+                    {statsLoaded ? (
+                      <>
+                        {totalActual.toFixed(1)} {t('ч')}
+                      </>
+                    ) : (
+                      <Skeleton width="3.5rem" height="1rem" />
+                    )}
                   </p>
                 </div>
               </div>
