@@ -549,10 +549,20 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const [isCreatingStage, setIsCreatingStage] = useState(false);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
-  // Полосы двигают друг друга, и каждая отвечает своим scroll. При дробном масштабе экрана
-  // scrollLeft округляется по-разному, и ответ уводил первую полосу на пиксель назад.
+  // Полосы двигают друг друга. Scroll от сдвинутой нами полосы приходит кадром позже, когда
+  // ведущая уже уехала дальше, и ответ откатывал её назад: прокрутка шла рывками. Поэтому
+  // событие, которое мы сами вызвали, гасим, а не пересылаем обратно.
+  const echoRef = useRef<HTMLElement | null>(null);
   const syncScroll = (from: HTMLElement, to: HTMLElement | null) => {
-    if (to && Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft;
+    if (echoRef.current === from) {
+      echoRef.current = null;
+      return;
+    }
+    if (!to || Math.abs(to.scrollLeft - from.scrollLeft) < 1) return;
+    const before = to.scrollLeft;
+    to.scrollLeft = from.scrollLeft;
+    // Упёрлась в край, события не будет, и гасить нечего.
+    echoRef.current = to.scrollLeft === before ? null : to;
   };
   // Первый поле каждого окна получает фокус: без ссылки модалка забирала бы
   // его на себя.
