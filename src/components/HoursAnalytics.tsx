@@ -20,6 +20,9 @@ import PageHeader from '@/components/PageHeader';
 import { downloadCsv } from '@/lib/csv';
 // Дата одной строкой на уровне модуля: язык известен только после монтирования.
 const SINCE_FORMAT = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
+// Недели приходят ключом YYYY-MM-DD: в тексте предупреждения их показываем по-человечески.
+const WEEK_FORMAT = dateFormat({ day: '2-digit', month: '2-digit', year: 'numeric' });
+const weekDate = (key: string) => WEEK_FORMAT.format(new Date(`${key.slice(0, 10)}T00:00:00`));
 import {
   HOUR_CLASS_TAG,
   HOUR_CLASSES,
@@ -853,8 +856,8 @@ function HoursAnalyticsView() {
             {t(
               'Нет списаний за {0} нед. между {1} и {2}: цифры за них занижены.',
               missing.length,
-              missing[0],
-              missing[missing.length - 1],
+              weekDate(missing[0]),
+              weekDate(missing[missing.length - 1]),
             )}
           </Notice>
         ) : null}

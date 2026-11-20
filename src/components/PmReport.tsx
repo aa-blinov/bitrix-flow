@@ -116,7 +116,7 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
           { id: 'fact', label: () => t('Факт, ч'), kind: 'hours' },
           { id: 'subFact', label: () => t('Из них подзадачи, ч'), kind: 'hours' },
           { id: 'delta', label: () => t('Разница, ч'), kind: 'hours' },
-          { id: 'deltaShare', label: () => t('Разница'), kind: 'percent' },
+          { id: 'deltaShare', label: () => t('Разница, %'), kind: 'percent' },
         ],
         sort: { id: 'delta', desc: true },
         groupings: ['project', 'user'],

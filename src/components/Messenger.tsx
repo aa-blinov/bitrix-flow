@@ -661,7 +661,9 @@ export default function Messenger() {
                       // Прочитанным диалог отметит сама переписка, когда последние сообщения
                       // загрузятся и будут видны.
                       onClick={() => setActiveId(dialog.id)}
-                      className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-surface-2 ${
+                      // На телефоне меню «…» видно всегда: строка оставляет ему место справа,
+                      // иначе кнопка ложилась поверх даты последнего сообщения.
+                      className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-surface-2 max-sm:pr-12 ${
                         dialog.id === activeId ? 'bg-surface-2' : ''
                       }`}
                     >
@@ -715,7 +717,11 @@ export default function Messenger() {
                         </span>
                       </span>
                     </button>
-                    <div className="absolute top-1 right-1 hidden group-focus-within:block group-hover:block max-sm:block">
+                    {/* На десктопе меню появляется по наведению поверх даты: подложка цвета
+                        строки прячет дату под ним, а не смешивает два слоя. По центру через
+                        my-auto, не transform: transform создаёт свой слой наложения, и открытое
+                        меню уходило под следующую строку списка. */}
+                    <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit rounded-ui bg-surface-2 group-focus-within:block group-hover:block max-sm:block max-sm:bg-transparent">
                       <Menu
                         label={t('Действия с диалогом')}
                         align="end"

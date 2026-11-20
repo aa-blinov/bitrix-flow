@@ -142,7 +142,7 @@ export function TaskCard({
             </Badge>
           )}
           {taskTags.slice(0, 3).map((tag) => (
-            <Chip key={tag} title={tag} className="max-w-28">
+            <Chip key={tag} title={tag} className="max-w-40">
               {tag}
             </Chip>
           ))}

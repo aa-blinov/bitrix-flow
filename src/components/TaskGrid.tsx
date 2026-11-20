@@ -712,6 +712,7 @@ const FieldControls = memo(function FieldControls({
       aria-label={t('Дедлайн')}
       size="sm"
       variant="underline"
+      placeholder={t('Без срока')}
       value={inputDate(task.dueDate)}
       // Дата без времени Битрикс читает как полночь в поясе портала (+05:00) —
       // по Москве это 22:00 прошлого дня. Сохраняем время прежнего дедлайна

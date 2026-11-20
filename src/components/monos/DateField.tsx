@@ -13,6 +13,8 @@ export type DateFieldProps = Omit<TextFieldProps, 'type' | 'value' | 'onChange' 
   value: string;
   onChange: (value: string) => void;
   withTime?: boolean;
+  /** Подпись пустого поля. По умолчанию маска: в плотной таблице она шумит в каждой строке. */
+  placeholder?: string;
 };
 
 function show(iso: string, withTime: boolean): string {
@@ -58,6 +60,7 @@ export function DateField({
   size = 'md',
   className,
   onBlur,
+  placeholder,
   ...props
 }: DateFieldProps) {
   const [text, setText] = React.useState(() => show(value, withTime));
@@ -90,7 +93,7 @@ export function DateField({
         type="text"
         inputMode="numeric"
         autoComplete="off"
-        placeholder={withTime ? t('ДД.ММ.ГГГГ ЧЧ:ММ') : t('ДД.ММ.ГГГГ')}
+        placeholder={placeholder ?? (withTime ? t('ДД.ММ.ГГГГ ЧЧ:ММ') : t('ДД.ММ.ГГГГ'))}
         value={text}
         onChange={(event) => change(event.target.value)}
         onBlur={(event) => {

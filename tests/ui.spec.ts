@@ -172,10 +172,12 @@ for (const mode of MODES) {
 test('статусы проектов: таблица, правка, фильтры и удаление', async ({ page }) => {
   await page.goto('/project-status');
   await settle(page);
-  // Две сеянные записи должны быть отрисованы с проектами из того же сида.
-  await expect(page.getByText('БСПБ', { exact: true })).toBeVisible();
-  await expect(page.getByText('Разработка API v2').first()).toBeVisible();
-  await expect(page.getByText('Додо Пицца', { exact: true })).toBeVisible();
+  // Две сеянные записи должны быть отрисованы с проектами из того же сида. Таблица, а не
+  // страница: в разметке есть и скрытая на десктопе карточная версия для телефона.
+  const table = page.getByRole('table');
+  await expect(table.getByText('БСПБ', { exact: true })).toBeVisible();
+  await expect(table.getByText('Разработка API v2').first()).toBeVisible();
+  await expect(table.getByText('Додо Пицца', { exact: true })).toBeVisible();
 
   // Правка: меняем статус проекта 10 и сохраняем — запись сразу в таблице.
   const row = page.locator('tr', { hasText: 'БСПБ' });

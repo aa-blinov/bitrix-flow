@@ -63,6 +63,10 @@ const task = ([
   deadline: deadlineOffset === null ? '' : day(deadlineOffset),
   timeEstimate: String(estimate),
   timeSpentInLogs: String(spent),
+  // REST отдаёт исполнителя и плоским полем, и объектом; отчёты Контроля читают плоское,
+  // и без него в тестах у каждой задачи выходило «Без ответственного».
+  responsibleId,
+  createdBy: '1',
   responsible: { id: responsibleId, name: USERS.find((user) => user.id === responsibleId).name },
   creator: { id: '1', name: 'Анна Кузнецова' },
   group: { id: groupId, name: PROJECTS.find((project) => project.id === groupId).name },

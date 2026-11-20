@@ -981,6 +981,7 @@ export const EN: Record<string, string> = {
   'Задачи с оценкой': 'Estimated tasks',
   Состояние: 'State',
   'Разница, ч': 'Difference, h',
+  'Разница, %': 'Difference, %',
   Разница: 'Difference',
   'Задач с оценкой за период нет': 'No estimated tasks in the period',
   'Открытые задачи и закрытые за период. Факт это все списания задачи и её подзадач без своей оценки; подзадача с оценкой идёт своей строкой.':

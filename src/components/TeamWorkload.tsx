@@ -566,7 +566,9 @@ export default function TeamWorkload() {
                           >
                             {assignee.name}
                           </span>
-                          <span className="block text-xs whitespace-nowrap text-ink-faint tabular-nums">
+                          {/* На телефоне колонка 150px: строка в одну линию вылезала поверх
+                              ячейки понедельника, поэтому там она переносится. */}
+                          <span className="block text-xs text-ink-faint tabular-nums sm:whitespace-nowrap">
                             {t('План')} {formatHours(memberPlannedHours)} {t('· факт')}{' '}
                             {formatHours(memberActualHours)}
                           </span>

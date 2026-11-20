@@ -393,7 +393,47 @@ export default function ProjectStatusPage() {
               </Button>
             )}
           </div>
-          <Card padding="none" className="mx-4 sm:mx-6 mb-6">
+          {/* На телефоне таблица из восьми колонок уезжала вбок, и правка с удалением
+              оказывались за краем экрана: там те же ячейки идут карточкой. */}
+          <ul className="mx-4 mb-6 space-y-2 md:hidden">
+            {visibleRows.map((status) => {
+              const row = status as unknown as Record<string, unknown>;
+              const actions = columns.find((column) => column.key === 'actions');
+              return (
+                <li key={status.projectId}>
+                  <Card padding="sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium text-ink">{projectName(status.projectId)}</p>
+                        <p className="text-ink-soft">{status.client || '—'}</p>
+                      </div>
+                      {actions?.cell?.(row, 0)}
+                    </div>
+                    <dl className="mt-2 grid gap-2 text-sm">
+                      {columns
+                        .filter((column) => !['actions', 'client', 'project'].includes(column.key))
+                        .map((column) => (
+                          <div key={column.key}>
+                            <dt className="text-xs uppercase tracking-widest text-ink-faint">
+                              {column.label}
+                            </dt>
+                            <dd className="mt-0.5">{column.cell?.(row, 0)}</dd>
+                          </div>
+                        ))}
+                    </dl>
+                  </Card>
+                </li>
+              );
+            })}
+            {!visibleRows.length && (
+              <li className="py-8 text-center text-sm text-ink-soft">
+                {statuses.length
+                  ? t('Под фильтр ничего не подходит')
+                  : t('Статусы ещё не заведены — добавьте первый')}
+              </li>
+            )}
+          </ul>
+          <Card padding="none" className="mx-4 mb-6 max-md:hidden sm:mx-6">
             <Table
               columns={columns}
               rows={visibleRows as unknown as Record<string, unknown>[]}
