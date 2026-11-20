@@ -13,6 +13,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const dialogId = String(body?.dialogId || '');
   const action = String(body?.action || '');
+  // «Прочитать все» относится ко всем диалогам сразу, номер диалога ему не нужен.
+  if (action === 'readAll')
+    return withMessenger(req, async (call) =>
+      (await call('im.dialog.read.all', {}, true))
+        ? NextResponse.json({ ok: true })
+        : NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 }),
+    );
   if (!DIALOG_ID.test(dialogId) || !(ACTIONS as readonly string[]).includes(action))
     return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 });
 

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 const bad = (error = 'BAD_REQUEST') => NextResponse.json({ error }, { status: 400 });
 
-// Настройки обычного группового чата: название, участники, выход. Чаты проектов и задач
+// Настройки обычного группового чата: название, участники, владелец, выход. Чаты проектов и задач
 // сюда не попадают: их состав и название задаёт сам проект или задача в Битриксе.
 // Права (кто может добавлять и исключать) проверяет портал, а мы отдаём его отказ как 422.
 // Методы чата отвечают true. Ответ без результата не подтверждение: настройки скажут,
@@ -52,6 +52,15 @@ export async function POST(req: NextRequest) {
       return done(
         await call('im.chat.user.delete', { CHAT_ID: chatId, USER_ID: userId }, true, true),
       );
+    });
+  }
+  // Передать владение: прежний владелец становится обычным участником. Портал разрешает
+  // это владельцу и администратору, остальным отказ уходит в настройки как есть.
+  if (action === 'owner') {
+    const userId = Number(body?.userId);
+    if (!Number.isInteger(userId) || userId <= 0) return bad('BAD_USER');
+    return withMessenger(req, async (call) => {
+      return done(await call('im.chat.setOwner', { CHAT_ID: chatId, USER_ID: userId }, true, true));
     });
   }
   if (action === 'leave') {

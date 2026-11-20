@@ -1253,6 +1253,11 @@ test('мессенджер: чат из людей переименовывае�
     .getByRole('list', { name: 'Кого добавить' })
     .getByRole('button', { name: /Анна Новикова/ })
     .click();
+  // Владелец чата я: рядом со мной подпись, у остальных кнопка передачи владения.
+  await expect(modal.getByRole('list', { name: 'Участники чата' })).toContainText('владелец');
+  await modal.getByRole('button', { name: 'Сделать владельцем: Дмитрий Соколов' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Передать' }).click();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await modal.getByRole('button', { name: 'Исключить Дмитрий Соколов' }).click();
   await modal.getByRole('button', { name: 'Выйти из чата' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Выйти' }).click();
@@ -1261,6 +1266,7 @@ test('мессенджер: чат из людей переименовывае�
   expect(calls).toEqual([
     { dialogId: 'chat22', action: 'rename', title: 'Новый архив' },
     { dialogId: 'chat22', action: 'add', userIds: [5] },
+    { dialogId: 'chat22', action: 'owner', userId: 2 },
     { dialogId: 'chat22', action: 'remove', userId: 2 },
     { dialogId: 'chat22', action: 'leave' },
   ]);
@@ -1769,4 +1775,18 @@ test('настройки часов: служебная учётка и своя
     await client.db(testDb).collection<{ _id: string }>('app_settings').deleteOne({ _id: 'hours' });
     await client.close();
   }
+});
+
+test('мессенджер: «Прочитать все» гасит счётчики одним запросом', async ({ page }) => {
+  const calls: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/messenger/dialog')) calls.push(request.postDataJSON());
+  });
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  const readAll = list.getByRole('button', { name: 'Прочитать все' });
+  await expect(readAll).toBeEnabled();
+  await readAll.click();
+  await expect(readAll).toBeDisabled();
+  expect(calls).toEqual([{ action: 'readAll' }]);
 });

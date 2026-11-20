@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellOff, BellRing, Ellipsis, Pin, SquarePen } from 'lucide-react';
+import { Bell, BellOff, BellRing, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -446,6 +446,22 @@ export default function Messenger() {
       .finally(settle);
   }, []);
 
+  // Все диалоги прочитаны одним вызовом портала: счётчики гасим сразу, при отказе перечитываем.
+  async function readAll() {
+    setDialogs((current) => current && current.map((item) => ({ ...item, unread: 0 })));
+    const response = await fetch('/api/messenger/dialog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'readAll' }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError(t('Не удалось отметить все диалоги прочитанными.'));
+      loadDialogs();
+      return;
+    }
+    window.dispatchEvent(new Event(CHAT_READ_EVENT));
+  }
+
   // Настройки диалога меняются сразу, а портал догоняет: при отказе список перечитывается.
   async function dialogAction(
     dialog: Dialog,
@@ -591,6 +607,15 @@ export default function Messenger() {
                       ]),
                 ]}
               />
+              <IconButton
+                label={t('Прочитать все')}
+                variant="outline"
+                size="md"
+                disabled={!dialogs?.some((item) => item.unread > 0)}
+                onClick={() => void readAll()}
+              >
+                <CheckCheck className="size-4" strokeWidth={1.7} />
+              </IconButton>
               <IconButton
                 label={t('Новый чат')}
                 variant="outline"

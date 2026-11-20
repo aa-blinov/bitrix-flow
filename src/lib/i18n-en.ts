@@ -1047,6 +1047,17 @@ export const EN: Record<string, string> = {
   'Норма: 8 ч в будний день периода, праздники не учтены. Люди: все, кто списывал часы, и исполнители открытых задач.':
     'Norm: 8 h per weekday in the period, holidays not counted. People: everyone who logged time and assignees of open tasks.',
   'Зависшие задачи': 'Stalled tasks',
+  'Не удалось отметить все диалоги прочитанными.': 'Could not mark all chats as read.',
+  'Прочитать все': 'Mark all as read',
+  владелец: 'owner',
+  'Сделать владельцем: {0}': 'Make owner: {0}',
+  'Сделать владельцем': 'Make owner',
+  'Не удалось передать владение: это может владелец чата или администратор.':
+    'Could not transfer ownership: only the chat owner or an administrator can.',
+  'Передать владение {0}?': 'Transfer ownership to {0}?',
+  'Новый владелец сможет переименовывать чат и управлять участниками. Вы останетесь обычным участником.':
+    'The new owner will be able to rename the chat and manage members. You will stay a regular member.',
+  Передать: 'Transfer',
   Настройки: 'Settings',
   'Общие настройки BitrixFlow для всей команды. Меняет только администратор':
     'BitrixFlow settings for the whole team. Only an administrator can change them',

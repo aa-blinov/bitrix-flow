@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { Crown, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PresenceDot } from '@/components/messenger/Presence';
 import { AlertDialog } from '@/components/monos/AlertDialog';
@@ -48,6 +48,8 @@ export function ChatSettingsModal({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [ownerId, setOwnerId] = useState<number | null>(null);
+  const [newOwner, setNewOwner] = useState<UserHit | null>(null);
 
   // Состав перечитывается после каждого действия: применяем только последний ответ,
   // иначе поздний старый вернул бы исключённого участника.
@@ -69,6 +71,17 @@ export function ChatSettingsModal({
     );
   }, [dialog.id]);
 
+  // Владельца отдаёт im.dialog.get, а не список участников. Без ответа владелец неизвестен,
+  // и передать владение не предлагаем.
+  const loadOwner = useCallback(
+    () =>
+      fetch(`/api/messenger/dialogs?dialogId=${encodeURIComponent(dialog.id)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => setOwnerId(Number(data?.dialog?.ownerId) || null))
+        .catch(() => setOwnerId(null)),
+    [dialog.id],
+  );
+
   // Сброс только при открытии окна: сверка названия с порталом меняет dialog.title, и
   // сброс по нему стёр бы предупреждение о неизвестном исходе.
   const syncGen = useRef(0);
@@ -83,14 +96,17 @@ export function ChatSettingsModal({
     windowGen.current += 1;
     // Закрытые настройки отменяют и незавершённое подтверждение выхода.
     setConfirmLeave(false);
+    setNewOwner(null);
     if (!open) return;
     setTitle(titleRef.current);
     setError('');
     setQuery('');
     // Состав с прошлого открытия мог устареть: до ответа не предлагаем по нему действий.
     setMembers(null);
+    setOwnerId(null);
     void loadMembers();
-  }, [open, loadMembers]);
+    void loadOwner();
+  }, [open, loadMembers, loadOwner]);
 
   useEffect(() => {
     const needle = query.trim();
@@ -156,6 +172,9 @@ export function ChatSettingsModal({
   }
 
   const memberIds = new Set((members || []).map((member) => member.id));
+  // Передать владение может владелец, а если владелец ушёл из чата, пусть решит портал:
+  // администратор это сможет. Остальным кнопка дала бы только отказ.
+  const canHandOver = ownerId !== null && (ownerId === me || !memberIds.has(ownerId));
   // Пока состав неизвестен, кандидатов не предлагаем: среди них были бы и участники.
   const candidates = members ? hits.filter((user) => !memberIds.has(user.id)) : [];
 
@@ -222,7 +241,23 @@ export function ChatSettingsModal({
                   <Avatar name={member.name} src={member.avatar} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm text-ink">{member.name}</span>
                   <PresenceDot presence={member.presence} />
-                  {member.id !== me && (
+                  {member.id === ownerId ? (
+                    <span className="shrink-0 text-xs text-ink-soft">{t('владелец')}</span>
+                  ) : (
+                    canHandOver && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-label={t('Сделать владельцем: {0}', member.name)}
+                        title={t('Сделать владельцем')}
+                        onClick={() => setNewOwner(member)}
+                        className="shrink-0 text-ink-soft hover:text-ink disabled:opacity-30"
+                      >
+                        <Crown className="size-4" strokeWidth={1.7} />
+                      </button>
+                    )
+                  )}
+                  {member.id !== me && member.id !== ownerId && (
                     <button
                       type="button"
                       disabled={busy}
@@ -292,6 +327,24 @@ export function ChatSettingsModal({
           </div>
         </div>
       </Modal>
+      <AlertDialog
+        open={newOwner !== null}
+        onCancel={() => setNewOwner(null)}
+        onConfirm={() => {
+          const target = newOwner;
+          setNewOwner(null);
+          if (!target) return;
+          void run(async () => {
+            await post({ dialogId: dialog.id, action: 'owner', userId: target.id });
+            await loadOwner();
+          }, t('Не удалось передать владение: это может владелец чата или администратор.'));
+        }}
+        title={t('Передать владение {0}?', newOwner?.name || '')}
+        description={t(
+          'Новый владелец сможет переименовывать чат и управлять участниками. Вы останетесь обычным участником.',
+        )}
+        confirmLabel={t('Передать')}
+      />
       <AlertDialog
         open={confirmLeave}
         onCancel={() => setConfirmLeave(false)}

@@ -71,6 +71,8 @@ export type Dialog = {
   presence?: Presence;
   /** Задача или проект, к которым привязан чат, для ссылки из шапки. */
   entityId?: string;
+  /** Владелец группового чата (im.dialog.get), для передачи владения в настройках. */
+  ownerId?: number;
   lastMessage?: { id: number; text: string; date: string; authorId: number };
   /** Заготовка приложения до первого ответа портала: настоящая запись её всегда заменяет. */
   local?: boolean;
@@ -440,6 +442,7 @@ export function normalizeDialogInfo(result: any, id: string): Dialog | null {
     avatar: usableAvatar(result.avatar),
     chatId: Number(result.id) || undefined,
     entityId: result.entity_id ? String(result.entity_id) : undefined,
+    ownerId: Number(result.owner) || undefined,
     unread: Number(result.counter) || 0,
     date: String(result.date_create || new Date().toISOString()),
   };
