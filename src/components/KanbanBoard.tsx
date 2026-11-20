@@ -800,7 +800,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 контролов отнимали у доски половину экрана. */}
             <Button
               variant="quiet"
-              size="md"
+              size="sm"
               className={`${toolbarControl} sm:hidden`}
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((open) => !open)}
@@ -810,7 +810,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             </Button>
             <Button
               variant={showFilters || activeFiltersCount > 0 ? 'primary' : 'quiet'}
-              size="md"
+              size="sm"
               className={toolbarControl}
               onClick={() => setShowFilters(!showFilters)}
               icon={<Filter size={14} strokeWidth={1.7} />}
@@ -825,7 +825,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
 
             <Button
               variant="secondary"
-              size="md"
+              size="sm"
               className={`${toolbarControl} ${moreOpen ? '' : 'max-sm:hidden'}`}
               onClick={() => setShowStageDialog(true)}
               icon={<Plus size={14} strokeWidth={1.7} />}
@@ -834,7 +834,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             </Button>
 
             <Button
-              size="md"
+              size="sm"
               className={toolbarControl}
               onClick={openAddDialog}
               icon={<Plus size={14} strokeWidth={1.7} />}
