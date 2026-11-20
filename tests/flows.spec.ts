@@ -1708,3 +1708,13 @@ test('переносы сроков: перенос из чата задачи �
   await page.getByRole('button', { name: /Перенесены повторно/ }).click();
   await expect(row).toBeVisible();
 });
+
+test('закрытые без списаний: отчёт открывается из меню', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'меню на телефоне в выдвижной панели');
+  await page.goto('/');
+  const nav = page.locator('aside nav');
+  await nav.getByRole('button', { name: 'Контроль' }).click();
+  await nav.getByRole('link', { name: 'Закрыты без списаний' }).click();
+  await expect(page).toHaveURL(/\/reports\/untracked/);
+  await expect(page.getByRole('heading', { name: 'Закрыты без списаний' })).toBeVisible();
+});

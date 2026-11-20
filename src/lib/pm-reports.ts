@@ -530,6 +530,29 @@ export function shifts(
   };
 }
 
+/** Закрытые в периоде задачи без единого списания: работа была, а часов за ней нет. */
+export const closedWithoutTime = (tasks: ReportTask[], from: string, to: string) =>
+  tasks.filter((task) => isClosed(task) && task.spent <= 0 && inPeriod(task.closed, from, to));
+
+export function untracked(tasks: ReportTask[], from: string, to: string): ReportResult {
+  const closed = tasks.filter((task) => isClosed(task) && inPeriod(task.closed, from, to));
+  const list = closedWithoutTime(tasks, from, to);
+  return {
+    tiles: [
+      { id: 'untracked', value: list.length },
+      { id: 'closed', value: closed.length },
+      { id: 'share', value: closed.length ? list.length / closed.length : null },
+    ],
+    tables: [
+      {
+        id: 'tasks',
+        rows: list.map((task) => ({ ...base(task), created: task.created, closed: task.closed })),
+      },
+    ],
+    notes: [],
+  };
+}
+
 export const STALE_REASONS = ['idle', 'overdue', 'noDeadline', 'noEstimate'] as const;
 export type StaleReason = (typeof STALE_REASONS)[number];
 

@@ -1047,6 +1047,14 @@ export const EN: Record<string, string> = {
   'Норма: 8 ч в будний день периода, праздники не учтены. Люди: все, кто списывал часы, и исполнители открытых задач.':
     'Norm: 8 h per weekday in the period, holidays not counted. People: everyone who logged time and assignees of open tasks.',
   'Зависшие задачи': 'Stalled tasks',
+  'Закрытые задачи, на которые не списано ни минуты': 'Closed tasks with no time logged at all',
+  'Без списаний': 'No time logged',
+  'Закрыто всего': 'Closed in total',
+  'Доля без списаний': 'Share without time',
+  'Закрытые без списаний среди всех закрытых за период':
+    'Closed without time among all tasks closed in the period',
+  'Задача закрыта в периоде, а списаний по ней нет ни за какое время. Списания подзадач родителю не засчитываются: подзадача без своих часов тоже попадёт в список.':
+    'The task was closed in the period and has no time logged ever. Subtask time does not count for the parent: a subtask without its own hours is listed too.',
   Перенесён: 'Moved',
   Снят: 'Removed',
   'Переносы сроков': 'Deadline shifts',

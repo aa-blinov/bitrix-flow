@@ -6,6 +6,7 @@ import { getDb } from './mongo';
 import { isDay } from './report-period';
 import {
   clientReport,
+  closedWithoutTime,
   deadlines,
   defects,
   isActive,
@@ -16,6 +17,7 @@ import {
   stale,
   throughput,
   timesheets,
+  untracked,
   type ReportResult,
   type ReportTask,
   type TimeEntry,
@@ -29,6 +31,7 @@ export const REPORT_KINDS = [
   'timesheets',
   'stale',
   'shifts',
+  'untracked',
   'client',
 ] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
@@ -266,6 +269,7 @@ async function fromTasks(
   if (kind === 'deadlines') return deadlines(tasks, from, to);
   if (kind === 'throughput') return throughput(tasks, weeks, from, to);
   if (kind === 'stale') return stale(tasks, params.idleDays);
+  if (kind === 'untracked') return untracked(tasks, from, to);
   if (kind === 'shifts') {
     const db = await getDb();
     await syncDeadlineChanges(db, memberId);
@@ -314,13 +318,7 @@ async function fromTasks(
     ]),
   ].filter((id) => !future && id && id !== '0' && !excluded.has(id));
   const missing = coverage.missingWeeks.filter((week) => weeks.includes(week));
-  const closedNoTime = all.filter(
-    (task) =>
-      isClosed(task) &&
-      task.spent <= 0 &&
-      task.closed.slice(0, 10) >= from &&
-      task.closed.slice(0, 10) <= to,
-  );
+  const closedNoTime = closedWithoutTime(all, from, to);
   return {
     ...timesheets(
       entries,

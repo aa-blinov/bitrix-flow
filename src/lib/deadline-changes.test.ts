@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDeadlineChange } from './deadline-changes';
-import { shifts, type ReportTask } from './pm-reports';
+import { shifts, untracked, type ReportTask } from './pm-reports';
 
 const link = '[URL=/workgroups/group/95/tasks/task/view/1/?chatAction=changeDeadline]';
 
@@ -80,5 +80,22 @@ describe('отчёт переносов', () => {
       ['2', '7', 'moved'],
       ['1', '7', 'removed'],
     ]);
+  });
+});
+
+describe('закрытые без списаний', () => {
+  it('берёт закрытые в периоде без часов и считает долю', () => {
+    const result = untracked(
+      [
+        task('1', { status: '5', closed: '2026-11-05T10:00:00+03:00' }),
+        task('2', { status: '5', closed: '2026-11-06T10:00:00+03:00', spent: 600 }),
+        task('3', { status: '5', closed: '2026-10-06T10:00:00+03:00' }),
+        task('4'),
+      ],
+      '2026-11-01',
+      '2026-11-30',
+    );
+    expect(result.tiles.map((tile) => tile.value)).toEqual([1, 2, 0.5]);
+    expect(result.tables[0].rows.map((row) => row.taskId)).toEqual(['1']);
   });
 });

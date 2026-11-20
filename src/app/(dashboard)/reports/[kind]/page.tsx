@@ -12,6 +12,7 @@ const TITLES: Record<ReportKind, string> = {
   timesheets: 'Списание часов',
   stale: 'Зависшие задачи',
   shifts: 'Переносы сроков',
+  untracked: 'Закрыты без списаний',
   client: 'Отчёт клиенту',
 };
 

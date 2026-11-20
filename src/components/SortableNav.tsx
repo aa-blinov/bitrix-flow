@@ -10,6 +10,7 @@ import {
   Gauge,
   Hourglass,
   CalendarSync,
+  TimerOff,
   LayoutDashboard,
   Scale,
   CalendarDays,
@@ -193,6 +194,14 @@ export const NAV_ITEMS = [
     section: 'control',
     get label() {
       return t('Переносы сроков');
+    },
+  },
+  {
+    href: '/reports/untracked',
+    icon: TimerOff,
+    section: 'control',
+    get label() {
+      return t('Закрыты без списаний');
     },
   },
   {
