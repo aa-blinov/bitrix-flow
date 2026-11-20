@@ -10,6 +10,8 @@ export interface BxTask {
   assigneeId?: string;
   assigneeName?: string;
   assigneeAvatar?: string;
+  creatorId?: string;
+  creatorName?: string;
   createdDate: string;
   updatedDate: string;
   dueDate?: string;

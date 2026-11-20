@@ -35,7 +35,9 @@ function toTaskListItem(task: any) {
     responsibleId: String(task.responsible?.id || task.responsibleId || task.RESPONSIBLE_ID || ''),
     responsibleName: task.responsible?.name || task.responsibleName || task.RESPONSIBLE_NAME || '',
     responsibleIcon: usableAvatar(task.responsible?.icon || task.responsibleIcon),
-    creatorId: String(task.creator?.id || task.creatorId || task.CREATED_BY || ''),
+    creatorId: String(
+      task.creator?.id || task.creatorId || task.createdBy || task.CREATED_BY || '',
+    ),
     creatorName: task.creator?.name || task.creatorName || '',
     commentsCount: Number(task.commentsCount ?? task.COMMENTS_COUNT) || 0,
     parentId: task.parentId || task.PARENT_ID || undefined,

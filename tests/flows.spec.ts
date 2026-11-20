@@ -47,6 +47,25 @@ test('тег добавляется и убирается в карточке', 
   await expect(dialog.getByRole('button', { name: 'Убрать тег регрессия' })).toHaveCount(0);
 });
 
+test('постановщик виден в карточке и меняется', async ({ page }) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+  const creator = dialog.getByRole('button', { name: 'Анна Кузнецова', exact: true });
+  await expect(creator).toBeVisible();
+  await creator.click();
+  const update = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/bitrix/tasks.task.update') &&
+      decodeURIComponent(request.postData() || '').includes('"CREATED_BY":"3"'),
+  );
+  await dialog.getByRole('combobox', { name: 'Постановщик' }).click();
+  await page.getByRole('option', { name: /Мария Орлова/ }).click();
+  await update;
+  await expect(dialog.getByRole('button', { name: 'Мария Орлова', exact: true })).toBeVisible();
+});
+
 test('кнопки статуса задачи пропускает прокси', async ({ page }) => {
   // Прокси пускает только методы из белого списка; «Начать», «Отложить» и
   // остальные кнопки статуса туда не попали и отвечали METHOD_NOT_ALLOWED.

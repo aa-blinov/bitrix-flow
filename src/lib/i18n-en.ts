@@ -743,6 +743,7 @@ export const EN: Record<string, string> = {
   Создаём: 'Creating',
   'Создаём…': 'Creating…',
   Соисполнители: 'Co-assignees',
+  'Не указан': 'Not set',
   Соисполнитель: 'Co-assignee',
   Сообщение: 'Message',
   'Сообщение {0}, {1}': 'Message {0}, {1}',

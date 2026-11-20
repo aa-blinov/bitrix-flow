@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import {
   X,
   User,
+  UserPen,
   Users,
   Eye,
   Flag,
@@ -1323,6 +1324,36 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       >
                         {task.assigneeName || t('Не назначен')}
                       </p>
+                    )}
+                  </div>
+
+                  {/* Постановщик принимает задачу и получает о ней уведомления: его меняют,
+                      когда задача переходит к другому руководителю. Пустым он не бывает. */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <UserPen size={12} strokeWidth={1.7} /> {t('Постановщик')}
+                    </p>
+                    {editingField === 'creatorId' ? (
+                      <SelectField
+                        variant="boxed"
+                        aria-label={t('Постановщик')}
+                        value={task.creatorId || ''}
+                        onChange={(event) =>
+                          event.target.value &&
+                          void handleUpdateField('creatorId', event.target.value)
+                        }
+                        options={users.map((user) => ({ value: user.id, label: userLabel(user) }))}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="-mx-1 block cursor-pointer rounded-ui px-1 py-0.5 text-left text-sm font-medium text-ink hover:bg-surface-2"
+                        onClick={() => setEditingField('creatorId')}
+                      >
+                        {task.creatorName ||
+                          users.find((user) => user.id === task.creatorId)?.name ||
+                          t('Не указан')}
+                      </button>
                     )}
                   </div>
 

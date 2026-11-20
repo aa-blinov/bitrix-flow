@@ -487,8 +487,9 @@ function mapTask(t: any): Bx24Task {
     responsibleId: t.responsibleId || t.responsible_id || t.responsible?.id || '',
     responsibleName: t.responsibleName || t.responsible_name || t.responsible?.name || '',
     responsibleIcon: t.responsibleIcon || t.responsible?.icon,
-    creatorId: t.creatorId || t.creator_id || '',
-    creatorName: t.creatorName || t.creator_name || '',
+    // tasks.task.list отдаёт постановщика полем createdBy, а не creatorId.
+    creatorId: String(t.creatorId || t.createdBy || t.creator?.id || t.creator_id || ''),
+    creatorName: t.creatorName || t.creator?.name || t.creator_name || '',
     commentsCount: t.commentsCount || t.comments_count || 0,
     storyPoints: Number(t.storyPoints || t.story_points) || undefined,
     parentId: t.parentId,
@@ -710,6 +711,7 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.title !== undefined) updateFields.TITLE = fields.title;
   if (fields.description !== undefined) updateFields.DESCRIPTION = fields.description;
   if (fields.responsibleId !== undefined) updateFields.RESPONSIBLE_ID = fields.responsibleId;
+  if (fields.createdBy !== undefined) updateFields.CREATED_BY = fields.createdBy;
   if (fields.priority !== undefined) updateFields.PRIORITY = toBitrixPriority(fields.priority);
   if (fields.deadline !== undefined) updateFields.DEADLINE = fields.deadline || null;
   if (fields.estimate !== undefined) updateFields.TIME_ESTIMATE = fields.estimate * 3600;

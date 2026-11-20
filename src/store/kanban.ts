@@ -284,6 +284,8 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
     subtasks: [],
     stageId: bxTask.stageId || '0',
     chatId: bxTask.chatId,
+    creatorId: bxTask.creatorId || undefined,
+    creatorName: bxTask.creatorName || undefined,
     accompliceIds: bxTask.accompliceIds,
     auditorIds: bxTask.auditorIds,
     // tags приходят и объектом Битрикса, и уже готовым массивом (из fetchTasks),
@@ -850,6 +852,9 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
       const user = users.find((item) => item.id === value);
       update.assigneeId = value;
       update.assigneeName = user?.name || t('Не назначен');
+    } else if (field === 'creatorId') {
+      update.creatorId = value;
+      update.creatorName = users.find((item) => item.id === value)?.name;
     } else if (field === 'priority') update.priority = value;
     else if (field === 'deadline') update.dueDate = value;
     else if (field === 'estimate') update.estimate = value;
@@ -878,6 +883,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     // Sync
     const bxFields: Record<string, any> = {};
     if (field === 'assigneeId') bxFields.responsibleId = value;
+    else if (field === 'creatorId') bxFields.createdBy = value;
     else if (field === 'priority') bxFields.priority = value;
     else if (field === 'deadline') bxFields.deadline = value || null;
     else if (field === 'estimate') bxFields.estimate = value;
