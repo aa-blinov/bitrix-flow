@@ -44,6 +44,16 @@
   --text-whisper-lg: var(--ui-text-whisper-lg);
   --text-whisper-lg--line-height: 1.45;
 
+  /* Кегли на ступень мельче стандартных Tailwind: моноширинная гарнитура на 12 и 14px
+     давила плотностью и контрастом, и весь экран казался крупным. */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.375rem;
+  --text-3xl: 1.625rem;
+
   /* Шкала отступов. */
   --spacing-hair: var(--ui-space-hair);
   --spacing-tight: var(--ui-space-tight);
