@@ -168,6 +168,11 @@ export const EN: Record<string, string> = {
   Группы: 'Groups',
   'Дата начала': 'Start date',
   'Дата окончания': 'End date',
+  'с {0}': 'from {0}',
+  'до {0}': 'until {0}',
+  'Сроки не заданы': 'No dates set',
+  'Сроки проекта': 'Project dates',
+  'Не удалось сохранить': 'Could not save',
   'Дата окончания не может быть раньше даты начала.':
     'The end date cannot be earlier than the start date.',
   'Два разных уровня доступа': 'Two different access levels',

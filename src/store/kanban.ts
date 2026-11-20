@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from '@/lib/task-tags';
 import { BxTask, BxComment, BxTaskResult, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
-import type { Bx24TimeEntry } from '@/lib/bitrix24';
+import type { Bx24TimeEntry, ProjectFields } from '@/lib/bitrix24';
 import * as persist from './persist';
 import {
   fetchTasksByProject,
@@ -144,10 +144,7 @@ interface KanbanStore {
   createStage: (title: string) => Promise<boolean>;
   renameStage: (stageId: string, title: string) => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<string>;
-  updateProject: (
-    id: string,
-    fields: { name?: string; description?: string; archived?: boolean },
-  ) => Promise<void>;
+  updateProject: (id: string, fields: ProjectFields) => Promise<void>;
   loadTasks: (groupId?: string | boolean, reset?: boolean) => Promise<void>;
   loadAllTasks: (append?: boolean) => Promise<void>;
   // Серверная страница списка становится источником правды для инлайн-правок:

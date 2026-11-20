@@ -12,12 +12,14 @@ const USERS = [
   { ID: '5', NAME: 'Екатерина', LAST_NAME: 'Морозова', EMAIL: 'e.morozova@example.com' },
 ];
 
-const PROJECTS = [
+const PROJECTS: Record<string, string>[] = [
   {
     ID: '10',
     NAME: 'Разработка API v2',
     DESCRIPTION: 'Перевод публичного API на GraphQL',
     NUMBER_OF_MEMBERS: '5',
+    PROJECT_DATE_START: '2026-02-01T00:00:00+03:00',
+    PROJECT_DATE_FINISH: '2026-04-30T23:59:59+03:00',
   },
   {
     ID: '11',
@@ -764,6 +766,21 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'sonet_group.get.json':
     case 'sonet_group.get':
       return PROJECTS;
+
+    // Правка живёт до перезапуска сервера: тестам хватает, чтобы перечитанный список её показал.
+    case 'sonet_group.update': {
+      const project = PROJECTS.find((item) => item.ID === params.GROUP_ID);
+      if (!project) return null;
+      for (const key of [
+        'NAME',
+        'DESCRIPTION',
+        'CLOSED',
+        'PROJECT_DATE_START',
+        'PROJECT_DATE_FINISH',
+      ])
+        if (params[key] !== undefined) project[key] = params[key];
+      return true;
+    }
 
     case 'user.get':
       return USERS;

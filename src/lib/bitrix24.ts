@@ -1,5 +1,6 @@
 // Используем in-memory fallback для клиента, MongoDB для сервера
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from './task-tags';
+import { portalDay } from './utils';
 
 const isClient = typeof window !== 'undefined';
 
@@ -136,6 +137,9 @@ export interface Bx24Project {
   isArchived?: boolean;
   /** Ключевые слова группы: в них живёт класс часов проекта. */
   keywords?: string;
+  /** Сроки проекта из портала, гггг-мм-дд. */
+  startDate?: string;
+  finishDate?: string;
 }
 
 export interface Bx24Stage {
@@ -308,7 +312,7 @@ export async function fetchUsers(): Promise<Bx24User[]> {
 
 // Все проекты - кеш 5 минут в MongoDB
 export async function fetchProjectList(): Promise<Bx24Project[]> {
-  const cached = await cacheGet<Bx24Project[]>('projects:list:v2');
+  const cached = await cacheGet<Bx24Project[]>('projects:list:v3');
   if (cached) return cached;
 
   const groupsMap = new Map<string, Bx24Project>();
@@ -323,6 +327,8 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
         membersCount: parseInt(g.NUMBER_OF_MEMBERS) || 0,
         image: g.IMAGE || undefined,
         isArchived: g.CLOSED === 'Y',
+        startDate: portalDay(g.PROJECT_DATE_START),
+        finishDate: portalDay(g.PROJECT_DATE_FINISH),
       });
     }
   } catch (e) {
@@ -330,7 +336,7 @@ export async function fetchProjectList(): Promise<Bx24Project[]> {
   }
 
   const projects = Array.from(groupsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  await cacheSet('projects:list:v2', projects, 5 * 60);
+  await cacheSet('projects:list:v3', projects, 5 * 60);
   return projects;
 }
 
@@ -981,11 +987,21 @@ export async function removeProjectMember(projectId: string, userId: string) {
   await bx24('sonet_group.user.delete', { GROUP_ID: projectId, USER_ID: userId });
 }
 
-export async function updateProject(
-  id: string,
-  fields: { name?: string; description?: string; archived?: boolean },
-): Promise<void> {
+export type ProjectFields = {
+  name?: string;
+  description?: string;
+  archived?: boolean;
+  startDate?: string;
+  finishDate?: string;
+};
+
+export async function updateProject(id: string, fields: ProjectFields): Promise<void> {
   const params: Record<string, string> = { GROUP_ID: id };
+  // Пустая строка стирает срок в портале.
+  if (fields.startDate !== undefined)
+    params.PROJECT_DATE_START = fields.startDate ? `${fields.startDate}T00:00:00` : '';
+  if (fields.finishDate !== undefined)
+    params.PROJECT_DATE_FINISH = fields.finishDate ? `${fields.finishDate}T23:59:59` : '';
   if (fields.name !== undefined) params.NAME = fields.name;
   if (fields.description !== undefined) params.DESCRIPTION = fields.description;
   if (fields.archived !== undefined) params.CLOSED = fields.archived ? 'Y' : 'N';

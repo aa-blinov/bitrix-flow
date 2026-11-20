@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cn, getProjectInitials, pluralRu, toLocalInputValue, usableAvatar } from './utils';
+import {
+  cn,
+  getProjectInitials,
+  pluralRu,
+  portalDay,
+  toLocalInputValue,
+  usableAvatar,
+} from './utils';
 
 describe('getProjectInitials', () => {
   it('uses only words made of letters', () => {
@@ -47,5 +54,14 @@ describe('cn', () => {
   it('keeps the custom font size next to a text color', () => {
     expect(cn('text-whisper', 'text-ink')).toBe('text-whisper text-ink');
     expect(cn('text-xs', 'text-whisper')).toBe('text-whisper');
+  });
+});
+
+describe('portalDay', () => {
+  it('берёт день как записан порталом, без сдвига пояса', () => {
+    expect(portalDay('2026-03-01T00:00:00+03:00')).toBe('2026-03-01');
+    expect(portalDay('01.03.2026 00:00:00')).toBe('2026-03-01');
+    expect(portalDay('')).toBe('');
+    expect(portalDay(null)).toBe('');
   });
 });

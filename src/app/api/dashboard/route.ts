@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { usableAvatar } from '@/lib/utils';
+import { portalDay, usableAvatar } from '@/lib/utils';
 import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
         image: g.IMAGE || undefined,
         isArchived: g.CLOSED === 'Y',
         keywords: g.KEYWORDS || '',
+        startDate: portalDay(g.PROJECT_DATE_START),
+        finishDate: portalDay(g.PROJECT_DATE_FINISH),
       })),
       users: (rawUsers || []).map((u: any) => ({
         id: u.ID,
@@ -101,6 +103,8 @@ export async function GET(req: NextRequest) {
       image: g.IMAGE || undefined,
       isArchived: g.CLOSED === 'Y',
       keywords: g.KEYWORDS || '',
+      startDate: portalDay(g.PROJECT_DATE_START),
+      finishDate: portalDay(g.PROJECT_DATE_FINISH),
     }));
 
     const users = (rawUsers || []).map((u: any) => ({

@@ -146,6 +146,9 @@ export interface Bx24Project {
   isArchived?: boolean;
   /** Ключевые слова группы: в них живёт класс часов проекта. */
   keywords?: string;
+  /** Сроки проекта из портала, гггг-мм-дд. */
+  startDate?: string;
+  finishDate?: string;
 }
 
 export interface Bx24User {

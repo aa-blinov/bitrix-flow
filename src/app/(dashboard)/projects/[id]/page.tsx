@@ -1,18 +1,19 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
-import { pluralRu } from '@/lib/utils';
+import { cn, pluralRu, toLocalInputValue } from '@/lib/utils';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
-import { ChevronRight, FolderKanban, Settings, Users, X } from 'lucide-react';
+import { CalendarRange, ChevronRight, FolderKanban, Settings, Users, X } from 'lucide-react';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
 import { useConfirm } from '@/components/monos/confirm-dialog';
 import { Tabs } from '@/components/monos/Tabs';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
+import { DateField } from '@/components/monos/DateField';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
@@ -21,7 +22,23 @@ import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
 import { Skeleton } from '@/components/monos/Skeleton';
 import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
-import { t } from '@/lib/i18n';
+import { dateFormat, t } from '@/lib/i18n';
+
+const PROJECT_DAY = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
+
+// День из портала (гггг-мм-дд) собираем в местной полуночи: new Date('2026-03-01')
+// это полночь UTC, и западнее Гринвича показалось бы 28 февраля.
+function formatProjectDay(day: string): string {
+  const [year, month, date] = day.split('-').map(Number);
+  return PROJECT_DAY.format(new Date(year, month - 1, date));
+}
+
+function projectPeriodLabel(start?: string, finish?: string): string {
+  if (start && finish) return `${formatProjectDay(start)} → ${formatProjectDay(finish)}`;
+  if (start) return t('с {0}', formatProjectDay(start));
+  if (finish) return t('до {0}', formatProjectDay(finish));
+  return t('Сроки не заданы');
+}
 
 // Переключатель вида живёт в панели над доской и над списком, поэтому список
 // вкладок набора рисуется без панели: содержимое панели — это сам вид.
@@ -54,6 +71,9 @@ export default function ProjectPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [finishDate, setFinishDate] = useState('');
+  const [settingsError, setSettingsError] = useState('');
   const [membersOpen, setMembersOpen] = useState(false);
   const [memberIds, setMemberIds] = useState<string[]>([]);
 
@@ -184,6 +204,11 @@ export default function ProjectPage() {
   const totalEstimate = stats.estimateHours;
   const totalActual = stats.actualHours;
   const overdueTasks = stats.overdue;
+  // Срок проекта прошёл, а проект не в архиве: красим период, как просрочку задач.
+  const projectOverdue =
+    !!currentProject?.finishDate &&
+    !currentProject.isArchived &&
+    currentProject.finishDate < toLocalInputValue(new Date().toISOString(), 'date');
   const unassignedTasks = stats.unassigned;
 
   useEffect(() => {
@@ -237,8 +262,31 @@ export default function ProjectPage() {
 
   async function saveProject() {
     if (!currentProject || !name.trim()) return;
-    await updateProject(currentProject.id, { name: name.trim(), description });
-    setSettingsOpen(false);
+    if (startDate && finishDate && startDate > finishDate) {
+      setSettingsError(t('Дата окончания не может быть раньше даты начала.'));
+      return;
+    }
+    try {
+      await updateProject(currentProject.id, {
+        name: name.trim(),
+        description,
+        startDate,
+        finishDate,
+      });
+      setSettingsOpen(false);
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : t('Не удалось сохранить'));
+    }
+  }
+
+  function openSettings() {
+    if (!currentProject) return;
+    setName(currentProject.name);
+    setDescription(currentProject.description);
+    setStartDate(currentProject.startDate || '');
+    setFinishDate(currentProject.finishDate || '');
+    setSettingsError('');
+    setSettingsOpen(true);
   }
 
   async function toggleArchive() {
@@ -334,6 +382,21 @@ export default function ProjectPage() {
                     t('участников'),
                   ])}
                 </Button>
+                {!isNoProject && (
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    onClick={openSettings}
+                    title={t('Сроки проекта')}
+                    className={cn(
+                      'h-auto min-h-0 max-sm:-my-3 max-sm:min-h-11 gap-1 px-0 py-0 text-sm',
+                      projectOverdue && 'font-medium text-danger-text',
+                    )}
+                    icon={<CalendarRange size={14} strokeWidth={1.7} />}
+                  >
+                    {projectPeriodLabel(currentProject.startDate, currentProject.finishDate)}
+                  </Button>
+                )}
                 {statsLoaded ? (
                   <>
                     <span>
@@ -394,11 +457,7 @@ export default function ProjectPage() {
                 variant="ghost"
                 size="md"
                 className={isNoProject ? 'hidden' : undefined}
-                onClick={() => {
-                  setName(currentProject.name);
-                  setDescription(currentProject.description);
-                  setSettingsOpen(true);
-                }}
+                onClick={openSettings}
               >
                 <Settings className="size-4" strokeWidth={1.7} />
               </IconButton>
@@ -478,6 +537,31 @@ export default function ProjectPage() {
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t('Описание')}
           />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DateField
+              label={t('Дата начала')}
+              variant="boxed"
+              value={startDate}
+              onChange={(value) => {
+                setStartDate(value);
+                setSettingsError('');
+              }}
+            />
+            <DateField
+              label={t('Дата окончания')}
+              variant="boxed"
+              value={finishDate}
+              onChange={(value) => {
+                setFinishDate(value);
+                setSettingsError('');
+              }}
+            />
+          </div>
+          {settingsError && (
+            <p role="alert" className="text-sm text-danger-text">
+              {settingsError}
+            </p>
+          )}
         </div>
       </Modal>
 

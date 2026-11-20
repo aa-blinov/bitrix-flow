@@ -1619,3 +1619,29 @@ test(
     await expect(page.getByRole('tab', { name: names[0], exact: true })).toHaveCount(0);
   },
 );
+
+test('сроки проекта видны в шапке и правятся в настройках', async ({ page }) => {
+  await page.goto('/projects/10');
+  await settle(page);
+  await expect(
+    page.getByRole('button', { name: '1 февр. 2026 г. → 30 апр. 2026 г.' }),
+  ).toBeVisible();
+
+  await page.goto('/projects/11');
+  await settle(page);
+  await page.getByRole('button', { name: 'Настройки проекта' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Дата начала').fill('01092026');
+  await dialog.getByLabel('Дата окончания').fill('31082026');
+  await dialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText(
+    'Дата окончания не может быть раньше даты начала.',
+  );
+
+  await dialog.getByLabel('Дата окончания').fill('31122026');
+  await dialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole('button', { name: '1 сент. 2026 г. → 31 дек. 2026 г.' }),
+  ).toBeVisible();
+});

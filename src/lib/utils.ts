@@ -55,6 +55,17 @@ export function pluralRu(count: number, forms: readonly [string, string, string]
   return rule === 'one' ? forms[0] : rule === 'few' ? forms[1] : forms[2];
 }
 
+// Дата проекта это день календаря, а не момент: берём день как его записал портал.
+// Перевод в пояс браузера сдвигал «1 марта 00:00 +03:00» на 28 февраля у тех, кто западнее.
+// Портал отдаёт ISO или, на старых версиях, дд.мм.гггг.
+export function portalDay(value: unknown): string {
+  const raw = String(value || '').trim();
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const ru = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  return ru ? `${ru[3]}-${ru[2]}-${ru[1]}` : '';
+}
+
 // Значение для <input type="datetime-local"> / "date" в поясе браузера.
 // Битрикс отдаёт время в поясе портала (+05:00), и срез строки показывал его
 // как местное: дедлайн 16:00 по Москве в поле выглядел как 18:00.
