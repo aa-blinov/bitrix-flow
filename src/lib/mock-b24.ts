@@ -19,7 +19,7 @@ const PROJECTS: Record<string, string>[] = [
     DESCRIPTION: 'Перевод публичного API на GraphQL',
     NUMBER_OF_MEMBERS: '5',
     PROJECT_DATE_START: '2026-02-01T00:00:00+03:00',
-    PROJECT_DATE_FINISH: '2026-04-30T23:59:59+03:00',
+    PROJECT_DATE_FINISH: '2026-04-29T22:00:00+03:00',
   },
   {
     ID: '11',

@@ -55,15 +55,18 @@ export function pluralRu(count: number, forms: readonly [string, string, string]
   return rule === 'one' ? forms[0] : rule === 'few' ? forms[1] : forms[2];
 }
 
-// Дата проекта это день календаря, а не момент: берём день как его записал портал.
-// Перевод в пояс браузера сдвигал «1 марта 00:00 +03:00» на 28 февраля у тех, кто западнее.
-// Портал отдаёт ISO или, на старых версиях, дд.мм.гггг.
+// Дата проекта это день календаря, а не момент. Портал хранит её полночью в поясе того, кто
+// записал (+05:00), а отдаёт в поясе сервера: 1 декабря приходит как «2026-11-30T22:00:00+03:00».
+// Срез строки давал 30 ноября, перевод в пояс браузера тоже ошибался. Полночь любого пояса
+// от -12 до +12 после сдвига на 12 часов попадает в свой день по UTC.
+// Старые версии портала отдают дд.мм.гггг, это уже день.
 export function portalDay(value: unknown): string {
   const raw = String(value || '').trim();
-  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (iso) return iso[1];
   const ru = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
-  return ru ? `${ru[3]}-${ru[2]}-${ru[1]}` : '';
+  if (ru) return `${ru[3]}-${ru[2]}-${ru[1]}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const moment = new Date(raw).getTime();
+  return Number.isNaN(moment) ? '' : new Date(moment + 12 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 // Значение для <input type="datetime-local"> / "date" в поясе браузера.

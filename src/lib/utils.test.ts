@@ -60,6 +60,9 @@ describe('cn', () => {
 describe('portalDay', () => {
   it('берёт день как записан порталом, без сдвига пояса', () => {
     expect(portalDay('2026-03-01T00:00:00+03:00')).toBe('2026-03-01');
+    // Живой портал: записано 1 декабря пользователем в +05:00, отдано в поясе сервера.
+    expect(portalDay('2026-11-30T22:00:00+03:00')).toBe('2026-12-01');
+    expect(portalDay('2026-03-01')).toBe('2026-03-01');
     expect(portalDay('01.03.2026 00:00:00')).toBe('2026-03-01');
     expect(portalDay('')).toBe('');
     expect(portalDay(null)).toBe('');

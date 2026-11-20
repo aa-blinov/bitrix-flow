@@ -997,11 +997,12 @@ export type ProjectFields = {
 
 export async function updateProject(id: string, fields: ProjectFields): Promise<void> {
   const params: Record<string, string> = { GROUP_ID: id };
-  // Пустая строка стирает срок в портале.
+  // Пустая строка стирает срок в портале. Время портал отбрасывает и хранит день полночью,
+  // поэтому и конец срока шлём полночью: 23:59:59 при разборе уезжал на следующий день.
   if (fields.startDate !== undefined)
     params.PROJECT_DATE_START = fields.startDate ? `${fields.startDate}T00:00:00` : '';
   if (fields.finishDate !== undefined)
-    params.PROJECT_DATE_FINISH = fields.finishDate ? `${fields.finishDate}T23:59:59` : '';
+    params.PROJECT_DATE_FINISH = fields.finishDate ? `${fields.finishDate}T00:00:00` : '';
   if (fields.name !== undefined) params.NAME = fields.name;
   if (fields.description !== undefined) params.DESCRIPTION = fields.description;
   if (fields.archived !== undefined) params.CLOSED = fields.archived ? 'Y' : 'N';
@@ -1039,7 +1040,7 @@ export async function createProject({
     INITIATE_PERMS: initiatePerms,
   };
   if (startDate) params.PROJECT_DATE_START = `${startDate}T00:00:00`;
-  if (finishDate) params.PROJECT_DATE_FINISH = `${finishDate}T23:59:59`;
+  if (finishDate) params.PROJECT_DATE_FINISH = `${finishDate}T00:00:00`;
   const result = await bx24('sonet_group.create', params);
   await cacheInvalidateByPrefix('projects:');
   return String(result.ID || result.id || result);
