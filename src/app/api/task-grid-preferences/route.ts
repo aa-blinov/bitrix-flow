@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 import { getDb } from '@/lib/mongo';
 
@@ -21,8 +21,11 @@ const COLUMN_KEYS = new Set([
   'tags',
 ]);
 
-async function memberId(request: NextRequest) {
-  return getAuthorizedMemberId(request.cookies.get(sessionCookie.name)?.value);
+// Раскладка своя у каждого человека: общая на портал запись давала любому, кто включил
+// колонку, менять таблицу всем остальным. Старые записи без userId просто не читаются.
+async function owner(request: NextRequest) {
+  const person = await getAuthorizedPerson(request.cookies.get(sessionCookie.name)?.value);
+  return person ? { memberId: person.memberId, userId: person.userId } : null;
 }
 
 function normalizeScope(value: unknown): 'all' | 'my' | 'projects' {
@@ -30,23 +33,21 @@ function normalizeScope(value: unknown): 'all' | 'my' | 'projects' {
 }
 
 export async function GET(request: NextRequest) {
-  const member = await memberId(request);
-  if (!member) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const who = await owner(request);
+  if (!who) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
 
   const scope = normalizeScope(request.nextUrl.searchParams.get('scope'));
-  const preferences = (await getDb()).collection('task_grid_preferences');
-  let preference = await preferences.findOne({ memberId: member, scope });
-  // Migrate the single global layout created before layouts gained scopes.
-  if (!preference && scope === 'all') {
-    preference = await preferences.findOne({ memberId: member, scope: { $exists: false } });
-    if (preference) await preferences.updateOne({ _id: preference._id }, { $set: { scope } });
-  }
+  const preference = await (
+    await getDb()
+  )
+    .collection('task_grid_preferences')
+    .findOne({ ...who, scope });
   return NextResponse.json({ preference: preference?.config || null });
 }
 
 export async function PUT(request: NextRequest) {
-  const member = await memberId(request);
-  if (!member) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
+  const who = await owner(request);
+  if (!who) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
   const scope = normalizeScope(body?.scope);
@@ -86,10 +87,10 @@ export async function PUT(request: NextRequest) {
 
   const savedConfig = { visibleColumns, columnWidths, sorts };
   await (await getDb()).collection('task_grid_preferences').updateOne(
-    { memberId: member, scope },
+    { ...who, scope },
     {
       $set: { config: savedConfig, updatedAt: new Date() },
-      $setOnInsert: { memberId: member, scope },
+      $setOnInsert: { ...who, scope },
     },
     { upsert: true },
   );
