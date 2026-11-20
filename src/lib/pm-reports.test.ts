@@ -262,6 +262,27 @@ describe('списание часов', () => {
     expect(tile(result, 'below')).toBe(2);
   });
 
+  it('своя норма и порог из настроек', () => {
+    const result = timesheets(
+      [
+        { userId: '1', day: '2026-11-10', seconds: 15 * H, taskId: '5' },
+        { userId: '2', day: '2026-11-10', seconds: 30 * H, taskId: '5' },
+      ],
+      ['1', '2'],
+      ['2026-11-09'],
+      '2026-11-09',
+      '2026-11-15',
+      [],
+      { dailyHours: 8, threshold: 0.7, perUser: { '1': 4 } },
+    );
+    // У первого норма 4 ч в день: 15 из 20 это 75 %, выше порога 70 %. У второго 30 из 40.
+    expect(result.tables[0].rows.map((row) => [row.userId, row.norm, row.filters])).toEqual([
+      ['1', 20, ''],
+      ['2', 40, ''],
+    ]);
+    expect(tile(result, 'below')).toBe(0);
+  });
+
   it('порог 80 % считается по секундам и за весь период', () => {
     const almost = 32 * H - 1;
     const result = timesheets(

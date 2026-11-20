@@ -83,6 +83,6 @@ export async function POST(req: NextRequest) {
       : 0,
     coverage: hours?.coverage || null,
     emptyMirror: tasks.length === 0,
-    excludedUsers: needsHours ? excludedUsers().size : 0,
+    excludedUsers: needsHours ? (await excludedUsers()).size : 0,
   });
 }

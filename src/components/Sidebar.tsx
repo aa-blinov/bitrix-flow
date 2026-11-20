@@ -1,7 +1,7 @@
 'use client';
 import { useKanbanStore } from '@/store/kanban';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
-import { Menu, LogOut, ChevronRight, ChevronUp, Plus, Send, Users } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, ChevronUp, Plus, Settings, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -393,12 +393,12 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
               )}
               {isAdmin && (
                 <Link
-                  href="/digest"
+                  href="/settings"
                   onClick={closeMobile}
                   className="flex min-h-9 items-center gap-2 rounded-ui px-2 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink max-sm:min-h-11"
                 >
-                  <Send size={16} strokeWidth={1.7} />
-                  {t('Недельная сводка')}
+                  <Settings size={16} strokeWidth={1.7} />
+                  {t('Настройки')}
                 </Link>
               )}
               <button

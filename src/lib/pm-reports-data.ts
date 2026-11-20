@@ -1,6 +1,7 @@
 // Загрузка для отчётов ПМ. Источники те же, что у аналитики часов: зеркало задач и
 // понедельные списания, которые собирает шедулер. Портал на рендер отчёта не трогаем.
 import { portalTime, syncDeadlineChanges } from './deadline-changes';
+import { hoursSettings } from './hours-settings';
 import { excludedUsers, loadHours, mirrorProjectId, weekStarts } from './hours';
 import { getDb } from './mongo';
 import { isDay } from './report-period';
@@ -142,7 +143,7 @@ export async function loadEntries(
       { projection: { start: 1, entries: 1, skipped: 1, updated_at: 1 } },
     )
     .toArray();
-  const excluded = excludedUsers();
+  const excluded = await excludedUsers();
   const raw = docs
     .flatMap((doc) => (doc.entries || []) as TimeEntry[])
     .map((entry) => ({ ...entry, userId: String(entry.userId), taskId: String(entry.taskId) }))
@@ -205,6 +206,8 @@ export type ReportResponse = ReportResult & {
   emptyMirror?: boolean;
   closedNoDate?: number;
   teamIncomplete?: boolean;
+  /** Норма табеля из настроек: подписи отчёта показывают порог и часы. */
+  norm?: { dailyHours: number; threshold: number };
 };
 
 /** Завершённые задачи без даты закрытия: ни в одну неделю их не отнести. */
@@ -222,7 +225,7 @@ export async function buildReport(
   params: ReportParams,
 ): Promise<ReportResponse> {
   const { from, to, projectId } = params;
-  const excludedCount = excludedUsers().size;
+  const excludedCount = (await excludedUsers()).size;
   if (kind === 'defects') {
     const report = await loadHours(memberId, from, to);
     const rows = report.rows.filter((row) => !projectId || row.projectId === projectId);
@@ -258,7 +261,7 @@ async function fromTasks(
   // Период целиком в будущем становится пустым: to раньше from, и ни один день в него не попадает.
   const to = from > today() ? shiftDay(from, -1) : params.to > today() ? today() : params.to;
   const weeks = weekStarts(from, to);
-  const excludedCount = excludedUsers().size;
+  const excludedCount = (await excludedUsers()).size;
   const tasks = projectId ? all.filter((task) => task.projectId === projectId) : all;
   // Период целиком в будущем: план и факт, люди табеля и поток пустые; просрочка «сейчас»
   // в отчёте сроков от периода не зависит и остаётся.
@@ -308,7 +311,8 @@ async function fromTasks(
   // ушедший год назад человек с одним старым списанием нормы не получает.
   const recentFrom = shiftDay(from, -TEAM_LOOKBACK_DAYS);
   const { entries, coverage } = await loadEntries(memberId, weekStarts(recentFrom, to), all, weeks);
-  const excluded = excludedUsers();
+  const settings = await hoursSettings();
+  const excluded = new Set(settings.excludedUserIds);
   const userIds = [
     ...new Set([
       ...entries
@@ -327,7 +331,9 @@ async function fromTasks(
       from,
       to,
       closedNoTime,
+      settings,
     ),
+    norm: { dailyHours: settings.dailyHours, threshold: settings.threshold },
     coverage: {
       ...coverage,
       missingWeeks: missing,

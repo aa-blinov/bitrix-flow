@@ -374,12 +374,21 @@ export function weekNorm(week: string, from: string, to: string, dailyHours: num
   return days * dailyHours;
 }
 
+export type Norm = {
+  dailyHours: number;
+  /** Доля нормы, ниже которой человек «ниже нормы». */
+  threshold: number;
+  /** Своя дневная норма у людей с неполным днём. */
+  perUser: Record<string, number>;
+};
+export const DEFAULT_NORM: Norm = { dailyHours: 8, threshold: 0.8, perUser: {} };
+
 /**
  * Списание часов: сколько человек списал против нормы, за период и по неделям. Люди
  * берутся из переданного списка, а не из списаний: тот, кто не списал ничего, и есть
  * главный сигнал. weeks это только собранные недели: несобранная неделя не ноль, а
- * отсутствие данных, и норма за неё не начисляется.
- * ponytail: норма 8 ч в будний день без праздников, производственный календарь если понадобится.
+ * отсутствие данных, и норма за неё не начисляется. Норма и порог из настроек.
+ * ponytail: будни без праздников, производственный календарь если понадобится.
  */
 export function timesheets(
   entries: TimeEntry[],
@@ -388,8 +397,9 @@ export function timesheets(
   from: string,
   to: string,
   closedNoTime: ReportTask[],
-  dailyHours = 8,
+  norm: Norm = DEFAULT_NORM,
 ): ReportResult {
+  const daily = (userId: string) => norm.perUser[userId] ?? norm.dailyHours;
   const logged = new Map<string, number>();
   for (const entry of entries) {
     if (entry.day < from || entry.day > to) continue;
@@ -400,21 +410,21 @@ export function timesheets(
   }
   const people = userIds.map((userId) => {
     const seconds = weeks.reduce((sum, week) => sum + (logged.get(`${userId}|${week}`) || 0), 0);
-    const norm = weeks.reduce((sum, week) => sum + weekNorm(week, from, to, dailyHours), 0);
-    const share = norm ? seconds / 3600 / norm : null;
-    return { userId, seconds, norm, share, below: share !== null && share < 0.8 };
+    const due = weeks.reduce((sum, week) => sum + weekNorm(week, from, to, daily(userId)), 0);
+    const share = due ? seconds / 3600 / due : null;
+    return { userId, seconds, norm: due, share, below: share !== null && share < norm.threshold };
   });
   const below = new Set(people.filter((person) => person.below).map((person) => person.userId));
   const rows = userIds.flatMap((userId) =>
     weeks.map((week) => {
-      const norm = weekNorm(week, from, to, dailyHours);
+      const due = weekNorm(week, from, to, daily(userId));
       const seconds = logged.get(`${userId}|${week}`) || 0;
       return {
         userId,
         week,
         fact: exact(seconds),
-        norm,
-        share: norm ? seconds / 3600 / norm : null,
+        norm: due,
+        share: due ? seconds / 3600 / due : null,
         filters: below.has(userId) ? 'below' : '',
       };
     }),

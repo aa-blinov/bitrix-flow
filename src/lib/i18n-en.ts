@@ -1035,7 +1035,7 @@ export const EN: Record<string, string> = {
     'Who logged less than the norm and which tasks were closed without time',
   Списано: 'Logged',
   Норма: 'Norm',
-  'Людей ниже 80% нормы': 'People below 80% of norm',
+  'Людей ниже порога нормы': 'People below the norm threshold',
   'Закрыто без списаний': 'Closed without time',
   'Люди по неделям': 'People by week',
   'Списано, ч': 'Logged, h',
@@ -1047,6 +1047,31 @@ export const EN: Record<string, string> = {
   'Норма: 8 ч в будний день периода, праздники не учтены. Люди: все, кто списывал часы, и исполнители открытых задач.':
     'Norm: 8 h per weekday in the period, holidays not counted. People: everyone who logged time and assignees of open tasks.',
   'Зависшие задачи': 'Stalled tasks',
+  Настройки: 'Settings',
+  'Общие настройки BitrixFlow для всей команды. Меняет только администратор':
+    'BitrixFlow settings for the whole team. Only an administrator can change them',
+  'Настройки часов сохранены': 'Hours settings saved',
+  'Учёт часов': 'Time tracking',
+  'Кого не считать в часах и какая норма в отчёте «Списание часов»':
+    'Who is left out of hours and what the norm is in the Time logging report',
+  'Служебные учётки сейчас берутся из .env на сервере. После сохранения здесь они перестанут учитываться.':
+    'Service accounts now come from the server .env. Once you save here, it stops being used.',
+  'Служебные учётки': 'Service accounts',
+  'Их списания не входят ни в аналитику часов, ни в отчёты, ни в дашборды: например, бот или общий аккаунт.':
+    'Their time is left out of hours analytics, reports and dashboards: a bot or a shared account, for example.',
+  'Добавить учётку': 'Add an account',
+  'Норма в будний день, ч': 'Norm per weekday, h',
+  'От 0 до 24 часов': 'Between 0 and 24 hours',
+  'Порог «ниже нормы», %': 'Below-norm threshold, %',
+  'Человек попадает в список, если списал меньше этой доли нормы':
+    'A person is listed if they logged less than this share of the norm',
+  'Целое число от 1 до 100': 'A whole number from 1 to 100',
+  'Своя норма': 'Individual norm',
+  'Для людей с неполным днём: часов в будний день вместо общей нормы.':
+    'For part-timers: hours per weekday instead of the common norm.',
+  'Норма для {0}, ч': 'Norm for {0}, h',
+  'От 0 до 24': '0 to 24',
+  'Добавить человека': 'Add a person',
   'Недельная сводка': 'Weekly digest',
   Понедельник: 'Monday',
   Вторник: 'Tuesday',
@@ -1348,10 +1373,11 @@ export const EN: Record<string, string> = {
     'Internal, presale, other and unassigned: not part of the defect share',
   'Доля брака считается только по коммерции и браку, остальные классы показаны отдельной плиткой. Классы те же, что в аналитике часов: тег задачи, тег предка или класс проекта. «Открыть» в строке ведёт в аналитику часов за этот проект и месяц.':
     'The defect share uses only commercial and defect hours; other classes are shown in a separate tile. Classes match hours analytics: task tag, ancestor tag or project class. "Open" in a row leads to hours analytics for that project and month.',
-  'Доля за весь период, а не за отдельную неделю': 'Share over the whole period, not a single week',
+  'Порог задаётся в настройках, по умолчанию 80%. Доля за весь период, а не за неделю':
+    'The threshold is set in settings, 80% by default. Share over the whole period, not a single week',
   'Люди за период': 'People over the period',
-  'Норма: 8 ч в будний день периода, праздники и отпуска не учтены. Люди: кто списывал часы за период или за 8 недель до него, и исполнители открытых задач. Новичку и ушедшему норма начисляется за весь период: смотрите на них отдельно.':
-    'Norm: 8 h per weekday in the period, holidays and vacations not counted. People: anyone who logged time in the period or 8 weeks before it, and assignees of open tasks. Newcomers and leavers get the norm for the whole period: review them separately.',
+  'Норма: часы в будний день из настроек (по умолчанию 8), у людей с неполным днём своя; праздники и отпуска не учтены. Люди: кто списывал часы за период или за 8 недель до него, и исполнители открытых задач. Новичку и ушедшему норма начисляется за весь период: смотрите на них отдельно.':
+    'Norm: hours per weekday from settings (8 by default), part-timers have their own; holidays and vacations not counted. People: anyone who logged time in the period or 8 weeks before it, and assignees of open tasks. Newcomers and leavers get the norm for the whole period: review them separately.',
   'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка. Дни без движения это полные сутки с момента активности. Нажмите на плитку, чтобы оставить только её задачи.':
     'Active tasks: everything except completed and deferred. Movement is the latest activity in Bitrix: a comment, status change or edit. Idle days are full 24-hour periods since that activity. Click a tile to keep only its tasks.',
   'Другие задачи с часами за период': 'Other tasks with hours in the period',

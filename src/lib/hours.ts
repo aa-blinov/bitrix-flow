@@ -1,6 +1,7 @@
 // Факт часов для аналитики: списания из понедельных документов workload_time_task,
 // проект и теги из task_mirror. Портал не трогаем: списания уже собраны шедулером,
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
+import { hoursSettings } from './hours-settings';
 import { getDb } from './mongo';
 import {
   classAt,
@@ -54,13 +55,8 @@ export type HoursReport = {
 
 // Служебные учётки (у старого PM-дашборда это пользователь 15) не должны
 // размывать доли классов, поэтому их убирают до агрегации, а не в интерфейсе.
-export const excludedUsers = () =>
-  new Set(
-    (process.env.HOURS_EXCLUDED_USER_IDS || '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean),
-  );
+// Список задаёт админ в настройках, запасной вариант HOURS_EXCLUDED_USER_IDS.
+export const excludedUsers = async () => new Set((await hoursSettings()).excludedUserIds);
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
 
@@ -95,7 +91,7 @@ export async function loadHours(memberId: string, from: string, to: string): Pro
     )
     .toArray();
 
-  const excluded = excludedUsers();
+  const excluded = await excludedUsers();
   const entries = docs
     .flatMap(
       (doc) =>

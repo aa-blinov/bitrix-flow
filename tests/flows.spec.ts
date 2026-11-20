@@ -1720,12 +1720,12 @@ test('закрытые без списаний: отчёт открываетс�
 });
 
 test('недельная сводка: админ выбирает групповой чат и время', async ({ page, testDb }) => {
-  await page.goto('/digest');
+  await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Недельная сводка' })).toBeVisible();
   await expect(page.getByText('Как выглядит сводка сейчас')).toBeVisible();
   await page.getByRole('button', { name: 'В групповой чат' }).click();
   await page.getByLabel('Номер чата').fill('1234');
-  await page.getByRole('button', { name: 'Сохранить' }).click();
+  await page.getByRole('button', { name: 'Сохранить' }).last().click();
   await expect(page.getByText('Настройки сводки сохранены')).toBeVisible();
 
   const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
@@ -1736,6 +1736,37 @@ test('недельная сводка: админ выбирает группо�
       .findOne({ _id: 'digest' });
     expect(saved).toMatchObject({ dialogId: 'chat1234', weekday: 1, hour: 9 });
   } finally {
+    await client.close();
+  }
+});
+
+test('настройки часов: служебная учётка и своя норма сохраняются', async ({ page, testDb }) => {
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Учёт часов' })).toBeVisible();
+  // Первый пункт списка это подсказка «Добавить…» с пустым значением.
+  await page.getByRole('combobox', { name: 'Добавить учётку' }).click();
+  await page.getByRole('option').nth(1).click();
+  await page.getByLabel('Порог «ниже нормы», %').fill('70');
+  await page.getByRole('combobox', { name: 'Добавить человека' }).click();
+  await page.getByRole('option').nth(1).click();
+  await page.getByRole('button', { name: 'Сохранить' }).first().click();
+  await expect(page.getByText('Настройки часов сохранены')).toBeVisible();
+
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    const saved = await client
+      .db(testDb)
+      .collection<{ _id: string; excludedUserIds?: string[]; perUser?: Record<string, number> }>(
+        'app_settings',
+      )
+      .findOne({ _id: 'hours' });
+    expect(saved).toMatchObject({ dailyHours: 8, threshold: 0.7 });
+    expect(saved?.excludedUserIds).toHaveLength(1);
+    expect(Object.values(saved?.perUser ?? {})).toEqual([4]);
+  } finally {
+    // База общая для потока: служебная учётка из этого теста убрала бы часы из аналитики
+    // в следующих тестах.
+    await client.db(testDb).collection<{ _id: string }>('app_settings').deleteOne({ _id: 'hours' });
     await client.close();
   }
 });
