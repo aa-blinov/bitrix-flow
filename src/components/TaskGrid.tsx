@@ -360,13 +360,13 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
 };
 const COLUMN_WIDTHS: Record<SortKey, number> = {
   title: 280,
-  project: 160,
-  stage: 140,
-  assignee: 170,
+  project: 140,
+  stage: 110,
+  assignee: 150,
   priority: 110,
   deadline: 140,
   estimate: 90,
-  actual: 80,
+  actual: 90,
   updated: 160,
   description: 260,
   created: 160,
@@ -375,6 +375,10 @@ const COLUMN_WIDTHS: Record<SortKey, number> = {
   storyPoints: 120,
   tags: 220,
 };
+// Название без ручной ширины резиновое: забирает свободное место и сжимается до этого
+// предела. С фиксированными 280px таблица по умолчанию на 1440 не влезала, и «Факт»
+// уезжал за край.
+const TITLE_MIN_WIDTH = 200;
 
 // Храним только ширины, которые юзер реально менял: раньше в базу уезжал весь
 // словарь, и новые значения по умолчанию до сохранивших раскладку не доходили.
@@ -1770,6 +1774,14 @@ export default function TaskGrid({
     return index < 0 ? '' : sorts.length > 1 ? String(index + 1) : '';
   };
   const sortDirection = (key: SortKey) => sorts.find((sort) => sort.key === key)?.direction;
+  const titleFluid = columnWidths.title === COLUMN_WIDTHS.title;
+  const colWidth = (key: SortKey) =>
+    key === 'title' && titleFluid ? undefined : columnWidths[key];
+  // Галка 64 и действия 80 плюс видимые колонки: ниже этой ширины таблица прокручивается.
+  const tableMinWidth = orderedVisibleColumns.reduce(
+    (sum, key) => sum + (colWidth(key) ?? TITLE_MIN_WIDTH),
+    144,
+  );
   const resizeColumn = (key: SortKey, startX: number, startWidth: number) => {
     setLayoutDirty(true);
     const move = (event: PointerEvent) =>
@@ -1799,7 +1811,7 @@ export default function TaskGrid({
           'relative p-0',
           key === 'title' && pinTitle && 'sticky left-16 z-20 border-r border-line',
         )}
-        style={{ width: columnWidths[key] }}
+        style={{ width: colWidth(key) }}
         ariaSort={direction ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
       >
         <button
@@ -1838,7 +1850,8 @@ export default function TaskGrid({
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            resizeColumn(key, event.clientX, columnWidths[key]);
+            // Ширину берём с экрана: у резинового названия в состоянии её нет.
+            resizeColumn(key, event.clientX, event.currentTarget.parentElement!.offsetWidth);
           }}
           className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-ink"
         />
@@ -2398,11 +2411,14 @@ export default function TaskGrid({
               ref={tableFade.ref}
               className={`${tableScrollClass} ${tableHeightClass} ${tableFade.className}`}
             >
-              <table className="w-full min-w-max table-fixed border-collapse text-left text-sm text-ink">
+              <table
+                className="w-full table-fixed border-collapse text-left text-sm text-ink"
+                style={{ minWidth: tableMinWidth }}
+              >
                 <colgroup>
                   <col className="w-16" />
                   {orderedVisibleColumns.map((column) => (
-                    <col key={column} style={{ width: columnWidths[column] }} />
+                    <col key={column} style={{ width: colWidth(column) }} />
                   ))}
                   <col className="w-20" />
                 </colgroup>
