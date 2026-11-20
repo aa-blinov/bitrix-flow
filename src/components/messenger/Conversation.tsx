@@ -182,6 +182,15 @@ export default function Conversation({
   const dragDepth = useRef(0);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Поле растёт по тексту: с rows=1 перенос через Shift+Enter прятал первую строку под
+  // скролл, и казалось, что строка одна. Потолок задаёт max-h у поля, дальше скролл.
+  // field-sizing: content это делает сам, но Firefox его не знает.
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight + input.offsetHeight - input.clientHeight}px`;
+  }, [draft]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   useEffect(() => {
@@ -1603,7 +1612,7 @@ export default function Conversation({
               // textarea по умолчанию строчный: под ним остаётся зазор в 7 px, обёртка выше
               // поля, и поле висит над кнопками. block убирает зазор, а высота в одну строку
               // равна кнопкам (min-h-9, на телефоне min-h-11).
-              className="flex-1 [&_textarea]:block [&_textarea]:min-h-9 [&_textarea]:py-1.5 max-sm:[&_textarea]:min-h-11"
+              className="flex-1 [&_textarea]:block [&_textarea]:max-h-60 [&_textarea]:min-h-9 [&_textarea]:resize-none [&_textarea]:py-1.5 max-sm:[&_textarea]:min-h-11"
               ref={inputRef}
               value={draft}
               onChange={(event) => onDraftChange(event.target.value, event.target.selectionStart)}

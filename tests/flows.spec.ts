@@ -512,6 +512,22 @@ test('мессенджер: Markdown и теги Битрикса, файлы, �
   await expect(chat.getByRole('img', { name: 'Не прочитано' })).toHaveCount(1);
 });
 
+test('мессенджер: поле сообщения растёт с переносами строк', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const input = chat.getByLabel('Сообщение', { exact: true });
+  const empty = (await input.boundingBox())!.height;
+  await input.fill('первая');
+  await input.press('Shift+Enter');
+  await input.pressSequentially('вторая');
+  await input.press('Shift+Enter');
+  await input.pressSequentially('третья');
+  await expect(input).toHaveValue('первая\nвторая\nтретья');
+  expect((await input.boundingBox())!.height).toBeGreaterThan(empty * 1.8);
+  // Очищенное поле возвращается к одной строке.
+  await input.fill('');
+  expect((await input.boundingBox())!.height).toBeLessThanOrEqual(empty + 1);
+});
+
 test('мессенджер: файл ждёт в очереди и уходит с подписью из поля', async ({ page }) => {
   const uploads = await recordUploads(page);
   const chat = await openDmitry(page);
