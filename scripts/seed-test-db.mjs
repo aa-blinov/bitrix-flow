@@ -105,6 +105,7 @@ for (const dbName of dbNames) {
     'project_class_periods',
     // Дашборды создают сами тесты: без очистки они копились от прогона к прогону.
     'dashboards',
+    'deadline_changes',
   ]) {
     await db.collection(name).deleteMany({});
   }

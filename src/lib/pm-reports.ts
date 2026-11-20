@@ -452,6 +452,84 @@ export function timesheets(
   };
 }
 
+export type ShiftEvent = {
+  taskId: string;
+  actorId: string;
+  kind: 'moved' | 'removed';
+  deadline: string;
+  /** Момент переноса, ISO. */
+  at: string;
+};
+
+/**
+ * Переносы сроков за период: каждая смена или снятие дедлайна после первой постановки.
+ * Направление не различается: в сообщении портала есть только новый срок. Повторный
+ * перенос (два и больше у одной задачи) это главный сигнал, на нём плитка-фильтр.
+ * Задачи, которых нет в зеркале (удалены или вне выбранного проекта), не попадают.
+ */
+export function shifts(
+  events: ShiftEvent[],
+  tasks: ReportTask[],
+  from: string,
+  to: string,
+): ReportResult {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const inScope = events
+    .filter((event) => byId.has(event.taskId) && inPeriod(event.at, from, to))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const perTask = new Map<string, ShiftEvent[]>();
+  for (const event of inScope)
+    perTask.set(event.taskId, [...(perTask.get(event.taskId) || []), event]);
+  const flags = (list: ShiftEvent[]) =>
+    [list.length >= 2 && 'repeat', list.some((event) => event.kind === 'removed') && 'removed']
+      .filter(Boolean)
+      .join(',');
+  const taskRows = [...perTask].map(([id, list]) => {
+    const task = byId.get(id)!;
+    return {
+      ...base(task),
+      state: stateOf(task),
+      shifts: list.length,
+      last: list[list.length - 1].at,
+      deadline: task.deadline || null,
+      filters: flags(list),
+    };
+  });
+  const eventRows = inScope.map((event) => {
+    const task = byId.get(event.taskId)!;
+    return {
+      ...base(task),
+      // Строка события это кто перенёс: группировка по людям показывает, кто двигает сроки.
+      userId: event.actorId,
+      at: event.at,
+      change: event.kind,
+      deadline: event.deadline || null,
+      filters: flags(perTask.get(event.taskId)!),
+    };
+  });
+  return {
+    tiles: [
+      { id: 'shifts', value: inScope.length },
+      { id: 'tasks', value: perTask.size },
+      {
+        id: 'repeat',
+        value: [...perTask.values()].filter((list) => list.length >= 2).length,
+        filter: 'repeat',
+      },
+      {
+        id: 'removed',
+        value: inScope.filter((event) => event.kind === 'removed').length,
+        filter: 'removed',
+      },
+    ],
+    tables: [
+      { id: 'tasks', rows: taskRows },
+      { id: 'events', rows: eventRows },
+    ],
+    notes: [],
+  };
+}
+
 export const STALE_REASONS = ['idle', 'overdue', 'noDeadline', 'noEstimate'] as const;
 export type StaleReason = (typeof STALE_REASONS)[number];
 

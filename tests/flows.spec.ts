@@ -1680,3 +1680,31 @@ test('сроки проекта видны в шапке и правятся в 
     page.getByRole('button', { name: '1 сент. 2026 г. → 31 дек. 2026 г.' }),
   ).toBeVisible();
 });
+
+test('переносы сроков: перенос из чата задачи виден в отчёте', async ({ page, testDb }) => {
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    const db = client.db(testDb);
+    const token = await db.collection('user_tokens').findOne({});
+    const link = '[URL=/workgroups/group/10/tasks/task/view/101/?chatAction=changeDeadline]';
+    await db.collection('notifications').insertMany(
+      ['901', '902'].map((messageId) => ({
+        member_id: token?.member_id,
+        type: 'comment_added',
+        taskId: '101',
+        messageId,
+        projectId: '10',
+        message: `[USER=2]Мария[/USER] изменила крайний срок задачи на ${link}[TIMESTAMP=4102444800 FORMAT=LONG_DATE_FORMAT][/URL]`,
+        created_at: new Date(),
+      })),
+    );
+  } finally {
+    await client.close();
+  }
+  await page.goto('/reports/shifts');
+  const row = page.getByRole('row', { name: /Перевести справочники на GraphQL/ }).first();
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('2');
+  await page.getByRole('button', { name: /Перенесены повторно/ }).click();
+  await expect(row).toBeVisible();
+});

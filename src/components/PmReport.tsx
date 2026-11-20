@@ -374,6 +374,60 @@ export const PM_REPORTS: Record<ReportKind, Meta> = {
         'Активные задачи: всё, кроме завершённых и отложенных. Движение это последняя активность в Битриксе: комментарий, смена статуса, правка. Дни без движения это полные сутки с момента активности; если активности нет, от создания. Нажмите на плитку, чтобы оставить только её задачи.',
       ),
   },
+  shifts: {
+    title: () => t('Переносы сроков'),
+    description: () => t('Какие задачи двигают дедлайн и кто его двигает'),
+    period: true,
+    defaultPeriod: 'month',
+    tiles: [
+      { id: 'shifts', label: () => t('Переносов'), kind: 'count' },
+      { id: 'tasks', label: () => t('Задач с переносом'), kind: 'count' },
+      {
+        id: 'repeat',
+        label: () => t('Перенесены повторно'),
+        kind: 'count',
+        hint: () => t('Задачи, у которых срок меняли два раза и больше за период'),
+      },
+      { id: 'removed', label: () => t('Срок снят'), kind: 'count' },
+    ],
+    tables: [
+      {
+        id: 'tasks',
+        title: () => t('Задачи'),
+        columns: [
+          C.project,
+          C.task,
+          C.user,
+          { id: 'state', label: () => t('Состояние'), kind: 'state' },
+          { id: 'shifts', label: () => t('Переносов'), kind: 'count' },
+          { id: 'last', label: () => t('Последний перенос'), kind: 'datetime' },
+          { id: 'deadline', label: () => t('Срок сейчас'), kind: 'datetime' },
+        ],
+        sort: { id: 'shifts', desc: true },
+        groupings: ['project', 'user'],
+        empty: () => t('За период сроки не переносили'),
+      },
+      {
+        id: 'events',
+        title: () => t('Все переносы'),
+        columns: [
+          C.project,
+          C.task,
+          { id: 'user', label: () => t('Кто перенёс'), kind: 'user' },
+          { id: 'at', label: () => t('Когда'), kind: 'datetime' },
+          { id: 'change', label: () => t('Что сделал'), kind: 'state' },
+          { id: 'deadline', label: () => t('Новый срок'), kind: 'datetime' },
+        ],
+        sort: { id: 'at', desc: true },
+        groupings: ['project', 'user'],
+        empty: () => t('За период сроки не переносили'),
+      },
+    ],
+    notes: () =>
+      t(
+        'Перенос это смена или снятие дедлайна после первой постановки, в любую сторону: портал сообщает только новый срок. История ведётся с 21.10.2026, когда приложение начало получать события портала. В таблице задач исполнитель, во всех переносах тот, кто перенёс. Нажмите на плитку, чтобы оставить только её задачи.',
+      ),
+  },
   client: {
     title: () => t('Отчёт клиенту'),
     description: () => t('Что сделано по проекту за период, что в работе и сколько часов'),
@@ -515,6 +569,8 @@ const STATE: Record<string, () => string> = {
   overdue: () => t('Просрочена'),
   onTime: () => t('Закрыта в срок'),
   paused: () => t('Отложена'),
+  moved: () => t('Перенесён'),
+  removed: () => t('Снят'),
 };
 const REASON: Record<string, () => string> = {
   idle: () => t('без движения'),

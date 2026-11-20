@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from 'next/server';
+import { saveDeadlineChanges } from '@/lib/deadline-changes';
 import { getDb } from '@/lib/mongo';
 import { invalidateByPrefix } from '@/lib/server-cache';
 import { bx24OAuth } from '@/lib/oauth-client';
@@ -207,6 +208,8 @@ export async function POST(req: NextRequest) {
     await db
       .collection('notifications')
       .insertOne({ member_id: memberId, ...details, created_at: now, raw_event: event });
+    if (details.type === 'comment_added')
+      await saveDeadlineChanges(db, [{ member_id: memberId, ...details, created_at: now }]);
     await db.collection('events_stream').insertOne({
       member_id: memberId,
       event: { ...details, createdAt: now.toISOString() },

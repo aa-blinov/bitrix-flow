@@ -9,6 +9,7 @@ import {
   FileText,
   Gauge,
   Hourglass,
+  CalendarSync,
   LayoutDashboard,
   Scale,
   CalendarDays,
@@ -184,6 +185,14 @@ export const NAV_ITEMS = [
     section: 'control',
     get label() {
       return t('Зависшие задачи');
+    },
+  },
+  {
+    href: '/reports/shifts',
+    icon: CalendarSync,
+    section: 'control',
+    get label() {
+      return t('Переносы сроков');
     },
   },
   {

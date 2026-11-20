@@ -1,5 +1,6 @@
 // Загрузка для отчётов ПМ. Источники те же, что у аналитики часов: зеркало задач и
 // понедельные списания, которые собирает шедулер. Портал на рендер отчёта не трогаем.
+import { portalTime, syncDeadlineChanges } from './deadline-changes';
 import { excludedUsers, loadHours, mirrorProjectId, weekStarts } from './hours';
 import { getDb } from './mongo';
 import { isDay } from './report-period';
@@ -11,6 +12,7 @@ import {
   isClosed,
   planFact,
   shiftDay,
+  shifts,
   stale,
   throughput,
   timesheets,
@@ -26,6 +28,7 @@ export const REPORT_KINDS = [
   'defects',
   'timesheets',
   'stale',
+  'shifts',
   'client',
 ] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
@@ -263,6 +266,29 @@ async function fromTasks(
   if (kind === 'deadlines') return deadlines(tasks, from, to);
   if (kind === 'throughput') return throughput(tasks, weeks, from, to);
   if (kind === 'stale') return stale(tasks, params.idleDays);
+  if (kind === 'shifts') {
+    const db = await getDb();
+    await syncDeadlineChanges(db, memberId);
+    // Запас в сутки с обеих сторон: день переноса считается по Москве, а не по UTC.
+    const docs = await db
+      .collection('deadline_changes')
+      .find({
+        member_id: memberId,
+        at: {
+          $gte: new Date(`${shiftDay(from, -1)}T00:00:00Z`),
+          $lte: new Date(`${shiftDay(to, 1)}T23:59:59Z`),
+        },
+      })
+      .toArray();
+    const events = docs.map((doc) => ({
+      taskId: String(doc.taskId),
+      actorId: String(doc.actorId),
+      kind: doc.kind as 'moved' | 'removed',
+      deadline: String(doc.deadline || ''),
+      at: portalTime(new Date(doc.at).getTime() / 1000),
+    }));
+    return shifts(events, tasks, from, to);
+  }
   if (kind === 'client') {
     if (!projectId) return { tiles: [], tables: [], notes: ['needProject'] };
     const { entries, coverage, extra } = await loadEntries(memberId, weeks, all);

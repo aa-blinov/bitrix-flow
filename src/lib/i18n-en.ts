@@ -1047,6 +1047,27 @@ export const EN: Record<string, string> = {
   'Норма: 8 ч в будний день периода, праздники не учтены. Люди: все, кто списывал часы, и исполнители открытых задач.':
     'Norm: 8 h per weekday in the period, holidays not counted. People: everyone who logged time and assignees of open tasks.',
   'Зависшие задачи': 'Stalled tasks',
+  Перенесён: 'Moved',
+  Снят: 'Removed',
+  'Переносы сроков': 'Deadline shifts',
+  'Какие задачи двигают дедлайн и кто его двигает':
+    'Which tasks have their deadline moved, and who moves it',
+  Переносов: 'Shifts',
+  'Задач с переносом': 'Tasks shifted',
+  'Перенесены повторно': 'Shifted repeatedly',
+  'Задачи, у которых срок меняли два раза и больше за период':
+    'Tasks whose deadline changed two or more times in the period',
+  'Срок снят': 'Deadline removed',
+  'Последний перенос': 'Last shift',
+  'Срок сейчас': 'Deadline now',
+  'За период сроки не переносили': 'No deadlines were moved in the period',
+  'Все переносы': 'All shifts',
+  'Кто перенёс': 'Moved by',
+  Когда: 'When',
+  'Что сделал': 'Action',
+  'Новый срок': 'New deadline',
+  'Перенос это смена или снятие дедлайна после первой постановки, в любую сторону: портал сообщает только новый срок. История ведётся с 21.10.2026, когда приложение начало получать события портала. В таблице задач исполнитель, во всех переносах тот, кто перенёс. Нажмите на плитку, чтобы оставить только её задачи.':
+    'A shift is any change or removal of a deadline after it was first set, in either direction: the portal reports only the new date. History starts on 21.10.2026, when the app began receiving portal events. The tasks table shows the assignee, the shifts table shows who moved the deadline. Click a tile to keep only its tasks.',
   'Открытые задачи без движения, просроченные, без дедлайна или оценки':
     'Open tasks with no activity, overdue, or missing a deadline or estimate',
   'Без движения': 'No activity',

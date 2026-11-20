@@ -65,6 +65,8 @@ async function setupIndexes(database: Db) {
     ['events_stream', { created_at: 1 }, { expireAfterSeconds: 2 * 24 * 60 * 60 }],
     ['notifications', { member_id: 1, created_at: -1 }],
     ['notifications', { created_at: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 }],
+    ['deadline_changes', { member_id: 1, messageId: 1 }, { unique: true }],
+    ['deadline_changes', { member_id: 1, at: 1 }],
   ];
   for (const [collection, key, options] of specs) {
     try {
