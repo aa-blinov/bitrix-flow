@@ -129,7 +129,6 @@ export const EN: Record<string, string> = {
   'Все задачи': 'All tasks',
   'Все проекты': 'All projects',
   'Все клиенты': 'All clients',
-  'Только последние': 'Latest only',
   'Все события': 'All events',
   'Все участники': 'All members',
   'Вход в приложение выполнен, но для этого браузера не найдено активное подключение к порталу.':
@@ -1343,4 +1342,14 @@ export const EN: Record<string, string> = {
     'The summary and its total cover all projects; the selected project is in the details below.',
   'Часы из списаний за период, по дню списания. Проект и класс берутся по текущему состоянию задачи: перенос задачи переносит и её прошлые часы. Списания удалённых задач не учитываются.':
     "Hours from time logs in the period, by log date. Project and class come from the task's current state: moving a task moves its past hours too. Logs of deleted tasks are not counted.",
+  'Не удалось удалить статус': 'Could not delete the status',
+  'Удалить статус проекта «{0}»?': 'Delete the status of project "{0}"?',
+  'Запись пропадёт из списка в Битрикс24 вместе с историей правок. Сам проект и его задачи не трогаются.':
+    'The record is removed from the Bitrix24 list together with its edit history. The project and its tasks are untouched.',
+  'Под фильтр ничего не подходит': 'Nothing matches the filter',
+  'Есть описание': 'Has a description',
+  'Перетащите задачу сюда': 'Drag a task here',
+  'Удалить виджет «{0}»?': 'Delete the widget "{0}"?',
+  'Виджет пропадёт у всей команды. Задачи и часы не трогаются.':
+    'The widget disappears for the whole team. Tasks and hours are untouched.',
 };

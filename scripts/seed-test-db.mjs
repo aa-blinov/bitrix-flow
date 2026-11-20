@@ -99,6 +99,8 @@ for (const dbName of dbNames) {
     'project_status',
     'project_status_history',
     'project_class_periods',
+    // Дашборды создают сами тесты: без очистки они копились от прогона к прогону.
+    'dashboards',
   ]) {
     await db.collection(name).deleteMany({});
   }

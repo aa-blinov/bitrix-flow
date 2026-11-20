@@ -34,7 +34,6 @@ import { SelectField } from '@/components/monos/SelectField';
 import { Tabs } from '@/components/monos/Tabs';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
-import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
 import {
@@ -1282,7 +1281,9 @@ function DashboardsView() {
           </Card>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Без переноса: при десятке дашбордов лента вкладок прокручивается внутри
+                себя, а «+» и меню остаются на той же строке, а не уезжают под неё. */}
+            <div className="flex items-center gap-2">
               <Tabs
                 variant="pill"
                 label={t('Дашборды')}
@@ -1298,7 +1299,7 @@ function DashboardsView() {
               >
                 <Plus className="size-4" strokeWidth={1.7} />
               </IconButton>
-              <div className="ml-auto flex items-center gap-1">
+              <div className="ml-auto flex shrink-0 items-center gap-1">
                 <Menu
                   label={t('Действия с дашбордом')}
                   align="end"
@@ -1359,7 +1360,7 @@ function DashboardsView() {
                   size="sm"
                   value={from}
                   onChange={(value) => value && setParams({ from: value })}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Начальная дата периода')}
                 />
                 <DateField
@@ -1367,13 +1368,13 @@ function DashboardsView() {
                   size="sm"
                   value={to}
                   onChange={(value) => value && setParams({ to: value })}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Конечная дата периода')}
                 />
                 <SelectField
                   size="sm"
                   variant="boxed"
-                  className={`${toolbarSelect} w-full sm:w-56`}
+                  className="w-full sm:w-56"
                   aria-label={t('Проект для всех виджетов')}
                   value={projectFilter}
                   onChange={(event) => setParams({ project: event.target.value || null })}
@@ -1519,8 +1520,23 @@ function DashboardsView() {
                             label: t('Удалить'),
                             icon: <Trash2 className="size-4" />,
                             danger: true,
+                            // Виджет снесёт вся команда: без вопроса клик по
+                            // корзине выглядел как «ничего не произошло».
                             onSelect: () =>
-                              setWidgets(active.widgets.filter((other) => other.id !== item.id)),
+                              void (async () => {
+                                const ok = await confirm({
+                                  title: t('Удалить виджет «{0}»?', item.title),
+                                  description: t(
+                                    'Виджет пропадёт у всей команды. Задачи и часы не трогаются.',
+                                  ),
+                                  confirmLabel: t('Удалить'),
+                                  destructive: true,
+                                });
+                                if (ok)
+                                  setWidgets(
+                                    active.widgets.filter((other) => other.id !== item.id),
+                                  );
+                              })(),
                           },
                         ]}
                         trigger={

@@ -6,11 +6,8 @@ import { TextField, type TextFieldProps } from './TextField';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-// Нативное поле даты рисует формат по языку браузера, а не страницы: при русском интерфейсе
-// человек видел mm/dd/yyyy. Поле здесь всегда ДД.ММ.ГГГГ, а значение наружу остаётся ISO,
-// как у нативного: YYYY-MM-DD или, со временем, YYYY-MM-DDTHH:mm.
-
-const HEIGHT = { sm: 'h-7', md: 'h-9', lg: 'h-11' } as const;
+// Нативного календаря у поля нет: значение набирают в маску, ДД.ММ.ГГГГ, а значение
+// наружу остаётся ISO, как у нативного: YYYY-MM-DD или, со временем, YYYY-MM-DDTHH:mm.
 
 export type DateFieldProps = Omit<TextFieldProps, 'type' | 'value' | 'onChange' | 'placeholder'> & {
   value: string;
@@ -64,10 +61,10 @@ export function DateField({
   ...props
 }: DateFieldProps) {
   const [text, setText] = React.useState(() => show(value, withTime));
-  const picker = React.useRef<HTMLInputElement | null>(null);
+  // Скрытый нативный input держит значение и умеет открывать системный выбор
+  // даты: showPicker вызывается с кнопки, из основного поля он бы уводил фокус.
+  const pickerRef = React.useRef<HTMLInputElement | null>(null);
 
-  // Значение пришло снаружи (сброс, выбор в календаре): показываем его, но не затираем
-  // то, что человек ещё печатает и что пока не стало датой.
   React.useEffect(() => {
     setText((current) => (parse(current, withTime) === value ? current : show(value, withTime)));
   }, [value, withTime]);
@@ -82,18 +79,11 @@ export function DateField({
     }
   };
 
-  const open = () => {
-    try {
-      picker.current?.showPicker();
-    } catch {
-      picker.current?.focus();
-    }
-  };
-
   return (
-    // self-start: в grid/flex-строках ячейка тянется по соседям (например,
-    // textarea), и прижатый к низу календарь уезжал под своё поле.
-    <div className={cn('relative self-start', className)}>
+    // self-center: в grid ячейка по умолчанию тянется на высоту строки. Высоту
+    // обёртке снаружи не задавай: поле внутри остаётся своей ступени, прижимается
+    // к верху и встаёт выше соседей, а календарь съезжает с его центра.
+    <div className={cn('relative self-center', className)}>
       <TextField
         {...props}
         size={size}
@@ -108,24 +98,33 @@ export function DateField({
           if (parse(text, withTime) === null && text !== '') setText(show(value, withTime));
           onBlur?.(event);
         }}
-        className="[&_input]:pr-8"
+        className="[&_input]:pr-9"
       />
       <button
         type="button"
         tabIndex={-1}
         aria-label={t('Открыть календарь')}
-        // Без этого нажатие уводит фокус с текстового поля: его onBlur закрывал редактирование.
+        title={t('Открыть календарь')}
+        // mousedown не отдаём браузеру: иначе нажатие уводит фокус с поля и
+        // его onBlur возвращал недонабранную дату к прежнему значению.
         onMouseDown={(event) => event.preventDefault()}
-        onClick={open}
+        onClick={() => {
+          // Нативный селектор даты: showPicker есть не везде, тогда фокус в поле.
+          const input = pickerRef.current;
+          try {
+            input?.showPicker?.();
+          } catch {
+            input?.focus();
+          }
+        }}
         className={cn(
-          'absolute right-0 bottom-0 flex w-8 items-center justify-center text-ink-soft transition-colors duration-fast hover:text-ink max-sm:h-11 max-sm:w-11',
-          HEIGHT[size],
+          'absolute inset-y-0 right-0 flex w-8 items-center justify-center text-ink-soft transition-colors duration-fast hover:text-ink max-sm:w-11',
         )}
       >
         <Calendar size={14} strokeWidth={1.7} aria-hidden="true" />
       </button>
       <input
-        ref={picker}
+        ref={pickerRef}
         type={withTime ? 'datetime-local' : 'date'}
         value={value}
         tabIndex={-1}

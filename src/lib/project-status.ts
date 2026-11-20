@@ -48,8 +48,11 @@ export const FIELD_LABELS = {
 export async function buildFieldMap(
   call: (method: string, params: Record<string, unknown>) => Promise<any>,
 ): Promise<StatusFieldMap> {
+  // Без IBLOCK_CODE портал отвечает REQUIRED_PARAMETERS_MISSING: чтение списка
+  // падало целиком, и экран молча жил на зеркале.
   const fields = await call('lists.field.get', {
     IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
+    IBLOCK_CODE: STATUS_LIST_CODE,
   });
   const map: StatusFieldMap = {};
   for (const field of Object.values(fields || {}) as any[]) {
@@ -63,11 +66,11 @@ export async function buildFieldMap(
 export function toIsoDate(value: unknown): string {
   const raw = String(value || '').trim();
   if (!raw) return '';
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  // Формат портала разбираем первым: new Date('03.04.2026') в V8 это 4 марта,
+  // день и месяц менялись местами у всех дат до 12-го числа.
   const match = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/);
-  if (!match) return '';
-  return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`).toISOString();
+  const parsed = new Date(match ? `${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z` : raw);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
 }
 
 // Значение свойства приходит вложенным ({<id>: value}) или плоским.

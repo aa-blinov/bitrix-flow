@@ -344,16 +344,13 @@ test('перетаскивание на доске переносит задач
     .getByRole('heading', { name: title, level: 3 })
     .locator('xpath=ancestor::*[@draggable="true"][1]');
   const target = 'На ревью';
-  await card.dragTo(
-    page
-      .getByRole('heading', { name: target, level: 2 })
-      .locator('xpath=ancestor::*[.//h3 or contains(@class,"min-h")][1]'),
-  );
   // Колонка по data-stage: хрупкий предок [.//h3] вылезал из опустевшей
-  // колонки (закрытые скрыты) на уровень всей доски.
+  // колонки (закрытые скрыты) на уровень всей доски, и бросок попадал в центр
+  // доски, то есть в ту колонку, что оказалась посередине.
   const columnFor = (name: string, level?: 2 | 3) =>
     page.locator('[data-stage]').filter({ has: page.getByRole('heading', { name, level }) });
   const column = columnFor(target, 2);
+  await card.dragTo(column);
   await expect(column.getByRole('heading', { name: title, level: 3 })).toBeVisible();
   // Только колонка, а не вся доска: у опустевшего «Бэклога» (закрытые
   // скрыты) предок по h3 вылезал на уровень контейнера.
@@ -1555,3 +1552,70 @@ test('кнопка «Обновить» крутится, пока список 
   await expect(page.getByText('Список обновлён')).toBeVisible();
   await expect(refresh).toBeEnabled();
 });
+
+test(
+  'дашборды: несколько своих экранов создаются, сохраняются и не распирают страницу',
+  { tag: '@mobile' },
+  async ({ page }, info) => {
+    await page.goto('/dashboards');
+    await page.waitForLoadState('networkidle');
+
+    // Десктоп и телефон идут в одну базу: имена свои на каждый проход, счёт от уже имеющихся.
+    const before = await page.getByRole('tab').count();
+    // Первый создаётся с пустого экрана, остальные через «+»: имя своё, шаблон пустой.
+    const names = Array.from(
+      { length: 7 },
+      (_, index) => `Экран ${info.project.name} ${index + 1}`,
+    );
+    const renamed = `Переименован ${info.project.name}`;
+    for (const name of names) {
+      const plus = page.getByRole('button', { name: 'Новый дашборд' });
+      if (await plus.count()) await plus.click();
+      await page.getByRole('radio', { name: /Пустой/ }).click();
+      await page.getByLabel('Название').fill(name);
+      await page.getByRole('button', { name: 'Создать дашборд' }).click();
+      await expect(page.getByRole('tab', { name, exact: true })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    }
+
+    // Семь вкладок прокручиваются внутри ленты: страница не шире экрана, иначе на
+    // телефоне окно создания уезжало вправо и кнопку было не нажать.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+    await expect(page.getByRole('tab', { name: names[6], exact: true })).toBeInViewport();
+
+    // Виджет в своём дашборде и новое имя переживают перезагрузку.
+    await page.getByRole('button', { name: 'Добавить виджет' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Сохранить' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await page.getByRole('button', { name: 'Действия с дашбордом' }).click();
+    await page.getByRole('menuitem', { name: 'Название и описание' }).click();
+    await page.getByRole('dialog').getByLabel('Название').fill(renamed);
+    await page.getByRole('dialog').getByRole('button', { name: 'Сохранить' }).click();
+    await expect(page.getByRole('tab', { name: renamed, exact: true })).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('tab')).toHaveCount(before + 7);
+    await expect(page.getByRole('tab', { name: renamed, exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByRole('button', { name: 'Добавить виджет' })).toHaveCount(0);
+    await page.getByRole('tab', { name: names[0], exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Добавить виджет' })).toBeVisible();
+
+    // Удаление спрашивает и убирает ровно один экран.
+    await page.getByRole('button', { name: 'Действия с дашбордом' }).click();
+    await page.getByRole('menuitem', { name: 'Удалить' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('tab')).toHaveCount(before + 6);
+    await expect(page.getByRole('tab', { name: names[0], exact: true })).toHaveCount(0);
+  },
+);

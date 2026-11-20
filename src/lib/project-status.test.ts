@@ -5,6 +5,7 @@ import {
   elementCode,
   elementFields,
   mapStatusElement,
+  toIsoDate,
   validateStatusPayload,
 } from './project-status';
 
@@ -73,5 +74,26 @@ describe('elementFields', () => {
     });
     const fields = elementFields(values, fieldMap);
     expect(fields[fieldMap['Срок шага']]).toBe('20.11.2026');
+  });
+});
+
+describe('toIsoDate', () => {
+  it('читает дд.мм.гггг как день и месяц, а не наоборот', () => {
+    expect(toIsoDate('03.04.2026')).toBe('2026-04-03T00:00:00.000Z');
+    expect(toIsoDate('20.03.2026 10:00:00')).toBe('2026-03-20T00:00:00.000Z');
+    expect(toIsoDate('2026-03-20')).toBe('2026-03-20T00:00:00.000Z');
+    expect(toIsoDate('ерунда')).toBe('');
+  });
+});
+
+describe('buildFieldMap', () => {
+  it('передаёт код списка: без него портал не отдаёт поля', async () => {
+    const calls: Record<string, unknown>[] = [];
+    const map = await buildFieldMap(async (_method, params) => {
+      calls.push(params);
+      return { PROPERTY_1: { NAME: 'Клиент', FIELD_ID: 'PROPERTY_1' } };
+    });
+    expect(calls[0]).toMatchObject({ IBLOCK_CODE: 'project_status' });
+    expect(map).toEqual({ Клиент: 'PROPERTY_1' });
   });
 });

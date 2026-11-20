@@ -169,7 +169,7 @@ for (const mode of MODES) {
   );
 }
 
-test('статусы проектов: таблица, правка и таймлайн', async ({ page }) => {
+test('статусы проектов: таблица, правка, фильтры и удаление', async ({ page }) => {
   await page.goto('/project-status');
   await settle(page);
   // Две сеянные записи должны быть отрисованы с проектами из того же сида.
@@ -178,15 +178,48 @@ test('статусы проектов: таблица, правка и тайм�
   await expect(page.getByText('Додо Пицца', { exact: true })).toBeVisible();
 
   // Правка: меняем статус проекта 10 и сохраняем — запись сразу в таблице.
-  const row = page.locator('tr', { hasText: 'Разработка API v2' });
+  const row = page.locator('tr', { hasText: 'БСПБ' });
   await row.getByRole('button', { name: 'Правка' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Сохранить' }).click();
   await expect(dialog).toBeHidden();
 
-  // Таймлайн: сеянная история статуса читается из зеркала.
-  await row.getByRole('button', { name: 'История' }).click();
-  await expect(page.getByText('История статуса')).toBeVisible();
-  await expect(page.getByText('Не оформлен → В работе')).toBeVisible();
+  // Фильтр по клиенту прячет чужие строки и попадает в адрес; сброс возвращает всё.
+  const other = page.locator('tr', { hasText: 'Додо Пицца' });
+  await page.getByRole('combobox', { name: 'Клиент' }).click();
+  await page.getByRole('option', { name: 'БСПБ' }).click();
+  await expect(other).toHaveCount(0);
+  await expect(row).toBeVisible();
+  await expect(page).toHaveURL(/client=/);
+  await page.getByRole('button', { name: 'Сбросить' }).click();
+  await expect(other).toBeVisible();
+  await expect(page).not.toHaveURL(/client=/);
+
+  // Фильтр по проекту читается из адреса: ссылка с одним проектом открывает одну строку.
+  await page.goto('/project-status?project=11');
+  await settle(page);
+  await expect(other).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await page.getByRole('button', { name: 'Сбросить' }).click();
+
+  // Ссылка на клиента, которого уже нет, не оставляет пустую таблицу.
+  await page.goto('/project-status?client=nope');
+  await settle(page);
+  await expect(row).toBeVisible();
+  await expect(page).not.toHaveURL(/client=/);
+
+  // Удаление спрашивает: отмена запись оставляет, подтверждение сносит и переживает перезагрузку.
+  await other.getByRole('button', { name: 'Удалить' }).click();
+  const ask = page.getByRole('alertdialog');
+  await expect(ask).toContainText('Удалить статус проекта');
+  await ask.getByRole('button', { name: 'Отмена' }).click();
+  await expect(other).toBeVisible();
+  await other.getByRole('button', { name: 'Удалить' }).click();
+  await ask.getByRole('button', { name: 'Удалить' }).click();
+  await expect(other).toHaveCount(0);
+  await page.reload();
+  await settle(page);
+  await expect(row).toBeVisible();
+  await expect(other).toHaveCount(0);
 });

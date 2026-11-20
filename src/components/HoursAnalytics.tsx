@@ -12,7 +12,6 @@ import { Card } from '@/components/monos/Card';
 import { Notice } from '@/components/monos/Notice';
 import { SelectField } from '@/components/monos/SelectField';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
-import { toolbarControl } from '@/components/monos/toolbar';
 import { DataTable, type DataTableFeatures } from '@/components/DataTable';
 import { DetailTree, PivotCards, type MobilePivotRow } from '@/components/HoursMobile';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -805,7 +804,7 @@ function HoursAnalyticsView() {
               size="sm"
               value={from}
               onChange={(value) => value && setParams({ from: value })}
-              className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+              className="w-full min-w-0 sm:w-40"
               aria-label={t('Начальная дата периода')}
             />
             <DateField
@@ -813,7 +812,7 @@ function HoursAnalyticsView() {
               size="sm"
               value={to}
               onChange={(value) => value && setParams({ to: value })}
-              className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+              className="w-full min-w-0 sm:w-40"
               aria-label={t('Конечная дата периода')}
             />
             {projectFilter ? (

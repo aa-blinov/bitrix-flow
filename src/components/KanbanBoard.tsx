@@ -888,11 +888,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         }}
         className="hidden overflow-x-auto border-b border-line bg-canvas lg:block"
       >
-        <div className="flex min-w-max gap-4 px-4 py-2 xl:gap-5">
+        <div className="flex gap-3 px-4 py-2 xl:gap-4">
           {allStages.map((stage) => (
-            <div key={stage.id} className="h-px w-[14rem] xl:w-[15rem]" />
+            <div key={stage.id} className="h-px flex-[1_0_14rem] max-w-[22rem]" />
           ))}
-          {orphanTasks.length > 0 && <div className="h-px w-[14rem] xl:w-[15rem]" />}
+          {orphanTasks.length > 0 && <div className="h-px flex-[1_0_14rem] max-w-[22rem]" />}
         </div>
       </div>
 
@@ -921,9 +921,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
                     {isRest ? t('Остальные фазы') : stage.name}
                   </h2>
-                  <span className="text-xs text-ink-faint">
+                  <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">
                     {colTasks.length}
-                    {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
+                    {/* Дробь только пока колонка догружается: «1 / 1» повторяло само себя. */}
+                    {(stagePages[stage.id]?.total ?? 0) > colTasks.length
+                      ? ` / ${stagePages[stage.id].total}`
+                      : ''}
                   </span>
                 </div>
                 <div className="space-y-1.5 p-2">
@@ -998,7 +1001,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         }}
         className="flex-1 snap-x snap-proximity overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
       >
-        <div className="flex h-full min-w-max gap-3 px-4 py-4 xl:gap-4">
+        {/* На десктопе без min-w-max: с ним ширину колонки задавало содержимое, а не
+            свободное место, и четвёртая колонка уезжала за край экрана. */}
+        <div className="flex h-full min-w-max gap-3 px-4 py-4 lg:min-w-0 xl:gap-4">
           {allStages.map((stage) => {
             const colTasks = tasksByStage.get(stage.id) || [];
             const isDragOver = dragOverColumn === stage.id;
@@ -1011,7 +1016,10 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 // после скрытия закрытых пустая колонка теряла h3 и предок
                 // вылезал на всю доску.
                 data-stage={stage.id}
-                className={`w-[20rem] shrink-0 snap-start bg-surface-2 lg:w-[14rem] lg:snap-none xl:w-[15rem] ${
+                // На десктопе колонка растёт до 22rem, пока на экране есть место: при
+                // фиксированных 14rem половина широкого окна пустовала, а в карточках
+                // обрезались теги и переносилась строка со сроком и часами.
+                className={`w-[20rem] shrink-0 snap-start bg-surface-2 lg:snap-none lg:w-auto lg:flex-[1_0_14rem] lg:max-w-[22rem] ${
                   isDragOver ? 'border-accent bg-accent/10' : ''
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
@@ -1019,7 +1027,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 onDrop={(e) => void handleDrop(e, stage.id)}
               >
                 {/* Column header */}
-                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <div className="group flex items-center gap-2 border-b border-line px-3 py-2.5">
                   <div className={`w-2 h-2 rounded-full ${getStageDotColor(stage.color)}`} />
                   {editingStageId === stage.id ? (
                     <TextField
@@ -1054,6 +1062,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     label={t('Переименовать фазу {0}', stage.name)}
                     variant="ghost"
                     size="sm"
+                    // Карандаш в каждой шапке был шумом: показываем его по наведению на
+                    // шапку и по фокусу с клавиатуры. Двойной клик по названию тоже правит.
+                    className="opacity-0 transition-opacity duration-fast focus-visible:opacity-100 group-hover:opacity-100"
                     onClick={() => {
                       setEditingStageId(stage.id);
                       setEditingStageTitle(stage.name);
@@ -1061,9 +1072,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                   >
                     <Pencil size={14} strokeWidth={1.7} />
                   </IconButton>
-                  <span className="text-xs text-ink-faint">
+                  <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">
                     {colTasks.length}
-                    {stagePages[stage.id] ? ` / ${stagePages[stage.id].total}` : ''}
+                    {/* Дробь только пока колонка догружается: «1 / 1» повторяло само себя. */}
+                    {(stagePages[stage.id]?.total ?? 0) > colTasks.length
+                      ? ` / ${stagePages[stage.id].total}`
+                      : ''}
                   </span>
                   <IconButton
                     label={t('Добавить задачу в фазу {0}', stage.name)}
@@ -1102,6 +1116,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                     />
                   ))}
 
+                  {!colTasks.length && inlineAddStage !== stage.id && (
+                    <p className="px-2 py-8 text-center text-xs text-ink-faint">
+                      {t('Перетащите задачу сюда')}
+                    </p>
+                  )}
                   {inlineAddStage === stage.id && (
                     <InlineAddForm
                       defaultAssigneeId={currentUser.id}
@@ -1130,7 +1149,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             <Card
               padding="none"
               data-stage="0"
-              className="w-[20rem] flex-shrink-0 border-dashed opacity-80 lg:w-[14rem] xl:w-[15rem]"
+              className="w-[20rem] flex-shrink-0 border-dashed opacity-80 lg:w-auto lg:flex-[1_0_14rem] lg:max-w-[22rem]"
               // Колонка без фазы не принимает перенос: сбрасывать фазу (stageId «0»)
               // REST Битрикса здесь нельзя (см. moveTaskToProject), и дроп вхолостую
               // выглядел бы как сработавший перенос.

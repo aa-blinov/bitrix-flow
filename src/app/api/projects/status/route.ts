@@ -80,13 +80,17 @@ async function readMirror(): Promise<ProjectStatus[]> {
     stepDeadline: row.stepDeadline ? new Date(row.stepDeadline).toISOString() : '',
     risk: String(row.risk || ''),
     ownerId: String(row.ownerId || ''),
-    updatedAt: row.updatedAt || row.updated_at || new Date().toISOString(),
+    updatedAt: String(row.updatedAt || row.updated_at || ''),
   }));
 }
 
-async function writeMirror(statuses: ProjectStatus[]) {
+// replace: после полного чтения списка зеркало повторяет портал, и запись,
+// удалённая в Битриксе, не возвращается призраком при следующем сбое портала.
+async function writeMirror(statuses: ProjectStatus[], replace = false) {
   const db = await getDb();
   const collection = db.collection('project_status');
+  if (replace)
+    await collection.deleteMany({ projectId: { $nin: statuses.map((row) => row.projectId) } });
   for (const status of statuses) {
     await collection.updateOne(
       { projectId: status.projectId },
@@ -165,14 +169,58 @@ export async function GET(req: NextRequest) {
     if (!token?.access_token || !token.domain)
       return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
     await ensureStatusList((method, params) => listElements(token, method, params as any));
-    const statuses = await fetchStatuses(token);
-    await writeMirror(statuses);
+    // Список портала не отдаёт время правки элемента: его помнит только зеркало.
+    // Без этого «Обновлено» в форме всегда показывало момент открытия страницы.
+    const known = new Map((await readMirror()).map((row) => [row.projectId, row.updatedAt]));
+    const statuses = (await fetchStatuses(token)).map((row) => ({
+      ...row,
+      updatedAt: known.get(row.projectId) || '',
+    }));
+    await writeMirror(statuses, true);
     return NextResponse.json({ statuses });
   } catch (error) {
     // Портал недоступен — отдаём зеркало, чтобы сводка оставалась читаемой.
     console.warn('[project-status] список недоступен, читаем зеркало:', error);
     return NextResponse.json({ statuses: await readMirror() });
   }
+}
+
+// Удаление статуса проекта. Сначала портал, потом зеркало: раньше зеркало
+// чистилось первым, и при сбое портала запись пропадала с экрана, оставаясь в Битриксе.
+export async function DELETE(req: NextRequest) {
+  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
+  if (!memberId) return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+
+  const projectId = req.nextUrl.searchParams.get('project_id');
+  if (!projectId || !/^\d+$/.test(projectId)) {
+    return NextResponse.json({ error: 'VALIDATION_FAILED' }, { status: 400 });
+  }
+
+  if (!isMockEnabled()) {
+    try {
+      const token = await getMemberToken(memberId);
+      if (!token?.access_token || !token.domain)
+        return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
+      await listElements(token, 'lists.element.delete', {
+        IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
+        IBLOCK_CODE: STATUS_LIST_CODE,
+        ELEMENT_CODE: elementCode(projectId),
+      });
+    } catch (error) {
+      // Элемент могли удалить раньше прямо в портале: это не ошибка, зеркало
+      // всё равно надо дочистить. Реальный сбой портала отдаём наверх.
+      const message = error instanceof Error ? error.message : '';
+      if (!/ELEMENT_NOT_FOUND/i.test(message)) {
+        console.warn('[project-status] удаление в портале не прошло:', message);
+        return NextResponse.json({ error: 'DELETE_FAILED', message }, { status: 502 });
+      }
+    }
+  }
+
+  const db = await getDb();
+  await db.collection('project_status').deleteOne({ projectId });
+  await db.collection('project_status_history').deleteMany({ projectId });
+  return NextResponse.json({ ok: true });
 }
 
 export async function PUT(req: NextRequest) {

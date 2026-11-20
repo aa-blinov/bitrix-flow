@@ -15,7 +15,6 @@ import { Notice } from '@/components/monos/Notice';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
 import { SelectField } from '@/components/monos/SelectField';
 import { TextField } from '@/components/monos/TextField';
-import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
 import { DataTable, type DataTableFeatures } from '@/components/DataTable';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
@@ -954,7 +953,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                   size="sm"
                   value={from}
                   onChange={(value) => value && setParams({ from: value })}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Начальная дата периода')}
                 />
                 <DateField
@@ -962,7 +961,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                   size="sm"
                   value={to}
                   onChange={(value) => value && setParams({ to: value })}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Конечная дата периода')}
                 />
               </>
@@ -971,7 +970,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
               <SelectField
                 size="sm"
                 variant="boxed"
-                className={`${toolbarSelect} w-full sm:w-56`}
+                className="w-full sm:w-56"
                 aria-label={t('Проект')}
                 value={projectId || ''}
                 onChange={(event) => setParams({ project: event.target.value || null })}
@@ -999,7 +998,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
                     const value = Math.floor(Number(event.target.value));
                     if (value >= 1) setParams({ days: value === 14 ? null : String(value) });
                   }}
-                  className={`${toolbarControl} w-20`}
+                  className="w-20"
                 />
               </label>
             )}

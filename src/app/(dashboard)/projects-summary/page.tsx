@@ -13,7 +13,7 @@ import { Progress } from '@/components/monos/Progress';
 import { SelectField } from '@/components/monos/SelectField';
 import { Table, type TableColumn } from '@/components/monos/Table';
 import { TextField } from '@/components/monos/TextField';
-import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
+import { toolbarControl } from '@/components/monos/toolbar';
 import { useSSE } from '@/hooks/useSSE';
 import LoadingState from '@/components/LoadingState';
 import PageHeader from '@/components/PageHeader';
@@ -365,7 +365,7 @@ export default function ProjectsSummaryPage() {
             <TextField
               variant="boxed"
               size="sm"
-              className={`${toolbarControl} w-full sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1`}
+              className="w-full sm:w-56 lg:w-auto lg:min-w-64 lg:flex-1"
               placeholder={t('Найти проект…')}
               aria-label={t('Найти проект')}
               value={query}
@@ -376,7 +376,7 @@ export default function ProjectsSummaryPage() {
               <SelectField
                 size="sm"
                 variant="boxed"
-                className={`${toolbarSelect} w-32`}
+                className="w-32"
                 value={dateField}
                 onChange={(event) => setDateField(event.target.value as 'changed' | 'created')}
                 options={[
@@ -398,7 +398,7 @@ export default function ProjectsSummaryPage() {
                   size="sm"
                   value={fromDate}
                   onChange={setFromDate}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Начальная дата периода')}
                 />
                 <label htmlFor="summary-date-to" className="text-ink-soft">
@@ -410,7 +410,7 @@ export default function ProjectsSummaryPage() {
                   size="sm"
                   value={toDate}
                   onChange={setToDate}
-                  className={`${toolbarControl} w-full min-w-0 sm:w-40`}
+                  className="w-full min-w-0 sm:w-40"
                   aria-label={t('Конечная дата периода')}
                 />
               </div>

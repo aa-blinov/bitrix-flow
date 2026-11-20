@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Clock3, Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/monos/Badge';
 import { Button } from '@/components/monos/Button';
 import { Card } from '@/components/monos/Card';
 import { DateField } from '@/components/monos/DateField';
 import { Modal } from '@/components/monos/Modal';
+import { useConfirm } from '@/components/monos/confirm-dialog';
 import { SelectField } from '@/components/monos/SelectField';
-import { Switch } from '@/components/monos/Switch';
 import { Table, type TableColumn } from '@/components/monos/Table';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
@@ -45,12 +45,6 @@ const STATUS_TONE: Record<string, 'accent' | 'warning' | 'success' | 'danger' | 
 const DEADLINE_FORMAT = dateFormat({ dateStyle: 'medium' });
 const UPDATED_FORMAT = dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
 
-type TimelineEntry = {
-  memberId: string;
-  changes: { field: string; from: string; to: string }[];
-  at: string;
-};
-
 const EMPTY_FORM: ProjectStatusRow = {
   projectId: '',
   client: '',
@@ -72,12 +66,10 @@ export default function ProjectStatusPage() {
   const [statuses, setStatuses] = useState<ProjectStatusRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editing, setEditing] = useState<ProjectStatusRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [timelineFor, setTimelineFor] = useState<ProjectStatusRow | null>(null);
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
-  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [editing, setEditing] = useState<ProjectStatusRow | null>(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     if (!memberId) return;
@@ -102,32 +94,6 @@ export default function ProjectStatusPage() {
     void loadProjects();
   }, [load, loadProjects]);
 
-  const openTimeline = useCallback(
-    async (row: ProjectStatusRow) => {
-      if (!memberId) return;
-      setSaveError('');
-      setTimelineFor(row);
-      setTimelineLoading(true);
-      try {
-        const response = await fetch(
-          `/api/projects/status?history_project_id=${encodeURIComponent(row.projectId)}`,
-          { headers: { 'X-Member-Id': memberId } },
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(t('Не удалось получить историю'));
-        setTimeline(data.timeline || []);
-      } catch {
-        // Ошибка видна в интерфейсе, а не «правок не было»: пустой таймлайн вводит в заблуждение.
-        setSaveError(t('Не удалось загрузить историю статуса'));
-        setTimeline([]);
-        setTimeline([]);
-      } finally {
-        setTimelineLoading(false);
-      }
-    },
-    [memberId],
-  );
-
   const projectName = useCallback(
     (projectId: string) => {
       const project = projects.find((item) => String(item.id) === projectId);
@@ -136,12 +102,40 @@ export default function ProjectStatusPage() {
     [projects],
   );
 
+  // Запись сносится и в зеркале, и в списке портала, вернуть её нельзя: спрашиваем
+  // тем же диалогом, что и остальные удаления. Подсветка кнопки «нажмите ещё раз»
+  // подтверждением не читалась.
+  const removeStatus = useCallback(
+    async (row: ProjectStatusRow) => {
+      if (!memberId) return;
+      const ok = await confirm({
+        title: t('Удалить статус проекта «{0}»?', projectName(row.projectId)),
+        description: t(
+          'Запись пропадёт из списка в Битрикс24 вместе с историей правок. Сам проект и его задачи не трогаются.',
+        ),
+        confirmLabel: t('Удалить'),
+        destructive: true,
+      });
+      if (!ok) return;
+      setSaveError('');
+      try {
+        const response = await fetch(
+          `/api/projects/status?project_id=${encodeURIComponent(row.projectId)}`,
+          { method: 'DELETE', headers: { 'X-Member-Id': memberId } },
+        );
+        if (!response.ok) throw new Error(t('Не удалось удалить статус'));
+        setStatuses((current) => current.filter((item) => item.projectId !== row.projectId));
+      } catch (reason) {
+        setSaveError(reason instanceof Error ? reason.message : t('Не удалось удалить статус'));
+      }
+    },
+    [memberId, confirm, projectName],
+  );
+
   const ownerName = (ownerId: string) => {
     const user = users.find((item) => String(item.id) === ownerId);
     return user ? user.name : '';
   };
-
-  const memberName = (id: string) => ownerName(id) || t('Пользователь') + ' #' + id;
 
   const save = useCallback(async () => {
     if (!editing || !memberId) return;
@@ -198,19 +192,17 @@ export default function ProjectStatusPage() {
   );
 
   // Фильтры живут в адресе страницы: ссылку с одним проектом или клиентом
-  // можно показать коллеге, а «только последние» переживает перезагрузку.
+  // можно показать коллеге.
   const searchParams = useSearchParams();
-  const [onlyLatest, setOnlyLatest] = useState(searchParams.get('history') !== '1');
   const [filterProject, setFilterProject] = useState(searchParams.get('project') || 'all');
   const [filterClient, setFilterClient] = useState(searchParams.get('client') || 'all');
   useEffect(() => {
     const params = new URLSearchParams();
     if (filterProject !== 'all') params.set('project', filterProject);
     if (filterClient !== 'all') params.set('client', filterClient);
-    if (!onlyLatest) params.set('history', '1');
     const query = params.toString();
     window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
-  }, [filterProject, filterClient, onlyLatest]);
+  }, [filterProject, filterClient]);
   const clients = useMemo(
     () =>
       [...new Set(statuses.map((row) => row.client).filter(Boolean))].sort((a, b) =>
@@ -218,25 +210,24 @@ export default function ProjectStatusPage() {
       ),
     [statuses],
   );
-  const visibleRows = useMemo(() => {
-    let rowsFiltered = rows.filter(
-      (row) =>
-        (filterProject === 'all' || row.projectId === filterProject) &&
-        (filterClient === 'all' || row.client === filterClient),
-    );
-    if (onlyLatest) {
-      // У проекта может быть несколько записей в списке (правки создавали
-      // новые элементы): оставляем самую свежую по updatedAt.
-      const latest = new Map<string, ProjectStatusRow>();
-      for (const row of rowsFiltered) {
-        const current = latest.get(row.projectId);
-        if (!current || +new Date(row.updatedAt || 0) > +new Date(current.updatedAt || 0))
-          latest.set(row.projectId, row);
-      }
-      rowsFiltered = [...latest.values()];
-    }
-    return rowsFiltered;
-  }, [rows, filterProject, filterClient, onlyLatest]);
+  // Ссылка с фильтром переживает запись, на которую она указывала: без сброса
+  // селект показывал пустое значение над пустой таблицей.
+  useEffect(() => {
+    if (isLoading || error) return;
+    if (filterProject !== 'all' && !statuses.some((row) => row.projectId === filterProject))
+      setFilterProject('all');
+    if (filterClient !== 'all' && !clients.includes(filterClient)) setFilterClient('all');
+  }, [isLoading, error, statuses, clients, filterProject, filterClient]);
+  // Одна запись на проект: элемент списка адресуется кодом project-<id>, дублей нет.
+  const visibleRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          (filterProject === 'all' || row.projectId === filterProject) &&
+          (filterClient === 'all' || row.client === filterClient),
+      ),
+    [rows, filterProject, filterClient],
+  );
 
   const asRow = (row: Record<string, unknown>) => row as unknown as ProjectStatusRow;
 
@@ -296,29 +287,34 @@ export default function ProjectStatusPage() {
       key: 'actions',
       label: '',
       align: 'right',
-      cell: (row) => (
-        <div className="flex justify-end gap-1">
-          <Button
-            variant="quiet"
-            size="sm"
-            aria-label={t('История')}
-            onClick={() => void openTimeline(asRow(row))}
-          >
-            <Clock3 className="size-4" strokeWidth={1.7} />
-          </Button>
-          <Button
-            variant="quiet"
-            size="sm"
-            aria-label={t('Правка')}
-            onClick={() => {
-              setSaveError('');
-              setEditing({ ...asRow(row) });
-            }}
-          >
-            <Pencil className="size-4" strokeWidth={1.7} />
-          </Button>
-        </div>
-      ),
+      cell: (row) => {
+        const status = asRow(row);
+        return (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="quiet"
+              size="sm"
+              aria-label={t('Правка')}
+              title={t('Правка')}
+              onClick={() => {
+                setSaveError('');
+                setEditing({ ...status });
+              }}
+            >
+              <Pencil className="size-4" strokeWidth={1.7} />
+            </Button>
+            <Button
+              variant="quiet"
+              size="sm"
+              aria-label={t('Удалить')}
+              title={t('Удалить')}
+              onClick={() => void removeStatus(status)}
+            >
+              <Trash2 className="size-4" strokeWidth={1.7} />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -347,12 +343,16 @@ export default function ProjectStatusPage() {
         </Card>
       ) : (
         <>
+          {/* Ошибка удаления или сохранения видна здесь, а не только в модалке
+              правки: без неё клик по корзине выглядит как «ничего не произошло». */}
+          {saveError && !editing && (
+            <p role="alert" className="px-4 text-sm text-danger-text sm:px-6">
+              {saveError}
+            </p>
+          )}
           {/* Тот же боковой отступ, что у шапки и списков задач: без него
               панель фильтров и таблица прилипали к краю окна. */}
           <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6">
-            <Switch checked={onlyLatest} onChange={setOnlyLatest} className="text-sm">
-              {t('Только последние')}
-            </Switch>
             <SelectField
               size="sm"
               variant="boxed"
@@ -380,14 +380,13 @@ export default function ProjectStatusPage() {
               ]}
               className="w-48"
             />
-            {(filterProject !== 'all' || filterClient !== 'all' || !onlyLatest) && (
+            {(filterProject !== 'all' || filterClient !== 'all') && (
               <Button
                 variant="quiet"
                 size="sm"
                 onClick={() => {
                   setFilterProject('all');
                   setFilterClient('all');
-                  setOnlyLatest(true);
                 }}
               >
                 {t('Сбросить')}
@@ -399,7 +398,13 @@ export default function ProjectStatusPage() {
               columns={columns}
               rows={visibleRows as unknown as Record<string, unknown>[]}
               rowKey={(row) => asRow(row).projectId}
-              emptyLabel={t('Статусы ещё не заведены — добавьте первый')}
+              // Пустая выборка под фильтром это не «статусов нет»: иначе человек
+              // идёт заводить запись, которая уже есть.
+              emptyLabel={
+                statuses.length
+                  ? t('Под фильтр ничего не подходит')
+                  : t('Статусы ещё не заведены — добавьте первый')
+              }
             />
           </Card>
         </>
@@ -433,7 +438,16 @@ export default function ProjectStatusPage() {
                 label: project.name || `${t('Проект')} #${project.id}`,
               }))}
               value={editing.projectId}
-              onChange={(event) => setEditing({ ...editing, projectId: event.target.value })}
+              // У проекта одна запись: выбор проекта с заведённым статусом
+              // подставляет её в форму, иначе сохранение молча затирало бы поля пустыми.
+              onChange={(event) =>
+                setEditing(
+                  statuses.find((row) => row.projectId === event.target.value) || {
+                    ...editing,
+                    projectId: event.target.value,
+                  },
+                )
+              }
             />
             <TextField
               label={t('Клиент')}
@@ -489,43 +503,6 @@ export default function ProjectStatusPage() {
               </p>
             )}
           </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={timelineFor !== null}
-        onClose={() => setTimelineFor(null)}
-        title={timelineFor ? `${t('История статуса')} — ${projectName(timelineFor.projectId)}` : ''}
-        size="md"
-      >
-        {timelineLoading ? (
-          <LoadingState />
-        ) : saveError ? (
-          <p className="text-sm text-danger-text">{saveError}</p>
-        ) : timeline.length ? (
-          <ol className="flex flex-col gap-3">
-            {/* Новые записи сверху — вне зависимости от порядка ответа API. */}
-            {[...timeline]
-              .sort((a, b) => +new Date(b.at) - +new Date(a.at))
-              .map((entry, index) => (
-                <li key={index} className="border-l-2 border-line pl-3">
-                  <p className="text-xs text-ink-faint">
-                    {UPDATED_FORMAT.format(new Date(entry.at))} — {memberName(entry.memberId)}
-                  </p>
-                  <ul className="mt-1 text-sm">
-                    {entry.changes.map((change, changeIndex) => (
-                      <li key={changeIndex}>
-                        <span className="font-medium">{change.field}: </span>
-                        {change.from && <span className="text-ink-soft">{change.from} → </span>}
-                        <span className="text-ink">{change.to}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-          </ol>
-        ) : (
-          <p className="text-sm text-ink-soft">{t('Правок пока не было')}</p>
         )}
       </Modal>
     </div>

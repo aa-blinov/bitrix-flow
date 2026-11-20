@@ -151,19 +151,23 @@ export function TaskCard({
         </div>
       )}
 
-      {/* Title and description indicator share one row so the icon never changes card height. */}
-      <div className={`mb-2 flex items-start gap-1 ${hasChips ? '' : 'pr-6'}`}>
-        <h3
-          className={`min-w-0 flex-1 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${
-            isCompleted ? 'text-ink-soft line-through' : 'text-ink'
-          }`}
-        >
-          {task.title}
-        </h3>
-        {task.description && (
-          <AlignLeft className="mt-0.5 shrink-0 text-ink-faint" size={14} strokeWidth={1.7} />
-        )}
-      </div>
+      <h3
+        className={`mb-2 text-sm leading-snug line-clamp-2 xl:line-clamp-3 ${hasChips ? '' : 'pr-6'} ${
+          isCompleted ? 'text-ink-soft line-through' : 'text-ink'
+        }`}
+      >
+        {task.title}
+      </h3>
+      {/* Признак описания отдельной строкой под названием, как в Asana: сбоку от
+          названия он отъедал у него ширину, а в строке меты терялся среди срока и часов. */}
+      {task.description && (
+        <AlignLeft
+          className="mb-2 text-ink-faint"
+          size={14}
+          strokeWidth={1.7}
+          aria-label={t('Есть описание')}
+        />
+      )}
 
       {/* Meta footer — в узких колонках (224px) «План + Факт» не помещаются
           в одну строку с дедлайном и аватаром. Перенос строк и truncate у

@@ -59,6 +59,14 @@ export function Tabs({
     [active, controlled, onChange],
   );
 
+  // Лента прокручивается внутри себя: выбранная вкладка (новый дашборд, ссылка
+  // с ?d=) иначе оставалась за краем, и было не видно, какой экран открыт.
+  React.useEffect(() => {
+    listEl.current
+      ?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [active, items.length]);
+
   // После переключения с клавиатуры фокус должен остаться на активной вкладке.
   React.useEffect(() => {
     if (!focusPending.current) return;
@@ -101,7 +109,9 @@ export function Tabs({
   };
 
   return (
-    <div className={className}>
+    // min-w-0: во flex-строке обёртка иначе растёт по содержимому, max-w-full
+    // списка считается уже от неё, и десяток вкладок распирал страницу шире экрана.
+    <div className={cn('min-w-0 max-w-full', className)}>
       <div
         ref={listEl}
         role="tablist"
