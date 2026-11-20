@@ -549,6 +549,11 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   const [isCreatingStage, setIsCreatingStage] = useState(false);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
+  // Полосы двигают друг друга, и каждая отвечает своим scroll. При дробном масштабе экрана
+  // scrollLeft округляется по-разному, и ответ уводил первую полосу на пиксель назад.
+  const syncScroll = (from: HTMLElement, to: HTMLElement | null) => {
+    if (to && Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft;
+  };
   // Первый поле каждого окна получает фокус: без ссылки модалка забирала бы
   // его на себя.
   const stageNameRef = useRef<HTMLInputElement>(null);
@@ -882,10 +887,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       {/* Верхний scrollbar — только desktop; синхронизирован с доской ниже. */}
       <div
         ref={topScrollRef}
-        onScroll={(event) => {
-          if (boardScrollRef.current)
-            boardScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
-        }}
+        onScroll={(event) => syncScroll(event.currentTarget, boardScrollRef.current)}
         className="hidden overflow-x-auto border-b border-line bg-canvas lg:block"
       >
         <div className="flex gap-3 px-4 py-2 xl:gap-4">
@@ -995,10 +997,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       <div
         hidden={!boardReady || (isLoading && !filteredTasks.length) || isMobile}
         ref={boardScrollRef}
-        onScroll={(event) => {
-          if (topScrollRef.current)
-            topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
-        }}
+        onScroll={(event) => syncScroll(event.currentTarget, topScrollRef.current)}
         className="flex-1 snap-x snap-proximity overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
       >
         {/* На десктопе без min-w-max: с ним ширину колонки задавало содержимое, а не
