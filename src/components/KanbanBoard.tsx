@@ -998,7 +998,9 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
         hidden={!boardReady || (isLoading && !filteredTasks.length) || isMobile}
         ref={boardScrollRef}
         onScroll={(event) => syncScroll(event.currentTarget, topScrollRef.current)}
-        className="flex-1 snap-x snap-proximity overflow-x-auto overscroll-x-contain bg-canvas lg:snap-none"
+        // Без scroll-snap: в окне уже lg (iframe портала) доску притягивало к краю колонки,
+        // и прокрутка тачпадом липла посреди движения.
+        className="flex-1 overflow-x-auto overscroll-x-contain bg-canvas"
       >
         {/* На десктопе без min-w-max: с ним ширину колонки задавало содержимое, а не
             свободное место, и четвёртая колонка уезжала за край экрана. */}
@@ -1018,7 +1020,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 // На десктопе колонка растёт до 22rem, пока на экране есть место: при
                 // фиксированных 14rem половина широкого окна пустовала, а в карточках
                 // обрезались теги и переносилась строка со сроком и часами.
-                className={`w-[20rem] shrink-0 snap-start bg-surface-2 lg:snap-none lg:w-auto lg:flex-[1_0_14rem] lg:max-w-[22rem] ${
+                className={`w-[20rem] shrink-0 bg-surface-2 lg:w-auto lg:flex-[1_0_14rem] lg:max-w-[22rem] ${
                   isDragOver ? 'border-accent bg-accent/10' : ''
                 }`}
                 onDragOver={(e) => handleDragOver(e, stage.id)}
