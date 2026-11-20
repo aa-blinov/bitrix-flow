@@ -256,7 +256,7 @@ export default function ProjectsSummaryPage() {
         const project = row as unknown as ProjectSummary;
         return (
           <>
-            <div className="text-sm">
+            <div className="text-xs">
               <span className="font-medium tabular-nums">{project.taskCount}</span>
               <span className="ml-1 text-ink-soft">{t('всего')}</span>
             </div>
@@ -371,7 +371,7 @@ export default function ProjectsSummaryPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <div className="flex items-center gap-1.5 text-sm">
+            <div className="flex items-center gap-1.5 text-xs">
               <span className="shrink-0 text-ink-soft">{t('По дате:')}</span>
               <SelectField
                 size="sm"
@@ -386,7 +386,7 @@ export default function ProjectsSummaryPage() {
                 aria-label={t('Считать по дате')}
               />
             </div>
-            <div className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
+            <div className="flex w-full flex-col gap-1 text-xs sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
               <span className="shrink-0 text-ink-soft">{t('Период:')}</span>
               <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-1 sm:w-auto sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
                 <label htmlFor="summary-date-from" className="text-ink-soft">
@@ -440,7 +440,7 @@ export default function ProjectsSummaryPage() {
             </Button>
           </div>
           {!isLoading && !error ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-3 py-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-3 py-2 text-xs">
               <span className="text-ink-soft">
                 {t('Просрочено:')}{' '}
                 <span

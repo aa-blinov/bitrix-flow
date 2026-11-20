@@ -774,7 +774,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                 { value: 'title', label: t('По названию') },
               ]}
               variant="boxed"
-              className={`${toolbarSelect} w-40 shrink-0`}
+              size="sm"
+              className={`${toolbarSelect} w-40 shrink-0 [&_button]:h-full`}
               aria-label={t('Сортировка задач')}
             />
           </div>
@@ -783,7 +784,8 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
             onChange={(value) => setTaskSearch(value)}
             placeholder={t('Поиск задач…')}
             label={t('Поиск задач на доске')}
-            className="w-48 shrink-0"
+            size="sm"
+            className="w-48 shrink-0 sm:[&_input]:h-9"
           />
           <div className="flex shrink-0 flex-wrap items-center gap-2 max-lg:max-w-full lg:ml-auto lg:flex-nowrap">
             <div className={moreWrap}>

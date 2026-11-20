@@ -126,7 +126,7 @@ function GridCell({
     <td
       colSpan={colSpan}
       title={title}
-      className={cn('border-b border-line px-2 py-1 align-middle text-sm', className)}
+      className={cn('border-b border-line px-2 py-1 align-middle text-xs', className)}
     >
       {children}
     </td>
@@ -1954,6 +1954,7 @@ export default function TaskGrid({
             <TextField
               type="search"
               variant="boxed"
+              size="sm"
               value={draftQuery}
               onChange={(event) => setDraftQuery(event.target.value)}
               onKeyDown={(event) => {

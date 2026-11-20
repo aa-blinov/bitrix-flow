@@ -26,6 +26,7 @@ import { Card } from '@/components/monos/Card';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
+import { toolbarControl, toolbarSelect } from '@/components/monos/toolbar';
 import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { FONT } from '@/components/monos/scale';
 
@@ -454,8 +455,8 @@ export default function TeamWorkload() {
                 onChange={(event) => setSelectedProjectId(event.target.value)}
                 options={projectOptions}
                 variant="boxed"
-                size="md"
-                className="w-52 shrink-0"
+                size="sm"
+                className={`${toolbarSelect} w-52 shrink-0 [&_button]:h-full`}
                 aria-label={t('Проект')}
               />
               <RefreshButton
@@ -468,6 +469,7 @@ export default function TeamWorkload() {
                 doneText={t('Обновление запущено')}
                 busy={timeRefreshing}
                 onRefresh={refreshActualTime}
+                className={toolbarControl}
               />
               <div className="flex shrink-0 items-center gap-2">
                 <IconButton
@@ -478,7 +480,12 @@ export default function TeamWorkload() {
                 >
                   <ChevronLeft className="size-4" strokeWidth={1.7} />
                 </IconButton>
-                <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={toolbarControl}
+                  onClick={() => setWeekStart(startOfWeek(new Date()))}
+                >
                   {t('Сегодня')}
                 </Button>
                 <IconButton
