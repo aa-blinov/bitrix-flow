@@ -67,6 +67,26 @@ const MESSAGES_POLL_REALTIME_MS = 20_000;
 // ponytail: только в памяти вкладки, после перезагрузки страницы черновиков нет.
 type Mention = { id: number | 'all'; name: string };
 const drafts = new Map<string, { text: string; files: File[]; mentions?: Mention[] }>();
+
+// Последняя страница каждого открытого чата: при возврате в чат она рисуется сразу, а не после
+// двух запросов (к нам и к порталу), и первая загрузка тут же заменяет её свежей версией.
+// Хранится только последняя страница: первая загрузка заменяет ровно её диапазон.
+type Snapshot = {
+  messages: Message[];
+  people: Record<string, Person>;
+  readers: Reader[] | null;
+  canPost: boolean;
+  role: string;
+  hasOlder: boolean;
+};
+const snapshots = new Map<string, Snapshot>();
+const SNAPSHOT_LIMIT = 40;
+function rememberSnapshot(id: string, snapshot: Snapshot) {
+  // Порядок вставки работает как очередь: свежий чат в конец, самый давний уходит первым.
+  snapshots.delete(id);
+  snapshots.set(id, snapshot);
+  if (snapshots.size > SNAPSHOT_LIMIT) snapshots.delete(snapshots.keys().next().value!);
+}
 // Сколько отправок идёт в каждом диалоге: вернувшаяся переписка не даёт отправить то же
 // второй раз. Счётчик, а не флаг: голосовое и текст могут идти одновременно.
 const sendingDialogs = new Map<string, number>();
@@ -125,8 +145,9 @@ export default function Conversation({
   onRenamed: (title: string) => void;
   onLeft: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[] | null>(null);
-  const [people, setPeople] = useState<Record<string, Person>>({});
+  const cached = snapshots.get(dialog.id);
+  const [messages, setMessages] = useState<Message[] | null>(cached?.messages ?? null);
+  const [people, setPeople] = useState<Record<string, Person>>(cached?.people ?? {});
   const [draft, setDraft] = useState(() => drafts.get(dialog.id)?.text ?? '');
   // Выбранные упоминания живут вместе с черновиком, иначе @Имя ушло бы простым текстом.
   const [mentions, setMentions] = useState<Mention[]>(() => drafts.get(dialog.id)?.mentions ?? []);
@@ -141,17 +162,17 @@ export default function Conversation({
     startSending(dialog.id);
   };
   const [error, setError] = useState('');
-  const [hasOlder, setHasOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(cached?.hasOlder ?? false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   // null пока портал не ответил: галочки без данных не рисуем.
-  const [readers, setReaders] = useState<Reader[] | null>(null);
-  const [canPost, setCanPost] = useState(true);
+  const [readers, setReaders] = useState<Reader[] | null>(cached?.readers ?? null);
+  const [canPost, setCanPost] = useState(cached?.canPost ?? true);
   const canPostRef = useRef(true);
   useEffect(() => {
     canPostRef.current = canPost;
   }, [canPost]);
   // Роль в чате: владелец и менеджер могут удалять чужие сообщения.
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState(cached?.role ?? '');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -390,6 +411,20 @@ export default function Conversation({
   }, [request, me, markSeen]);
   const realtime = useRealtime();
   usePolling(load, realtime ? MESSAGES_POLL_REALTIME_MS : MESSAGES_POLL_MS);
+
+  // Снимок пишем только с данных портала и только у последних сообщений: окно после прыжка
+  // к найденному не последняя страница.
+  useEffect(() => {
+    if (!loaded.current || jumped || !messages) return;
+    rememberSnapshot(dialogId, {
+      messages: messages.slice(-MESSAGES_PAGE),
+      people,
+      readers,
+      canPost,
+      role,
+      hasOlder: hasOlder || messages.length > MESSAGES_PAGE,
+    });
+  }, [dialogId, messages, people, readers, canPost, role, hasOlder, jumped]);
 
   // Событие по этому диалогу: новое сообщение подтягивается сразу, а правка, удаление
   // и лайк перечитывают страницу целиком (курсор afterId такие изменения не отдаёт).

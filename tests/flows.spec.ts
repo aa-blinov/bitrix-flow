@@ -1790,3 +1790,19 @@ test('мессенджер: «Прочитать все» гасит счётч�
   await expect(readAll).toBeDisabled();
   expect(calls).toEqual([{ action: 'readAll' }]);
 });
+
+test('мессенджер: в открытый раньше чат возврат мгновенный, без ожидания портала', async ({
+  page,
+}) => {
+  const chat = await openDmitry(page);
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  await list.getByRole('button', { name: /Мария Орлова/ }).click();
+  // Ответ на повторную загрузку чата Дмитрия держим 5 секунд: переписка должна показаться
+  // из кэша раньше, чем он придёт.
+  await page.route('**/api/messenger/messages?dialogId=2*', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await route.continue().catch(() => {});
+  });
+  await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
+  await expect(chat).toContainText('Посмотришь ревью?', { timeout: 1500 });
+});

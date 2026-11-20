@@ -1,3 +1,4 @@
+import type { Db } from 'mongodb';
 import { getDb } from '@/lib/mongo';
 
 // Нормализация task_mirror: полезная нагрузка приходит и из REST, и из вебхуков,
@@ -241,10 +242,79 @@ function mergeRows(): Record<string, unknown> {
   };
 }
 
+// Склейка двух коллекций дорогая: на 2800 задачах около 0,5 с, и платил её каждый запрос
+// списка (медиана /api/tasks/all была 1 с). Поэтому готовая склейка лежит в своей коллекции
+// и пересобирается, только когда меняются исходные: отпечаток это число записей и последние
+// метки времени обеих коллекций, его подсчёт стоит миллисекунды. Все записи в task_mirror
+// и tasks ставят updated_at или synced_at, на этом держится свежесть.
+const built = new Map<string, string>();
+const pending = new Map<string, { version: string; done: Promise<void> }>();
+
+const mergedCollection = (memberId: string) => `task_merged_${memberId}`;
+
+async function sourceVersion(db: Db, memberId: string) {
+  const stamp = (coll: string, fields: string[]) =>
+    db
+      .collection(coll)
+      .aggregate([
+        { $match: { member_id: memberId } },
+        {
+          $group: {
+            _id: null,
+            n: { $sum: 1 },
+            ...Object.fromEntries(fields.map((field) => [field, { $max: `$${field}` }])),
+          },
+        },
+      ])
+      .next();
+  const [mirror, tasks] = await Promise.all([
+    stamp('task_mirror', ['updated_at', 'synced_at']),
+    stamp('tasks', ['updated_at']),
+  ]);
+  return JSON.stringify([mirror, tasks]);
+}
+
+async function ensureMerged(db: Db, memberId: string) {
+  const version = await sourceVersion(db, memberId);
+  if (built.get(memberId) === version) return;
+  // Параллельные запросы при одной и той же смене ждут одну сборку, а не запускают свою.
+  let job = pending.get(memberId);
+  if (job?.version !== version) {
+    const done = db
+      .collection('task_mirror')
+      .aggregate(
+        [
+          ...taskMergeStages(memberId),
+          { $set: { member_id: memberId } },
+          { $out: mergedCollection(memberId) },
+        ],
+        { allowDiskUse: true },
+      )
+      .toArray()
+      .then(() => {
+        built.set(memberId, version);
+      })
+      .finally(() => {
+        if (pending.get(memberId)?.done === done) pending.delete(memberId);
+      });
+    job = { version, done };
+    pending.set(memberId, job);
+  }
+  await job.done;
+}
+
+/**
+ * Стадии для агрегации по task_mirror: $match по _id: null ничего не находит по индексу, и подмешивание готовой
+ * склейки. Вызывающим ничего менять не надо: документы те же, что дал бы taskMergeStages.
+ */
 export async function taskMirrorStages(memberId: string) {
   const db = await getDb();
+  await ensureMerged(db, memberId);
   return {
     db,
-    stages: taskMergeStages(memberId) as Record<string, unknown>[],
+    stages: [
+      { $match: { _id: null } },
+      { $unionWith: { coll: mergedCollection(memberId), pipeline: [] } },
+    ] as Record<string, unknown>[],
   };
 }

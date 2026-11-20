@@ -207,6 +207,8 @@ export async function applyClassTags(
               {
                 $set: {
                   'data.tags': Object.fromEntries(tags.map((title, i) => [i, { title }])),
+                  // Метка нужна готовой склейке задач: без неё она не узнает о смене тегов.
+                  updated_at: new Date(),
                 },
               },
             );
