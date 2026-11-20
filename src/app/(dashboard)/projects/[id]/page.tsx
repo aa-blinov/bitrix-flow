@@ -88,6 +88,7 @@ export default function ProjectPage() {
     updateProject,
     users,
     isLoading,
+    projectDatesAvailable,
   } = useKanbanStore(
     useShallow((s) => ({
       projects: s.projects,
@@ -100,6 +101,7 @@ export default function ProjectPage() {
       updateProject: s.updateProject,
       users: s.users,
       isLoading: s.isLoading,
+      projectDatesAvailable: s.projectDatesAvailable,
     })),
   );
 
@@ -270,8 +272,7 @@ export default function ProjectPage() {
       await updateProject(currentProject.id, {
         name: name.trim(),
         description,
-        startDate,
-        finishDate,
+        ...(projectDatesAvailable ? { startDate, finishDate } : {}),
       });
       setSettingsOpen(false);
     } catch (error) {
@@ -382,7 +383,7 @@ export default function ProjectPage() {
                     t('участников'),
                   ])}
                 </Button>
-                {!isNoProject && (
+                {!isNoProject && projectDatesAvailable && (
                   <Button
                     variant="quiet"
                     size="sm"
@@ -537,7 +538,7 @@ export default function ProjectPage() {
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t('Описание')}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={cn('grid gap-4 sm:grid-cols-2', !projectDatesAvailable && 'hidden')}>
             <DateField
               label={t('Дата начала')}
               variant="boxed"

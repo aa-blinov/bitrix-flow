@@ -89,6 +89,8 @@ function normalizeComments(
 interface KanbanStore {
   // Данные
   projects: Bx24Project[];
+  // Портал отдаёт сроки проекта, только если у приложения есть право socialnetwork.
+  projectDatesAvailable: boolean;
   tasks: BxTask[];
   subtasks: Record<string, BxTask[]>;
   users: Bx24User[];
@@ -301,6 +303,7 @@ let inFlightProjects: Promise<void> | null = null;
 // при инициализации стора: сервер и первый клиентский рендер должны совпадать.
 export const useKanbanStore = create<KanbanStore>((set, get) => ({
   projects: [],
+  projectDatesAvailable: false,
   tasks: [],
   subtasks: {},
   users: [],
@@ -384,10 +387,16 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           throw new Error(err.error || 'Failed to load');
         }
 
-        const { projects: projectsResult, users: usersResult, currentUser } = await res.json();
+        const {
+          projects: projectsResult,
+          projectDates,
+          users: usersResult,
+          currentUser,
+        } = await res.json();
 
         set({
           projects: projectsResult || [],
+          projectDatesAvailable: !!projectDates,
           users: usersResult || [],
           currentUser: currentUser?.id ? currentUser : get().currentUser,
           isLoading: false,

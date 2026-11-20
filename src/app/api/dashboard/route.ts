@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
         startDate: portalDay(g.PROJECT_DATE_START),
         finishDate: portalDay(g.PROJECT_DATE_FINISH),
       })),
+      projectDates: true,
       users: (rawUsers || []).map((u: any) => ({
         id: u.ID,
         name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
@@ -79,8 +80,9 @@ export async function GET(req: NextRequest) {
   const PROJECTS_TTL = 5 * 60 * 1000;
 
   try {
-    const [rawProjects, rawUsers, rawCurrentUser] = await Promise.all([
+    const [rawProjects, projectDates, rawUsers, rawCurrentUser] = await Promise.all([
       serverCache(`${memberId}:projects:all`, () => fetchAllProjects(token), PROJECTS_TTL),
+      serverCache(`${memberId}:projects:dates`, () => fetchProjectDates(token), PROJECTS_TTL),
       serverCache(
         `${memberId}:users:all`,
         () => callBitrix24(token, 'user.get', { ACTIVE: 'true' }),
@@ -103,8 +105,8 @@ export async function GET(req: NextRequest) {
       image: g.IMAGE || undefined,
       isArchived: g.CLOSED === 'Y',
       keywords: g.KEYWORDS || '',
-      startDate: portalDay(g.PROJECT_DATE_START),
-      finishDate: portalDay(g.PROJECT_DATE_FINISH),
+      startDate: projectDates?.[String(g.ID)]?.start || '',
+      finishDate: projectDates?.[String(g.ID)]?.finish || '',
     }));
 
     const users = (rawUsers || []).map((u: any) => ({
@@ -150,7 +152,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ projects, users, currentUser });
+    return NextResponse.json({ projects, projectDates: !!projectDates, users, currentUser });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -189,6 +191,43 @@ async function fetchAllProjects(token: any) {
   }
 
   return projects;
+}
+
+// sonet_group.get сроков проекта не отдаёт (проверено на живом портале), их знает только
+// socialnetwork.api, а ему нужно право socialnetwork. Без права возвращаем null, и интерфейс
+// прячет сроки: иначе у всех проектов было бы «Сроки не заданы», а сохранённые даты пропадали.
+async function fetchProjectDates(
+  token: any,
+): Promise<Record<string, { start: string; finish: string }> | null> {
+  const dates: Record<string, { start: string; finish: string }> = {};
+  const visited = new Set<number>();
+  let start = 0;
+  try {
+    while (!visited.has(start)) {
+      visited.add(start);
+      const data = await callBitrix24Response(token, 'socialnetwork.api.workgroup.list', {
+        'select[0]': 'ID',
+        'select[1]': 'PROJECT_DATE_START',
+        'select[2]': 'PROJECT_DATE_FINISH',
+        start: String(start),
+      });
+      // Новый API кладёт строки в workgroups и бывает, что в camelCase: принимаем оба вида.
+      const rows = Array.isArray(data.result) ? data.result : data.result?.workgroups || [];
+      for (const g of rows) {
+        dates[String(g.ID ?? g.id)] = {
+          start: portalDay(g.PROJECT_DATE_START ?? g.projectDateStart),
+          finish: portalDay(g.PROJECT_DATE_FINISH ?? g.projectDateFinish),
+        };
+      }
+      if (data.next === undefined || data.next === null) break;
+      start = Number(data.next);
+    }
+    return dates;
+  } catch (error) {
+    if (!/insufficient_scope/i.test(String(error)))
+      console.warn('[dashboard] сроки проектов не прочитались:', error);
+    return null;
+  }
 }
 
 async function callBitrix24WithToken(token: any, method: string, params: Record<string, string>) {
