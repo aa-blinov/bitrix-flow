@@ -53,6 +53,9 @@ function parse(text: string, withTime: boolean): string | null {
   return `${date}T${d.slice(8, 10)}:${d.slice(10, 12)}`;
 }
 
+// Высоты повторяют ступени TextField.
+const BUTTON_HEIGHT = { sm: 'h-7', md: 'h-9', lg: 'h-11' } as const;
+
 export function DateField({
   value,
   onChange,
@@ -120,8 +123,11 @@ export function DateField({
             input?.focus();
           }
         }}
+        // Кнопка прижата к низу и высотой с само поле: на всю обёртку она захватывала и
+        // подпись над полем, и календарь у полей с подписью вставал выше центра поля.
         className={cn(
-          'absolute inset-y-0 right-0 flex w-8 items-center justify-center text-ink-soft transition-colors duration-fast hover:text-ink max-sm:w-11',
+          'absolute right-0 bottom-0 flex w-8 items-center justify-center text-ink-soft transition-colors duration-fast hover:text-ink max-sm:h-11 max-sm:w-11',
+          BUTTON_HEIGHT[size],
         )}
       >
         <Calendar size={14} strokeWidth={1.7} aria-hidden="true" />
