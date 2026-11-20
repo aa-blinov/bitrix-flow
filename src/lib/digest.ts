@@ -1,6 +1,6 @@
-// Недельная сводка руководителю прямо в чат Битрикса. Почты и Telegram в проекте нет,
-// а сообщение в Битриксе доходит без новых сервисов и ключей: приложение уже ходит в
-// портал от имени владельца токена. Выключено, пока не задан DIGEST_DIALOG_ID.
+// Недельная сводка руководителю прямо в чат Битрикса: приложение уже ходит в портал от
+// имени владельца токена. Куда и когда слать, задаёт админ в настройках (app_settings);
+// пока там ничего не сохранено, действуют DIGEST_* из окружения. Без получателя выключена.
 
 import { getProtectedMemberId } from './authorized-member';
 import { deliverDigest, digestChannels } from './digest-delivery';
@@ -95,49 +95,120 @@ export async function collectDigest(memberId: string, now = new Date()) {
   };
 }
 
+export type DigestConfig = {
+  /** Число это личка пользователя, chat<число> групповой чат, пусто значит не слать. */
+  dialogId: string;
+  /** 0 воскресенье, 1 понедельник. День и час по Москве, как остальные даты портала. */
+  weekday: number;
+  hour: number;
+  source: 'settings' | 'env';
+};
+
+const SETTINGS_ID = 'digest';
+type SettingsDoc = { _id: string; dialogId?: unknown; weekday?: unknown; hour?: unknown };
+const int = (value: unknown, fallback: number, max: number) => {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 && number <= max ? number : fallback;
+};
+
+export const validDialogId = (value: string) => value === '' || /^(chat)?\d+$/.test(value);
+
+/** Настройки из базы важнее окружения: их меняют в интерфейсе без перезапуска контейнера. */
+export async function digestConfig(): Promise<DigestConfig> {
+  const db = await getDb();
+  const saved = await db.collection<SettingsDoc>('app_settings').findOne({ _id: SETTINGS_ID });
+  const raw: Omit<SettingsDoc, '_id'> = saved ?? {
+    dialogId: process.env.DIGEST_DIALOG_ID,
+    weekday: process.env.DIGEST_WEEKDAY,
+    hour: process.env.DIGEST_HOUR,
+  };
+  const dialogId = String(raw.dialogId ?? '').trim();
+  return {
+    dialogId: validDialogId(dialogId) ? dialogId : '',
+    weekday: int(raw.weekday, 1, 6),
+    hour: int(raw.hour, 9, 23),
+    source: saved ? 'settings' : 'env',
+  };
+}
+
+export async function saveDigestConfig(config: Omit<DigestConfig, 'source'>) {
+  const db = await getDb();
+  await db
+    .collection<SettingsDoc>('app_settings')
+    .updateOne(
+      { _id: SETTINGS_ID },
+      { $set: { ...config, updatedAt: new Date() } },
+      { upsert: true },
+    );
+}
+
 // Сводка уходит во все включённые каналы (см. digest-delivery.ts). Чат Битрикса единственный
 // канал, которому нужен токен портала, поэтому он замыкает memberId.
-export function configuredChannels(memberId: string) {
-  return digestChannels(process.env, async (text) => {
-    await bx24OAuth(memberId, 'im.message.add', {
-      DIALOG_ID: process.env.DIGEST_DIALOG_ID,
-      MESSAGE: text,
-    });
+export function configuredChannels(memberId: string, dialogId: string) {
+  return digestChannels({ ...process.env, DIGEST_DIALOG_ID: dialogId }, async (text) => {
+    await bx24OAuth(memberId, 'im.message.add', { DIALOG_ID: dialogId, MESSAGE: text });
   });
 }
 
-export function digestEnabled() {
-  return configuredChannels('').length > 0;
+export async function digestEnabled() {
+  return configuredChannels('', (await digestConfig()).dialogId).length > 0;
+}
+
+export async function previewDigest() {
+  const memberId = await getProtectedMemberId();
+  return memberId ? buildDigest(await collectDigest(memberId)) : '';
 }
 
 export async function sendDigest() {
   const memberId = await getProtectedMemberId();
   if (!memberId) throw new Error('NO_TOKEN');
+  const { dialogId } = await digestConfig();
   const text = buildDigest(await collectDigest(memberId));
-  const results = await deliverDigest(configuredChannels(memberId), text);
+  const results = await deliverDigest(configuredChannels(memberId, dialogId), text);
   return { text, results };
 }
 
-// Ключ «год-неделя по понедельнику»: одна сводка в неделю, даже если сервер перезапустится
+/** День недели (0 воскресенье), час и дата по Москве: пояс контейнера не важен. */
+function moscow(now: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Moscow',
+      weekday: 'short',
+      hour: 'numeric',
+      hourCycle: 'h23',
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday),
+    hour: Number(parts.hour),
+    day: now.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' }),
+  };
+}
+
+// Ключ «неделя по понедельнику»: одна сводка в неделю, даже если сервер перезапустится
 // в назначенный час.
 function weekKey(now: Date) {
-  const monday = new Date(now);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const { weekday, day } = moscow(now);
+  const monday = new Date(`${day}T12:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() - ((weekday + 6) % 7));
   return monday.toISOString().slice(0, 10);
 }
 
 export function shouldSendDigest(now: Date, weekday: number, hour: number) {
-  return now.getDay() === weekday && now.getHours() >= hour;
+  const local = moscow(now);
+  return local.weekday === weekday && local.hour >= hour;
 }
 
 export function startDigest() {
-  if (!digestEnabled() || process.env.MOCK_B24 === '1') return;
-  // 1 = понедельник. Час и день по часовому поясу сервера (TZ в окружении контейнера).
-  const weekday = Number(process.env.DIGEST_WEEKDAY ?? 1);
-  const hour = Number(process.env.DIGEST_HOUR ?? 9);
+  if (process.env.MOCK_B24 === '1') return;
+  // Таймер идёт всегда, а настройки читаются на каждом тике: получателя и время меняют в
+  // интерфейсе, и перезапуск ради этого не нужен.
   const tick = async () => {
     const now = new Date();
+    const { dialogId, weekday, hour } = await digestConfig();
+    if (!configuredChannels('', dialogId).length) return;
     if (!shouldSendDigest(now, weekday, hour)) return;
     const db = await getDb();
     const key = weekKey(now);
@@ -157,7 +228,4 @@ export function startDigest() {
     }
   };
   setInterval(() => void tick().catch(() => {}), 10 * 60_000);
-  console.log(
-    `[digest] включена: каналов ${configuredChannels('').length}, день ${weekday}, час ${hour}`,
-  );
 }

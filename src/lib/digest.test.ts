@@ -30,10 +30,13 @@ describe('digest', () => {
     expect(text).toContain('Просрочек нет.');
   });
 
-  it('fires on the chosen weekday from the chosen hour', () => {
-    const monday = (h: number) => new Date(2026, 9, 26, h, 0, 0);
-    expect(shouldSendDigest(monday(8), 1, 9)).toBe(false);
-    expect(shouldSendDigest(monday(9), 1, 9)).toBe(true);
-    expect(shouldSendDigest(new Date(2026, 9, 27, 10), 1, 9)).toBe(false);
+  it('fires on the chosen weekday from the chosen hour, by Moscow time', () => {
+    const moscow = (day: string, h: number) =>
+      new Date(`${day}T${String(h).padStart(2, '0')}:00:00+03:00`);
+    expect(shouldSendDigest(moscow('2026-10-26', 8), 1, 9)).toBe(false);
+    expect(shouldSendDigest(moscow('2026-10-26', 9), 1, 9)).toBe(true);
+    expect(shouldSendDigest(moscow('2026-10-27', 10), 1, 9)).toBe(false);
+    // 07:00 UTC в понедельник это уже 10:00 по Москве: пояс контейнера не важен.
+    expect(shouldSendDigest(new Date('2026-10-26T07:00:00Z'), 1, 9)).toBe(true);
   });
 });

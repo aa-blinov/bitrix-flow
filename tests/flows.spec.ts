@@ -1718,3 +1718,24 @@ test('закрытые без списаний: отчёт открываетс�
   await expect(page).toHaveURL(/\/reports\/untracked/);
   await expect(page.getByRole('heading', { name: 'Закрыты без списаний' })).toBeVisible();
 });
+
+test('недельная сводка: админ выбирает групповой чат и время', async ({ page, testDb }) => {
+  await page.goto('/digest');
+  await expect(page.getByRole('heading', { name: 'Недельная сводка' })).toBeVisible();
+  await expect(page.getByText('Как выглядит сводка сейчас')).toBeVisible();
+  await page.getByRole('button', { name: 'В групповой чат' }).click();
+  await page.getByLabel('Номер чата').fill('1234');
+  await page.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(page.getByText('Настройки сводки сохранены')).toBeVisible();
+
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    const saved = await client
+      .db(testDb)
+      .collection<{ _id: string }>('app_settings')
+      .findOne({ _id: 'digest' });
+    expect(saved).toMatchObject({ dialogId: 'chat1234', weekday: 1, hour: 9 });
+  } finally {
+    await client.close();
+  }
+});

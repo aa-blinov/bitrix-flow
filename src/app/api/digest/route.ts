@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   const memberId = person?.memberId;
   if (!memberId) return NextResponse.json({ error: 'AUTHENTICATION_REQUIRED' }, { status: 401 });
-  if (!digestEnabled())
+  if (!(await digestEnabled()))
     return NextResponse.json({ error: 'DIGEST_NOT_CONFIGURED' }, { status: 409 });
   try {
     return NextResponse.json(await sendDigest());
