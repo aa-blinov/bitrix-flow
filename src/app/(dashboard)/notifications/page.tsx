@@ -278,11 +278,22 @@ export default function NotificationsPage() {
                 </Card>
               );
               return href ? (
-                <Link prefetch={false} key={item.id} href={href} className="block">
+                // content-visibility: 50 карточек по 70 узлов, за краем экрана браузер их не верстает.
+                <Link
+                  prefetch={false}
+                  key={item.id}
+                  href={href}
+                  className="block [content-visibility:auto] [contain-intrinsic-size:auto_96px]"
+                >
                   {content}
                 </Link>
               ) : (
-                <div key={item.id}>{content}</div>
+                <div
+                  key={item.id}
+                  className="[content-visibility:auto] [contain-intrinsic-size:auto_96px]"
+                >
+                  {content}
+                </div>
               );
             })}
             {pageCount > 1 && (

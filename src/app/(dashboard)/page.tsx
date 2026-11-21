@@ -43,13 +43,11 @@ export default function DashboardPage() {
     } catch {}
   };
 
-  const { projects, allTasks, isLoading, selectedProjectId, setSelectedProject } = useKanbanStore(
+  const { projects, allTasks, isLoading } = useKanbanStore(
     useShallow((s) => ({
       projects: s.projects,
       allTasks: s.allTasks,
       isLoading: s.isLoading,
-      selectedProjectId: s.selectedProjectId,
-      setSelectedProject: s.setSelectedProject,
     })),
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,12 +88,6 @@ export default function DashboardPage() {
   }, [statsAttempt]);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const hasBootstrapped = useRef(false);
-  // Проект выбираем, как только список появился — неважно, чей запрос его
-  // принёс: сайдбар обращается за проектами в том же тике.
-  useEffect(() => {
-    if (!selectedProjectId && projects.length > 0) setSelectedProject(projects[0].id);
-  }, [projects, selectedProjectId, setSelectedProject]);
-
   useEffect(() => {
     if (hasBootstrapped.current) return;
     hasBootstrapped.current = true;
@@ -116,7 +108,9 @@ export default function DashboardPage() {
 
   // Спиннер во весь экран прятал и шапку: страница оставалась без заголовка,
   // пока грузились проекты. Каркас рисуем сразу, спиннер — на месте списка.
-  const isBootstrapping = isLoading || !selectedProjectId;
+  // Раньше главная ради этого выбирала первый проект, а выбор тянул из портала его фазы
+  // и перечитывал его задачи на каждое событие. Ждём только список проектов.
+  const isBootstrapping = isLoading || projects.length === 0;
 
   // «Без проекта» — такой же вход, как в левой панели: у портала 69 задач вне
   // групп, и без этой карточки с главной до них было не добраться.

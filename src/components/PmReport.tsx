@@ -814,7 +814,9 @@ function ReportTableView({
             .filter((column) => ['hours', 'count', 'days', 'percent'].includes(column.kind))
             .map((column) => column.id)}
           emptyLabel={meta.empty()}
-          pageSize={300}
+          // 300 строк по восемь ячеек давали почти 5 тысяч узлов и долгую задачу на переходе;
+          // остальное догружает «Показать ещё».
+          pageSize={100}
         />
       )}
     </section>
