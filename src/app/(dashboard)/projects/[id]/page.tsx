@@ -568,7 +568,13 @@ export default function ProjectPage() {
 
       <div className="w-full min-w-0 pb-6">
         {effectiveView === 'kanban' ? (
-          <KanbanBoard toolbar={viewTabs} />
+          // Пока стор не переключился на проект из адреса, доска успевала запросить
+          // теги и колонки прошлого проекта.
+          selectedProjectId === projectId ? (
+            <KanbanBoard toolbar={viewTabs} />
+          ) : (
+            <LoadingState />
+          )
         ) : (
           <TaskGrid
             initialGroupBy="stage"

@@ -31,18 +31,32 @@ async function listElements(token: TokenRef, method: string, params: Record<stri
 
 // Адресация элемента по IBLOCK_ID: lists.element.get принимает его или код
 // списка, но поиск по коду надёжнее — ID свежесозданного списка не кешируем.
+// Список и его поля меняются раз в жизни портала, а их чтение стоило двух вызовов
+// портала подряд на каждое открытие экрана. Держим 10 минут; сбой чтения элементов
+// сбрасывает запись, чтобы удалённый и пересозданный список подхватился сразу.
+const IBLOCK_TTL_MS = 10 * 60_000;
+const iblockCache = new Map<
+  string,
+  { at: number; value: { id: string; fieldMap: StatusFieldMap } }
+>();
+
 async function findIblock(
   token: TokenRef,
 ): Promise<{ id: string; fieldMap: StatusFieldMap } | null> {
-  const lists = await listElements(token, 'lists.get', { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID });
+  const cached = iblockCache.get(token.domain);
+  if (cached && Date.now() - cached.at < IBLOCK_TTL_MS) return cached.value;
+  const [lists, fieldMap] = await Promise.all([
+    listElements(token, 'lists.get', { IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID }),
+    buildFieldMap((method, params) => listElements(token, method, params)),
+  ]);
   // У списков REST ключ кода — CODE, на старых порталах встречается IBLOCK_CODE.
   const list = (lists || []).find(
     (item: any) => item?.IBLOCK_CODE === STATUS_LIST_CODE || item?.CODE === STATUS_LIST_CODE,
   );
   if (!list) return null;
-  const iblockId = String(list.ID || list.IBLOCK_ID || '');
-  const fieldMap = await buildFieldMap((method, params) => listElements(token, method, params));
-  return { id: iblockId, fieldMap };
+  const value = { id: String(list.ID || list.IBLOCK_ID || ''), fieldMap };
+  iblockCache.set(token.domain, { at: Date.now(), value });
+  return value;
 }
 
 async function fetchStatuses(token: TokenRef): Promise<ProjectStatus[]> {
@@ -52,6 +66,9 @@ async function fetchStatuses(token: TokenRef): Promise<ProjectStatus[]> {
     IBLOCK_TYPE_ID: STATUS_LIST_TYPE_ID,
     IBLOCK_ID: iblock.id,
     IBLOCK_CODE: STATUS_LIST_CODE,
+  }).catch((error) => {
+    iblockCache.delete(token.domain);
+    throw error;
   });
   return (elements || [])
     .map((element: Record<string, unknown>) => mapStatusElement(element, iblock.fieldMap))
@@ -91,13 +108,17 @@ async function writeMirror(statuses: ProjectStatus[], replace = false) {
   const collection = db.collection('project_status');
   if (replace)
     await collection.deleteMany({ projectId: { $nin: statuses.map((row) => row.projectId) } });
-  for (const status of statuses) {
-    await collection.updateOne(
-      { projectId: status.projectId },
-      { $set: { ...status, synced_at: new Date() } },
-      { upsert: true },
-    );
-  }
+  if (!statuses.length) return;
+  const now = new Date();
+  await collection.bulkWrite(
+    statuses.map((status) => ({
+      updateOne: {
+        filter: { projectId: status.projectId },
+        update: { $set: { ...status, synced_at: now } },
+        upsert: true,
+      },
+    })),
+  );
 }
 
 // Подписи полей в истории: ключи совпадают с payload.
@@ -171,8 +192,9 @@ export async function GET(req: NextRequest) {
     await ensureStatusList((method, params) => listElements(token, method, params as any));
     // Список портала не отдаёт время правки элемента: его помнит только зеркало.
     // Без этого «Обновлено» в форме всегда показывало момент открытия страницы.
-    const known = new Map((await readMirror()).map((row) => [row.projectId, row.updatedAt]));
-    const statuses = (await fetchStatuses(token)).map((row) => ({
+    const [mirror, fresh] = await Promise.all([readMirror(), fetchStatuses(token)]);
+    const known = new Map(mirror.map((row) => [row.projectId, row.updatedAt]));
+    const statuses = fresh.map((row) => ({
       ...row,
       updatedAt: known.get(row.projectId) || '',
     }));

@@ -555,13 +555,18 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
 // при переходах и раз в пять минут: событий об изменении счётчика портал не шлёт.
 function useOverdueCount(pathname: string) {
   const [count, setCount] = useState<number | undefined>(undefined);
+  const loadedAt = useRef(0);
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
+    const load = () => {
+      loadedAt.current = Date.now();
       void fetchTaskCounters()
         .then((counters) => !cancelled && setCount(counters.expired))
         .catch(() => {});
-    load();
+    };
+    // Счётчик живёт в портале: вызов на каждый переход по меню стоил до секунды на экран.
+    // После правки задачи переход через минуту уже покажет свежую цифру.
+    if (Date.now() - loadedAt.current > 60_000) load();
     const timer = window.setInterval(load, 5 * 60_000);
     return () => {
       cancelled = true;

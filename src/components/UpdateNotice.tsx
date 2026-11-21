@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/monos/Button';
 import { IconButton } from '@/components/monos/IconButton';
@@ -15,38 +15,36 @@ const CHECK_INTERVAL_MS = 5 * 60_000;
  * решает сам, когда прерваться.
  */
 export default function UpdateNotice() {
-  const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  // Базовая версия в ref: в состоянии её смена перезапускала эффект и сразу слала второй запрос.
+  const baseVersion = useRef<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  const check = useCallback(async (baseline: string | null) => {
+  const check = useCallback(async () => {
     try {
       const response = await fetch('/api/version', { cache: 'no-store' });
       const data = await response.json();
       if (typeof data.version !== 'string' || !data.version) return;
-      if (!baseline) {
-        setBaseVersion(data.version);
-        return;
-      }
-      if (data.version !== baseline) setUpdateAvailable(true);
+      if (!baseVersion.current) baseVersion.current = data.version;
+      else if (data.version !== baseVersion.current) setUpdateAvailable(true);
     } catch {
       // Сеть или деплой в процессе — молча ждём следующей проверки.
     }
   }, []);
 
   useEffect(() => {
-    void check(baseVersion);
-    const timer = window.setInterval(() => void check(baseVersion), CHECK_INTERVAL_MS);
+    void check();
+    const timer = window.setInterval(() => void check(), CHECK_INTERVAL_MS);
     // Вернулись на вкладку после часа в стороне — проверяем сразу, а не через интервал.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void check(baseVersion);
+      if (document.visibilityState === 'visible') void check();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [baseVersion, check]);
+  }, [check]);
 
   if (!updateAvailable || dismissed) return null;
 
