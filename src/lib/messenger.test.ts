@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMentions,
   applyReactions,
+  normalizeKeyboard,
   isReaction,
   reactionsOf,
   DIALOG_ID,
@@ -371,5 +372,43 @@ describe('реакции, закреп и превью ссылки', () => {
     expect(isReaction('fire')).toBe(true);
     expect(isReaction('drop table')).toBe(false);
     expect(isReaction(undefined)).toBe(false);
+  });
+});
+
+describe('кнопки ботов', () => {
+  it('понимает оба формата KEYBOARD и выбрасывает кнопки без действия', () => {
+    const buttons = normalizeKeyboard(
+      {
+        BOT_ID: 456,
+        BUTTONS: [
+          { TEXT: 'Сайт', LINK: 'https://example.com' },
+          { TEXT: 'Опасная', LINK: 'javascript:alert(1)' },
+          { TYPE: 'NEWLINE' },
+          { TEXT: 'Создать', COMMAND: 'task', COMMAND_PARAMS: '42' },
+          { TEXT: 'Вставить', ACTION: 'PUT', ACTION_VALUE: 'привет' },
+          { TEXT: 'Только телефон', ACTION: 'COPY', ACTION_VALUE: '1', CONTEXT: 'MOBILE' },
+          { TEXT: 'Без значения', ACTION: 'SEND' },
+        ],
+      },
+      9,
+    );
+    expect(buttons).toEqual([
+      { kind: 'button', text: 'Сайт', disabled: false, link: 'https://example.com' },
+      { kind: 'newline' },
+      {
+        kind: 'button',
+        text: 'Создать',
+        disabled: false,
+        command: 'task',
+        params: '42',
+        botId: 456,
+      },
+      { kind: 'button', text: 'Вставить', disabled: false, action: 'PUT', value: 'привет' },
+    ]);
+    // Короткий формат: массив кнопок, бот это автор сообщения.
+    expect(normalizeKeyboard([{ TEXT: 'Ок', COMMAND: 'ok' }], 77)).toEqual([
+      { kind: 'button', text: 'Ок', disabled: false, command: 'ok', params: '', botId: 77 },
+    ]);
+    expect(normalizeKeyboard([{ TYPE: 'NEWLINE' }], 1)).toEqual([]);
   });
 });

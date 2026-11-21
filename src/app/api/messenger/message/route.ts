@@ -66,6 +66,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     });
   }
+  // Непрочитано начиная с этого сообщения, как «Отметить непрочитанным» в Битриксе.
+  if (kind === 'unread') {
+    const dialogId = String(body?.dialogId || '');
+    if (!DIALOG_ID.test(dialogId)) return badRequest('BAD_DIALOG_ID');
+    return withMessenger(req, async (call) => {
+      confirmed(
+        await call('im.dialog.unread', { DIALOG_ID: dialogId, MESSAGE_ID: messageId }, true),
+      );
+      return NextResponse.json({ ok: true });
+    });
+  }
+  // Кнопка бота с командой. Форма, а не JSON: в личном чате с ботом JSON портал принимает
+  // с ответом true, но команда до бота не доходит (так в документации im.message.command).
+  if (kind === 'command') {
+    const botId = Number(body?.botId);
+    const command = String(body?.command || '').replace(/^\//, '');
+    const params = typeof body?.params === 'string' ? body.params.slice(0, 1000) : '';
+    if (!Number.isInteger(botId) || botId <= 0) return badRequest('BAD_BOT');
+    if (!/^[\w.-]{1,64}$/.test(command)) return badRequest('BAD_COMMAND');
+    return withMessenger(req, async (call) => {
+      confirmed(
+        await call(
+          'im.message.command',
+          { MESSAGE_ID: messageId, BOT_ID: botId, COMMAND: command, COMMAND_PARAMS: params },
+          true,
+        ),
+      );
+      return NextResponse.json({ ok: true });
+    });
+  }
   const action = kind === 'unlike' ? 'minus' : 'plus';
   return withMessenger(req, async (call) => {
     confirmed(await call('im.message.like', { MESSAGE_ID: messageId, ACTION: action }, true));

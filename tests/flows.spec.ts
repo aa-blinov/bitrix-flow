@@ -1055,6 +1055,135 @@ test('мессенджер: диалог скрывается из списка,
   ).toBeVisible();
 });
 
+test('мессенджер: диалог открывается внизу, стрелка возвращает к последним', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const feed = chat.locator('[aria-live="polite"]');
+  const gap = () => feed.evaluate((box) => box.scrollHeight - box.scrollTop - box.clientHeight);
+  await expect.poll(gap).toBeLessThan(80);
+  await feed.evaluate((box) => box.scrollTo({ top: 0 }));
+  await chat.getByRole('button', { name: 'Прокрутить вниз' }).click();
+  await expect.poll(gap).toBeLessThan(80);
+  await expect(chat.getByRole('button', { name: 'Прокрутить вниз' })).toHaveCount(0);
+});
+
+test('мессенджер: кнопки бота, непрочитано отсюда, файл на Диск и файл с Диска', async ({
+  page,
+}) => {
+  // Кнопки бота подмешиваем в ответ: в моке переписки их нет, а снимки трогать не нужно.
+  await page.route('**/api/messenger/messages?*', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    for (const message of data.messages || [])
+      if (message.id === 55)
+        message.keyboard = [
+          {
+            kind: 'button',
+            text: 'Вставить ответ',
+            disabled: false,
+            action: 'PUT',
+            value: 'Принято',
+          },
+          {
+            kind: 'button',
+            text: 'Создать отчёт',
+            disabled: false,
+            command: 'report',
+            params: '7',
+            botId: 2,
+          },
+        ];
+    await route.fulfill({ response, json: data });
+  });
+  const chat = await openDmitry(page);
+  const posts: Record<string, unknown>[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && /\/api\/messenger\/(message|disk)$/.test(request.url()))
+      posts.push(request.postDataJSON());
+  });
+
+  const bot = chat.getByRole('group', { name: 'Кнопки бота' });
+  await bot.getByRole('button', { name: 'Вставить ответ' }).click();
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue('Принято');
+  await bot.getByRole('button', { name: 'Создать отчёт' }).click();
+  await expect(chat.getByRole('status')).toContainText('Команда отправлена боту');
+  expect(posts).toContainEqual({
+    messageId: 55,
+    action: 'command',
+    botId: 2,
+    command: 'report',
+    params: '7',
+  });
+
+  await (await bubble(chat, 'Сообщение 51')).getByRole('button', { name: 'Ещё' }).click();
+  await page.getByRole('menuitem', { name: 'Сохранить на Диск: договор.pdf' }).click();
+  await expect(chat.getByRole('status')).toContainText('сохранён на Диск');
+  expect(posts).toContainEqual({ action: 'save', fileId: 504 });
+
+  await (await bubble(chat, 'Сообщение 51')).getByRole('button', { name: 'Ещё' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить файл: договор.pdf' }).click();
+  await expect(chat.getByText('договор.pdf')).toHaveCount(0);
+  expect(posts).toContainEqual({ action: 'delete', chatId: 2, fileId: 504 });
+
+  await chat.getByRole('button', { name: 'Файл с Диска' }).click();
+  const drive = page.getByRole('dialog', { name: 'Файл с Диска' });
+  await drive.getByRole('button', { name: /Документы/ }).click();
+  await drive.getByRole('button', { name: /договор\.docx/ }).click();
+  await drive.getByRole('button', { name: 'Отправить в чат' }).click();
+  await expect(drive).toHaveCount(0);
+  expect(posts).toContainEqual({ action: 'commit', dialogId: '2', fileIds: [103] });
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ещё' }).click();
+  await page.getByRole('menuitem', { name: 'Непрочитано отсюда' }).click();
+  await expect(page.getByText('Выберите диалог слева')).toBeVisible();
+  expect(posts).toContainEqual({ messageId: 54, action: 'unread', dialogId: '2' });
+});
+
+test('мессенджер: свой статус меняется из шапки', async ({ page }) => {
+  await page.goto('/messenger');
+  const change = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/api/messenger/status'),
+  );
+  await page.getByRole('button', { name: 'Мой статус: В сети' }).click();
+  await page.getByRole('menuitem', { name: 'Не беспокоить' }).click();
+  expect((await change).postDataJSON()).toEqual({ status: 'dnd' });
+  await expect(page.getByRole('button', { name: 'Мой статус: Не беспокоить' })).toBeVisible();
+});
+
+test('уведомления Битрикс24: приглашение принимается, на личное отвечают, лишнее удаляют', async ({
+  page,
+}) => {
+  const posts: Record<string, unknown>[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/portal-notifications'))
+      posts.push(request.postDataJSON());
+  });
+  await page.goto('/notifications');
+  await page.getByRole('button', { name: /^Битрикс24/ }).click();
+  const list = page.getByRole('list', { name: 'Уведомления Битрикс24' });
+  await expect(list).toContainText('Приглашение на встречу «Планёрка»');
+  await expect.poll(() => posts).toContainEqual({ action: 'read', ids: [901] });
+
+  await list.getByRole('button', { name: 'Подтвердить участие' }).click();
+  const status = page.locator('p[role="status"]');
+  await expect(status).toContainText('Подтвердить участие');
+  await expect(list).not.toContainText('Планёрка');
+  expect(posts).toContainEqual({ action: 'confirm', id: 901, value: 'Y' });
+
+  await list.getByRole('button', { name: 'Ответить' }).click();
+  await list.getByLabel('Ответ').fill('Посмотрю сегодня');
+  await list.getByRole('button', { name: 'Отправить' }).click();
+  await expect(status).toHaveText('Ответ отправлен');
+  expect(posts).toContainEqual({ action: 'answer', id: 902, text: 'Посмотрю сегодня' });
+
+  await list
+    .getByRole('listitem')
+    .filter({ hasText: 'Напоминание о событии' })
+    .getByRole('button', { name: 'Удалить уведомление' })
+    .click();
+  await expect(list).not.toContainText('Напоминание о событии');
+  expect(posts).toContainEqual({ action: 'delete', id: 903 });
+});
+
 test('меню: у «Сообщений» стоит значок непрочитанных', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
   await page.route('**/api/messenger/counters', (route) =>

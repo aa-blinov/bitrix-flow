@@ -99,6 +99,63 @@ export type AttachBlock =
   | { type: 'delimiter' };
 export type Attach = { description?: string; blocks: AttachBlock[] };
 
+/**
+ * Кнопка бота. Действие ровно одно: ссылка, команда боту или действие на стороне клиента
+ * (PUT вставить в поле, SEND отправить, COPY скопировать, CALL позвонить, DIALOG открыть чат).
+ * newline это служебный перенос ряда.
+ */
+export type KeyboardButton =
+  | { kind: 'newline' }
+  | {
+      kind: 'button';
+      text: string;
+      disabled: boolean;
+      link?: string;
+      action?: 'PUT' | 'SEND' | 'COPY' | 'CALL' | 'DIALOG';
+      value?: string;
+      command?: string;
+      params?: string;
+      botId?: number;
+    };
+
+const KEYBOARD_ACTIONS = new Set(['PUT', 'SEND', 'COPY', 'CALL', 'DIALOG']);
+
+// KEYBOARD приходит массивом кнопок или объектом { BOT_ID, BUTTONS }. Кнопку без
+// понятного действия не рисуем: нажать её было бы нечем.
+export function normalizeKeyboard(raw: unknown, authorId: number): KeyboardButton[] {
+  type Raw = Record<string, unknown>;
+  const box = (raw || {}) as Raw;
+  const botId = Number(box.BOT_ID) || authorId;
+  const list = (Array.isArray(raw) ? raw : Array.isArray(box.BUTTONS) ? box.BUTTONS : []) as Raw[];
+  const buttons: KeyboardButton[] = [];
+  for (const item of list) {
+    if (item?.TYPE === 'NEWLINE') {
+      buttons.push({ kind: 'newline' });
+      continue;
+    }
+    const text = String(item?.TEXT || '').trim();
+    if (!text || item?.CONTEXT === 'MOBILE') continue;
+    const base = { kind: 'button' as const, text, disabled: item?.DISABLED === 'Y' };
+    const link = String(item?.LINK || '');
+    const action = String(item?.ACTION || '');
+    if (/^(https?:\/\/|\/)/.test(link)) buttons.push({ ...base, link });
+    else if (item?.COMMAND)
+      buttons.push({
+        ...base,
+        command: String(item.COMMAND),
+        params: item.COMMAND_PARAMS ? String(item.COMMAND_PARAMS) : '',
+        botId: Number(item.BOT_ID) || botId,
+      });
+    else if (KEYBOARD_ACTIONS.has(action) && item?.ACTION_VALUE)
+      buttons.push({
+        ...base,
+        action: action as 'PUT' | 'SEND' | 'COPY' | 'CALL' | 'DIALOG',
+        value: String(item.ACTION_VALUE),
+      });
+  }
+  return buttons.some((button) => button.kind === 'button') ? buttons : [];
+}
+
 export type Message = {
   id: number;
   authorId: number;
@@ -114,6 +171,8 @@ export type Message = {
   reactions?: Record<string, number[]>;
   /** Сообщение закреплено в чате (params.IS_PINNED). */
   pinned?: boolean;
+  /** Кнопки под сообщением бота (params.KEYBOARD). */
+  keyboard?: KeyboardButton[];
   files: MessageFile[];
   attach: Attach[];
 };
@@ -339,6 +398,9 @@ export function normalizeMessages(result: any): {
         edited: m.params?.IS_EDITED === 'Y',
         likes: Array.isArray(m.params?.LIKE) ? m.params.LIKE.map(Number) : [],
         pinned: m.params?.IS_PINNED === 'Y',
+        keyboard: m.params?.KEYBOARD
+          ? normalizeKeyboard(m.params.KEYBOARD, Number(m.author_id) || 0)
+          : undefined,
         // params приходит пустым массивом, а не объектом, если параметров нет.
         // Портал не прислал запись файла: вложение не выкидываем, а показываем по номеру.
         // Скачивание и пересылка идут по id, поэтому файл остаётся доступным.

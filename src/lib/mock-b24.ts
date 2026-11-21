@@ -578,6 +578,8 @@ const MOCK_DIALOGS = {
       id: '2',
       type: 'user',
       title: 'Дмитрий Соколов',
+      // Номер чата нужен действиям с файлами (im.disk.file.delete принимает CHAT_ID).
+      chat_id: 2,
       counter: 2,
       date_last_activity: '2026-03-02T10:00:00+03:00',
       message: {
@@ -959,6 +961,73 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return { messages: [], reactions: [] };
     case 'im.v2.Chat.load':
       return { pins: [], messages: [], additionalMessages: [] };
+    case 'im.notify.get':
+      return {
+        total_unread_count: 1,
+        users: [{ id: 2, name: 'Дмитрий Соколов', avatar: '' }],
+        notifications: [
+          {
+            id: 901,
+            notify_type: 1,
+            notify_module: 'calendar',
+            author_id: 2,
+            date: '2026-03-04T10:00:00+03:00',
+            notify_title: 'Приглашение на встречу «Планёрка»',
+            text: 'Приглашаю вас принять участие во встрече «Планёрка»',
+            notify_read: 'N',
+            notify_buttons: JSON.stringify([
+              { COMMAND: 'notifyConfirm', COMMAND_PARAMS: '901|Y', TEXT: 'Подтвердить участие' },
+              { COMMAND: 'notifyConfirm', COMMAND_PARAMS: '901|N', TEXT: 'Отказаться' },
+            ]),
+          },
+          {
+            id: 902,
+            notify_type: 2,
+            notify_module: 'im',
+            author_id: 2,
+            date: '2026-03-03T12:00:00+03:00',
+            notify_title: '',
+            text: 'Посмотри, пожалуйста, отчёт',
+            notify_read: 'Y',
+          },
+          {
+            id: 903,
+            notify_type: 4,
+            notify_module: 'calendar',
+            author_id: 0,
+            date: '2026-03-02T09:00:00+03:00',
+            notify_title: '',
+            text: 'Напоминание о событии «Ретро»',
+            notify_read: 'Y',
+          },
+        ],
+      };
+    case 'im.notify.confirm':
+      return { result_message: ['Ваш выбор: «Подтвердить участие»'] };
+    case 'im.notify.answer':
+      return { result_message: ['Ваш ответ успешно отправлен.'] };
+    case 'im.user.status.get':
+      return 'online';
+    case 'disk.storage.getlist':
+      return [{ ID: '1', ENTITY_TYPE: 'user', ROOT_OBJECT_ID: '100' }];
+    case 'disk.folder.getchildren':
+      return params.id === '100'
+        ? [
+            { ID: '101', NAME: 'Документы', TYPE: 'folder' },
+            { ID: '102', NAME: 'план.pdf', TYPE: 'file', SIZE: '2048' },
+          ]
+        : [{ ID: '103', NAME: 'договор.docx', TYPE: 'file', SIZE: '4096' }];
+    case 'im.disk.file.save':
+      return { folder: { id: 7, name: 'Сохраненные файлы' }, file: { id: 8, name: 'файл' } };
+    case 'im.disk.file.commit':
+      return { FILES: { disk102: { id: 104 } }, MESSAGE_ID: 1002 };
+    case 'im.notify.read.list':
+    case 'im.notify.delete':
+    case 'im.user.status.set':
+    case 'im.dialog.unread':
+    case 'im.message.command':
+    case 'im.disk.file.delete':
+      return true;
     case 'im.v2.Chat.Message.pin':
     case 'im.v2.Chat.Message.unpin':
       return [];

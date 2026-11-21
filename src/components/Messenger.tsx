@@ -537,6 +537,7 @@ export default function Messenger() {
       <PageHeader
         title={t('Сообщения')}
         description={t('Личные чаты, группы и обсуждения задач из Битрикс24')}
+        actions={<MyStatus />}
       />
       {error && (
         <p role="alert" className="px-4 pt-3 text-sm text-danger-text lg:px-6">
@@ -823,6 +824,7 @@ export default function Messenger() {
               onRead={markRead}
               onSent={loadDialogs}
               onPin={() => void dialogAction(active, active.pinned ? 'unpin' : 'pin')}
+              onOpenDialog={setActiveId}
               onRenamed={(title) =>
                 setDialogs((current) =>
                   current
@@ -844,5 +846,57 @@ export default function Messenger() {
       </div>
       <NewChatModal open={newChatOpen} onClose={() => setNewChatOpen(false)} onOpen={openDialog} />
     </div>
+  );
+}
+
+// Свой статус в чатах Битрикса: его видят коллеги. Ставится тем же методом, что и в
+// самом Битриксе, поэтому совпадает с тем, что показывает портал.
+const STATUS_DOT = { online: 'bg-success', dnd: 'bg-danger', away: 'bg-warning' } as const;
+type MyStatusValue = keyof typeof STATUS_DOT;
+const statusLabel = (status: MyStatusValue) =>
+  status === 'dnd' ? t('Не беспокоить') : status === 'away' ? t('Отошёл') : t('В сети');
+
+function MyStatus() {
+  const [status, setStatus] = useState<MyStatusValue | null>(null);
+  useEffect(() => {
+    fetch('/api/messenger/status')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => data?.status && setStatus(data.status))
+      .catch(() => {});
+  }, []);
+  async function change(next: MyStatusValue) {
+    const before = status;
+    setStatus(next);
+    const response = await fetch('/api/messenger/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    }).catch(() => null);
+    if (!response?.ok) setStatus(before);
+  }
+  if (!status) return null;
+  return (
+    <Menu
+      portal
+      align="end"
+      width="auto"
+      label={t('Мой статус')}
+      trigger={
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label={t('Мой статус: {0}', statusLabel(status))}
+        >
+          <span className={`inline-block size-2.5 rounded-full ${STATUS_DOT[status]}`} />
+          {statusLabel(status)}
+        </Button>
+      }
+      items={(['online', 'dnd', 'away'] as const).map((value) => ({
+        value,
+        label: statusLabel(value),
+        disabled: value === status,
+        onSelect: () => void change(value),
+      }))}
+    />
   );
 }

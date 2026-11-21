@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import {
+  ArrowDown,
   ArrowLeft,
   CornerUpLeft,
   Ellipsis,
+  HardDrive,
   Smile,
   SmilePlus,
   FileText,
@@ -37,6 +39,7 @@ import LoadingState from '@/components/LoadingState';
 import QuickCreateTask from '@/components/QuickCreateTask';
 import { ChatSettingsModal } from '@/components/messenger/ChatSettings';
 import { ForwardModal } from '@/components/messenger/Dialogs';
+import { DrivePicker } from '@/components/messenger/DrivePicker';
 import { AttachView, FileView, ReadMark } from '@/components/messenger/MessageParts';
 import { PresenceDot } from '@/components/messenger/Presence';
 import { useMessengerEvents, useRealtime } from '@/components/messenger/realtime';
@@ -56,6 +59,7 @@ import {
   reactionsOf,
   readersOf,
   type Dialog,
+  type KeyboardButton,
   type Message,
   type Person,
   type Presence,
@@ -205,6 +209,7 @@ export default function Conversation({
   onPin,
   onRenamed,
   onLeft,
+  onOpenDialog,
 }: {
   dialog: Dialog;
   dialogs: Dialog[];
@@ -216,6 +221,8 @@ export default function Conversation({
   onPin: () => void;
   onRenamed: (title: string) => void;
   onLeft: () => void;
+  /** Кнопка бота «открыть чат». */
+  onOpenDialog?: (id: string) => void;
 }) {
   const cached = snapshots.get(dialog.id);
   const [messages, setMessages] = useState<Message[] | null>(cached?.messages ?? null);
@@ -303,6 +310,9 @@ export default function Conversation({
   const [pins, setPins] = useState<PinnedMessage[]>([]);
   const [reactingTo, setReactingTo] = useState<number | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
+  // Кнопка бота с командой ждёт ответа портала и не нажимается второй раз.
+  const [pressing, setPressing] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   // Сообщение, у которого открыта панель действий (на телефоне вместо наведения).
   const [actionsFor, setActionsFor] = useState<number | null>(null);
@@ -582,6 +592,30 @@ export default function Conversation({
   useEffect(() => {
     if (stickToBottom.current) bottom.current?.scrollIntoView({ block: 'end' });
   }, [newestId]);
+  // Высоту ленты после первой прокрутки меняют картинки, превью ссылок и полоса закрепа:
+  // раньше диалог открывался не внизу. Пока читатель у низа, держим его там при любой
+  // такой перемене. load не всплывает, поэтому слушаем его на погружении.
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
+    const keep = () => {
+      if (stickToBottom.current && !jumpedRef.current) box.scrollTop = box.scrollHeight;
+    };
+    box.addEventListener('load', keep, true);
+    const observer = new ResizeObserver(keep);
+    observer.observe(box);
+    return () => {
+      box.removeEventListener('load', keep, true);
+      observer.disconnect();
+    };
+  }, []);
+  // Стрелка вниз видна, когда читатель ушёл вверх дальше пары экранов сообщений.
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
+  function scrollToLatest() {
+    stickToBottom.current = true;
+    setAwayFromBottom(false);
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
+  }
 
   const nameOf = (message: Message) =>
     people[String(message.authorId)]?.name ||
@@ -806,6 +840,101 @@ export default function Conversation({
           : t('Ветка обсуждения создана'),
     );
     load();
+  }
+
+  // Непрочитано с этого сообщения: диалог закрываем, иначе открытая переписка тут же
+  // отметила бы его прочитанным снова. Список перечитываем, чтобы появился счётчик.
+  async function markUnreadFrom(message: Message) {
+    const response = await fetch('/api/messenger/message', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ messageId: message.id, action: 'unread', dialogId: dialog.id }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError(t('Не удалось отметить непрочитанным. Попробуйте ещё раз.'));
+      return;
+    }
+    onBack();
+    onSent();
+  }
+
+  async function saveToDrive(fileId: number, name: string) {
+    const response = await fetch('/api/messenger/disk', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ action: 'save', fileId }),
+    }).catch(() => null);
+    const data = response?.ok ? await response.json().catch(() => null) : null;
+    if (!data) {
+      setError(t('Не удалось сохранить «{0}» на Диск.', name));
+      return;
+    }
+    setNotice(
+      t('«{0}» сохранён на Диск в папку «{1}»', name, data.folder || t('Сохранённые файлы')),
+    );
+  }
+
+  async function deleteFile(message: Message, fileId: number, name: string) {
+    if (!dialog.chatId) return;
+    const response = await fetch('/api/messenger/disk', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ action: 'delete', chatId: dialog.chatId, fileId }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError(t('Не удалось удалить «{0}»: удалять можно свои файлы.', name));
+      return;
+    }
+    setMessages(
+      (current) =>
+        current &&
+        current.map((m) =>
+          m.id === message.id ? { ...m, files: m.files.filter((file) => file.id !== fileId) } : m,
+        ),
+    );
+  }
+
+  // Кнопки ботов. Ссылки и звонок рисуются ссылками, остальное выполняется здесь:
+  // PUT вставляет текст в поле, SEND отправляет его, COPY копирует, DIALOG открывает чат,
+  // команда уходит боту через im.message.command.
+  async function pressButton(
+    message: Message,
+    button: Extract<KeyboardButton, { kind: 'button' }>,
+  ) {
+    if (button.action === 'PUT' && button.value) {
+      setDraft(button.value);
+      inputRef.current?.focus();
+    } else if (button.action === 'SEND' && button.value) {
+      const response = await fetch('/api/messenger/messages', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ dialogId: dialog.id, text: button.value }),
+      }).catch(() => null);
+      if (!response?.ok) setError(t('Сообщение не отправилось. Попробуйте ещё раз.'));
+      else load();
+    } else if (button.action === 'COPY' && button.value) {
+      await navigator.clipboard?.writeText(button.value).catch(() => {});
+      setNotice(t('Скопировано'));
+    } else if (button.action === 'DIALOG' && button.value) {
+      onOpenDialog?.(button.value);
+    } else if (button.command && button.botId) {
+      const key = `${message.id}:${button.text}`;
+      setPressing(key);
+      const response = await fetch('/api/messenger/message', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({
+          messageId: message.id,
+          action: 'command',
+          botId: button.botId,
+          command: button.command,
+          params: button.params || '',
+        }),
+      }).catch(() => null);
+      setPressing(null);
+      if (!response?.ok) setError(t('Бот не принял команду. Попробуйте ещё раз.'));
+      else setNotice(t('Команда отправлена боту'));
+    }
   }
 
   // Эмодзи встаёт туда, где стоит курсор, а не в конец черновика.
@@ -1481,7 +1610,9 @@ export default function Conversation({
         aria-live="polite"
         onScroll={(event) => {
           const box = event.currentTarget;
-          stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+          const distance = box.scrollHeight - box.scrollTop - box.clientHeight;
+          stickToBottom.current = distance < 80;
+          setAwayFromBottom(distance > 400);
           flushSeen();
         }}
       >
@@ -1696,6 +1827,29 @@ export default function Conversation({
                             label: t('Обсудить в ветке'),
                             onSelect: () => void shareMessage(message, 'CHAT'),
                           },
+                          ...(mine
+                            ? []
+                            : [
+                                {
+                                  label: t('Непрочитано отсюда'),
+                                  onSelect: () => void markUnreadFrom(message),
+                                },
+                              ]),
+                          ...message.files.flatMap((file) => [
+                            {
+                              label: t('Сохранить на Диск: {0}', file.name),
+                              onSelect: () => void saveToDrive(file.id, file.name),
+                            },
+                            ...((mine || role === 'owner' || role === 'manager') && dialog.chatId
+                              ? [
+                                  {
+                                    label: t('Удалить файл: {0}', file.name),
+                                    danger: true,
+                                    onSelect: () => void deleteFile(message, file.id, file.name),
+                                  },
+                                ]
+                              : []),
+                          ]),
                         ]}
                       />
                     </div>
@@ -1726,6 +1880,47 @@ export default function Conversation({
                   {message.attach.map((attach, index) => (
                     <AttachView key={index} attach={attach} />
                   ))}
+                  {message.keyboard && message.keyboard.length > 0 && (
+                    <div
+                      role="group"
+                      aria-label={t('Кнопки бота')}
+                      className="mt-2 flex flex-wrap gap-1.5"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {message.keyboard.map((button, index) =>
+                        button.kind === 'newline' ? (
+                          <span key={index} className="basis-full" />
+                        ) : button.link || button.action === 'CALL' ? (
+                          <a
+                            key={index}
+                            href={button.link || `tel:${button.value}`}
+                            target={
+                              button.link?.startsWith('/') || !button.link ? undefined : '_blank'
+                            }
+                            rel="noreferrer"
+                            aria-disabled={button.disabled || undefined}
+                            className={`inline-flex min-h-8 items-center rounded-ui border border-line bg-canvas px-3 text-xs text-ink hover:bg-surface-2 ${
+                              button.disabled ? 'pointer-events-none opacity-40' : ''
+                            }`}
+                          >
+                            {button.text}
+                          </a>
+                        ) : (
+                          <Button
+                            key={index}
+                            size="sm"
+                            variant="secondary"
+                            disabled={
+                              button.disabled || pressing === `${message.id}:${button.text}`
+                            }
+                            onClick={() => void pressButton(message, button)}
+                          >
+                            {button.text}
+                          </Button>
+                        ),
+                      )}
+                    </div>
+                  )}
                   {!message.text && !message.files.length && !message.attach.length && (
                     <p className="text-sm text-ink-soft">{t('Сообщение без текста')}</p>
                   )}
@@ -1790,6 +1985,19 @@ export default function Conversation({
               </div>
             );
           })
+        )}
+        {awayFromBottom && !jumped && (
+          // sticky внутри ленты: кнопка стоит у нижнего края окна переписки, пока читатель
+          // выше, и не занимает места, когда он внизу.
+          <div className="pointer-events-none sticky bottom-0 z-10 flex justify-end">
+            <IconButton
+              label={t('Прокрутить вниз')}
+              className="pointer-events-auto rounded-full bg-canvas shadow-overlay"
+              onClick={scrollToLatest}
+            >
+              <ArrowDown className="size-4" strokeWidth={1.7} />
+            </IconButton>
+          </div>
         )}
         <div ref={bottom} />
       </div>
@@ -1930,6 +2138,15 @@ export default function Conversation({
             >
               <Paperclip className="size-4" strokeWidth={1.7} />
             </Button>
+            <Button
+              variant="quiet"
+              disabled={sending}
+              onClick={() => setDriveOpen(true)}
+              aria-label={t('Файл с Диска')}
+              className="max-sm:hidden"
+            >
+              <HardDrive className="size-4" strokeWidth={1.7} />
+            </Button>
             <Popover
               open={emojiOpen}
               onOpenChange={setEmojiOpen}
@@ -2036,6 +2253,19 @@ export default function Conversation({
         description={t('Сообщение удалится у всех участников чата.')}
         confirmLabel={t('Удалить')}
       />
+      {/* Монтируется только открытым: каждое открытие начинается с корня Диска. */}
+      {driveOpen && (
+        <DrivePicker
+          open
+          dialogId={dialog.id}
+          onClose={() => setDriveOpen(false)}
+          onSent={() => {
+            setNotice(t('Файлы с Диска отправлены'));
+            load();
+            onSent();
+          }}
+        />
+      )}
       {taskFrom && (
         <QuickCreateTask initial={taskDraft(taskFrom)} onClose={() => setTaskFrom(null)} />
       )}
