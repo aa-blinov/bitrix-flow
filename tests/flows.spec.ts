@@ -1916,6 +1916,16 @@ test('переносы сроков: перенос из чата задачи �
   await expect(row).toContainText('2');
   await page.getByRole('button', { name: /Перенесены повторно/ }).click();
   await expect(row).toBeVisible();
+  // База потока общая: оставленные записи попадали в снимок страницы уведомлений.
+  const cleanup = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    await cleanup
+      .db(testDb)
+      .collection('notifications')
+      .deleteMany({ messageId: { $in: ['901', '902'] } });
+  } finally {
+    await cleanup.close();
+  }
 });
 
 test('закрытые без списаний: отчёт открывается из меню', async ({ page }, testInfo) => {

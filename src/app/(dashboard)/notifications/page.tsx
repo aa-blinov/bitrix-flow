@@ -266,7 +266,8 @@ export default function NotificationsPage() {
                     : null;
                   const createdAt = item.created_at || item.createdAt;
                   const typeLabel = noticeLabel(item.type);
-                  const titleIncludesType = item.title
+                  // Запись без заголовка роняла всю страницу: событие портала его не обещает.
+                  const titleIncludesType = (item.title || '')
                     .toLocaleLowerCase('ru')
                     .startsWith(typeLabel.toLocaleLowerCase('ru'));
                   const content = (
