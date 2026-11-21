@@ -73,6 +73,8 @@ export type Dialog = {
   entityId?: string;
   /** Владелец группового чата (im.dialog.get), для передачи владения в настройках. */
   ownerId?: number;
+  /** Описание группового чата (im.dialog.get), для настроек. */
+  description?: string;
   lastMessage?: { id: number; text: string; date: string; authorId: number };
   /** Заготовка приложения до первого ответа портала: настоящая запись её всегда заменяет. */
   local?: boolean;
@@ -91,7 +93,7 @@ export type MessageFile = {
 export type AttachBlock =
   | { type: 'text'; text: string }
   | { type: 'user'; name: string }
-  | { type: 'link'; name: string; link: string; desc?: string }
+  | { type: 'link'; name: string; link: string; desc?: string; preview?: string }
   | { type: 'grid'; rows: { name: string; value: string }[] }
   | { type: 'files'; names: string[] }
   | { type: 'delimiter' };
@@ -105,6 +107,13 @@ export type Message = {
   edited: boolean;
   /** Кто поставил лайк: params.LIKE, список id пользователей. */
   likes: number[];
+  /**
+   * Реакции по коду: im.dialog.messages.get сводит любую реакцию в LIKE, поэтому коды
+   * догружаются из im.v2. Нет поля: подробностей нет, показываем likes как лайки.
+   */
+  reactions?: Record<string, number[]>;
+  /** Сообщение закреплено в чате (params.IS_PINNED). */
+  pinned?: boolean;
   files: MessageFile[];
   attach: Attach[];
 };
@@ -179,6 +188,27 @@ export const VOICE_NAME = 'Голосовое сообщение';
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 export const DIALOGS_PAGE = 50;
+
+// Цвета чата, которые принимает im.chat.updateColor: портал знает только эти имена.
+// Значения сверены с тем, что портал отдаёт в im.dialog.get после смены цвета.
+export const CHAT_COLORS: { name: string; hex: string }[] = [
+  { name: 'RED', hex: '#df532d' },
+  { name: 'GREEN', hex: '#64a513' },
+  { name: 'MINT', hex: '#4ba984' },
+  { name: 'LIGHT_BLUE', hex: '#4ba5c3' },
+  { name: 'DARK_BLUE', hex: '#3e99ce' },
+  { name: 'PURPLE', hex: '#8474c8' },
+  { name: 'AQUA', hex: '#1eb4aa' },
+  { name: 'PINK', hex: '#f76187' },
+  { name: 'LIME', hex: '#58cc47' },
+  { name: 'BROWN', hex: '#ab7761' },
+  { name: 'AZURE', hex: '#29619b' },
+  { name: 'KHAKI', hex: '#728f7a' },
+  { name: 'SAND', hex: '#ba9c7b' },
+  { name: 'MARENGO', hex: '#556574' },
+  { name: 'GRAY', hex: '#909090' },
+  { name: 'GRAPHITE', hex: '#5e5f5e' },
+];
 // LIMIT метода im.dialog.messages.get: больше 50 портал не отдаёт.
 export const MESSAGES_PAGE = 50;
 
@@ -242,7 +272,19 @@ function normalizeAttach(raw: any): Attach[] {
           link: String(block.LINK.LINK),
           desc: block.LINK.DESC ? String(block.LINK.DESC) : undefined,
         });
-      else if (Array.isArray(block.GRID))
+      // Превью ссылки портал строит сам и кладёт блоком RICH_LINK.
+      else if (Array.isArray(block.RICH_LINK) && block.RICH_LINK[0]?.LINK) {
+        const rich = block.RICH_LINK[0];
+        blocks.push({
+          type: 'link',
+          name: String(rich.NAME || rich.LINK),
+          link: String(rich.LINK),
+          desc: rich.DESC ? String(rich.DESC) : undefined,
+          preview: /^https:\/\//.test(String(rich.PREVIEW || ''))
+            ? String(rich.PREVIEW)
+            : undefined,
+        });
+      } else if (Array.isArray(block.GRID))
         blocks.push({
           type: 'grid',
           rows: block.GRID.map((cell: any) => ({
@@ -296,6 +338,7 @@ export function normalizeMessages(result: any): {
         date: String(m.date || ''),
         edited: m.params?.IS_EDITED === 'Y',
         likes: Array.isArray(m.params?.LIKE) ? m.params.LIKE.map(Number) : [],
+        pinned: m.params?.IS_PINNED === 'Y',
         // params приходит пустым массивом, а не объектом, если параметров нет.
         // Портал не прислал запись файла: вложение не выкидываем, а показываем по номеру.
         // Скачивание и пересылка идут по id, поэтому файл остаётся доступным.
@@ -443,6 +486,8 @@ export function normalizeDialogInfo(result: any, id: string): Dialog | null {
     chatId: Number(result.id) || undefined,
     entityId: result.entity_id ? String(result.entity_id) : undefined,
     ownerId: Number(result.owner) || undefined,
+    description: result.description ? String(result.description) : undefined,
+    color: result.color ? String(result.color) : undefined,
     unread: Number(result.counter) || 0,
     date: String(result.date_create || new Date().toISOString()),
   };
@@ -487,4 +532,53 @@ export function portalErrorHint(message: unknown): string | null {
   if (/expired_token|invalid_token|NO_AUTH/i.test(text))
     return t('Доступ приложения к порталу истёк. Откройте приложение из Битрикс24 заново.');
   return null;
+}
+
+// Реакции портала (коды im.v2.Chat.Message.Reaction.add). Эмодзи собираются из кодовых
+// точек: эмодзи в исходниках запрещены стилем репозитория.
+export const REACTIONS: { code: string; points: number[] }[] = [
+  { code: 'like', points: [0x1f44d] },
+  { code: 'redHeart', points: [0x2764, 0xfe0f] },
+  { code: 'faceWithTearsOfJoy', points: [0x1f602] },
+  { code: 'fire', points: [0x1f525] },
+  { code: 'clappingHands', points: [0x1f44f] },
+  { code: 'wonder', points: [0x1f62e] },
+  { code: 'cry', points: [0x1f622] },
+  { code: 'thinkingFace', points: [0x1f914] },
+  { code: 'foldedHands', points: [0x1f64f] },
+  { code: 'okHand', points: [0x1f44c] },
+  { code: 'eyes', points: [0x1f440] },
+  { code: 'whiteHeavyCheckMark', points: [0x2705] },
+];
+const REACTION_CODES = new Set(REACTIONS.map((reaction) => reaction.code));
+export const isReaction = (code: unknown): code is string =>
+  typeof code === 'string' && REACTION_CODES.has(code);
+// Код, которого нет в нашем наборе (портал их добавляет без предупреждения), не теряется:
+// показываем его как лайк, а не прячем чужую реакцию.
+export const reactionEmoji = (code: string) =>
+  String.fromCodePoint(
+    ...(REACTIONS.find((reaction) => reaction.code === code)?.points || [0x1f44d]),
+  );
+
+/** Реакции сообщения: подробные из im.v2, иначе лайки. */
+export const reactionsOf = (message: Message): Record<string, number[]> =>
+  message.reactions || (message.likes.length ? { like: message.likes } : {});
+
+/** Подмешивает реакции из ответа im.v2.Chat.Message.tail к сообщениям старого метода. */
+export function applyReactions(messages: Message[], raw: unknown): Message[] {
+  if (!Array.isArray(raw)) return messages;
+  const byMessage = new Map<number, Record<string, number[]>>();
+  for (const item of raw as { messageId?: unknown; reactionUsers?: unknown }[]) {
+    const users = item?.reactionUsers;
+    if (!item?.messageId || !users || typeof users !== 'object') continue;
+    const map: Record<string, number[]> = {};
+    for (const [code, ids] of Object.entries(users))
+      if (Array.isArray(ids) && ids.length) map[code] = ids.map(Number);
+    byMessage.set(Number(item.messageId), map);
+  }
+  // Сообщения с лайками, которых нет в ответе im.v2, оставляем как есть: ответ мог быть
+  // неполным, и пустая карта стёрла бы видимые реакции.
+  return messages.map((message) =>
+    byMessage.has(message.id) ? { ...message, reactions: byMessage.get(message.id) } : message,
+  );
 }

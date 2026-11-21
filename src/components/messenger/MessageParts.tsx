@@ -279,7 +279,19 @@ export function AttachView({ attach }: { attach: Attach }) {
                   {block.name}
                 </a>
               )}
-              {block.desc && <p className="text-xs text-ink-soft">{block.desc}</p>}
+              {block.desc && <p className="line-clamp-3 text-xs text-ink-soft">{block.desc}</p>}
+              {/* Картинку превью портал берёт с самого сайта. no-referrer: сайту незачем
+                  знать, из какого чата по ней пришли. */}
+              {block.preview && (
+                // eslint-disable-next-line @next/next/no-img-element -- чужой адрес, не наша статика
+                <img
+                  src={block.preview}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="mt-1 max-h-40 w-auto max-w-full rounded-ui border border-line object-cover"
+                />
+              )}
             </div>
           );
         if (block.type === 'grid')

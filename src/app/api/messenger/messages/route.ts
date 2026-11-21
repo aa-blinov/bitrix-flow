@@ -3,6 +3,7 @@ import { withMessenger } from '@/lib/messenger-api';
 import {
   DIALOG_ID,
   MESSAGES_PAGE,
+  applyReactions,
   canPostIn,
   normalizeMessages,
   normalizeReaders,
@@ -26,7 +27,8 @@ export function GET(req: NextRequest) {
   return withMessenger(req, async (call) => {
     // Прочитанность нужна только свежей порции: при листании вверх историю
     // читать заново незачем. Сбой этого вызова не должен ронять сами сообщения.
-    const [result, dialog] = await Promise.all([
+    const full = !beforeId && !afterId;
+    const [result, dialog, chat] = await Promise.all([
       call('im.dialog.messages.get', {
         DIALOG_ID: dialogId,
         LIMIT: String(MESSAGES_PAGE),
@@ -34,12 +36,35 @@ export function GET(req: NextRequest) {
         ...(/^\d{1,12}$/.test(afterId) ? { FIRST_ID: afterId } : {}),
       }),
       beforeId ? null : call('im.dialog.get', { DIALOG_ID: dialogId }).catch(() => null),
+      // Закреплённые сообщения отдаёт только im.v2.Chat.load. Берём их при открытии и полном
+      // перечитывании (раз в несколько опросов), а не на каждый опрос новых.
+      full ? call('im.v2.Chat.load', { dialogId, limit: 1 }).catch(() => null) : null,
     ]);
     // Ответ без списка сообщений не пустая история: иначе полное перечитывание стёрло бы её.
     if (!Array.isArray(result?.messages))
       return NextResponse.json({ error: 'BAD_PORTAL_RESPONSE' }, { status: 502 });
+    const normalized = normalizeMessages(result);
+    // Старый метод сводит любую реакцию в LIKE. Коды берём из im.v2 той же порцией, и только
+    // если в ней есть отметки: опрос без реакций лишнего вызова портала не делает.
+    const liked = normalized.messages.filter((message) => message.likes.length);
+    if (liked.length && Number(result.chat_id) > 0) {
+      const first = normalized.messages[0].id;
+      const tail = await call(
+        'im.v2.Chat.Message.tail',
+        {
+          chatId: Number(result.chat_id),
+          filter: { lastId: first - 1 },
+          order: { id: 'ASC' },
+          limit: normalized.messages.length,
+        },
+        false,
+        true,
+      ).catch(() => null);
+      normalized.messages = applyReactions(normalized.messages, tail?.reactions);
+    }
     return NextResponse.json({
-      ...normalizeMessages(result),
+      ...normalized,
+      ...(chat ? { pins: pinsOf(chat) } : {}),
       ...(dialog
         ? {
             readers: normalizeReaders(dialog, me),
@@ -49,6 +74,30 @@ export function GET(req: NextRequest) {
         : {}),
     });
   });
+}
+
+type Pin = { id: number; authorId: number; text: string };
+
+// Закреп чата: im.v2.Chat.load отдаёт номера в pins, а сами сообщения в messages и
+// additionalMessages. Сообщение, которого в ответе нет, всё равно показываем по номеру.
+function pinsOf(chat: {
+  pins?: { messageId?: unknown }[];
+  messages?: { id?: unknown; authorId?: unknown; text?: unknown }[];
+  additionalMessages?: { id?: unknown; authorId?: unknown; text?: unknown }[];
+}): Pin[] {
+  const bodies = new Map<number, { authorId?: unknown; text?: unknown }>();
+  for (const message of [...(chat?.messages || []), ...(chat?.additionalMessages || [])])
+    bodies.set(Number(message?.id), message);
+  return (Array.isArray(chat?.pins) ? chat.pins : [])
+    .map((pin) => {
+      const body = bodies.get(Number(pin?.messageId));
+      return {
+        id: Number(pin?.messageId) || 0,
+        authorId: Number(body?.authorId) || 0,
+        text: String(body?.text || ''),
+      };
+    })
+    .filter((pin) => pin.id > 0);
 }
 
 export async function POST(req: NextRequest) {

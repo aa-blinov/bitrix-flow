@@ -96,7 +96,7 @@ export function NewChatModal({
   onClose: () => void;
   onOpen: (dialog: Opened) => void;
 }) {
-  const [mode, setMode] = useState<'user' | 'group'>('user');
+  const [mode, setMode] = useState<'user' | 'group' | 'channel'>('user');
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<UserHit[]>([]);
   const [title, setTitle] = useState('');
@@ -117,8 +117,12 @@ export function NewChatModal({
     setError('');
   }, [open]);
 
+  // Группа и канал создаются из одного окна. Каналу участники не обязательны: в канал
+  // подписывают позже, а писать в нём могут только администраторы.
+  const channel = mode === 'channel';
+  const many = mode !== 'user';
   async function createGroup() {
-    if (!title.trim() || !picked.length || creating) return;
+    if (!title.trim() || (!channel && !picked.length) || creating) return;
     const mine = session.current;
     setCreating(true);
     setError('');
@@ -126,7 +130,11 @@ export function NewChatModal({
       const response = await fetch('/api/messenger/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), userIds: picked.map((user) => user.id) }),
+        body: JSON.stringify({
+          title: title.trim(),
+          userIds: picked.map((user) => user.id),
+          ...(channel ? { kind: 'channel' } : {}),
+        }),
       }).catch(() => null);
       // Нет ответа или портал не ответил: чат мог создаться, повтор дал бы второй.
       if (mine !== session.current) return;
@@ -146,7 +154,7 @@ export function NewChatModal({
         return;
       }
       if (mine === session.current)
-        onOpen({ id: data.dialogId, kind: 'chat', title: title.trim() });
+        onOpen({ id: data.dialogId, kind: channel ? 'channel' : 'chat', title: title.trim() });
     } catch {
       // Окно закрыли и открыли заново: ошибка прошлой группы к нему не относится.
       if (mine === session.current) setError(t('Не удалось создать чат. Попробуйте ещё раз.'));
@@ -171,14 +179,15 @@ export function NewChatModal({
           options={[
             { value: 'user', label: t('Личный') },
             { value: 'group', label: t('Группа') },
+            { value: 'channel', label: t('Канал') },
           ]}
           value={mode}
-          onChange={(value) => setMode(value as 'user' | 'group')}
+          onChange={(value) => setMode(value as 'user' | 'group' | 'channel')}
         />
-        {mode === 'group' && (
+        {many && (
           <TextField
             id="new-chat-title"
-            label={t('Название группы')}
+            label={channel ? t('Название канала') : t('Название группы')}
             variant="boxed"
             size="sm"
             value={title}
@@ -186,7 +195,7 @@ export function NewChatModal({
             onChange={(event) => setTitle(event.target.value)}
           />
         )}
-        {mode === 'group' && picked.length > 0 && (
+        {many && picked.length > 0 && (
           <ul className="flex flex-wrap gap-1.5" aria-label={t('Участники')}>
             {picked.map((user) => (
               <li key={user.id}>
@@ -228,7 +237,7 @@ export function NewChatModal({
                 <UserRow
                   key={user.id}
                   user={user}
-                  selected={mode === 'group' && picked.some((item) => item.id === user.id)}
+                  selected={many && picked.some((item) => item.id === user.id)}
                   onClick={() =>
                     mode === 'user'
                       ? onOpen({
@@ -250,13 +259,13 @@ export function NewChatModal({
             {error}
           </p>
         )}
-        {mode === 'group' && (
+        {many && (
           <div className="flex justify-end">
             <Button
               onClick={() => void createGroup()}
-              disabled={!title.trim() || !picked.length || creating}
+              disabled={!title.trim() || (!channel && !picked.length) || creating}
             >
-              {creating ? t('Создаём') : t('Создать группу')}
+              {creating ? t('Создаём') : channel ? t('Создать канал') : t('Создать группу')}
             </Button>
           </div>
         )}

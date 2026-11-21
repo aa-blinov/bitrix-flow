@@ -8,8 +8,9 @@ import { Avatar } from '@/components/monos/Avatar';
 import { Button } from '@/components/monos/Button';
 import { Modal } from '@/components/monos/Modal';
 import { SearchField } from '@/components/monos/SearchField';
+import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
-import type { Dialog, UserHit } from '@/lib/messenger';
+import { CHAT_COLORS, type Dialog, type UserHit } from '@/lib/messenger';
 import { t } from '@/lib/i18n';
 
 const post = (body: Record<string, unknown>) =>
@@ -50,6 +51,12 @@ export function ChatSettingsModal({
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [ownerId, setOwnerId] = useState<number | null>(null);
   const [newOwner, setNewOwner] = useState<UserHit | null>(null);
+  // Описание и цвет приходят из im.dialog.get вместе с владельцем.
+  const [description, setDescription] = useState('');
+  const [savedDescription, setSavedDescription] = useState('');
+  const [color, setColor] = useState('');
+  const [notice, setNotice] = useState('');
+  const avatarInput = useRef<HTMLInputElement>(null);
 
   // Состав перечитывается после каждого действия: применяем только последний ответ,
   // иначе поздний старый вернул бы исключённого участника.
@@ -77,7 +84,13 @@ export function ChatSettingsModal({
     () =>
       fetch(`/api/messenger/dialogs?dialogId=${encodeURIComponent(dialog.id)}`)
         .then((response) => (response.ok ? response.json() : null))
-        .then((data) => setOwnerId(Number(data?.dialog?.ownerId) || null))
+        .then((data) => {
+          setOwnerId(Number(data?.dialog?.ownerId) || null);
+          const text = String(data?.dialog?.description || '');
+          setDescription(text);
+          setSavedDescription(text);
+          setColor(String(data?.dialog?.color || '').toLowerCase());
+        })
         .catch(() => setOwnerId(null)),
     [dialog.id],
   );
@@ -100,6 +113,7 @@ export function ChatSettingsModal({
     if (!open) return;
     setTitle(titleRef.current);
     setError('');
+    setNotice('');
     setQuery('');
     // Состав с прошлого открытия мог устареть: до ответа не предлагаем по нему действий.
     setMembers(null);
@@ -230,6 +244,92 @@ export function ChatSettingsModal({
             </Button>
           </form>
 
+          <form
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = description.trim();
+              if (busy || next === savedDescription) return;
+              void run(async () => {
+                await post({ dialogId: dialog.id, action: 'describe', description: next });
+                setSavedDescription(next);
+                setNotice(t('Описание сохранено'));
+              }, t('Не удалось сохранить описание: это может владелец чата.'));
+            }}
+          >
+            <TextArea
+              id="chat-settings-description"
+              label={t('Описание')}
+              variant="boxed"
+              rows={2}
+              maxLength={2000}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                disabled={busy || description.trim() === savedDescription}
+              >
+                {t('Сохранить описание')}
+              </Button>
+            </div>
+          </form>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div role="radiogroup" aria-label={t('Цвет чата')} className="flex flex-wrap gap-1.5">
+              {/* Цвета это данные портала (im.chat.updateColor знает только эти имена),
+                  а не палитра приложения, поэтому они заданы значениями. */}
+              {CHAT_COLORS.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={color === item.hex}
+                  aria-label={t('Цвет {0}', item.name.toLowerCase())}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await post({ dialogId: dialog.id, action: 'color', color: item.name });
+                      setColor(item.hex);
+                    }, t('Не удалось сменить цвет: на это нужны права в чате.'))
+                  }
+                  style={{ backgroundColor: item.hex }}
+                  className={`size-6 rounded-full border-2 ${
+                    color === item.hex ? 'border-ink' : 'border-transparent'
+                  }`}
+                />
+              ))}
+            </div>
+            <input
+              ref={avatarInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              hidden
+              aria-label={t('Аватар чата')}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (!file) return;
+                void run(async () => {
+                  const avatar = await squareAvatar(file);
+                  await post({ dialogId: dialog.id, action: 'avatar', avatar });
+                  setNotice(t('Аватар обновлён'));
+                }, t('Не удалось сменить аватар: нужна картинка PNG, JPEG или WebP и права в чате.'));
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => avatarInput.current?.click()}
+            >
+              {t('Сменить аватар')}
+            </Button>
+          </div>
+
           <div>
             <p className="mb-1.5 text-xs uppercase tracking-widest text-ink-soft">
               {t('Участники')}
@@ -320,6 +420,11 @@ export function ChatSettingsModal({
               {error}
             </p>
           )}
+          {notice && !error && (
+            <p role="status" className="text-sm text-ink-soft">
+              {notice}
+            </p>
+          )}
           <div className="flex justify-end">
             <Button variant="secondary" disabled={busy} onClick={() => setConfirmLeave(true)}>
               {t('Выйти из чата')}
@@ -363,4 +468,29 @@ export function ChatSettingsModal({
       />
     </>
   );
+}
+
+// Портал хранит аватар квадратом, а фото с телефона весят мегабайты: ужимаем до 256 px
+// по центру. Ответ base64 без префикса data:, как ждёт im.chat.updateAvatar.
+async function squareAvatar(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  canvas
+    .getContext('2d')
+    ?.drawImage(
+      bitmap,
+      (bitmap.width - side) / 2,
+      (bitmap.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      256,
+      256,
+    );
+  bitmap.close();
+  return canvas.toDataURL('image/png').split(',')[1] || '';
 }

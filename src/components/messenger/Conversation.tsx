@@ -4,6 +4,9 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   CornerUpLeft,
+  Ellipsis,
+  Smile,
+  SmilePlus,
   FileText,
   Pin,
   Users,
@@ -24,6 +27,8 @@ import { Avatar } from '@/components/monos/Avatar';
 import { Button } from '@/components/monos/Button';
 import { AlertDialog } from '@/components/monos/AlertDialog';
 import { IconButton } from '@/components/monos/IconButton';
+import { Menu } from '@/components/monos/Menu';
+import { Popover } from '@/components/monos/Popover';
 import { SearchField } from '@/components/monos/SearchField';
 import { TextArea } from '@/components/monos/TextArea';
 import BitrixText from '@/components/BitrixText';
@@ -45,7 +50,10 @@ import {
   formatBytes,
   mergeMessages,
   presenceText,
+  REACTIONS,
   quoteBlock,
+  reactionEmoji,
+  reactionsOf,
   readersOf,
   type Dialog,
   type Message,
@@ -121,6 +129,70 @@ function forgetFile(dialogId: string, file: File) {
   if (saved) drafts.set(dialogId, { ...saved, files: saved.files.filter((item) => item !== file) });
   for (const listener of sentListeners) listener({ dialogId, file });
 }
+
+type PinnedMessage = { id: number; authorId: number; text: string };
+
+// Подписи реакций для экранного диктора: сам значок он читает невнятно.
+const reactionLabel = (code: string): string =>
+  ({
+    like: t('Нравится'),
+    redHeart: t('Сердце'),
+    faceWithTearsOfJoy: t('Смешно'),
+    fire: t('Огонь'),
+    clappingHands: t('Аплодисменты'),
+    wonder: t('Удивление'),
+    cry: t('Грустно'),
+    thinkingFace: t('Задумался'),
+    foldedHands: t('Спасибо'),
+    okHand: t('Хорошо'),
+    eyes: t('Смотрю'),
+    whiteHeavyCheckMark: t('Готово'),
+  })[code] || t('Реакция');
+
+// Частые эмодзи для поля ввода. Кодовые точки, а не символы: эмодзи в исходниках
+// запрещены стилем репозитория. Остальные доступны системной панелью ОС.
+const EMOJI = [
+  [0x1f600],
+  [0x1f603],
+  [0x1f604],
+  [0x1f601],
+  [0x1f605],
+  [0x1f602],
+  [0x1f60a],
+  [0x1f609],
+  [0x1f60d],
+  [0x1f618],
+  [0x1f60e],
+  [0x1f914],
+  [0x1f644],
+  [0x1f62e],
+  [0x1f622],
+  [0x1f62d],
+  [0x1f621],
+  [0x1f973],
+  [0x1f60f],
+  [0x1f634],
+  [0x1f44d],
+  [0x1f44e],
+  [0x1f44f],
+  [0x1f64f],
+  [0x1f44c],
+  [0x270c, 0xfe0f],
+  [0x1f91d],
+  [0x1f4aa],
+  [0x1f440],
+  [0x1f525],
+  [0x2764, 0xfe0f],
+  [0x1f494],
+  [0x2705],
+  [0x274c],
+  [0x26a0, 0xfe0f],
+  [0x2753],
+  [0x1f4a1],
+  [0x1f680],
+  [0x1f389],
+  [0x1f4cc],
+].map((points) => String.fromCodePoint(...points));
 
 export default function Conversation({
   dialog,
@@ -227,6 +299,10 @@ export default function Conversation({
   const [deleting, setDeleting] = useState<Message | null>(null);
   const [forwarding, setForwarding] = useState<Message | null>(null);
   const [taskFrom, setTaskFrom] = useState<Message | null>(null);
+  // Закреплённые сообщения чата: приходят с полным перечитыванием, правятся оптимистично.
+  const [pins, setPins] = useState<PinnedMessage[]>([]);
+  const [reactingTo, setReactingTo] = useState<number | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [notice, setNotice] = useState('');
   // Сообщение, у которого открыта панель действий (на телефоне вместо наведения).
   const [actionsFor, setActionsFor] = useState<number | null>(null);
@@ -262,6 +338,7 @@ export default function Conversation({
               readers?: Reader[];
               canPost?: boolean;
               role?: string;
+              pins?: PinnedMessage[];
             }>)
           : Promise.reject(new Error(String(response.status))),
       ),
@@ -356,6 +433,7 @@ export default function Conversation({
         setError((current) => (current === t('Не удалось загрузить сообщения.') ? '' : current));
         setPeople((known) => ({ ...known, ...data.people }));
         if (data.readers) setReaders(data.readers);
+        if (data.pins) setPins(data.pins);
         if (data.canPost !== undefined) setCanPost(data.canPost);
         if (data.role !== undefined) setRole(data.role);
         if (first) setHasOlder(data.messages.length >= MESSAGES_PAGE);
@@ -660,6 +738,90 @@ export default function Conversation({
     if (!response?.ok) apply(message.likes);
   }
 
+  // Реакция видна сразу и откатывается, если портал отказал. Лайк это тоже реакция, поэтому
+  // списки likes и reactions меняются вместе.
+  async function toggleReaction(message: Message, code: string) {
+    setReactingTo(null);
+    const before = reactionsOf(message);
+    const mine = (before[code] || []).includes(me);
+    const next: Record<string, number[]> = { ...before };
+    next[code] = mine ? next[code].filter((id) => id !== me) : [...(next[code] || []), me];
+    if (!next[code].length) delete next[code];
+    const likes = [...new Set(Object.values(next).flat())];
+    const apply = (reactions: Record<string, number[]>, likeIds: number[]) =>
+      setMessages(
+        (current) =>
+          current &&
+          current.map((m) => (m.id === message.id ? { ...m, reactions, likes: likeIds } : m)),
+      );
+    apply(next, likes);
+    const response = await fetch('/api/messenger/message', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        messageId: message.id,
+        action: mine ? 'unreact' : 'react',
+        reaction: code,
+      }),
+    }).catch(() => null);
+    if (!response?.ok) apply(before, message.likes);
+  }
+
+  async function togglePin(message: Message) {
+    const pinned = pins.some((pin) => pin.id === message.id);
+    const before = pins;
+    setPins(
+      pinned
+        ? pins.filter((pin) => pin.id !== message.id)
+        : [{ id: message.id, authorId: message.authorId, text: message.text }, ...pins],
+    );
+    const response = await fetch('/api/messenger/message', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ messageId: message.id, action: pinned ? 'unpin' : 'pin' }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setPins(before);
+      setError(t('Не удалось изменить закреп: на это нужны права в чате.'));
+    }
+  }
+
+  // Встреча, пост в ленте или ветка обсуждения из сообщения. Портал отвечает true и пишет
+  // в чат служебное сообщение со ссылкой на созданное, его подтянет следующий опрос.
+  async function shareMessage(message: Message, type: 'CALEND' | 'POST' | 'CHAT') {
+    const response = await fetch('/api/messenger/message', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ messageId: message.id, action: 'share', type, dialogId: dialog.id }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setError(t('Не удалось создать из сообщения. Попробуйте ещё раз.'));
+      return;
+    }
+    setNotice(
+      type === 'CALEND'
+        ? t('Встреча создана в календаре')
+        : type === 'POST'
+          ? t('Пост создан в ленте')
+          : t('Ветка обсуждения создана'),
+    );
+    load();
+  }
+
+  // Эмодзи встаёт туда, где стоит курсор, а не в конец черновика.
+  function insertEmoji(emoji: string) {
+    const input = inputRef.current;
+    const at = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? at;
+    const next = draft.slice(0, at) + emoji + draft.slice(end);
+    setDraft(next);
+    setEmojiOpen(false);
+    window.requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(at + emoji.length, at + emoji.length);
+    });
+  }
+
   const restoreDraft = () => {
     setDraft(beforeEdit.current);
     setMentions(beforeEditMentions.current);
@@ -711,7 +873,14 @@ export default function Conversation({
         current &&
         current.map((m) =>
           m.id === target.id
-            ? { ...m, text: t('Это сообщение было удалено.'), files: [], attach: [], likes: [] }
+            ? {
+                ...m,
+                text: t('Это сообщение было удалено.'),
+                files: [],
+                attach: [],
+                likes: [],
+                reactions: undefined,
+              }
             : m,
         ),
     );
@@ -1288,6 +1457,22 @@ export default function Conversation({
           )}
         </div>
       )}
+      {pins.length > 0 && (
+        <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-1.5 text-sm">
+          <Pin className="size-3.5 shrink-0 text-ink-soft" strokeWidth={1.7} />
+          <button
+            type="button"
+            onClick={() => void jumpTo(pins[0].id)}
+            aria-label={t('Перейти к закреплённому сообщению')}
+            className="min-w-0 flex-1 truncate text-left text-ink hover:underline"
+          >
+            {bitrixPlainText(pins[0].text, parseMessageNodes) || t('Вложение')}
+          </button>
+          {pins.length > 1 && (
+            <span className="shrink-0 text-xs text-ink-soft">{t('ещё {0}', pins.length - 1)}</span>
+          )}
+        </div>
+      )}
       <div
         ref={scroller}
         // Сверху запас под панель действий: она стоит над сообщением, и у самого первого
@@ -1368,7 +1553,9 @@ export default function Conversation({
                 >
                   {!deleted && (
                     <div
-                      className={`absolute right-2 bottom-full z-10 mb-1 gap-0.5 rounded-ui border border-line bg-canvas p-0.5 shadow-overlay group-focus-within:flex group-hover:flex ${
+                      // У чужих сообщений (они слева) панель растёт вправо, в сторону переписки:
+                      // прижатая к правому краю, она уходила на список диалогов.
+                      className={`absolute ${mine ? 'right-2' : 'left-2'} bottom-full z-10 mb-1 gap-0.5 rounded-ui border border-line bg-canvas p-0.5 shadow-overlay group-focus-within:flex group-hover:flex ${
                         actionsFor === message.id ? 'flex' : 'hidden'
                       }`}
                       onClick={(event) => event.stopPropagation()}
@@ -1395,6 +1582,45 @@ export default function Conversation({
                           strokeWidth={1.7}
                         />
                       </IconButton>
+                      <Popover
+                        open={reactingTo === message.id}
+                        onOpenChange={(open) => setReactingTo(open ? message.id : null)}
+                        placement="top"
+                        align="end"
+                        panelClassName="w-60 p-1"
+                        trigger={
+                          <IconButton
+                            label={t('Реакция')}
+                            variant="ghost"
+                            size="sm"
+                            tooltipText=""
+                            className="max-sm:h-9 max-sm:w-9"
+                          >
+                            <SmilePlus className="size-3.5" strokeWidth={1.7} />
+                          </IconButton>
+                        }
+                      >
+                        <div
+                          role="group"
+                          aria-label={t('Реакции')}
+                          className="grid grid-cols-6 gap-0.5"
+                        >
+                          {REACTIONS.map((reaction) => (
+                            <button
+                              key={reaction.code}
+                              type="button"
+                              aria-label={reactionLabel(reaction.code)}
+                              aria-pressed={(reactionsOf(message)[reaction.code] || []).includes(
+                                me,
+                              )}
+                              onClick={() => void toggleReaction(message, reaction.code)}
+                              className="flex size-9 items-center justify-center rounded-ui text-lg hover:bg-surface-2 aria-pressed:bg-surface-2"
+                            >
+                              {reactionEmoji(reaction.code)}
+                            </button>
+                          ))}
+                        </div>
+                      </Popover>
                       <IconButton
                         label={t('Создать задачу')}
                         variant="ghost"
@@ -1435,6 +1661,43 @@ export default function Conversation({
                           <Trash2 className="size-3.5" strokeWidth={1.7} />
                         </IconButton>
                       )}
+                      <Menu
+                        label={t('Ещё')}
+                        align="end"
+                        width="auto"
+                        portal
+                        trigger={
+                          <IconButton
+                            label={t('Ещё')}
+                            variant="ghost"
+                            size="sm"
+                            tooltipText=""
+                            className="max-sm:h-9 max-sm:w-9"
+                          >
+                            <Ellipsis className="size-3.5" strokeWidth={1.7} />
+                          </IconButton>
+                        }
+                        items={[
+                          {
+                            label: pins.some((pin) => pin.id === message.id)
+                              ? t('Открепить сообщение')
+                              : t('Закрепить сообщение'),
+                            onSelect: () => void togglePin(message),
+                          },
+                          {
+                            label: t('Создать встречу'),
+                            onSelect: () => void shareMessage(message, 'CALEND'),
+                          },
+                          {
+                            label: t('Пост в ленту'),
+                            onSelect: () => void shareMessage(message, 'POST'),
+                          },
+                          {
+                            label: t('Обсудить в ветке'),
+                            onSelect: () => void shareMessage(message, 'CHAT'),
+                          },
+                        ]}
+                      />
                     </div>
                   )}
                   {!mine && dialog.kind !== 'user' && (
@@ -1467,24 +1730,52 @@ export default function Conversation({
                     <p className="text-sm text-ink-soft">{t('Сообщение без текста')}</p>
                   )}
                   <div className="mt-1 flex items-center justify-end gap-1.5 text-xs text-ink-soft">
-                    {message.likes.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void toggleLike(message);
-                        }}
-                        aria-pressed={liked}
-                        aria-label={t('Нравится: {0}', message.likes.length)}
-                        className="mr-auto inline-flex items-center gap-1 rounded-ui border border-line px-1.5 py-0.5"
-                      >
-                        <Heart
-                          className={`size-3 ${liked ? 'fill-current text-accent-text' : ''}`}
-                          strokeWidth={1.7}
-                        />
-                        {message.likes.length}
-                      </button>
-                    )}
+                    {message.reactions
+                      ? Object.keys(message.reactions).length > 0 && (
+                          <span className="mr-auto flex flex-wrap gap-1">
+                            {Object.entries(message.reactions).map(([code, ids]) => (
+                              <button
+                                key={code}
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleReaction(message, code);
+                                }}
+                                aria-pressed={ids.includes(me)}
+                                aria-label={t('{0}: {1}', reactionLabel(code), ids.length)}
+                                title={ids
+                                  .map(
+                                    (id) => people[String(id)]?.name || t('Пользователь {0}', id),
+                                  )
+                                  .join(', ')}
+                                className={`inline-flex items-center gap-1 rounded-ui border px-1.5 py-0.5 ${
+                                  ids.includes(me) ? 'border-accent-text text-ink' : 'border-line'
+                                }`}
+                              >
+                                <span aria-hidden="true">{reactionEmoji(code)}</span>
+                                {ids.length}
+                              </button>
+                            ))}
+                          </span>
+                        )
+                      : message.likes.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void toggleLike(message);
+                            }}
+                            aria-pressed={liked}
+                            aria-label={t('Нравится: {0}', message.likes.length)}
+                            className="mr-auto inline-flex items-center gap-1 rounded-ui border border-line px-1.5 py-0.5"
+                          >
+                            <Heart
+                              className={`size-3 ${liked ? 'fill-current text-accent-text' : ''}`}
+                              strokeWidth={1.7}
+                            />
+                            {message.likes.length}
+                          </button>
+                        )}
                     {message.edited && <span>{t('изменено')}</span>}
                     <time dateTime={message.date}>{when(message.date)}</time>
                     {mine && readers && dialog.kind !== 'channel' && (
@@ -1639,6 +1930,30 @@ export default function Conversation({
             >
               <Paperclip className="size-4" strokeWidth={1.7} />
             </Button>
+            <Popover
+              open={emojiOpen}
+              onOpenChange={setEmojiOpen}
+              placement="top"
+              panelClassName="w-72 p-1"
+              trigger={
+                <Button variant="quiet" disabled={sending} aria-label={t('Эмодзи')}>
+                  <Smile className="size-4" strokeWidth={1.7} />
+                </Button>
+              }
+            >
+              <div role="group" aria-label={t('Эмодзи')} className="grid grid-cols-8 gap-0.5">
+                {EMOJI.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => insertEmoji(emoji)}
+                    className="flex size-8 items-center justify-center rounded-ui text-lg hover:bg-surface-2"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </Popover>
             <TextArea
               aria-label={t('Сообщение')}
               placeholder={t('Сообщение')}

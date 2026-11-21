@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMentions,
+  applyReactions,
+  isReaction,
+  reactionsOf,
   DIALOG_ID,
   mergeDialogs,
   mergeMessages,
@@ -305,5 +308,68 @@ describe('safeNext', () => {
     expect(safeNext('https://evil.com')).toBe('/');
     expect(safeNext('/\tevil')).toBe('/');
     expect(safeNext(null)).toBe('/');
+  });
+});
+
+describe('реакции, закреп и превью ссылки', () => {
+  const raw = {
+    messages: [
+      {
+        id: 10,
+        author_id: 9,
+        text: 'см. https://github.com',
+        params: {
+          LIKE: [9, 2],
+          IS_PINNED: 'Y',
+          ATTACH: [
+            {
+              BLOCKS: [
+                {
+                  RICH_LINK: [
+                    {
+                      NAME: 'GitHub',
+                      LINK: 'https://github.com/',
+                      DESC: 'Платформа',
+                      PREVIEW: 'https://img.example/og.jpg',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { id: 11, author_id: 2, text: 'без реакций', params: [] },
+    ],
+  };
+
+  it('берёт закреп и превью ссылки из params', () => {
+    const [first, second] = normalizeMessages(raw).messages;
+    expect(first.pinned).toBe(true);
+    expect(second.pinned).toBe(false);
+    expect(first.attach[0].blocks[0]).toEqual({
+      type: 'link',
+      name: 'GitHub',
+      link: 'https://github.com/',
+      desc: 'Платформа',
+      preview: 'https://img.example/og.jpg',
+    });
+  });
+
+  it('подмешивает коды реакций из im.v2 и не трогает сообщения без ответа', () => {
+    const messages = applyReactions(normalizeMessages(raw).messages, [
+      { messageId: 10, reactionUsers: { fire: [9], like: [2] } },
+    ]);
+    expect(messages[0].reactions).toEqual({ fire: [9], like: [2] });
+    expect(messages[1].reactions).toBeUndefined();
+    // Без подробностей реакции показываются лайками.
+    expect(reactionsOf(normalizeMessages(raw).messages[0])).toEqual({ like: [9, 2] });
+    expect(applyReactions(messages, null)).toBe(messages);
+  });
+
+  it('пропускает в портал только известные коды реакций', () => {
+    expect(isReaction('fire')).toBe(true);
+    expect(isReaction('drop table')).toBe(false);
+    expect(isReaction(undefined)).toBe(false);
   });
 });

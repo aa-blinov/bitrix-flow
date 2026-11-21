@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CHAT_COLORS } from '@/lib/messenger';
 import { withMessenger } from '@/lib/messenger-api';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +62,39 @@ export async function POST(req: NextRequest) {
     if (!Number.isInteger(userId) || userId <= 0) return bad('BAD_USER');
     return withMessenger(req, async (call) => {
       return done(await call('im.chat.setOwner', { CHAT_ID: chatId, USER_ID: userId }, true, true));
+    });
+  }
+  if (action === 'describe') {
+    const description =
+      typeof body?.description === 'string' ? body.description.trim().slice(0, 2000) : '';
+    return withMessenger(req, async (call) => {
+      return done(
+        await call(
+          'im.v2.Chat.update',
+          { dialogId: `chat${chatId}`, fields: { description } },
+          true,
+          true,
+        ),
+      );
+    });
+  }
+  if (action === 'color') {
+    const color = String(body?.color || '');
+    if (!CHAT_COLORS.some((item) => item.name === color)) return bad('BAD_COLOR');
+    return withMessenger(req, async (call) => {
+      return done(await call('im.chat.updateColor', { CHAT_ID: chatId, COLOR: color }, true));
+    });
+  }
+  // Аватар приходит base64 без префикса data:. Предел с запасом под фото с телефона:
+  // портал сам ужимает картинку, а больше 2 МБ тело запроса к нему не пропустит.
+  if (action === 'avatar') {
+    const avatar = typeof body?.avatar === 'string' ? body.avatar : '';
+    if (!avatar || avatar.length > 2_800_000 || !/^[A-Za-z0-9+/=]+$/.test(avatar))
+      return bad('BAD_AVATAR');
+    return withMessenger(req, async (call) => {
+      return done(
+        await call('im.chat.updateAvatar', { CHAT_ID: chatId, AVATAR: avatar }, true, true),
+      );
     });
   }
   if (action === 'leave') {

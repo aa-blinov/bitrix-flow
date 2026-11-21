@@ -5,7 +5,7 @@ import { invalidateMuted } from '@/lib/messenger-events';
 
 export const dynamic = 'force-dynamic';
 
-const ACTIONS = ['pin', 'unpin', 'unread', 'mute', 'unmute'] as const;
+const ACTIONS = ['pin', 'unpin', 'unread', 'mute', 'unmute', 'hide'] as const;
 
 // Закрепить, пометить непрочитанным, отключить звук: настройки диалога живут в
 // Битриксе, поэтому каждое действие это один вызов портала.
@@ -33,11 +33,14 @@ export async function POST(req: NextRequest) {
           )
         : action === 'unread'
           ? await call('im.recent.unread', { DIALOG_ID: dialogId, ACTION: 'Y' }, true)
-          : await call(
-              'im.chat.mute',
-              { DIALOG_ID: dialogId, MUTE: action === 'mute' ? 'Y' : 'N' },
-              true,
-            );
+          : // Скрыть из списка, как в Битриксе: диалог вернётся с первым новым сообщением.
+            action === 'hide'
+            ? await call('im.recent.hide', { DIALOG_ID: dialogId }, true)
+            : await call(
+                'im.chat.mute',
+                { DIALOG_ID: dialogId, MUTE: action === 'mute' ? 'Y' : 'N' },
+                true,
+              );
     // Без подтверждения портала 502: клиент перечитает список, а не покажет успех.
     if (!result) return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
     // Иначе поллер ещё до пяти минут звенел бы по заглушённому чату.

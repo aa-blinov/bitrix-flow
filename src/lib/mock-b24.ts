@@ -953,6 +953,24 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'im.counters.get':
       return { TYPE: { MESSENGER: 0 } };
 
+    // Реакции и закреп мок не хранит: снимки переписки остаются прежними, а действия
+    // проверяются по оптимистичному виду и по запросам.
+    case 'im.v2.Chat.Message.tail':
+      return { messages: [], reactions: [] };
+    case 'im.v2.Chat.load':
+      return { pins: [], messages: [], additionalMessages: [] };
+    case 'im.v2.Chat.Message.pin':
+    case 'im.v2.Chat.Message.unpin':
+      return [];
+    case 'im.v2.Chat.add':
+      return { chat: {}, chatId: 78 };
+    case 'im.v2.Chat.Message.Reaction.add':
+    case 'im.v2.Chat.Message.Reaction.delete':
+    case 'im.v2.Chat.update':
+    case 'im.message.share':
+    case 'im.recent.hide':
+    case 'im.chat.updateColor':
+    case 'im.chat.updateAvatar':
     case 'im.message.like':
     case 'im.message.update':
     case 'im.message.delete':

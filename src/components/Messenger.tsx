@@ -465,23 +465,28 @@ export default function Messenger() {
   // Настройки диалога меняются сразу, а портал догоняет: при отказе список перечитывается.
   async function dialogAction(
     dialog: Dialog,
-    action: 'pin' | 'unpin' | 'unread' | 'mute' | 'unmute',
+    action: 'pin' | 'unpin' | 'unread' | 'mute' | 'unmute' | 'hide',
   ) {
-    setDialogs(
-      (current) =>
-        current &&
-        mergeDialogs(
-          current.filter((item) => item.id !== dialog.id),
-          [
-            {
-              ...dialog,
-              pinned: action === 'pin' ? true : action === 'unpin' ? false : dialog.pinned,
-              muted: action === 'mute' ? true : action === 'unmute' ? false : dialog.muted,
-              unread: action === 'unread' ? Math.max(1, dialog.unread) : dialog.unread,
-            },
-          ],
-        ),
-    );
+    // Скрытый диалог уходит из списка сразу; портал вернёт его с первым новым сообщением.
+    if (action === 'hide') {
+      setDialogs((current) => current && current.filter((item) => item.id !== dialog.id));
+      if (activeId === dialog.id) setActiveId('');
+    } else
+      setDialogs(
+        (current) =>
+          current &&
+          mergeDialogs(
+            current.filter((item) => item.id !== dialog.id),
+            [
+              {
+                ...dialog,
+                pinned: action === 'pin' ? true : action === 'unpin' ? false : dialog.pinned,
+                muted: action === 'mute' ? true : action === 'unmute' ? false : dialog.muted,
+                unread: action === 'unread' ? Math.max(1, dialog.unread) : dialog.unread,
+              },
+            ],
+          ),
+      );
     const response = await fetch('/api/messenger/dialog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -775,6 +780,10 @@ export default function Messenger() {
                             label: dialog.muted ? t('Включить звук') : t('Отключить звук'),
                             onSelect: () =>
                               void dialogAction(dialog, dialog.muted ? 'unmute' : 'mute'),
+                          },
+                          {
+                            label: t('Скрыть из списка'),
+                            onSelect: () => void dialogAction(dialog, 'hide'),
                           },
                         ]}
                       />

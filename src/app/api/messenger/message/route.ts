@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DIALOG_ID, MESSAGE_ID } from '@/lib/messenger';
+import { DIALOG_ID, MESSAGE_ID, isReaction } from '@/lib/messenger';
 import { getDb } from '@/lib/mongo';
 import { isMockEnabled } from '@/lib/mock-b24';
 import type { MessengerEvent } from '@/lib/messenger-events';
@@ -22,11 +22,51 @@ async function read(req: NextRequest) {
   return { body, messageId, valid: MESSAGE_ID.test(messageId) };
 }
 
-// Лайк: портал сам проверяет, что сообщение видно пользователю.
+// Что можно создать из сообщения (im.message.share): встреча в календаре, пост в ленте или
+// обсуждение в отдельной ветке. Задача создаётся своей формой, а не отсюда.
+const SHARE_TYPES = new Set(['CALEND', 'POST', 'CHAT']);
+
+// Лайк, реакция, закреп и «создать из сообщения». Права и видимость сообщения проверяет
+// портал. v2-методы закрепа отвечают пустым массивом, поэтому их подтверждение это
+// отсутствие ошибки, а не true.
 export async function POST(req: NextRequest) {
   const { body, messageId, valid } = await read(req);
   if (!valid) return badRequest('BAD_MESSAGE_ID');
-  const action = body?.action === 'unlike' ? 'minus' : 'plus';
+  const kind = String(body?.action || '');
+  if (kind === 'react' || kind === 'unreact') {
+    if (!isReaction(body?.reaction)) return badRequest('BAD_REACTION');
+    const method =
+      kind === 'react' ? 'im.v2.Chat.Message.Reaction.add' : 'im.v2.Chat.Message.Reaction.delete';
+    return withMessenger(req, async (call) => {
+      confirmed(
+        await call(method, { messageId: Number(messageId), reaction: body.reaction }, true),
+      );
+      return NextResponse.json({ ok: true });
+    });
+  }
+  if (kind === 'pin' || kind === 'unpin') {
+    return withMessenger(req, async (call) => {
+      await call(`im.v2.Chat.Message.${kind}`, { messageId: Number(messageId) }, true);
+      return NextResponse.json({ ok: true });
+    });
+  }
+  if (kind === 'share') {
+    const type = String(body?.type || '');
+    const dialogId = String(body?.dialogId || '');
+    if (!SHARE_TYPES.has(type)) return badRequest('BAD_SHARE_TYPE');
+    if (!DIALOG_ID.test(dialogId)) return badRequest('BAD_DIALOG_ID');
+    return withMessenger(req, async (call) => {
+      confirmed(
+        await call(
+          'im.message.share',
+          { MESSAGE_ID: messageId, DIALOG_ID: dialogId, TYPE: type },
+          true,
+        ),
+      );
+      return NextResponse.json({ ok: true });
+    });
+  }
+  const action = kind === 'unlike' ? 'minus' : 'plus';
   return withMessenger(req, async (call) => {
     confirmed(await call('im.message.like', { MESSAGE_ID: messageId, ACTION: action }, true));
     return NextResponse.json({ ok: true });

@@ -992,6 +992,69 @@ test('мессенджер: диалог закрепляется, глушит�
   ]);
 });
 
+test('мессенджер: реакции, закреп, встреча из сообщения и эмодзи', async ({ page }) => {
+  const chat = await openDmitry(page);
+  const posts: unknown[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/messenger/message'))
+      posts.push(request.postDataJSON());
+  });
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Реакция' }).click();
+  await page.getByRole('group', { name: 'Реакции' }).getByRole('button', { name: 'Огонь' }).click();
+  await expect(chat.getByRole('button', { name: 'Огонь: 1' })).toBeVisible();
+  expect(posts).toContainEqual({ messageId: 54, action: 'react', reaction: 'fire' });
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ещё' }).click();
+  await page.getByRole('menuitem', { name: 'Закрепить сообщение' }).click();
+  await expect(chat.getByRole('button', { name: 'Перейти к закреплённому сообщению' })).toHaveText(
+    'Сообщение 54',
+  );
+  expect(posts).toContainEqual({ messageId: 54, action: 'pin' });
+
+  await (await bubble(chat, 'Сообщение 54')).getByRole('button', { name: 'Ещё' }).click();
+  await page.getByRole('menuitem', { name: 'Создать встречу' }).click();
+  await expect(chat.getByRole('status')).toContainText('Встреча создана в календаре');
+  expect(posts).toContainEqual({ messageId: 54, action: 'share', type: 'CALEND', dialogId: '2' });
+
+  await chat.getByRole('button', { name: 'Эмодзи' }).click();
+  await page.getByRole('group', { name: 'Эмодзи' }).getByRole('button').first().click();
+  await expect(chat.getByLabel('Сообщение', { exact: true })).toHaveValue(
+    String.fromCodePoint(0x1f600),
+  );
+});
+
+test('мессенджер: диалог скрывается из списка, канал создаётся из «Нового чата»', async ({
+  page,
+}) => {
+  await page.goto('/messenger');
+  const list = page.getByRole('region', { name: 'Диалоги' });
+  const row = list.getByRole('listitem').filter({ hasText: 'Разработка API v2' });
+  await row.hover();
+  await row.getByRole('button', { name: 'Действия с диалогом' }).click();
+  const hide = page.waitForRequest((request) => request.url().endsWith('/api/messenger/dialog'));
+  await page.getByRole('menuitem', { name: 'Скрыть из списка' }).click();
+  expect((await hide).postDataJSON()).toEqual({ dialogId: 'chat20', action: 'hide' });
+  await expect(row).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Новый чат' }).click();
+  const modal = page.getByRole('dialog', { name: 'Новый чат' });
+  await modal.getByRole('button', { name: 'Канал' }).click();
+  await modal.getByLabel('Название канала').fill('Новости отдела');
+  const create = page.waitForRequest((request) => request.url().endsWith('/api/messenger/chats'));
+  await modal.getByRole('button', { name: 'Создать канал' }).click();
+  expect((await create).postDataJSON()).toEqual({
+    title: 'Новости отдела',
+    userIds: [],
+    kind: 'channel',
+  });
+  await expect(
+    page
+      .getByRole('region', { name: 'Переписка' })
+      .getByRole('heading', { name: 'Новости отдела' }),
+  ).toBeVisible();
+});
+
 test('меню: у «Сообщений» стоит значок непрочитанных', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'на телефоне меню лежит в выдвижной панели');
   await page.route('**/api/messenger/counters', (route) =>
@@ -1243,8 +1306,17 @@ test('мессенджер: чат из людей переименовывае�
     'Дмитрий Соколов',
   );
 
+  await modal.getByLabel('Описание').fill('Архив переписки');
+  await modal.getByRole('button', { name: 'Сохранить описание' }).click();
+  await expect(modal.getByRole('status')).toHaveText('Описание сохранено');
+  await modal.getByRole('radio', { name: 'Цвет mint' }).click();
+  await expect(modal.getByRole('radio', { name: 'Цвет mint' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+
   await modal.getByLabel('Название').fill('Новый архив');
-  await modal.getByRole('button', { name: 'Сохранить' }).click();
+  await modal.getByRole('button', { name: 'Сохранить', exact: true }).click();
   await expect(chat.getByRole('heading', { name: 'Новый архив' })).toBeVisible();
 
   await chat.getByRole('button', { name: 'Настройки чата' }).click();
@@ -1264,6 +1336,8 @@ test('мессенджер: чат из людей переименовывае�
   await expect(list.getByRole('button', { name: /Новый архив/ })).toHaveCount(0);
 
   expect(calls).toEqual([
+    { dialogId: 'chat22', action: 'describe', description: 'Архив переписки' },
+    { dialogId: 'chat22', action: 'color', color: 'MINT' },
     { dialogId: 'chat22', action: 'rename', title: 'Новый архив' },
     { dialogId: 'chat22', action: 'add', userIds: [5] },
     { dialogId: 'chat22', action: 'owner', userId: 2 },
