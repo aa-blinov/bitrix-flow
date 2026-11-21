@@ -214,6 +214,7 @@ export function DetailTree({
             {group.rows.map((row, index) => (
               <li key={`${group.key}${row.taskId}:${index}`}>
                 <Link
+                  prefetch={false}
                   href={`/all-tasks?task=${row.taskId}`}
                   title={row.conflict ? t('На задаче два разных классовых тега') : undefined}
                   className={cn(

@@ -726,13 +726,21 @@ function ReportTableView({
               if (info.row.getIsGrouped()) return formatCell(column.kind, value);
               if (column.kind === 'task')
                 return (
-                  <Link className="hover:underline" href={taskHref(info.row.original)}>
+                  <Link
+                    prefetch={false}
+                    className="hover:underline"
+                    href={taskHref(info.row.original)}
+                  >
                     {String(value)}
                   </Link>
                 );
               if (column.kind === 'link')
                 return (
-                  <Link className="text-ink underline" href={hoursHref(info.row.original)}>
+                  <Link
+                    prefetch={false}
+                    className="text-ink underline"
+                    href={hoursHref(info.row.original)}
+                  >
                     {t('Открыть')}
                   </Link>
                 );
@@ -844,6 +852,7 @@ function MobileRows({ meta, rows }: { meta: TableMeta; rows: ReportRow[] }) {
             {title.kind === 'task' ? (
               // Ссылка растянута на всю карточку: на телефоне в название высотой 18px не попасть.
               <Link
+                prefetch={false}
                 className="font-medium text-ink after:absolute after:inset-0 after:rounded-ui hover:underline"
                 href={taskHref(row)}
               >
@@ -866,6 +875,7 @@ function MobileRows({ meta, rows }: { meta: TableMeta; rows: ReportRow[] }) {
             </dl>
             {link && (
               <Link
+                prefetch={false}
                 className="mt-2 inline-flex min-h-11 items-center text-xs text-ink underline"
                 href={hoursHref(row)}
               >

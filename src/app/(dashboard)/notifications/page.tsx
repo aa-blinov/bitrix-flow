@@ -278,7 +278,7 @@ export default function NotificationsPage() {
                 </Card>
               );
               return href ? (
-                <Link key={item.id} href={href} className="block">
+                <Link prefetch={false} key={item.id} href={href} className="block">
                   {content}
                 </Link>
               ) : (

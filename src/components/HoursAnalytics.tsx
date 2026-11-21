@@ -711,6 +711,7 @@ function HoursAnalyticsView() {
             info.getValue()
           ) : (
             <Link
+              prefetch={false}
               className="hover:underline"
               href={`/all-tasks?task=${info.row.original.taskId}`}
               title={info.row.original.conflict ? t('На задаче два разных классовых тега') : ''}
@@ -733,7 +734,11 @@ function HoursAnalyticsView() {
         header: () => t('Часы'),
         aggregationFn: 'sum',
         cell: (info) => (
-          <Link className="hover:underline" href={`/all-tasks?task=${info.row.original.taskId}`}>
+          <Link
+            prefetch={false}
+            className="hover:underline"
+            href={`/all-tasks?task=${info.row.original.taskId}`}
+          >
             {fmt(info.getValue())}
           </Link>
         ),

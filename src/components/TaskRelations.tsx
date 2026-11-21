@@ -25,6 +25,7 @@ function RelatedRow({ task, onRemove }: { task: RelatedTask; onRemove?: () => vo
   return (
     <div className="flex items-center justify-between gap-2 rounded-ui border border-line bg-surface-2 px-2 py-1 text-sm">
       <Link
+        prefetch={false}
         href={href(task)}
         className={`min-w-0 truncate hover:underline ${task.status === DONE ? 'text-ink-faint line-through' : 'text-ink'}`}
       >

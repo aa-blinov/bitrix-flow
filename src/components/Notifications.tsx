@@ -217,6 +217,7 @@ export default function Notifications({
               );
               return href ? (
                 <Link
+                  prefetch={false}
                   key={item.id}
                   href={href}
                   onClick={() => setOpen(false)}
@@ -241,6 +242,7 @@ export default function Notifications({
         </div>
         <Separator />
         <Link
+          prefetch={false}
           href="/notifications"
           onClick={() => setOpen(false)}
           className="block px-3 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-ink transition-opacity duration-fast hover:opacity-60"

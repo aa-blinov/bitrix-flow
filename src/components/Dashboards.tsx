@@ -805,6 +805,7 @@ function DrillDrawer({
           </p>
           {data.tasks.map((row) => (
             <Link
+              prefetch={false}
               key={`${row.id}|${row.userId}`}
               href={taskHref(row)}
               className="flex items-start gap-3 rounded-ui px-2 py-1.5 text-sm hover:bg-surface-2"
