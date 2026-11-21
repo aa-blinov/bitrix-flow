@@ -728,8 +728,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
           </div>
         )}
         {/* На телефоне кнопки статуса и фаза не влезали в строку и растягивали
-            всю карточку вширь: переносим их, а «Закрыть» держим справа. */}
-        <div className="sticky top-0 z-10 -mx-6 mb-4 flex flex-wrap items-center gap-2 border-b border-line bg-canvas px-6 py-2 sm:-mx-8 sm:px-8">
+            всю карточку вширь: переносим их, а «Закрыть» держим справа.
+            Отрицательный top равен паддингу окна: при top-0 шапка липла под паддингом,
+            и над ней в щель просвечивал прокручиваемый текст. */}
+        <div className="sticky -top-6 z-10 sm:-top-8 -mx-6 mb-4 flex flex-wrap items-center gap-2 border-b border-line bg-canvas px-6 py-2 sm:-mx-8 sm:px-8">
           <span className="text-whisper text-ink-faint">#{task.id}</span>
           <Badge tone={statusTone(task.status)}>{STATUS_LABELS[task.status] || task.status}</Badge>
           <div className="flex shrink-0 flex-wrap items-center gap-1">
