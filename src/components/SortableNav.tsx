@@ -293,11 +293,14 @@ function SortableNavLink({
   pathname,
   onNavigate,
   badge,
+  alert,
 }: {
   item: (typeof NAV_ITEMS)[number];
   pathname: string;
   onNavigate: () => void;
   badge?: number | null;
+  /** Счётчик тревожный (просрочки): красный и с пояснением, что он считает. */
+  alert?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.href,
@@ -330,7 +333,10 @@ function SortableNavLink({
         // непрочитанных нет, а потом число «вдруг» появляется.
         <Skeleton width="1.75rem" height="1.1rem" rounded="full" />
       ) : badge !== undefined && badge > 0 ? (
-        <Badge tone="neutral">{badge}</Badge>
+        <Badge tone={alert ? 'danger' : 'neutral'} title={alert}>
+          {badge}
+          {alert && <span className="sr-only"> {alert}</span>}
+        </Badge>
       ) : null}
     </Link>
   );
@@ -349,12 +355,14 @@ export default function SortableNav({
   pathname,
   onNavigate,
   badges = {},
+  alerts = {},
 }: {
   order: string[];
   onReorder: (order: string[]) => void;
   pathname: string;
   onNavigate: () => void;
-  badges?: Record<string, number | null>;
+  badges?: Record<string, number | null | undefined>;
+  alerts?: Record<string, string>;
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -458,6 +466,7 @@ export default function SortableNav({
               pathname={pathname}
               onNavigate={flat ? navigate : onNavigate}
               badge={badges[item.href]}
+              alert={alerts[item.href]}
             />
           ))}
         </div>

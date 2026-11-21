@@ -26,6 +26,7 @@ import SortableNav, { useNavOrder, useWideScreen } from '@/components/SortableNa
 import { useChatAlerts } from '@/components/messenger/useChatAlerts';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
+import { fetchTaskCounters } from '@/lib/bitrix24';
 
 export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   // Селекторы, а не весь стор: иначе Sidebar ре-рендерится на любой set()
@@ -86,6 +87,7 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const [navOrder, setNavOrder] = useNavOrder();
   const chatUnread = useChatAlerts();
+  const overdue = useOverdueCount(pathname);
   // Постоянное меню с 1024px: только тогда справа от него есть место для панелей подвала.
   // Уже, в выдвижном меню, они открываются вверх.
   const wide = useWideScreen();
@@ -202,7 +204,8 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
           onReorder={setNavOrder}
           pathname={pathname}
           onNavigate={closeMobile}
-          badges={{ '/messenger': chatUnread }}
+          badges={{ '/messenger': chatUnread, '/my-tasks': overdue }}
+          alerts={{ '/my-tasks': t('просрочено') }}
         />
 
         {/* Проекты забирают всё свободное место, но не меньше 16rem: если меню над ними
@@ -546,4 +549,24 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
       </Modal>
     </>
   );
+}
+
+// Счётчик просрочек портала, тот же, что Битрикс показывает в «Моих задачах». Перечитываем
+// при переходах и раз в пять минут: событий об изменении счётчика портал не шлёт.
+function useOverdueCount(pathname: string) {
+  const [count, setCount] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      void fetchTaskCounters()
+        .then((counters) => !cancelled && setCount(counters.expired))
+        .catch(() => {});
+    load();
+    const timer = window.setInterval(load, 5 * 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pathname]);
+  return count;
 }

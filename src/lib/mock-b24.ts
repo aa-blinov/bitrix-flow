@@ -755,6 +755,10 @@ function mockMessagesPage(params: Record<string, string>) {
   };
 }
 
+// Связи и избранное меняются в тестах, но на снимки доски не влияют, поэтому хранятся.
+const DEPENDS: Record<string, string[]> = {};
+const FAVORITES = new Set<string>();
+
 export function isMockEnabled(): boolean {
   return ON;
 }
@@ -796,6 +800,17 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     }
 
     case 'tasks.task.list': {
+      const all = Object.values(ALL_TASKS).flat();
+      if (params['filter[DEPENDS_ON]']) {
+        const id = params['filter[DEPENDS_ON]'];
+        const tasks = all.filter((task) => (DEPENDS[String(task.id)] || []).includes(id));
+        return { tasks, next: undefined, total: tasks.length };
+      }
+      if (params['filter[ID]']) {
+        const ids = params['filter[ID]'].split(',');
+        const tasks = all.filter((task) => ids.includes(String(task.id)));
+        return { tasks, next: undefined, total: tasks.length };
+      }
       const groupId = params['filter[GROUP_ID]'] || params.groupId;
       const tasks = groupId && ALL_TASKS[groupId] ? ALL_TASKS[groupId] : [];
       return { tasks, next: undefined, total: tasks.length };
@@ -837,6 +852,11 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'tasks.task.approve':
     case 'tasks.task.disapprove':
     case 'tasks.task.update': {
+      if (method === 'tasks.task.update') {
+        const fields = JSON.parse(params.fields || '{}');
+        if (Array.isArray(fields.DEPENDS_ON))
+          DEPENDS[params.taskId] = fields.DEPENDS_ON.map(String);
+      }
       // Подтверждаем правку, но данные не меняем: мок живёт весь прогон
       // UI-тестов, и перенос задачи в одном тесте сдвинул бы снимки остальных.
       return { task: { id: params.taskId } };
@@ -846,8 +866,56 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       const id = params.taskId || params['filter[ID]'];
       const all = Object.values(ALL_TASKS).flat();
       const task = all.find((t) => String(t.id) === String(id));
-      return task ? { ...task, chatId: '1' } : null;
+      return task
+        ? { ...task, chatId: '1', favorite: FAVORITES.has(String(id)) ? 'Y' : 'N' }
+        : null;
     }
+
+    case 'task.item.getdependson':
+      return DEPENDS[params.TASKID] || [];
+
+    case 'tasks.task.favorite.add':
+      FAVORITES.add(params.taskId);
+      return true;
+
+    case 'tasks.task.favorite.remove':
+      FAVORITES.delete(params.taskId);
+      return true;
+
+    // Ноль просроченных: иначе счётчик в меню попал бы во все снимки экранов.
+    case 'tasks.task.counters.get':
+      return {
+        expired: { counter: 0 },
+        new_comments: { counter: 0 },
+        mentioned: { counter: 0 },
+      };
+
+    case 'tasks.task.history.list':
+      return {
+        list: [
+          {
+            id: 3,
+            createdDate: '2026-03-03T10:15:00+03:00',
+            field: 'DEADLINE',
+            value: { from: '1772700000', to: '1773046800' },
+            user: { id: 2, name: 'Дмитрий', lastName: 'Соколов' },
+          },
+          {
+            id: 2,
+            createdDate: '2026-03-02T12:00:00+03:00',
+            field: 'STATUS',
+            value: { from: '2', to: '3' },
+            user: { id: 1, name: 'Анна', lastName: 'Кузнецова' },
+          },
+          {
+            id: 1,
+            createdDate: '2026-03-01T09:00:00+03:00',
+            field: 'NEW',
+            value: { from: null, to: null },
+            user: { id: 1, name: 'Анна', lastName: 'Кузнецова' },
+          },
+        ],
+      };
 
     case 'im.recent.list':
       return Number(params.OFFSET) > 0 ? MOCK_DIALOGS_NEXT : MOCK_DIALOGS;

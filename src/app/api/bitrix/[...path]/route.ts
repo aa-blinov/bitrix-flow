@@ -159,6 +159,8 @@ const MUTATION_METHODS = new Set([
   'tasks.task.result.add',
   'tasks.task.result.update',
   'tasks.task.result.delete',
+  'tasks.task.favorite.add',
+  'tasks.task.favorite.remove',
 ]);
 const JSON_PAYLOAD_METHODS = new Set([
   'tasks.task.list',
@@ -225,7 +227,8 @@ async function refreshMirrorAfterMutation(
   result: any,
 ): Promise<void> {
   const taskId = mutatedTaskId(params, result);
-  if (!taskId) return;
+  // Избранное личное и в зеркале не живёт: синк задачи только задержал бы ответ.
+  if (!taskId || method.startsWith('tasks.task.favorite.')) return;
   const { syncTaskMirror, removeTask } = await import('@/lib/task-mirror');
   if (method === 'tasks.task.delete') {
     await removeTask(memberId, taskId);
@@ -285,6 +288,14 @@ const ALLOWED_METHODS = new Set([
   'user.get',
   'user.current',
   'im.dialog.messages.get',
+  // История, связи, избранное и счётчики: карточка и меню показывают то же, что портал.
+  // tasks.task.dependence.* на портале нет, связь «Связанные задачи» пишется полем
+  // DEPENDS_ON через tasks.task.update, а читается только этим старым методом.
+  'tasks.task.history.list',
+  'task.item.getdependson',
+  'tasks.task.favorite.add',
+  'tasks.task.favorite.remove',
+  'tasks.task.counters.get',
 ]);
 
 async function handleRequest(req: NextRequest, method: string) {
@@ -655,6 +666,9 @@ const READ_ONLY_METHODS = new Set([
   'user.get',
   'user.current',
   'im.dialog.messages.get',
+  'tasks.task.history.list',
+  'task.item.getdependson',
+  'tasks.task.counters.get',
 ]);
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {

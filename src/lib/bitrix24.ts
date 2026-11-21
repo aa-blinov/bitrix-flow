@@ -721,6 +721,8 @@ export async function updateTaskFull(taskId: string, fields: any): Promise<void>
   if (fields.accompliceIds !== undefined) updateFields.ACCOMPLICES = fields.accompliceIds;
   if (fields.auditorIds !== undefined) updateFields.AUDITORS = fields.auditorIds;
   if (fields.tags !== undefined) updateFields.TAGS = fields.tags;
+  // Поле заменяется целиком: пустой список снимает все связи.
+  if (fields.dependsOn !== undefined) updateFields.DEPENDS_ON = fields.dependsOn;
 
   await bx24('tasks.task.update', {
     taskId,
@@ -841,6 +843,93 @@ export async function fetchTaskById(taskId: string): Promise<Bx24Task> {
       bitrixTaskTags(task.tags || task.TAGS),
       extractTaskTags(task.title, task.description),
     ),
+  };
+}
+
+export type TaskHistoryEntry = {
+  id: string;
+  createdDate: string;
+  field: string;
+  from: string;
+  to: string;
+  userId: string;
+  userName: string;
+};
+
+export async function fetchTaskHistory(taskId: string): Promise<TaskHistoryEntry[]> {
+  const result = await bx24('tasks.task.history.list', { taskId });
+  return (result?.list || []).map((item: any) => ({
+    id: String(item.id),
+    createdDate: String(item.createdDate || ''),
+    field: String(item.field || ''),
+    from: item.value?.from == null ? '' : String(item.value.from),
+    to: item.value?.to == null ? '' : String(item.value.to),
+    userId: String(item.user?.id || ''),
+    userName: [item.user?.name, item.user?.lastName].filter(Boolean).join(' '),
+  }));
+}
+
+export type RelatedTask = { id: string; title: string; status: string; groupId: string };
+
+const relatedTask = (task: any): RelatedTask => ({
+  id: String(task.id),
+  title: String(task.title || ''),
+  status: String(task.status || ''),
+  groupId: String(task.groupId || task.group?.id || '0'),
+});
+
+const RELATED_SELECT = {
+  'select[0]': 'ID',
+  'select[1]': 'TITLE',
+  'select[2]': 'STATUS',
+  'select[3]': 'GROUP_ID',
+};
+
+/** «Связанные задачи» портала: от каких задач зависит эта и какие ждут её. */
+export async function fetchTaskRelations(
+  taskId: string,
+): Promise<{ dependsOn: RelatedTask[]; blocks: RelatedTask[] }> {
+  const [ids, blocking] = await Promise.all([
+    bx24('task.item.getdependson', { TASKID: taskId }),
+    bx24('tasks.task.list', { 'filter[DEPENDS_ON]': taskId, ...RELATED_SELECT }),
+  ]);
+  const dependsOnIds = (Array.isArray(ids) ? ids : []).map(String);
+  const found = dependsOnIds.length
+    ? await bx24('tasks.task.list', { 'filter[ID]': dependsOnIds.join(','), ...RELATED_SELECT })
+    : { tasks: [] };
+  const byId = new Map<string, RelatedTask>(
+    (found?.tasks || []).map((task: any) => [String(task.id), relatedTask(task)]),
+  );
+  return {
+    // Задача без доступа не находится списком, но связь с ней есть: показываем номер.
+    dependsOn: dependsOnIds.map(
+      (id) => byId.get(id) || { id, title: `#${id}`, status: '', groupId: '0' },
+    ),
+    blocks: (blocking?.tasks || []).map(relatedTask),
+  };
+}
+
+export async function fetchTaskFavorite(taskId: string): Promise<boolean> {
+  const result = await bx24('tasks.task.get', {
+    taskId,
+    'select[0]': 'ID',
+    'select[1]': 'FAVORITE',
+  });
+  return (result?.task || result)?.favorite === 'Y';
+}
+
+export async function setTaskFavorite(taskId: string, favorite: boolean): Promise<void> {
+  await bx24(favorite ? 'tasks.task.favorite.add' : 'tasks.task.favorite.remove', { taskId });
+}
+
+export type TaskCounters = { expired: number; newComments: number; mentioned: number };
+
+export async function fetchTaskCounters(): Promise<TaskCounters> {
+  const result = await bx24('tasks.task.counters.get', {});
+  return {
+    expired: Number(result?.expired?.counter) || 0,
+    newComments: Number(result?.new_comments?.counter) || 0,
+    mentioned: Number(result?.mentioned?.counter) || 0,
   };
 }
 

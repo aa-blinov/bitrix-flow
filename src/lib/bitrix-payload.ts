@@ -75,7 +75,9 @@ export function getPayload(
       payload.select[Number(childKey)] = value;
     } else {
       payload[field] ||= {};
-      payload[field][childKey] = value;
+      // Несколько id через запятую: фильтр по списку задач одним запросом.
+      payload[field][childKey] =
+        field === 'filter' && childKey === 'ID' && value.includes(',') ? value.split(',') : value;
     }
   }
   return payload;

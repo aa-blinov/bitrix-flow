@@ -1806,3 +1806,52 @@ test('мессенджер: в открытый раньше чат возвра
   await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
   await expect(chat).toContainText('Посмотришь ревью?', { timeout: 1500 });
 });
+
+test('карточка: избранное, связанные задачи и история изменений', async ({ page }) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+
+  await dialog.getByRole('button', { name: 'Добавить в избранное' }).click();
+  await expect(dialog.getByRole('button', { name: 'Убрать из избранного' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Убрать из избранного' }).click();
+  await expect(dialog.getByRole('button', { name: 'Добавить в избранное' })).toBeVisible();
+
+  const update = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/bitrix/tasks.task.update') &&
+      decodeURIComponent(request.postData() || '').includes('"DEPENDS_ON":[1002]'),
+  );
+  await dialog.getByLabel('Добавить связанную задачу').fill('Apollo');
+  await dialog.getByRole('button', { name: '#1002, Настроить Apollo Server' }).click();
+  await update;
+  await expect(dialog.getByRole('link', { name: '#1002 Настроить Apollo Server' })).toBeVisible();
+  await expect(dialog.getByText('Ждёт задач: 1')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Убрать связь с #1002' }).click();
+  await expect(dialog.getByRole('link', { name: '#1002 Настроить Apollo Server' })).toHaveCount(0);
+
+  await dialog.getByRole('button', { name: 'История изменений' }).click();
+  await expect(dialog.getByText('Задача создана')).toBeVisible();
+  await expect(dialog.locator('li', { hasText: 'Статус' })).toContainText('Новая → В работе');
+  await expect(dialog.locator('li', { hasText: 'Дедлайн' })).toContainText('Дмитрий Соколов');
+});
+
+test('счётчик просроченных задач портала виден в меню', async ({ page }) => {
+  await page.route('**/api/bitrix/tasks.task.counters.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          expired: { counter: 3 },
+          new_comments: { counter: 0 },
+          mentioned: { counter: 0 },
+        },
+      },
+    }),
+  );
+  await page.goto('/all-tasks');
+  // Пункт живёт в группе «Задачи»: свёрнутая группа показывает сумму, раскрытая сам счётчик.
+  await expect(page.getByRole('button', { name: /Задачи\s*3/ })).toBeVisible();
+  await page.getByRole('button', { name: /Задачи\s*3/ }).click();
+  await expect(page.getByRole('link', { name: /Мои задачи\s*3 просрочено/ })).toBeVisible();
+});
