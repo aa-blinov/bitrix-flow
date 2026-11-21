@@ -684,12 +684,18 @@ test(
     expect(clip && field && mic).toBeTruthy();
     // Поле целиком в окне: раньше страница стояла ниже окна, и поле уходило за край.
     expect(field!.y + field!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-    // Плавающая кнопка меню на телефоне не лежит на кнопке отправки.
+    // Открытый чат на телефоне занимает весь экран и закрывает плавающую кнопку меню:
+    // она не лежит на кнопке отправки, и под полем нет пустой полосы.
     const menuButton = page.getByRole('button', { name: 'Открыть меню' });
     if (await menuButton.count()) {
       const menu = (await menuButton.boundingBox())!;
-      // Под мессенджером оставлена полоса для кнопки меню: поле целиком выше неё.
-      expect(field!.y + field!.height).toBeLessThanOrEqual(menu.y);
+      const onTop = await page.evaluate(
+        ({ x, y }) =>
+          document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+        { x: menu.x + menu.width / 2, y: menu.y + menu.height / 2 },
+      );
+      expect(onTop).not.toBe('Открыть меню');
+      expect(page.viewportSize()!.height - (field!.y + field!.height)).toBeLessThan(24);
     }
     for (const box of [clip!, mic!]) {
       expect(Math.abs(box.y - field!.y)).toBeLessThanOrEqual(1);
@@ -1367,12 +1373,23 @@ test('мессенджер: диалог закрепляется кнопкой
   const list = page.getByRole('region', { name: 'Диалоги' });
   // На телефоне список прячется за открытым чатом.
   const back = page.getByRole('button', { name: 'К списку диалогов' });
-  if (await back.isVisible()) await back.click();
+  const mobile = await back.isVisible();
+  if (mobile) await back.click();
   // Дмитрий и так первый по дате: закрепляем группу ниже, чтобы порядок изменился.
   await list.getByRole('button', { name: /Разработка API v2/ }).click();
-  await chat.getByRole('button', { name: 'Закрепить диалог' }).click();
-  await expect(chat.getByRole('button', { name: 'Открепить диалог' })).toBeVisible();
-  if (await back.isVisible()) await back.click();
+  // Название диалога видно в шапке и на телефоне: раньше кнопки вытесняли его целиком.
+  await expect(chat.getByRole('heading', { name: 'Разработка API v2' })).toBeVisible();
+  if (mobile) {
+    // На телефоне чат на весь экран, без шапки страницы; закреп живёт в меню строки списка.
+    await expect(page.getByRole('heading', { name: 'Сообщения', exact: true })).toBeHidden();
+    await back.click();
+    const row = list.getByRole('listitem').filter({ hasText: 'Разработка API v2' });
+    await row.getByRole('button', { name: 'Действия с диалогом' }).click();
+    await page.getByRole('menuitem', { name: 'Закрепить' }).click();
+  } else {
+    await chat.getByRole('button', { name: 'Закрепить диалог' }).click();
+    await expect(chat.getByRole('button', { name: 'Открепить диалог' })).toBeVisible();
+  }
   await expect(list.getByRole('listitem').first()).toContainText('Разработка API v2');
 });
 

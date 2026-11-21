@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CornerUpLeft,
   Ellipsis,
+  ExternalLink,
   HardDrive,
   Smile,
   SmilePlus,
@@ -1473,7 +1474,7 @@ export default function Conversation({
           {t('Отпустите файлы, чтобы прикрепить')}
         </div>
       )}
-      <div className="flex min-h-14 items-center gap-3 border-b border-line px-3">
+      <div className="flex min-h-14 items-center gap-2 border-b border-line px-3 sm:gap-3">
         <Button
           variant="quiet"
           size="sm"
@@ -1503,8 +1504,17 @@ export default function Conversation({
           )}
         </div>
         {link && (
-          <Link href={link} className="shrink-0 text-xs text-accent-text hover:underline">
-            {dialog.kind === 'task' ? t('Открыть задачу') : t('Открыть проект')}
+          // На телефоне подпись становится значком: вместе с кнопками она не оставляла места
+          // названию диалога, и в шапке был виден только аватар.
+          <Link
+            href={link}
+            aria-label={dialog.kind === 'task' ? t('Открыть задачу') : t('Открыть проект')}
+            className="inline-flex shrink-0 items-center justify-center text-xs text-accent-text hover:underline max-sm:size-11"
+          >
+            <span className="max-sm:hidden">
+              {dialog.kind === 'task' ? t('Открыть задачу') : t('Открыть проект')}
+            </span>
+            <ExternalLink className="size-4 sm:hidden" strokeWidth={1.7} />
           </Link>
         )}
         {portal && (
@@ -1529,11 +1539,13 @@ export default function Conversation({
             <Users className="size-4" strokeWidth={1.7} />
           </IconButton>
         )}
+        {/* На телефоне закреп есть в меню строки списка, а здесь место нужнее названию. */}
         <IconButton
           label={dialog.pinned ? t('Открепить диалог') : t('Закрепить диалог')}
           variant="ghost"
           pressed={Boolean(dialog.pinned)}
           onClick={onPin}
+          className="max-sm:hidden"
         >
           <Pin className={`size-4 ${dialog.pinned ? 'fill-current' : ''}`} strokeWidth={1.7} />
         </IconButton>

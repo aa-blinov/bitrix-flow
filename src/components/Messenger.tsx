@@ -533,11 +533,19 @@ export default function Messenger() {
   return (
     // На телефоне внизу страницы 5rem под плавающую кнопку меню (pb-20 у main): отнимаем их,
     // чтобы страница не прокручивалась и кнопка не лежала на поле ввода.
-    <div className="flex h-[calc(100dvh-5rem)] flex-col bg-canvas lg:h-dvh">
+    // Открытый диалог на телефоне занимает весь экран, как в мессенджерах: шапка страницы и
+    // полоса под кнопкой меню съедали треть высоты. Слой меню, а не выше: меню сообщений
+    // уходят порталом в конец body с тем же слоем и остаются поверх.
+    <div
+      className={`flex h-[calc(100dvh-5rem)] flex-col bg-canvas lg:h-dvh ${
+        activeId ? 'max-md:fixed max-md:inset-0 max-md:z-menu max-md:h-dvh' : ''
+      }`}
+    >
       <PageHeader
         title={t('Сообщения')}
         description={t('Личные чаты, группы и обсуждения задач из Битрикс24')}
         actions={<MyStatus />}
+        className={activeId ? 'max-md:hidden' : undefined}
       />
       {error && (
         <p role="alert" className="px-4 pt-3 text-sm text-danger-text lg:px-6">
@@ -752,7 +760,7 @@ export default function Messenger() {
                         строки прячет дату под ним, а не смешивает два слоя. По центру через
                         my-auto, не transform: transform создаёт свой слой наложения, и открытое
                         меню уходило под следующую строку списка. */}
-                    <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit rounded-ui bg-surface-2 group-focus-within:block group-hover:block max-sm:block max-sm:bg-transparent">
+                    <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit rounded-ui bg-surface-2 group-focus-within:block sm:pl-8 group-hover:block max-sm:block max-sm:bg-transparent">
                       <Menu
                         label={t('Действия с диалогом')}
                         align="end"
@@ -887,7 +895,8 @@ function MyStatus() {
           size="sm"
           aria-label={t('Мой статус: {0}', statusLabel(status))}
         >
-          <span className={`inline-block size-2.5 rounded-full ${STATUS_DOT[status]}`} />
+          {/* Button кладёт всё содержимое в один span, gap кнопки сюда не доходит. */}
+          <span className={`mr-1.5 inline-block size-2.5 rounded-full ${STATUS_DOT[status]}`} />
           {statusLabel(status)}
         </Button>
       }
