@@ -82,6 +82,12 @@ export default function TaskHistory({ taskId }: { taskId: string }) {
     if (field === 'RESPONSIBLE_ID' || field === 'CREATED_BY') return userName(value);
     if (field === 'ACCOMPLICES' || field === 'AUDITORS')
       return value.split(',').filter(Boolean).map(userName).join(', ');
+    if (field === 'DEPENDS_ON' || field === 'PARENT_ID')
+      return value
+        .split(',')
+        .filter(Boolean)
+        .map((id) => `#${id}`)
+        .join(', ');
     if (field === 'GROUP_ID')
       return projects.find((project) => project.id === value)?.name || `#${value}`;
     if (field === 'TIME_ESTIMATE' || field === 'TIME_SPENT_IN_LOGS')
