@@ -78,14 +78,6 @@ function eventDetails(event: string, raw: any) {
     message: title,
     ...base,
   };
-  return {
-    type: 'task_updated',
-    taskId,
-    messageId,
-    title: 'Задача обновлена',
-    message: title,
-    ...base,
-  };
 }
 
 async function enrichComment(memberId: string, details: ReturnType<typeof eventDetails>) {
@@ -138,6 +130,44 @@ async function enrichTaskTitle(memberId: string, details: ReturnType<typeof even
   }
 }
 
+async function recordEvent(
+  db: Awaited<ReturnType<typeof getDb>>,
+  memberId: string,
+  event: string,
+  raw: ReturnType<typeof eventDetails>,
+  now: Date,
+) {
+  const details = await enrichTaskTitle(memberId, await enrichComment(memberId, raw));
+  const messageId = 'messageId' in details ? details.messageId : '';
+  if (messageId) {
+    const existing = await db
+      .collection('notifications')
+      .findOne({ member_id: memberId, messageId });
+    if (existing) {
+      // Дублирующийся комментарий: не плодим карточки, только обновляем детали.
+      await db
+        .collection('notifications')
+        .updateOne(
+          { _id: existing._id },
+          { $set: { ...details, created_at: now, raw_event: event } },
+        );
+      invalidateByPrefix(`${memberId}:`);
+      return;
+    }
+  }
+  await db
+    .collection('notifications')
+    .insertOne({ member_id: memberId, ...details, created_at: now, raw_event: event });
+  if (details.type === 'comment_added')
+    await saveDeadlineChanges(db, [{ member_id: memberId, ...details, created_at: now }]);
+  await db.collection('events_stream').insertOne({
+    member_id: memberId,
+    event: { ...details, createdAt: now.toISOString() },
+    created_at: now,
+  });
+  invalidateByPrefix(`${memberId}:`);
+}
+
 const INSTALL_TRUST_WINDOW_MS = 60 * 60 * 1000;
 
 /** Окно, в котором портал ещё вправе назвать свой application_token. */
@@ -186,54 +216,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'INVALID_EVENT_AUTH' }, { status: 403 });
     }
 
-    const commentDetails = await enrichComment(memberId, eventDetails(event, body.data));
-    const details = await enrichTaskTitle(memberId, commentDetails);
+    const raw = eventDetails(event, body.data);
     const now = new Date();
-    if ((details as any).messageId) {
-      const existing = await db
-        .collection('notifications')
-        .findOne({ member_id: memberId, messageId: (details as any).messageId });
-      if (existing) {
-        // Дублирующийся комментарий: не плодим карточки, только обновляем детали.
-        await db
-          .collection('notifications')
-          .updateOne(
-            { _id: existing._id },
-            { $set: { ...details, created_at: now, raw_event: event } },
-          );
-        invalidateByPrefix(`${memberId}:`);
-        return NextResponse.json({ ok: true, merged: true });
-      }
-    }
-    await db
-      .collection('notifications')
-      .insertOne({ member_id: memberId, ...details, created_at: now, raw_event: event });
-    if (details.type === 'comment_added')
-      await saveDeadlineChanges(db, [{ member_id: memberId, ...details, created_at: now }]);
-    await db.collection('events_stream').insertOne({
-      member_id: memberId,
-      event: { ...details, createdAt: now.toISOString() },
-      created_at: now,
-    });
-
     invalidateByPrefix(`${memberId}:`);
     await db
       .collection('project_summary_snapshots')
       .updateOne({ member_id: memberId }, { $set: { stale: true, stale_at: now } });
     // Без taskId нечего синхронизировать. Заглушка нужна, чтобы пустое событие
     // не помечалось как «все задачи устарели» в сводке.
-    if (details.taskId) {
-      await db.collection('tasks').deleteOne({ id: details.taskId });
-      await enqueueTaskMirrorSync(memberId, details.taskId, event);
+    if (raw.taskId) {
+      await db.collection('tasks').deleteOne({ id: raw.taskId });
+      await enqueueTaskMirrorSync(memberId, raw.taskId, event);
     }
-    // Bitrix receives an acknowledgement immediately. The precise task mirror is
-    // updated afterwards, so one event never triggers a portal-wide task scan.
+    // До ответа только проверка и постановка в очередь. Текст комментария и название задачи
+    // портал отдаёт за секунды (с повторами до 3 с), и пока мы ждали их до ответа, каждое
+    // десятое событие отвечало дольше 15 с: Битрикс считает такое событие потерянным.
+    // Запись в историю и синк зеркала идут параллельно, чтобы задача не ждала текста.
     after(async () => {
-      try {
-        await processTaskMirrorJobs(memberId);
-      } catch (syncError) {
-        console.error('Incremental task mirror sync failed', syncError);
-      }
+      await Promise.all([
+        recordEvent(db, memberId, event, raw, now).catch((recordError) =>
+          console.error('Event history record failed', recordError),
+        ),
+        processTaskMirrorJobs(memberId).catch((syncError) =>
+          console.error('Incremental task mirror sync failed', syncError),
+        ),
+      ]);
     });
     return NextResponse.json({ status: 'ok' });
   } catch (error) {
