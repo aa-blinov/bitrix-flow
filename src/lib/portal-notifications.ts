@@ -14,7 +14,10 @@ export type PortalNotification = {
   read: boolean;
   author?: { id: number; name: string; avatar?: string };
   buttons: PortalNotificationButton[];
-  /** Быстрый ответ портал принимает на уведомления от людей. */
+  /**
+   * Уведомление от человека: под ним кнопка ответа. Признака «ответ принимается» портал в
+   * списке не отдаёт, отказ приходит при попытке, и его показывают как есть.
+   */
   canAnswer: boolean;
 };
 
@@ -39,6 +42,12 @@ function buttonsOf(raw: unknown, id: number): PortalNotificationButton[] {
         : null;
     })
     .filter((button): button is PortalNotificationButton => button !== null);
+}
+
+// Календарь присылает приглашения с перепутанной вложенностью:
+// [B][URL=адрес%5B/B%5D]адрес[/B][/URL]. Без правки в тексте торчали хвосты [/URL].
+function tidyMarkup(text: string): string {
+  return text.replace(/%5B\/?B%5D/gi, '').replace(/\[\/B\]\[\/URL\]/g, '[/URL][/B]');
 }
 
 export function normalizePortalNotifications(result: unknown): {
@@ -66,7 +75,7 @@ export function normalizePortalNotifications(result: unknown): {
         type,
         module: String(item.notify_module || ''),
         title: String(item.notify_title || ''),
-        text: String(item.text || ''),
+        text: tidyMarkup(String(item.text || '')),
         date: String(item.date || ''),
         read: item.notify_read === 'Y',
         author: person
@@ -77,7 +86,7 @@ export function normalizePortalNotifications(result: unknown): {
             }
           : undefined,
         buttons: buttonsOf(item.notify_buttons, id),
-        canAnswer: type === 2 && authorId > 0 && item.notify_module === 'im',
+        canAnswer: type === 2 && authorId > 0,
       };
     });
   return { items, unread: Number(data.total_unread_count) || 0 };

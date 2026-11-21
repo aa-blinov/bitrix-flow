@@ -43,7 +43,13 @@ export async function POST(req: NextRequest) {
     );
     if (!ids.length || ids.length > 200) return bad('BAD_IDS');
     return withMessenger(req, async (call) =>
-      (await call('im.notify.read.list', { IDS: ids, ACTION: body?.unread ? 'N' : 'Y' }, true))
+      // JSON: массив IDS форма передаёт так, что портал его не видит (PARAMS_ERROR).
+      (await call(
+        'im.notify.read.list',
+        { IDS: ids, ACTION: body?.unread ? 'N' : 'Y' },
+        true,
+        true,
+      ))
         ? NextResponse.json({ ok: true })
         : NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 }),
     );

@@ -22,7 +22,12 @@ describe('normalizePortalNotifications', () => {
           ]),
         },
         { id: 2, notify_type: 2, notify_module: 'im', author_id: 297, notify_read: 'Y' },
-        { id: 3, notify_type: 2, notify_module: 'tasks', author_id: 297, notify_buttons: '{' },
+        { id: 3, notify_type: 4, notify_module: 'tasks', author_id: 0, notify_buttons: '{' },
+        {
+          id: 4,
+          notify_type: 1,
+          text: 'Место: "[B][URL=https://t.me/j/1%5B/B%5D]https://t.me/j/1[/B][/URL]"',
+        },
       ],
     });
     expect(unread).toBe(2);
@@ -33,9 +38,10 @@ describe('normalizePortalNotifications', () => {
     expect(items[0].read).toBe(false);
     expect(items[0].author).toEqual({ id: 297, name: 'Екатерина', avatar: 'https://cdn/a.png' });
     expect(items[1].canAnswer).toBe(true);
-    // Сломанная строка кнопок не роняет разбор, а уведомление задачи не предлагает ответ.
+    // Сломанная строка кнопок не роняет разбор, а системное уведомление не предлагает ответ.
     expect(items[2].buttons).toEqual([]);
     expect(items[2].canAnswer).toBe(false);
+    expect(items[3].text).toBe('Место: "[B][URL=https://t.me/j/1]https://t.me/j/1[/URL][/B]"');
   });
 
   it('пустой ответ портала это пустой список', () => {

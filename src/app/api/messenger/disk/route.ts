@@ -16,19 +16,31 @@ export function GET(req: NextRequest) {
   return withMessenger(req, async (call, _memberId, userId) => {
     let folderId = raw;
     if (!folderId) {
-      const storages = await call('disk.storage.getlist', {
-        filter: { ENTITY_TYPE: 'user', ENTITY_ID: userId },
-      });
+      // JSON: вложенный filter форма не передаёт.
+      const storages = await call(
+        'disk.storage.getlist',
+        { filter: { ENTITY_TYPE: 'user', ENTITY_ID: userId } },
+        false,
+        true,
+      );
       folderId = String(storages?.[0]?.ROOT_OBJECT_ID || '');
       if (!folderId) return NextResponse.json({ error: 'NO_STORAGE' }, { status: 502 });
     }
-    const children = await call('disk.folder.getchildren', { id: folderId });
-    const items: DiskItem[] = (Array.isArray(children) ? children : [])
+    // Портал отдаёт папку страницами по 50: «Сохранённые файлы» у Блинова лежали на второй
+    // и в окне не появлялись. ponytail: потолок 500 элементов, дальше нужен поиск по Диску.
+    const children: Record<string, unknown>[] = [];
+    for (let start = 0; start < 500; start += 50) {
+      const page = await call('disk.folder.getchildren', { id: folderId, start });
+      if (!Array.isArray(page)) break;
+      children.push(...page);
+      if (page.length < 50) break;
+    }
+    const items: DiskItem[] = children
       .filter((item) => item?.ID && (item.TYPE === 'folder' || item.TYPE === 'file'))
       .map((item) => ({
         id: Number(item.ID),
         name: String(item.NAME || ''),
-        type: item.TYPE,
+        type: item.TYPE as DiskItem['type'],
         size: Number(item.SIZE) || 0,
       }))
       // Папки сверху, дальше по имени: так листают Диск и в самом Битриксе.
@@ -73,7 +85,12 @@ export async function POST(req: NextRequest) {
     if (!DIALOG_ID.test(dialogId)) return bad('BAD_DIALOG_ID');
     if (!ids.length || ids.length > 10) return bad('BAD_FILES');
     return withMessenger(req, async (call) => {
-      const result = await call('im.disk.file.commit', { DIALOG_ID: dialogId, FILE_ID: ids }, true);
+      const result = await call(
+        'im.disk.file.commit',
+        { DIALOG_ID: dialogId, FILE_ID: ids },
+        true,
+        true,
+      );
       // Ответ без файлов: исход неизвестен, повтор дал бы второе сообщение.
       if (!result?.FILES) return NextResponse.json({ error: 'UNKNOWN_RESULT' }, { status: 502 });
       return NextResponse.json({ ok: true });
