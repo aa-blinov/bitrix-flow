@@ -25,6 +25,7 @@ export async function withMessenger(
       params?: Record<string, unknown>,
       mutation?: boolean,
       json?: boolean,
+      v3?: boolean,
     ) => Promise<any>,
     memberId: string,
     userId: string,
@@ -40,6 +41,7 @@ export async function withMessenger(
     params: Record<string, unknown> = {},
     mutation = false,
     json = false,
+    v3 = false,
   ) => {
     if (isMockEnabled()) return mockHandle(method, params as Record<string, string>);
     // Повтор POST отправил бы сообщение дважды, поэтому гонка адресов только на чтении.
@@ -47,6 +49,7 @@ export async function withMessenger(
     return bx24OAuth(memberId, method, params, {
       parallel: !mutation,
       json,
+      v3,
       asUser: person.userId,
     });
   };

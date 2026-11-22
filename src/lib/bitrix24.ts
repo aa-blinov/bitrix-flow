@@ -103,6 +103,8 @@ export interface Bx24Task {
   createdDate: string;
   changedDate: string;
   deadline?: string;
+  startDatePlan?: string;
+  endDatePlan?: string;
   timeEstimate: number;
   timeSpentInLogs: number;
   groupId: string;
@@ -480,6 +482,8 @@ function mapTask(t: any): Bx24Task {
     createdDate: t.createdDate,
     changedDate: t.changedDate,
     deadline: t.deadline || undefined,
+    startDatePlan: t.startDatePlan || undefined,
+    endDatePlan: t.endDatePlan || undefined,
     timeEstimate: parseInt(t.timeEstimate) || 0,
     timeSpentInLogs: parseInt(t.timeSpentInLogs) || 0,
     groupId: t.groupId || t.group_id || '0',

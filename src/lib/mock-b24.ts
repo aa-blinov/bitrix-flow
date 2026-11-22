@@ -761,6 +761,7 @@ function mockMessagesPage(params: Record<string, string>) {
 const DEPENDS: Record<string, string[]> = {};
 const FAVORITES = new Set<string>();
 const WATCHING = new Set<string>();
+const GANTT_LINKS: { from: string; to: string }[] = [];
 const FEED: Record<string, string>[] = [
   {
     ID: '33',
@@ -994,6 +995,31 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         SKIP_TIME: params.skip_time,
       });
       return Number(id);
+    }
+
+    case 'tasks.task.gantt.link.list': {
+      const raw = params as unknown as { filter: [string, number] };
+      const id = String(raw.filter?.[1] ?? '');
+      return {
+        items: GANTT_LINKS.filter((link) => link.from === id).map((link) => ({
+          taskId: Number(link.from),
+          dependentId: Number(link.to),
+          type: 'finish_start',
+        })),
+      };
+    }
+    case 'task.dependence.add': {
+      const raw = params as unknown as { taskIdFrom: number; taskIdTo: number };
+      GANTT_LINKS.push({ from: String(raw.taskIdFrom), to: String(raw.taskIdTo) });
+      return [];
+    }
+    case 'task.dependence.delete': {
+      const raw = params as unknown as { taskIdFrom: number; taskIdTo: number };
+      const index = GANTT_LINKS.findIndex(
+        (link) => link.from === String(raw.taskIdFrom) && link.to === String(raw.taskIdTo),
+      );
+      if (index >= 0) GANTT_LINKS.splice(index, 1);
+      return [];
     }
 
     case 'crm.item.list': {

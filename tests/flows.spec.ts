@@ -2200,3 +2200,22 @@ test('проект: сроки, календарь и лента', async ({ page
   await page.getByRole('button', { name: 'Опубликовать' }).click();
   await expect(feed.getByRole('listitem').first()).toContainText('Релиз переносим на вторник');
 });
+
+test('проект: Гант связывает задачи и снимает связь', async ({ page }) => {
+  await page.goto('/projects/10?view=gantt');
+  await settle(page);
+  await page
+    .getByRole('button', { name: 'Связать: после «Перевести справочники на GraphQL»' })
+    .click();
+  await expect(page.getByRole('status').filter({ hasText: 'начнётся после' })).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Начать после выбранной: Описать схему подписок' })
+    .click();
+  const link = page.getByRole('button', {
+    name: 'Связь: Перевести справочники на GraphQL → Описать схему подписок',
+  });
+  await expect(link).toHaveCount(1);
+  await link.dispatchEvent('click');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
+  await expect(link).toHaveCount(0);
+});

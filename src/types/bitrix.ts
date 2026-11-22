@@ -15,6 +15,9 @@ export interface BxTask {
   createdDate: string;
   updatedDate: string;
   dueDate?: string;
+  /** Плановые даты портала: по ним строится Гант. */
+  planStart?: string;
+  planEnd?: string;
   estimate: number;
   actualTime: number;
   storyPoints?: number;

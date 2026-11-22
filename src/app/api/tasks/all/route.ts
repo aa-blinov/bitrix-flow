@@ -28,6 +28,9 @@ function toTaskListItem(task: any) {
     createdDate: task.createdDate || task.CREATED_DATE || '',
     changedDate: task.changedDate || task.CHANGED_DATE || '',
     deadline: task.deadline || task.DEADLINE || undefined,
+    // Плановые даты нужны Ганту: без них полоса строится от создания до срока.
+    startDatePlan: task.startDatePlan || task.START_DATE_PLAN || undefined,
+    endDatePlan: task.endDatePlan || task.END_DATE_PLAN || undefined,
     timeEstimate: Number(task.timeEstimate ?? task.TIME_ESTIMATE) || 0,
     timeSpentInLogs: Number(task.timeSpentInLogs ?? task.TIME_SPENT_IN_LOGS) || 0,
     groupId: String(task.group?.id || task.groupId || task.GROUP_ID || '0'),

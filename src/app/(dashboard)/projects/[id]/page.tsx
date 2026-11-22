@@ -9,6 +9,7 @@ import KanbanBoard from '@/components/KanbanBoard';
 import DeadlineBoard from '@/components/project/DeadlineBoard';
 import ProjectCalendar from '@/components/project/ProjectCalendar';
 import ProjectFeed from '@/components/project/ProjectFeed';
+import ProjectGantt from '@/components/project/ProjectGantt';
 import { CalendarRange, ChevronRight, Ellipsis, FolderKanban, Settings, Users } from 'lucide-react';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
@@ -77,6 +78,12 @@ const VIEW_TABS = [
     id: 'calendar',
     get label() {
       return t('Календарь');
+    },
+  },
+  {
+    id: 'gantt',
+    get label() {
+      return t('Гант');
     },
   },
   {
@@ -709,6 +716,8 @@ export default function ProjectPage() {
           <DeadlineBoard projectId={projectId} toolbar={viewTabs} />
         ) : effectiveView === 'calendar' ? (
           <ProjectCalendar projectId={projectId} toolbar={viewTabs} />
+        ) : effectiveView === 'gantt' ? (
+          <ProjectGantt projectId={projectId} toolbar={viewTabs} />
         ) : effectiveView === 'feed' ? (
           <ProjectFeed projectId={projectId} toolbar={viewTabs} />
         ) : effectiveView === 'kanban' ? (

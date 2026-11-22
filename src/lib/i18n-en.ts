@@ -1644,4 +1644,16 @@ export const EN: Record<string, string> = {
   'Лента проекта': 'Project feed',
   Важное: 'Important',
   'Комментариев: {0}': 'Comments: {0}',
+  Гант: 'Gantt',
+  'Не удалось загрузить связи задач.': 'Could not load task links.',
+  'Не удалось изменить связь': 'Could not change the link',
+  'Удалить связь?': 'Delete the link?',
+  '«{0}» больше не будет ждать «{1}».': '“{0}” will no longer wait for “{1}”.',
+  'Выберите задачу, которая начнётся после «{0}»': 'Pick the task that starts after “{0}”',
+  'У открытых задач проекта нет дат, Ганту нечего показать.':
+    'Open project tasks have no dates, nothing to show on the Gantt chart.',
+  'Начать после выбранной: {0}': 'Start after the selected one: {0}',
+  'Связать: после «{0}»': 'Link: after “{0}”',
+  'Связать с задачей, которая начнётся после этой': 'Link to a task that starts after this one',
+  'Связь: {0} → {1}': 'Link: {0} → {1}',
 };

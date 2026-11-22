@@ -270,6 +270,8 @@ export function convertBxTask(bxTask: Bx24Task): BxTask {
     createdDate: bxTask.createdDate,
     updatedDate: bxTask.changedDate,
     dueDate: bxTask.deadline,
+    planStart: bxTask.startDatePlan,
+    planEnd: bxTask.endDatePlan,
     estimate: secondsToHours(bxTask.timeEstimate),
     actualTime: secondsToHours(bxTask.timeSpentInLogs),
     comments: [],
