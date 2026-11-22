@@ -20,30 +20,34 @@ export function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.sort - b.sort);
     const result: PlanStage[] = await Promise.all(
-      stages.map(async ({ id, title, color }, index) => {
-        const list = await call(
-          'tasks.task.list',
-          {
-            // Задачи, которые человек ещё не раскладывал, лежат со стадией 0 и видны в первой
-            // колонке. Документация пишет, что 0 добавлять не нужно, но портал без него
-            // отдаёт пустую колонку. MEMBER оставляет только задачи самого человека.
-            filter: {
-              STAGE_ID: index === 0 ? [0, Number(id)] : Number(id),
-              MEMBER: Number(userId),
-              '!STATUS': 5,
+      stages.map(async ({ id, title, color }) => {
+        const tasks: any[] = [];
+        // ponytail: до 4 страниц по 50, дальше колонка обрезается; хватит, пока в плане не сотни задач.
+        for (let start = 0; start < 200; start += 50) {
+          const list = await call(
+            'tasks.task.list',
+            {
+              // Личная стадия лежит в STAGES_ID. STAGE_ID это стадия доски проекта: по нему
+              // проверка на портале показала 19 случайных задач из 100. Нераспланированные
+              // портал сам держит в первой стадии. MEMBER оставляет только задачи человека.
+              filter: { STAGES_ID: Number(id), MEMBER: Number(userId), '!STATUS': 5 },
+              select: ['ID', 'TITLE', 'DEADLINE', 'GROUP_ID'],
+              order: { DEADLINE: 'asc' },
+              start,
             },
-            select: ['ID', 'TITLE', 'DEADLINE', 'GROUP_ID'],
-            order: { DEADLINE: 'asc' },
-          },
-          false,
-          true,
-        ).catch(() => null);
-        const tasks = (list?.tasks || list || []) as any[];
+            false,
+            true,
+          ).catch(() => null);
+          const page = (list?.tasks || list || []) as any[];
+          if (!Array.isArray(page)) break;
+          tasks.push(...page);
+          if (page.length < 50) break;
+        }
         return {
           id,
           title,
           color,
-          tasks: (Array.isArray(tasks) ? tasks : []).map((task) => ({
+          tasks: tasks.map((task) => ({
             id: String(task.id ?? task.ID),
             title: String(task.title ?? task.TITLE ?? ''),
             deadline: String(task.deadline ?? task.DEADLINE ?? ''),

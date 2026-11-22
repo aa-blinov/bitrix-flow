@@ -30,7 +30,9 @@ export function ganttSpan(task: {
   return { start: from, end: to, planned: false };
 }
 
-// Ответ tasks.task.gantt.link.list (REST v3): taskId предшественник, dependentId зависимая.
+// Ответ tasks.task.gantt.link.list (REST v3): вопреки имени поля taskId это зависимая задача,
+// а dependentId предшественник. Проверено на портале: task.dependence.add с taskIdFrom 6249
+// и taskIdTo 6251 читается фильтром по 6251 как { taskId: 6251, dependentId: 6249 }.
 export function normalizeLinks(raw: unknown): GanttLink[] {
   const items = Array.isArray(raw)
     ? raw
@@ -39,8 +41,8 @@ export function normalizeLinks(raw: unknown): GanttLink[] {
       : [];
   return items
     .map((item: any) => ({
-      from: String(item?.taskId ?? ''),
-      to: String(item?.dependentId ?? ''),
+      from: String(item?.dependentId ?? ''),
+      to: String(item?.taskId ?? ''),
       type: String(item?.type || 'finish_start'),
     }))
     .filter((link: GanttLink) => link.from && link.to);

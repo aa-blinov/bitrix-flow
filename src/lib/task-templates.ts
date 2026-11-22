@@ -22,7 +22,23 @@ export type TaskTemplate = {
 const ids = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
 const time = (value: unknown) => (/^\d{2}:\d{2}$/.test(String(value)) ? String(value) : '05:00');
 
-export function parseRecurrence(replicate: unknown, params: any): Recurrence | null {
+// tasks.template.get отдаёт REPLICATE_PARAMS PHP-сериализованной строкой, а list пустым
+// объектом. Повтор плоский: строки, числа и массив дней недели, их и достаём.
+export function phpParams(value: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const entry = /s:\d+:"(\w+)";(?:s:\d+:"([^"]*)"|i:(-?\d+)|a:\d+:\{([^}]*)\}|N)/g;
+  for (const [, key, text, int, list] of value.matchAll(entry))
+    out[key] =
+      text ?? (int !== undefined ? Number(int) : list !== undefined ? arrayValues(list) : null);
+  return out;
+}
+
+// В массиве PHP ключи и значения чередуются: «i:0;i:3;i:1;i:5;» это [3, 5].
+const arrayValues = (body: string) =>
+  [...body.matchAll(/i:(-?\d+);/g)].map((match) => Number(match[1])).filter((_, i) => i % 2);
+
+export function parseRecurrence(replicate: unknown, raw: any): Recurrence | null {
+  const params = typeof raw === 'string' ? phpParams(raw) : raw;
   if (replicate !== 'Y' || !params || typeof params !== 'object') return null;
   if (params.PERIOD === 'weekly')
     return {

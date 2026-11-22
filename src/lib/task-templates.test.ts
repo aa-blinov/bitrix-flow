@@ -30,6 +30,16 @@ describe('task-templates', () => {
     expect(replicateFields(null)).toEqual({ REPLICATE: 'N' });
     expect(parseRecurrence('N', { PERIOD: 'daily' })).toBeNull();
   });
+  it('читает повтор из PHP-строки tasks.template.get', () => {
+    // Строка с портала: шаблон «по средам и пятницам в 10:00».
+    const raw =
+      'a:5:{s:6:"PERIOD";s:6:"weekly";s:9:"WEEK_DAYS";a:2:{i:0;i:3;i:1;i:5;}s:4:"TIME";s:5:"10:00";s:8:"END_DATE";N;s:15:"MONTHLY_DAY_NUM";i:1;}';
+    expect(parseRecurrence('Y', raw)).toEqual({
+      period: 'weekly',
+      weekDays: [3, 5],
+      time: '10:00',
+    });
+  });
   it('дата портала с ведущими нулями', () => {
     expect(portalDay(new Date(2026, 0, 5))).toBe('05.01.2026 00:00:00');
   });

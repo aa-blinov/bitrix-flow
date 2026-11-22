@@ -956,7 +956,7 @@ export async function setTaskMuted(taskId: string, muted: boolean): Promise<void
 }
 
 // Делегировать может исполнитель без права править задачу: обычная смена исполнителя
-// ему недоступна, а delegate оставляет его наблюдателем.
+// ему недоступна, а delegate разрешён.
 export async function delegateTask(taskId: string, userId: string): Promise<void> {
   await bx24('tasks.task.delegate', { taskId, userId });
   await cacheInvalidateByPrefix('tasks:');

@@ -872,11 +872,15 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'tasks.task.list': {
       const all = Object.values(ALL_TASKS).flat();
-      const planFilter = (params as unknown as { filter?: { STAGE_ID?: unknown; MEMBER?: number } })
-        .filter;
-      if (planFilter?.MEMBER && planFilter.STAGE_ID !== undefined) {
-        const wanted = [planFilter.STAGE_ID].flat().map(String);
-        const tasks = all.filter((task) => wanted.includes(MY_PLAN[String(task.id)] || '0'));
+      const planFilter = (
+        params as unknown as { filter?: { STAGES_ID?: unknown; MEMBER?: number } }
+      ).filter;
+      if (planFilter?.MEMBER && planFilter.STAGES_ID !== undefined) {
+        const wanted = [planFilter.STAGES_ID].flat().map(String);
+        const tasks = all.filter((task) =>
+          // Как на портале: нераспланированные лежат в первой личной стадии.
+          wanted.includes(MY_PLAN[String(task.id)] || '31'),
+        );
         return { tasks: tasks.slice(0, 6), next: undefined, total: tasks.length };
       }
       if (params['filter[DEPENDS_ON]']) {
@@ -1029,9 +1033,10 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       const raw = params as unknown as { filter: [string, number] };
       const id = String(raw.filter?.[1] ?? '');
       return {
-        items: GANTT_LINKS.filter((link) => link.from === id).map((link) => ({
-          taskId: Number(link.from),
-          dependentId: Number(link.to),
+        // Как на портале: связь читается по зависимой задаче, предшественник в dependentId.
+        items: GANTT_LINKS.filter((link) => link.to === id).map((link) => ({
+          taskId: Number(link.to),
+          dependentId: Number(link.from),
           type: 'finish_start',
         })),
       };
@@ -1056,8 +1061,17 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return true;
     }
 
+    // Как на портале: список отдаёт параметры повтора пустыми, полные есть только в get.
     case 'tasks.template.list':
-      return { task_templates: Object.fromEntries(TEMPLATES.map((item) => [item.ID, item])) };
+      return {
+        task_templates: Object.fromEntries(
+          TEMPLATES.map((item) => [item.ID, { ...item, REPLICATE_PARAMS: {} }]),
+        ),
+      };
+    case 'tasks.template.get': {
+      const id = Number((params as unknown as { templateId: number }).templateId);
+      return { task_template: TEMPLATES.find((entry) => entry.ID === id) || null };
+    }
     case 'tasks.template.checklist.list':
       return { checkListItems: [] };
     case 'tasks.template.add': {

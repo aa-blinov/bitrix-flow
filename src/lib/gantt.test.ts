@@ -21,7 +21,7 @@ describe('gantt', () => {
     expect(ganttSpan({})).toBeNull();
   });
   it('разбирает связи v3 в обоих видах ответа', () => {
-    const link = { taskId: 101, dependentId: 102, type: 'finish_start' };
+    const link = { taskId: 102, dependentId: 101, type: 'finish_start' };
     expect(normalizeLinks([link])).toEqual([{ from: '101', to: '102', type: 'finish_start' }]);
     expect(normalizeLinks({ items: [link] })).toHaveLength(1);
     expect(normalizeLinks(null)).toEqual([]);

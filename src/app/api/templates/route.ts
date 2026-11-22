@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withMessenger } from '@/lib/messenger-api';
-import { normalizeTemplates, replicateFields, type Recurrence } from '@/lib/task-templates';
+import {
+  normalizeTemplates,
+  parseRecurrence,
+  replicateFields,
+  type Recurrence,
+} from '@/lib/task-templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +15,19 @@ const num = (value: unknown) => (/^\d+$/.test(String(value ?? '')) ? Number(valu
 export function GET(req: NextRequest) {
   return withMessenger(req, async (call) => {
     const raw = await call('tasks.template.list', {}, false, true);
-    return NextResponse.json({ templates: normalizeTemplates(raw) });
+    const templates = normalizeTemplates(raw);
+    // Список отдаёт параметры повтора пустыми: без них правка шаблона затёрла бы настоящий
+    // повтор на «каждый день». Поэтому у регулярных шаблонов дочитываем их по одному.
+    await Promise.all(
+      templates
+        .filter((template) => template.recurrence)
+        .map(async (template) => {
+          const full = await call('tasks.template.get', { templateId: Number(template.id) });
+          const item = full?.task_template ?? full;
+          template.recurrence = parseRecurrence(item?.REPLICATE, item?.REPLICATE_PARAMS);
+        }),
+    );
+    return NextResponse.json({ templates });
   });
 }
 
