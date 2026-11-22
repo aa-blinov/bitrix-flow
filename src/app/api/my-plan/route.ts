@@ -9,7 +9,7 @@ export type PlanStage = { id: string; title: string; color: string; tasks: PlanT
 // «Мой план» у каждого свой, поэтому только токен человека: токен портала вернул бы
 // план владельца приложения. Стадии это task.stages.get с entityId 0.
 export function GET(req: NextRequest) {
-  return withMessenger(req, async (call) => {
+  return withMessenger(req, async (call, _memberId, userId) => {
     const raw = await call('task.stages.get', { entityId: 0 });
     const stages = (Array.isArray(raw) ? raw : Object.values(raw || {}))
       .map((stage: any) => ({
@@ -20,11 +20,18 @@ export function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.sort - b.sort);
     const result: PlanStage[] = await Promise.all(
-      stages.map(async ({ id, title, color }) => {
+      stages.map(async ({ id, title, color }, index) => {
         const list = await call(
           'tasks.task.list',
           {
-            filter: { STAGE_ID: id, '!STATUS': 5 },
+            // Задачи, которые человек ещё не раскладывал, лежат со стадией 0 и видны в первой
+            // колонке. Документация пишет, что 0 добавлять не нужно, но портал без него
+            // отдаёт пустую колонку. MEMBER оставляет только задачи самого человека.
+            filter: {
+              STAGE_ID: index === 0 ? [0, Number(id)] : Number(id),
+              MEMBER: Number(userId),
+              '!STATUS': 5,
+            },
             select: ['ID', 'TITLE', 'DEADLINE', 'GROUP_ID'],
             order: { DEADLINE: 'asc' },
           },

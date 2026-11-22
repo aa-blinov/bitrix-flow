@@ -872,11 +872,11 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'tasks.task.list': {
       const all = Object.values(ALL_TASKS).flat();
-      const planStage = (params as unknown as { filter?: { STAGE_ID?: string } }).filter?.STAGE_ID;
-      if (planStage) {
-        const tasks = all.filter(
-          (task) => (MY_PLAN[String(task.id)] || MY_PLAN_STAGES[0].ID) === String(planStage),
-        );
+      const planFilter = (params as unknown as { filter?: { STAGE_ID?: unknown; MEMBER?: number } })
+        .filter;
+      if (planFilter?.MEMBER && planFilter.STAGE_ID !== undefined) {
+        const wanted = [planFilter.STAGE_ID].flat().map(String);
+        const tasks = all.filter((task) => wanted.includes(MY_PLAN[String(task.id)] || '0'));
         return { tasks: tasks.slice(0, 6), next: undefined, total: tasks.length };
       }
       if (params['filter[DEPENDS_ON]']) {
