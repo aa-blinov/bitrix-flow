@@ -1290,6 +1290,9 @@ test('мессенджер: у файлов видны имена, голосо�
   const chat = await openDmitry(page);
   await expect(chat.getByText('фото.jpg · 5 КБ')).toBeVisible();
   await expect(chat.getByText('Голосовое сообщение', { exact: true })).toBeVisible();
+  // Свой плеер вместо нативного: кнопка и перемотка в палитре приложения.
+  await expect(chat.getByRole('button', { name: 'Воспроизвести' }).first()).toBeVisible();
+  await expect(chat.getByRole('slider', { name: 'Перемотка' }).first()).toBeVisible();
   await chat.getByRole('button', { name: 'Скорость воспроизведения 1×' }).click();
   await expect(chat.getByRole('button', { name: 'Скорость воспроизведения 1.5×' })).toBeVisible();
 });

@@ -9,6 +9,8 @@ import {
   ExternalLink,
   FileText,
   Paperclip,
+  Pause,
+  Play,
   PlayCircle,
 } from 'lucide-react';
 import { Button } from '@/components/monos/Button';
@@ -95,6 +97,125 @@ export function ReadMark({
 
 const SPEEDS = [1, 1.5, 2];
 
+const clock = (sec: number) => {
+  const s = Math.floor(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+// Свой плеер вместо controls: нативный белый и не попадает в палитру ни в одной теме.
+function AudioPlayer({
+  src,
+  name,
+  isVoice,
+  media,
+}: {
+  src: string;
+  name: string;
+  isVoice: boolean;
+  media: ReturnType<typeof useMediaLoad>;
+}) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [rate, setRate] = useState(1);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  // Запись MediaRecorder (webm) приходит без длительности: Chrome отдаёт Infinity, пока не
+  // дочитает файл. Перемотка в конец заставляет его дочитать, потом возвращаемся в начало.
+  const probing = useRef(false);
+
+  const readDuration = () => {
+    const el = audio.current;
+    if (!el) return;
+    if (Number.isFinite(el.duration)) {
+      setDuration(el.duration);
+      if (probing.current) {
+        probing.current = false;
+        el.currentTime = 0;
+      }
+    } else if (!probing.current) {
+      probing.current = true;
+      el.currentTime = 1e7;
+    }
+  };
+
+  return (
+    <div className="mt-0.5 flex w-72 max-w-full items-center gap-2">
+      <audio
+        ref={audio}
+        // У голосового сразу видна длительность; обычный звук грузится по нажатию.
+        preload={isVoice ? 'metadata' : 'none'}
+        src={src}
+        aria-label={name}
+        onWaiting={media.onLoading}
+        onCanPlay={media.onReady}
+        onPlaying={media.onReady}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onLoadedMetadata={() => {
+          if (audio.current) audio.current.playbackRate = rate;
+          readDuration();
+        }}
+        onDurationChange={readDuration}
+        onTimeUpdate={() => {
+          if (!probing.current) setTime(audio.current?.currentTime ?? 0);
+        }}
+        onError={media.onError}
+        className="hidden"
+      />
+      <button
+        type="button"
+        aria-label={playing ? t('Пауза') : t('Воспроизвести')}
+        onClick={() => {
+          const el = audio.current;
+          if (!el) return;
+          if (el.paused) void el.play().catch(media.onError);
+          else el.pause();
+        }}
+        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-ink hover:border-line-strong"
+      >
+        {media.status === 'loading' && playing ? (
+          <Spinner label={t('Загрузка файла')} size="sm" />
+        ) : playing ? (
+          <Pause className="size-4" strokeWidth={2} fill="currentColor" />
+        ) : (
+          <Play className="ml-0.5 size-4" strokeWidth={2} fill="currentColor" />
+        )}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step="any"
+        value={Math.min(time, duration || 0)}
+        disabled={!duration}
+        aria-label={t('Перемотка')}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          setTime(next);
+          if (audio.current) audio.current.currentTime = next;
+        }}
+        className="h-1 min-w-0 flex-1 cursor-pointer accent-accent disabled:cursor-default"
+      />
+      <span className="shrink-0 text-xs text-ink-soft tabular-nums">
+        {clock(playing || time ? time : duration)}
+      </span>
+      <button
+        type="button"
+        aria-label={t('Скорость воспроизведения {0}×', rate)}
+        onClick={() => {
+          const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
+          setRate(next);
+          if (audio.current) audio.current.playbackRate = next;
+        }}
+        className="shrink-0 rounded-ui border border-line px-1.5 py-0.5 text-xs text-ink-soft hover:text-ink"
+      >
+        {rate}×
+      </button>
+    </div>
+  );
+}
+
 // Подпись под медиа: имя файла, у голосового вместо длинного имени с датой понятная метка.
 function Caption({ children }: { children: string }) {
   return <span className="mt-0.5 block max-w-64 truncate text-xs text-ink-soft">{children}</span>;
@@ -112,8 +233,6 @@ export function FileView({
   // Звук не грузится, пока его не включат (preload none): до этого он готов.
   const media = useMediaLoad(file.kind === 'audio' ? 'ready' : 'loading');
   const src = media.url(fileUrl(dialogId, file));
-  const audio = useRef<HTMLAudioElement>(null);
-  const [rate, setRate] = useState(1);
   const isVoice = file.name.startsWith(VOICE_NAME);
 
   if (file.kind === 'image' || file.kind === 'video') {
@@ -179,40 +298,13 @@ export function FileView({
     return (
       <div className="mt-1">
         <Caption>{isVoice ? t('Голосовое сообщение') : file.name}</Caption>
-        <div className="mt-0.5 flex items-center gap-2">
-          <audio
-            ref={audio}
-            key={media.attempt}
-            controls
-            // У голосового сразу видна длительность; обычный звук грузится по нажатию.
-            preload={isVoice ? 'metadata' : 'none'}
-            src={src}
-            aria-label={file.name}
-            onWaiting={media.onLoading}
-            onCanPlay={media.onReady}
-            onPlaying={media.onReady}
-            onLoadedMetadata={() => {
-              if (audio.current) audio.current.playbackRate = rate;
-            }}
-            onError={media.onError}
-            className="w-64 max-w-full"
-          />
-          {media.status === 'loading' && (
-            <Spinner label={t('Загрузка файла')} size="sm" className="text-ink-soft" />
-          )}
-          <button
-            type="button"
-            aria-label={t('Скорость воспроизведения {0}×', rate)}
-            onClick={() => {
-              const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
-              setRate(next);
-              if (audio.current) audio.current.playbackRate = next;
-            }}
-            className="shrink-0 rounded-ui border border-line px-1.5 py-0.5 text-xs text-ink-soft hover:text-ink"
-          >
-            {rate}×
-          </button>
-        </div>
+        <AudioPlayer
+          key={media.attempt}
+          src={src}
+          name={file.name}
+          isVoice={isVoice}
+          media={media}
+        />
       </div>
     );
   }
