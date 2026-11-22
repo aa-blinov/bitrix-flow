@@ -172,7 +172,7 @@ function AudioPlayer({
           if (el.paused) void el.play().catch(media.onError);
           else el.pause();
         }}
-        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-ink hover:border-line-strong"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-canvas hover:opacity-80"
       >
         {media.status === 'loading' && playing ? (
           <Spinner label={t('Загрузка файла')} size="sm" />

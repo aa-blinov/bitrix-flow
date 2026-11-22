@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellOff, BellRing, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
+import { AtSign, Bell, BellOff, Check, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -91,6 +91,12 @@ const GONE_CODES = new Set([
   'USER_NOT_FOUND',
   'NOT_FOUND',
 ]);
+
+const NOTIFY_LABELS = () => ({
+  all: t('На все сообщения'),
+  mentions: t('Только упоминания'),
+  off: t('Без звука'),
+});
 
 export default function Messenger() {
   const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
@@ -501,9 +507,11 @@ export default function Messenger() {
     if (action === 'unread') window.dispatchEvent(new Event(CHAT_READ_EVENT));
   }
 
-  async function toggleNotify() {
-    const next = await setChatNotify(!notifyOn);
-    setNotifyOn(next);
+  const notifyChoice = notifyOn ? notifyMode : 'off';
+
+  async function chooseNotify(choice: 'all' | 'mentions' | 'off') {
+    if (choice !== 'off') setNotifySoundMode(choice);
+    if ((choice !== 'off') !== notifyOn) setNotifyOn(await setChatNotify(choice !== 'off'));
   }
 
   function setNotifySoundMode(mode: 'all' | 'mentions') {
@@ -536,8 +544,10 @@ export default function Messenger() {
     // Открытый диалог на телефоне занимает весь экран, как в мессенджерах: шапка страницы и
     // полоса под кнопкой меню съедали треть высоты. Слой меню, а не выше: меню сообщений
     // уходят порталом в конец body с тем же слоем и остаются поверх.
+    // На планшете на весь экран нельзя: кнопка меню там единственный путь к навигации. Полосу
+    // под ней забираем, а кнопке отдаём место справа от поля ввода.
     <div
-      className={`flex h-[calc(100dvh-5rem)] flex-col bg-canvas lg:h-dvh ${
+      className={`flex h-[calc(100dvh-5rem)] flex-col bg-canvas md:-mb-20 md:h-dvh lg:mb-0 ${
         activeId ? 'max-md:fixed max-md:inset-0 max-md:z-menu max-md:h-dvh' : ''
       }`}
     >
@@ -567,59 +577,39 @@ export default function Messenger() {
                 onChange={setQuery}
                 className="min-w-0 flex-1"
               />
+              {/* Кнопка только открывает меню: раньше нажатие ещё и переключало звук, и меню
+                  открывалось уже с противоположным выбором. Текущий режим отмечен галкой. */}
               <Menu
                 portal
                 align="end"
                 width="auto"
-                label={t('Режим уведомлений')}
+                label={t('Звук уведомлений')}
                 trigger={
                   <IconButton
-                    label={notifyOn ? t('Режим уведомлений') : t('Включить уведомления')}
+                    label={t('Звук уведомлений: {0}', NOTIFY_LABELS()[notifyChoice])}
                     variant="outline"
                     size="md"
-                    pressed={notifyOn}
-                    onClick={() => void toggleNotify()}
                   >
-                    {notifyOn ? (
-                      notifyMode === 'mentions' ? (
-                        <BellRing className="size-4" strokeWidth={1.7} />
-                      ) : (
-                        <Bell className="size-4" strokeWidth={1.7} />
-                      )
-                    ) : (
+                    {notifyChoice === 'off' ? (
                       <BellOff className="size-4" strokeWidth={1.7} />
+                    ) : notifyChoice === 'mentions' ? (
+                      <AtSign className="size-4" strokeWidth={1.7} />
+                    ) : (
+                      <Bell className="size-4" strokeWidth={1.7} />
                     )}
                   </IconButton>
                 }
-                items={[
-                  ...(notifyOn
-                    ? [
-                        {
-                          value: 'all',
-                          label: t('Звенеть на все сообщения'),
-                          disabled: notifyMode === 'all',
-                          onSelect: () => setNotifySoundMode('all'),
-                        },
-                        {
-                          value: 'mentions',
-                          label: t('Звенеть только на упоминания'),
-                          disabled: notifyMode === 'mentions',
-                          onSelect: () => setNotifySoundMode('mentions'),
-                        },
-                        {
-                          value: 'off',
-                          label: t('Выключить уведомления'),
-                          onSelect: () => void toggleNotify(),
-                        },
-                      ]
-                    : [
-                        {
-                          value: 'on',
-                          label: t('Включить уведомления'),
-                          onSelect: () => void toggleNotify(),
-                        },
-                      ]),
-                ]}
+                items={(['all', 'mentions', 'off'] as const).map((value) => ({
+                  value,
+                  label: NOTIFY_LABELS()[value],
+                  icon: (
+                    <Check
+                      className={`size-4 ${value === notifyChoice ? '' : 'invisible'}`}
+                      strokeWidth={1.7}
+                    />
+                  ),
+                  onSelect: () => void chooseNotify(value),
+                }))}
               />
               <IconButton
                 label={t('Прочитать все')}

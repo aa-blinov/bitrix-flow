@@ -2124,7 +2124,7 @@ export default function Conversation({
             </ul>
           )}
           <form
-            className="flex items-end gap-2 p-3"
+            className="flex items-end gap-2 p-3 md:max-lg:pr-20"
             onSubmit={(event) => {
               event.preventDefault();
               void send();

@@ -1286,6 +1286,21 @@ test('событие из очереди портала звенит внутр�
   }
   await expect.poll(chimes).toBeGreaterThanOrEqual(1);
 });
+test('мессенджер: звук уведомлений выбирается в меню, кнопка его не переключает', async ({
+  page,
+}) => {
+  await openDmitry(page);
+  const bell = page.getByRole('button', { name: /^Звук уведомлений/ });
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
+  await bell.click();
+  // Нажатие только открывает меню и ничего не меняет.
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
+  await page.getByRole('menuitem', { name: 'Только упоминания' }).click();
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: Только упоминания');
+  await bell.click();
+  await page.getByRole('menuitem', { name: 'Без звука' }).click();
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
+});
 test('мессенджер: у файлов видны имена, голосовое подписано и ускоряется', async ({ page }) => {
   const chat = await openDmitry(page);
   await expect(chat.getByText('фото.jpg · 5 КБ')).toBeVisible();
