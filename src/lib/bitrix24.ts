@@ -1123,6 +1123,24 @@ export async function removeProjectMember(projectId: string, userId: string) {
   await bx24('sonet_group.user.delete', { GROUP_ID: projectId, USER_ID: userId });
 }
 
+/** Роль в проекте по-портальному: A владелец, E модератор, K участник. */
+export type ProjectRole = 'A' | 'E' | 'K';
+
+export async function setProjectMemberRole(projectId: string, userId: string, role: 'E' | 'K') {
+  await bx24('sonet_group.user.update', { GROUP_ID: projectId, USER_ID: userId, ROLE: role });
+}
+
+// Владелец у проекта один: прежний становится обычным участником.
+export async function setProjectOwner(projectId: string, userId: string) {
+  await bx24('sonet_group.setowner', { GROUP_ID: projectId, USER_ID: userId });
+}
+
+// Портал удаляет вместе с проектом его ленту и Диск со всеми файлами, без корзины.
+export async function deleteProject(projectId: string) {
+  await bx24('sonet_group.delete', { GROUP_ID: projectId });
+  await cacheInvalidateByPrefix('projects');
+}
+
 export type ProjectFields = {
   name?: string;
   description?: string;

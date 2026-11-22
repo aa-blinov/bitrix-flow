@@ -2141,3 +2141,62 @@ test('счётчик просроченных задач портала виде
   await page.getByRole('button', { name: /Задачи\s*3/ }).click();
   await expect(page.getByRole('link', { name: /Мои задачи\s*3 просрочено/ })).toBeVisible();
 });
+
+test('проект: роли участников и удаление проекта', async ({ page }) => {
+  await page.goto('/projects/12');
+  await settle(page);
+  await page
+    .getByRole('button', { name: /участник/ })
+    .first()
+    .click();
+  const list = page.getByRole('list', { name: 'Участники проекта' });
+  await expect(list.getByRole('listitem').filter({ hasText: 'Дмитрий Соколов' })).toContainText(
+    'модератор',
+  );
+  // У владельца нет меню: его не удалить и не понизить.
+  await expect(
+    page.getByRole('button', { name: 'Действия с участником Анна Кузнецова' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Действия с участником Мария Орлова' }).click();
+  await page.getByRole('menuitem', { name: 'Сделать модератором' }).click();
+  await expect(list.getByRole('listitem').filter({ hasText: 'Мария Орлова' })).toContainText(
+    'модератор',
+  );
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Настройки проекта' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Удалить проект' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Диском со всеми файлами');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить навсегда' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('проект: сроки, календарь и лента', async ({ page }) => {
+  await page.goto('/projects/12?view=deadlines');
+  await settle(page);
+  const overdue = page.getByRole('region', { name: 'Просрочено' });
+  const today = page.getByRole('region', { name: 'Сегодня' });
+  const card = overdue.getByRole('button', { name: /Обновить зависимости/ });
+  await expect(card).toBeVisible();
+  const update = page.waitForRequest(
+    (request) => request.url().includes('tasks.task.update') && request.method() === 'POST',
+  );
+  await card.dragTo(today);
+  expect((await update).postData()).toContain('DEADLINE');
+  await expect(today.getByRole('button', { name: /Обновить зависимости/ })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Календарь' }).click();
+  await page.getByRole('button', { name: 'Встреча', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Встреча в календаре проекта' });
+  await dialog.getByLabel('Название').fill('Ретро спринта');
+  await dialog.getByRole('button', { name: 'Создать' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Ретро спринта').filter({ visible: true })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Лента' }).click();
+  const feed = page.getByRole('list', { name: 'Лента проекта' });
+  await expect(feed).toContainText('Демо в пятницу');
+  await page.getByLabel('Текст поста').fill('Релиз переносим на вторник');
+  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await expect(feed.getByRole('listitem').first()).toContainText('Релиз переносим на вторник');
+});

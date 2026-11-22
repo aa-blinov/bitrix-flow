@@ -6,7 +6,10 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import KanbanBoard from '@/components/KanbanBoard';
-import { CalendarRange, ChevronRight, FolderKanban, Settings, Users, X } from 'lucide-react';
+import DeadlineBoard from '@/components/project/DeadlineBoard';
+import ProjectCalendar from '@/components/project/ProjectCalendar';
+import ProjectFeed from '@/components/project/ProjectFeed';
+import { CalendarRange, ChevronRight, Ellipsis, FolderKanban, Settings, Users } from 'lucide-react';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
 import { useConfirm } from '@/components/monos/confirm-dialog';
@@ -21,7 +24,16 @@ import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
 import { Skeleton } from '@/components/monos/Skeleton';
-import { addProjectMember, fetchProjectMembers, removeProjectMember } from '@/lib/bitrix24';
+import {
+  addProjectMember,
+  deleteProject,
+  fetchProjectMembers,
+  removeProjectMember,
+  setProjectMemberRole,
+  setProjectOwner,
+  type ProjectRole,
+} from '@/lib/bitrix24';
+import { Menu } from '@/components/monos/Menu';
 import { dateFormat, t } from '@/lib/i18n';
 
 const PROJECT_DAY = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
@@ -55,7 +67,26 @@ const VIEW_TABS = [
       return t('Список');
     },
   },
+  {
+    id: 'deadlines',
+    get label() {
+      return t('Сроки');
+    },
+  },
+  {
+    id: 'calendar',
+    get label() {
+      return t('Календарь');
+    },
+  },
+  {
+    id: 'feed',
+    get label() {
+      return t('Лента');
+    },
+  },
 ];
+const VIEW_IDS = VIEW_TABS.map((tab) => tab.id);
 
 export default function ProjectPage() {
   const params = useParams();
@@ -65,7 +96,10 @@ export default function ProjectPage() {
   const projectId = (params?.id as string) || '0';
   const notificationTaskId = searchParams.get('task');
   const initialStatus = searchParams.get('status') || 'all';
-  const [view, setView] = useState(() => (searchParams.get('view') === 'grid' ? 'grid' : 'kanban'));
+  const [view, setView] = useState(() => {
+    const requested = searchParams.get('view') || '';
+    return VIEW_IDS.includes(requested) ? requested : 'kanban';
+  });
   // У задач без проекта нет ни доски, ни стадий, поэтому только список.
   const effectiveView = projectId === NO_PROJECT_ID ? 'grid' : view;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -75,7 +109,8 @@ export default function ProjectPage() {
   const [finishDate, setFinishDate] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [membersOpen, setMembersOpen] = useState(false);
-  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [members, setMembers] = useState<{ id: string; role: ProjectRole }[]>([]);
+  const memberIds = useMemo(() => members.map((member) => member.id), [members]);
 
   const {
     projects,
@@ -217,17 +252,21 @@ export default function ProjectPage() {
     if (!membersOpen || !currentProject) return;
     void fetchProjectMembers(currentProject.id)
       .then((result) =>
-        setMemberIds(
+        setMembers(
           (Array.isArray(result) ? result : []).map((item: unknown) => {
             if (item && typeof item === 'object') {
               const value = item as Record<string, unknown>;
-              return String(value.USER_ID ?? value.userId ?? '');
+              const role = String(value.ROLE ?? 'K');
+              return {
+                id: String(value.USER_ID ?? value.userId ?? ''),
+                role: (['A', 'E'].includes(role) ? role : 'K') as ProjectRole,
+              };
             }
-            return String(item);
+            return { id: String(item), role: 'K' as ProjectRole };
           }),
         ),
       )
-      .catch(() => setMemberIds([]));
+      .catch(() => setMembers([]));
   }, [currentProject, membersOpen]);
 
   const memberOptions = useMemo(
@@ -241,7 +280,7 @@ export default function ProjectPage() {
   async function addMember(userId: string) {
     if (!currentProject) return;
     await addProjectMember(currentProject.id, userId);
-    setMemberIds((ids) => [...ids, userId]);
+    setMembers((list) => [...list, { id: userId, role: 'K' }]);
     await useKanbanStore.getState().loadProjects(true);
   }
 
@@ -258,8 +297,59 @@ export default function ProjectPage() {
     });
     if (!agreed) return;
     await removeProjectMember(currentProject.id, userId);
-    setMemberIds((ids) => ids.filter((id) => id !== userId));
+    setMembers((list) => list.filter((member) => member.id !== userId));
     await useKanbanStore.getState().loadProjects(true);
+  }
+
+  const [membersError, setMembersError] = useState('');
+  async function changeRole(userId: string, role: ProjectRole) {
+    if (!currentProject) return;
+    const userName = users.find((user) => user.id === userId)?.name || `#${userId}`;
+    if (role === 'A') {
+      const agreed = await confirm({
+        title: t('Сделать владельцем {0}?', userName),
+        description: t('Владелец у проекта один: прежний станет обычным участником.'),
+        confirmLabel: t('Передать'),
+      });
+      if (!agreed) return;
+    }
+    setMembersError('');
+    try {
+      if (role === 'A') await setProjectOwner(currentProject.id, userId);
+      else await setProjectMemberRole(currentProject.id, userId, role);
+      setMembers((list) =>
+        list.map((member) =>
+          member.id === userId
+            ? { ...member, role }
+            : role === 'A' && member.role === 'A'
+              ? { ...member, role: 'K' }
+              : member,
+        ),
+      );
+    } catch (error) {
+      setMembersError(error instanceof Error ? error.message : t('Не удалось сменить роль'));
+    }
+  }
+
+  async function removeProject() {
+    if (!currentProject) return;
+    const agreed = await confirm({
+      title: t('Удалить проект «{0}»?', currentProject.name),
+      description: t(
+        'Битрикс24 удалит проект насовсем вместе с его лентой и Диском со всеми файлами. Вернуть их будет нельзя. Если проект просто закончился, лучше отправить его в архив.',
+      ),
+      confirmLabel: t('Удалить навсегда'),
+      destructive: true,
+    });
+    if (!agreed) return;
+    try {
+      await deleteProject(currentProject.id);
+      setSettingsOpen(false);
+      await useKanbanStore.getState().loadProjects(true);
+      router.push('/');
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : t('Не удалось удалить проект'));
+    }
   }
 
   async function saveProject() {
@@ -486,27 +576,70 @@ export default function ProjectPage() {
           size="md"
           aria-label={t('Добавить участника')}
         />
-        <div className="mt-4 max-h-64 space-y-1 overflow-y-auto">
-          {memberIds.map((id) => {
-            const user = users.find((item) => item.id === id);
+        <ul aria-label={t('Участники проекта')} className="mt-4 max-h-80 space-y-1 overflow-y-auto">
+          {members.map(({ id, role }) => {
+            const name = users.find((item) => item.id === id)?.name || t('Пользователь #{0}', id);
             return (
-              <div
+              <li
                 key={id}
-                className="flex items-center justify-between rounded-ui px-2 py-2 text-sm"
+                className="flex items-center justify-between gap-2 rounded-ui px-2 py-1.5 text-sm"
               >
-                <span>{user?.name || t('Пользователь #{0}', id)}</span>
-                <IconButton
-                  label={t('Удалить участника')}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void removeMember(id)}
-                >
-                  <X className="size-4" strokeWidth={1.7} />
-                </IconButton>
-              </div>
+                <span className="min-w-0 truncate">{name}</span>
+                <span className="ml-auto shrink-0 text-xs text-ink-soft">
+                  {role === 'A' ? t('владелец') : role === 'E' ? t('модератор') : ''}
+                </span>
+                {/* Владельца не удалить и не понизить: сначала роль передают другому. */}
+                {role !== 'A' && (
+                  <Menu
+                    portal
+                    align="end"
+                    width="auto"
+                    label={t('Действия с участником {0}', name)}
+                    trigger={
+                      <IconButton
+                        label={t('Действия с участником {0}', name)}
+                        variant="ghost"
+                        size="sm"
+                      >
+                        <Ellipsis className="size-4" strokeWidth={1.7} />
+                      </IconButton>
+                    }
+                    items={[
+                      role === 'E'
+                        ? {
+                            value: 'K',
+                            label: t('Сделать участником'),
+                            onSelect: () => void changeRole(id, 'K'),
+                          }
+                        : {
+                            value: 'E',
+                            label: t('Сделать модератором'),
+                            onSelect: () => void changeRole(id, 'E'),
+                          },
+                      {
+                        value: 'A',
+                        label: t('Сделать владельцем'),
+                        onSelect: () => void changeRole(id, 'A'),
+                      },
+                      { value: 'sep', label: '', separator: true },
+                      {
+                        value: 'remove',
+                        label: t('Удалить из проекта'),
+                        danger: true,
+                        onSelect: () => void removeMember(id),
+                      },
+                    ]}
+                  />
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
+        {membersError && (
+          <p role="alert" className="mt-2 text-sm text-danger-text">
+            {membersError}
+          </p>
+        )}
       </Modal>
 
       <Modal
@@ -516,9 +649,14 @@ export default function ProjectPage() {
         size="md"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <Button variant="secondary" onClick={() => void toggleArchive()}>
-              {currentProject.isArchived ? t('Разархивировать') : t('Архивировать')}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => void toggleArchive()}>
+                {currentProject.isArchived ? t('Разархивировать') : t('Архивировать')}
+              </Button>
+              <Button variant="danger" onClick={() => void removeProject()}>
+                {t('Удалить проект')}
+              </Button>
+            </div>
             <Button onClick={() => void saveProject()} disabled={!name.trim()}>
               {t('Сохранить')}
             </Button>
@@ -567,7 +705,13 @@ export default function ProjectPage() {
       </Modal>
 
       <div className="w-full min-w-0 pb-6">
-        {effectiveView === 'kanban' ? (
+        {effectiveView === 'deadlines' ? (
+          <DeadlineBoard projectId={projectId} toolbar={viewTabs} />
+        ) : effectiveView === 'calendar' ? (
+          <ProjectCalendar projectId={projectId} toolbar={viewTabs} />
+        ) : effectiveView === 'feed' ? (
+          <ProjectFeed projectId={projectId} toolbar={viewTabs} />
+        ) : effectiveView === 'kanban' ? (
           // Пока стор не переключился на проект из адреса, доска успевала запросить
           // теги и колонки прошлого проекта.
           selectedProjectId === projectId ? (

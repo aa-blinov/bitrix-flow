@@ -761,6 +761,18 @@ function mockMessagesPage(params: Record<string, string>) {
 const DEPENDS: Record<string, string[]> = {};
 const FAVORITES = new Set<string>();
 const WATCHING = new Set<string>();
+const FEED: Record<string, string>[] = [
+  {
+    ID: '33',
+    AUTHOR_ID: '2',
+    TITLE: 'Демо в пятницу',
+    DETAIL_TEXT: 'Показываем [B]API v2[/B] заказчику, нужны все.',
+    DATE_PUBLISH: '2026-03-02T10:00:00+03:00',
+    NUM_COMMENTS: '2',
+  },
+];
+const EVENTS: Record<string, string>[] = [];
+const MEMBERS: Record<string, { USER_ID: string; ROLE: string }[]> = {};
 const MUTED = new Set<string>();
 const CRM_LINKS: Record<string, string[]> = {};
 const CRM_ITEMS: Record<
@@ -802,6 +814,28 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         if (params[key] !== undefined) project[key] = params[key];
       return true;
     }
+
+    // Роли меняются в тестах, поэтому хранятся до перезапуска сервера.
+    case 'sonet_group.user.get':
+      return (MEMBERS[params.ID] ||= [
+        { USER_ID: '1', ROLE: 'A' },
+        { USER_ID: '2', ROLE: 'E' },
+        { USER_ID: '3', ROLE: 'K' },
+      ]);
+    case 'sonet_group.user.update': {
+      const list = MEMBERS[params.GROUP_ID] || [];
+      for (const member of list) if (member.USER_ID === params.USER_ID) member.ROLE = params.ROLE;
+      return [Number(params.USER_ID)];
+    }
+    case 'sonet_group.setowner': {
+      for (const member of MEMBERS[params.GROUP_ID] || [])
+        member.ROLE =
+          member.USER_ID === params.USER_ID ? 'A' : member.ROLE === 'A' ? 'K' : member.ROLE;
+      return true;
+    }
+    // Удаление не трогает список: остальные тесты ходят в те же проекты.
+    case 'sonet_group.delete':
+      return true;
 
     case 'user.get':
       return USERS;
@@ -923,6 +957,44 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     // Как и правка, не меняет данные задачи: снимки доски остаются прежними.
     case 'tasks.task.delegate':
       return { task: { id: params.taskId, responsibleId: params.userId } };
+
+    // Лента и календарь проекта живут до перезапуска сервера, как и остальные правки мока.
+    case 'log.blogpost.get':
+      return FEED;
+    case 'log.blogpost.add': {
+      const raw = params as unknown as { POST_TITLE?: string; POST_MESSAGE: string };
+      const id = String(100 + FEED.length);
+      FEED.unshift({
+        ID: id,
+        AUTHOR_ID: '1',
+        TITLE: raw.POST_TITLE || raw.POST_MESSAGE.slice(0, 40),
+        DETAIL_TEXT: raw.POST_MESSAGE,
+        DATE_PUBLISH: new Date().toISOString(),
+        NUM_COMMENTS: '0',
+        MICRO: raw.POST_TITLE ? 'N' : 'Y',
+      });
+      return { id: Number(id) };
+    }
+    case 'calendar.section.get':
+      return [{ ID: '7', NAME: 'Проект', PERM: { add: true } }];
+    case 'calendar.event.get':
+      return EVENTS;
+    case 'calendar.event.add': {
+      const id = String(500 + EVENTS.length);
+      const toPortal = (value: string) => {
+        const [date, time = '00:00'] = value.split(' ');
+        const [year, month, day] = date.split('-');
+        return `${day}.${month}.${year} ${time}:00`;
+      };
+      EVENTS.push({
+        ID: id,
+        NAME: params.name,
+        DATE_FROM: toPortal(params.from),
+        DATE_TO: toPortal(params.to),
+        SKIP_TIME: params.skip_time,
+      });
+      return Number(id);
+    }
 
     case 'crm.item.list': {
       const raw = params as unknown as {
