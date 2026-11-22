@@ -2219,3 +2219,44 @@ test('проект: Гант связывает задачи и снимает �
   await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
   await expect(link).toHaveCount(0);
 });
+
+test('мой план: личные колонки, задача переносится между ними', async ({ page }) => {
+  await page.goto('/my-plan');
+  await settle(page);
+  const unplanned = page.getByRole('region', { name: 'Не спланированы' });
+  const week = page.getByRole('region', { name: 'Сделаю на неделе' });
+  const card = unplanned.getByRole('button').first();
+  const title = (await card.textContent())?.trim().slice(0, 20) || '';
+  const move = page.waitForRequest(
+    (request) => request.url().includes('/api/my-plan') && request.method() === 'POST',
+  );
+  await card.dragTo(week);
+  expect((await move).postDataJSON()).toMatchObject({ stageId: '33' });
+  await expect(week).toContainText(title);
+});
+
+test('шаблоны: задача по шаблону и регулярный шаблон', async ({ page }) => {
+  await page.goto('/templates');
+  await settle(page);
+  const list = page.getByRole('list', { name: 'Шаблоны задач' });
+  await expect(list).toContainText('Каждую неделю: пт, в 10:00');
+
+  await page.getByRole('button', { name: 'Новый шаблон' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Новый шаблон' });
+  await dialog.getByLabel('Название').fill('Планёрка по понедельникам');
+  await dialog.getByLabel('Повторять').click();
+  await page.getByRole('option', { name: 'Каждую неделю' }).click();
+  await dialog.getByRole('button', { name: 'вт' }).click();
+  await dialog.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    list.getByRole('listitem').filter({ hasText: 'Планёрка по понедельникам' }),
+  ).toContainText('Каждую неделю: пн, вт');
+
+  await list
+    .getByRole('listitem')
+    .filter({ hasText: 'Еженедельный отчёт заказчику' })
+    .getByRole('button', { name: 'Создать задачу' })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'Еженедельный отчёт заказчику' })).toBeVisible();
+});

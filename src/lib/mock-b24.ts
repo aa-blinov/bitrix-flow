@@ -761,6 +761,24 @@ function mockMessagesPage(params: Record<string, string>) {
 const DEPENDS: Record<string, string[]> = {};
 const FAVORITES = new Set<string>();
 const WATCHING = new Set<string>();
+const TEMPLATES: Record<string, unknown>[] = [
+  {
+    ID: 1,
+    TITLE: 'Еженедельный отчёт заказчику',
+    DESCRIPTION: 'Собрать статус по задачам и отправить',
+    RESPONSIBLE_ID: 1,
+    GROUP_ID: 10,
+    PRIORITY: '1',
+    REPLICATE: 'Y',
+    REPLICATE_PARAMS: { PERIOD: 'weekly', WEEK_DAYS: [5], TIME: '10:00' },
+  },
+];
+const MY_PLAN_STAGES = [
+  { ID: '31', TITLE: 'Не спланированы', SORT: '100', COLOR: '00C4FB' },
+  { ID: '33', TITLE: 'Сделаю на неделе', SORT: '200', COLOR: '47D1E2' },
+  { ID: '35', TITLE: 'Сделаю потом', SORT: '300', COLOR: '75D900' },
+];
+const MY_PLAN: Record<string, string> = {};
 const GANTT_LINKS: { from: string; to: string }[] = [];
 const FEED: Record<string, string>[] = [
   {
@@ -845,6 +863,7 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return { ID: '1', NAME: 'Анна', LAST_NAME: 'Кузнецова', EMAIL: 'anna@example.com' };
 
     case 'task.stages.get': {
+      if (String(params.entityId) === '0') return MY_PLAN_STAGES;
       const entityId = params.entityId;
       const stages = STAGES_MAP[entityId];
       if (!stages) return [];
@@ -853,6 +872,13 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     case 'tasks.task.list': {
       const all = Object.values(ALL_TASKS).flat();
+      const planStage = (params as unknown as { filter?: { STAGE_ID?: string } }).filter?.STAGE_ID;
+      if (planStage) {
+        const tasks = all.filter(
+          (task) => (MY_PLAN[String(task.id)] || MY_PLAN_STAGES[0].ID) === String(planStage),
+        );
+        return { tasks: tasks.slice(0, 6), next: undefined, total: tasks.length };
+      }
       if (params['filter[DEPENDS_ON]']) {
         const id = params['filter[DEPENDS_ON]'];
         const tasks = all.filter((task) => (DEPENDS[String(task.id)] || []).includes(id));
@@ -871,7 +897,9 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'tasks.task.add': {
       // Мок-режим: создаём задачу локально и возвращаем id, чтобы фича
       // inline-добавления была тестируема без реального Битрикса.
-      const fields = JSON.parse(params.fields || '{}');
+      // Прокси шлёт fields строкой, серверные роуты объектом.
+      const raw = params.fields as unknown;
+      const fields = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {};
       const id = `mock-${Date.now()}`;
       const task = {
         id,
@@ -1020,6 +1048,34 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       );
       if (index >= 0) GANTT_LINKS.splice(index, 1);
       return [];
+    }
+
+    case 'task.stages.movetask': {
+      const raw = params as unknown as { id: number; stageId: number };
+      MY_PLAN[String(raw.id)] = String(raw.stageId);
+      return true;
+    }
+
+    case 'tasks.template.list':
+      return { task_templates: Object.fromEntries(TEMPLATES.map((item) => [item.ID, item])) };
+    case 'tasks.template.checklist.list':
+      return { checkListItems: [] };
+    case 'tasks.template.add': {
+      const raw = params as unknown as { fields: Record<string, unknown> };
+      TEMPLATES.push({ ...raw.fields, ID: 10 + TEMPLATES.length });
+      return 10 + TEMPLATES.length - 1;
+    }
+    case 'tasks.template.update': {
+      const raw = params as unknown as { templateId: number; fields: Record<string, unknown> };
+      const item = TEMPLATES.find((entry) => entry.ID === raw.templateId);
+      if (item) Object.assign(item, raw.fields);
+      return true;
+    }
+    case 'tasks.template.delete': {
+      const raw = params as unknown as { templateId: number };
+      const index = TEMPLATES.findIndex((entry) => entry.ID === raw.templateId);
+      if (index >= 0) TEMPLATES.splice(index, 1);
+      return true;
     }
 
     case 'crm.item.list': {

@@ -10,6 +10,8 @@ import {
   Gauge,
   Hourglass,
   CalendarSync,
+  Copy,
+  SquareKanban,
   TimerOff,
   LayoutDashboard,
   Scale,
@@ -98,6 +100,22 @@ export const NAV_ITEMS = [
     section: 'tasks',
     get label() {
       return t('Все задачи');
+    },
+  },
+  {
+    href: '/my-plan',
+    icon: SquareKanban,
+    section: 'tasks',
+    get label() {
+      return t('Мой план');
+    },
+  },
+  {
+    href: '/templates',
+    icon: Copy,
+    section: 'tasks',
+    get label() {
+      return t('Шаблоны');
     },
   },
   {
