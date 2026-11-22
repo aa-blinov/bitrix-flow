@@ -34,7 +34,8 @@ function readAlertsFlag() {
   try {
     // Пушей в браузер больше нет, но флаг alerts продолжает экономить фоновым вкладкам
     // лишние события чата в SSE.
-    return localStorage.getItem(CHAT_NOTIFY_KEY) === '1';
+    // Без выбора звук включён (на упоминания), как в chatNotifyEnabled.
+    return localStorage.getItem(CHAT_NOTIFY_KEY) !== '0';
   } catch {
     return false;
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { AtSign, Bell, BellOff, Check, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
+import { AtSign, Bell, BellOff, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
 import { Badge } from '@/components/monos/Badge';
@@ -111,7 +111,7 @@ export default function Messenger() {
   const moreRef = useRef<HTMLDivElement>(null);
   const [notifyOn, setNotifyOn] = useState(false);
   // Упоминания звенят всегда отдельно: их пропустить страшнее, чем услышать лишний звон.
-  const [notifyMode, setNotifyMode] = useState<'all' | 'mentions'>('all');
+  const [notifyMode, setNotifyMode] = useState<'all' | 'mentions'>('mentions');
   // Чаты с портала по тому же запросу: список диалогов знает только последние.
   const [found, setFound] = useState<Dialog[]>([]);
   const [foundFailed, setFoundFailed] = useState(false);
@@ -122,7 +122,7 @@ export default function Messenger() {
     setNotifyOn(chatNotifyEnabled());
     try {
       const mode = localStorage.getItem('bitrix-flow-chat-notify-mode');
-      if (mode === 'mentions' || mode === 'all') setNotifyMode(mode);
+      if (mode === 'all') setNotifyMode(mode);
     } catch {}
     // Адрес с номером диалога (ссылка уведомления или обновление страницы) главнее
     // последнего открытого диалога, который хранится в браузере.
@@ -584,6 +584,7 @@ export default function Messenger() {
                 align="end"
                 width="auto"
                 label={t('Звук уведомлений')}
+                title={t('Звук уведомлений')}
                 trigger={
                   <IconButton
                     label={t('Звук уведомлений: {0}', NOTIFY_LABELS()[notifyChoice])}
@@ -602,12 +603,7 @@ export default function Messenger() {
                 items={(['all', 'mentions', 'off'] as const).map((value) => ({
                   value,
                   label: NOTIFY_LABELS()[value],
-                  icon: (
-                    <Check
-                      className={`size-4 ${value === notifyChoice ? '' : 'invisible'}`}
-                      strokeWidth={1.7}
-                    />
-                  ),
+                  checked: value === notifyChoice,
                   onSelect: () => void chooseNotify(value),
                 }))}
               />

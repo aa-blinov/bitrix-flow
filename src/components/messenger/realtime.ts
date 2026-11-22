@@ -44,7 +44,9 @@ const NOTIFY_KEY = CHAT_NOTIFY_KEY;
 
 export function chatNotifyEnabled(): boolean {
   try {
-    return localStorage.getItem(NOTIFY_KEY) === '1';
+    // Без выбора звук включён на упоминания: иначе новичок не услышит, что его позвали,
+    // пока сам не найдёт кнопку.
+    return localStorage.getItem(NOTIFY_KEY) !== '0';
   } catch {
     return false;
   }
@@ -148,8 +150,7 @@ function notify(event: MessengerEvent, _onClick: () => void) {
   if (!chatNotifyEnabled()) return;
   // Режим «только упоминания»: обычные сообщения молча попадают в значок.
   try {
-    if (localStorage.getItem('bitrix-flow-chat-notify-mode') === 'mentions' && !event.mentioned)
-      return;
+    if (localStorage.getItem('bitrix-flow-chat-notify-mode') !== 'all' && !event.mentioned) return;
   } catch {}
   // Внутри приложения виден значок непрочитанных, поэтому сигнал здесь — только звук.
   chime(event.mentioned);

@@ -1246,6 +1246,8 @@ test('событие из очереди портала звенит внутр�
     scope.AudioContext = FakeAudioContext;
     scope.__chimes = () => chimes;
     localStorage.setItem('bitrix-flow-chat-notify', '1');
+    // Обычное сообщение звенит только в режиме «на все»: по умолчанию звенят упоминания.
+    localStorage.setItem('bitrix-flow-chat-notify-mode', 'all');
   });
   await page.goto('/');
   await page.waitForLoadState('networkidle');
@@ -1286,20 +1288,28 @@ test('событие из очереди портала звенит внутр�
   }
   await expect.poll(chimes).toBeGreaterThanOrEqual(1);
 });
-test('мессенджер: звук уведомлений выбирается в меню, кнопка его не переключает', async ({
+test('мессенджер: звук уведомлений выбирается в меню, по умолчанию на упоминания', async ({
   page,
 }) => {
   await openDmitry(page);
   const bell = page.getByRole('button', { name: /^Звук уведомлений/ });
-  await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
-  await bell.click();
-  // Нажатие только открывает меню и ничего не меняет.
-  await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
-  await page.getByRole('menuitem', { name: 'Только упоминания' }).click();
+  // По умолчанию звенят упоминания: так новичок не пропустит, что его позвали.
   await expect(bell).toHaveAccessibleName('Звук уведомлений: Только упоминания');
   await bell.click();
-  await page.getByRole('menuitem', { name: 'Без звука' }).click();
+  // Нажатие только открывает меню и ничего не меняет; у меню видна подпись,
+  // фокус стоит на выбранном пункте, а не на первом.
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: Только упоминания');
+  const menu = page.getByRole('menu', { name: 'Звук уведомлений' });
+  await expect(menu.getByText('Звук уведомлений')).toBeVisible();
+  const mentions = page.getByRole('menuitemradio', { name: 'Только упоминания' });
+  await expect(mentions).toHaveAttribute('aria-checked', 'true');
+  await expect(mentions).toBeFocused();
+  await page.getByRole('menuitemradio', { name: 'Без звука' }).click();
   await expect(bell).toHaveAccessibleName('Звук уведомлений: Без звука');
+  await bell.click();
+  await expect(page.getByRole('menuitemradio', { name: 'Без звука' })).toBeFocused();
+  await page.getByRole('menuitemradio', { name: 'На все сообщения' }).click();
+  await expect(bell).toHaveAccessibleName('Звук уведомлений: На все сообщения');
 });
 test('мессенджер: у файлов видны имена, голосовое подписано и ускоряется', async ({ page }) => {
   const chat = await openDmitry(page);

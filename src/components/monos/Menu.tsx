@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -16,6 +16,8 @@ export type MenuItem = {
   disabled?: boolean;
   danger?: boolean;
   separator?: boolean;
+  /** Пункт выбора одного из нескольких: галка у выбранного, фокус при открытии на нём. */
+  checked?: boolean;
   onSelect?: (item: MenuItem) => void;
 };
 
@@ -23,6 +25,8 @@ export type MenuProps = {
   items: MenuItem[];
   /** Доступное имя меню и текст кнопки по умолчанию. */
   label?: string;
+  /** Видимая подпись над пунктами: без неё список выбора не говорит, что он выбирает. */
+  title?: string;
   align?: 'start' | 'end';
   placement?: 'top' | 'bottom';
   width?: 'menu' | 'trigger' | 'auto';
@@ -79,6 +83,7 @@ export function Menu({
   trigger,
   className,
   portal = false,
+  title,
 }: MenuProps) {
   const [open, setOpen] = React.useState(false);
   const [portalPos, setPortalPos] = React.useState<{
@@ -95,19 +100,28 @@ export function Menu({
       setFit({ dx: 0, dy: 0 });
       return;
     }
+    // Портальное меню до первого замера стоит в конце страницы: мерить его там значит
+    // увести вверх, поверх собственной кнопки. Ждём позицию у триггера.
+    if (portal && !portalPos) return;
     const frame = requestAnimationFrame(() => {
       const menu = menuEl.current;
       if (!menu) return;
-      const rect = menu.getBoundingClientRect();
-      let dx = 0;
-      let dy = 0;
-      if (rect.right > window.innerWidth - 8) dx = window.innerWidth - 8 - rect.right;
-      if (rect.left + dx < 8) dx = 8 - rect.left;
-      if (rect.bottom > window.innerHeight - 8) dy = window.innerHeight - 8 - rect.bottom;
-      setFit((current) => (current.dx === dx && current.dy === dy ? current : { dx, dy }));
+      setFit((current) => {
+        // Замер уже включает прошлый сдвиг: считаем от исходного места, иначе сдвиг копится.
+        const rect = menu.getBoundingClientRect();
+        const left = rect.left - current.dx;
+        const right = rect.right - current.dx;
+        const bottom = rect.bottom - current.dy;
+        let dx = 0;
+        let dy = 0;
+        if (right > window.innerWidth - 8) dx = window.innerWidth - 8 - right;
+        if (left + dx < 8) dx = 8 - left;
+        if (bottom > window.innerHeight - 8) dy = window.innerHeight - 8 - bottom;
+        return current.dx === dx && current.dy === dy ? current : { dx, dy };
+      });
     });
     return () => cancelAnimationFrame(frame);
-  }, [open, items]);
+  }, [open, items, portal, portalPos]);
   const anchor = React.useRef<HTMLDivElement | null>(null);
   const menuEl = React.useRef<HTMLDivElement | null>(null);
   const triggerEl = React.useRef<HTMLElement | null>(null);
@@ -115,7 +129,7 @@ export function Menu({
   const enabledItems = React.useCallback(
     (): HTMLElement[] =>
       Array.from(
-        menuEl.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [],
+        menuEl.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])') ?? [],
       ),
     [],
   );
@@ -143,10 +157,13 @@ export function Menu({
     setOpen((value) => !value);
   }, [disabled]);
 
-  // Открытое меню сразу получает фокус на первом доступном пункте.
+  // Открытое меню сразу получает фокус: на выбранном пункте, иначе на первом. Фокус на первом
+  // при галке на другом подсвечивал две строки, и было непонятно, что выбрано.
   React.useEffect(() => {
-    if (open) focusItem(0);
-  }, [open, focusItem]);
+    if (!open) return;
+    const checked = enabledItems().findIndex((el) => el.getAttribute('aria-checked') === 'true');
+    focusItem(Math.max(checked, 0));
+  }, [open, focusItem, enabledItems]);
 
   // Позиция портального поповера привязана к триггеру. Слушаем прокрутку на
   // capture-фазе: выпадашка уезжает и со скроллом окна, и со скроллом
@@ -298,6 +315,11 @@ export function Menu({
       }
       onKeyDown={onMenuKeyDown}
     >
+      {title ? (
+        <p className="px-3 pt-1.5 pb-1 text-whisper tracking-wide text-ink-soft uppercase">
+          {title}
+        </p>
+      ) : null}
       {items.map((item, index) =>
         item.separator ? (
           <div
@@ -310,7 +332,8 @@ export function Menu({
           <button
             key={item.value ?? item.label ?? index}
             type="button"
-            role="menuitem"
+            role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={item.checked}
             disabled={item.disabled}
             className={cn(
               'flex min-h-8 w-full items-center max-sm:min-h-11 gap-2.5 rounded-ui px-3 text-left text-sm outline-none transition-colors duration-fast focus:bg-surface focus:text-ink',
@@ -321,6 +344,13 @@ export function Menu({
             )}
             onClick={() => choose(item)}
           >
+            {item.checked !== undefined ? (
+              <Check
+                aria-hidden="true"
+                className={cn('size-4 shrink-0', !item.checked && 'invisible')}
+                strokeWidth={1.7}
+              />
+            ) : null}
             {item.icon ? (
               <span className="shrink-0" aria-hidden="true">
                 {item.icon}
