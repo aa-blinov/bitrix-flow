@@ -184,11 +184,13 @@ test('задачу можно удалить из карточки после п
   await settle(page);
   await page.getByRole('button', { name: 'Обновить зависимости' }).first().click();
   const dialog = page.getByRole('dialog', { name: /Обновить зависимости/ });
-  await dialog.getByRole('button', { name: 'Удалить задачу' }).click();
+  await dialog.getByRole('button', { name: 'Действия с задачей' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить задачу' }).click();
   // Отмена ничего не удаляет.
   await page.getByRole('alertdialog').getByRole('button', { name: 'Отмена' }).click();
   expect(deleted).toEqual([]);
-  await dialog.getByRole('button', { name: 'Удалить задачу' }).click();
+  await dialog.getByRole('button', { name: 'Действия с задачей' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить задачу' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Удалить' }).click();
   await expect.poll(() => deleted.length).toBe(1);
   expect(deleted[0]).toContain('taskId=107');
@@ -2063,6 +2065,32 @@ test('мессенджер: в открытый раньше чат возвра
   });
   await list.getByRole('button', { name: /Дмитрий Соколов/ }).click();
   await expect(chat).toContainText('Посмотришь ревью?', { timeout: 1500 });
+});
+
+test('карточка: наблюдение, звук и привязка к CRM', async ({ page }) => {
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+  const actions = dialog.getByRole('button', { name: 'Действия с задачей' });
+
+  await actions.click();
+  await page.getByRole('menuitem', { name: 'Наблюдать', exact: true }).click();
+  await actions.click();
+  await page.getByRole('menuitem', { name: 'Без уведомлений по задаче' }).click();
+  await actions.click();
+  await expect(page.getByRole('menuitem', { name: 'Перестать наблюдать' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Перестать наблюдать' }).click();
+  await actions.click();
+  await page.getByRole('menuitem', { name: 'Включить уведомления по задаче' }).click();
+
+  // Поиск идёт по сделкам, контактам, компаниям и лидам сразу.
+  await dialog.getByRole('textbox', { name: 'Привязать элемент CRM' }).fill('Ромаш');
+  await expect(dialog.getByRole('button', { name: 'Контакт: Олег Ромашкин' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Компания: ООО Ромашка' }).click();
+  await expect(dialog.getByText('ООО Ромашка')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Отвязать ООО Ромашка' }).click();
+  await expect(dialog.getByText('ООО Ромашка')).toHaveCount(0);
 });
 
 test('карточка: избранное, связанные задачи и история изменений', async ({ page }) => {

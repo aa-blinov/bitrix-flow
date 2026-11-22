@@ -282,13 +282,15 @@ export function Menu({
 
   const popoverNode = (
     <div
+      // Портальное меню на слое подсказок, как список SelectField: из модалки (карточка
+      // задачи) со слоем меню оно оказывалось под ней и не нажималось.
       ref={menuEl}
       role="menu"
       aria-label={label}
       tabIndex={-1}
       className={cn(
         portal
-          ? 'animate-fade-in fixed z-menu max-h-[min(60vh,20rem)] overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay'
+          ? 'animate-fade-in fixed z-tooltip max-h-[min(60vh,20rem)] overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay'
           : 'animate-fade-in absolute z-menu overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay',
         portal ? PORTAL_WIDTHS[width] : WIDTHS[width],
         // В портал-режиме позиция задаётся стилем, align-классы конфликтуют

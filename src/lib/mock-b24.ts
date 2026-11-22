@@ -760,6 +760,21 @@ function mockMessagesPage(params: Record<string, string>) {
 // Связи и избранное меняются в тестах, но на снимки доски не влияют, поэтому хранятся.
 const DEPENDS: Record<string, string[]> = {};
 const FAVORITES = new Set<string>();
+const WATCHING = new Set<string>();
+const MUTED = new Set<string>();
+const CRM_LINKS: Record<string, string[]> = {};
+const CRM_ITEMS: Record<
+  number,
+  { id: number; title?: string; name?: string; lastName?: string }[]
+> = {
+  1: [{ id: 3, title: 'Лид с сайта' }],
+  2: [
+    { id: 7, title: 'Внедрение CRM для ООО Ромашка' },
+    { id: 8, title: 'Поддержка Ромашки на 2026' },
+  ],
+  3: [{ id: 5, name: 'Олег', lastName: 'Ромашкин' }],
+  4: [{ id: 2, title: 'ООО Ромашка' }],
+};
 
 export function isMockEnabled(): boolean {
   return ON;
@@ -858,6 +873,8 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         const fields = JSON.parse(params.fields || '{}');
         if (Array.isArray(fields.DEPENDS_ON))
           DEPENDS[params.taskId] = fields.DEPENDS_ON.map(String);
+        if (Array.isArray(fields.UF_CRM_TASK))
+          CRM_LINKS[params.taskId] = fields.UF_CRM_TASK.map(String);
       }
       // Подтверждаем правку, но данные не меняем: мок живёт весь прогон
       // UI-тестов, и перенос задачи в одном тесте сдвинул бы снимки остальных.
@@ -869,7 +886,14 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       const all = Object.values(ALL_TASKS).flat();
       const task = all.find((t) => String(t.id) === String(id));
       return task
-        ? { ...task, chatId: '1', favorite: FAVORITES.has(String(id)) ? 'Y' : 'N' }
+        ? {
+            ...task,
+            chatId: '1',
+            favorite: FAVORITES.has(String(id)) ? 'Y' : 'N',
+            isMuted: MUTED.has(String(id)) ? 'Y' : 'N',
+            auditors: WATCHING.has(String(id)) ? ['1'] : [],
+            ufCrmTask: CRM_LINKS[String(id)] || null,
+          }
         : null;
     }
 
@@ -883,6 +907,43 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     case 'tasks.task.favorite.remove':
       FAVORITES.delete(params.taskId);
       return true;
+
+    case 'tasks.task.startwatch':
+      WATCHING.add(params.taskId);
+      return { task: { id: params.taskId } };
+    case 'tasks.task.stopwatch':
+      WATCHING.delete(params.taskId);
+      return { task: { id: params.taskId } };
+    case 'tasks.task.mute':
+      MUTED.add(params.id);
+      return { task: { id: params.id } };
+    case 'tasks.task.unmute':
+      MUTED.delete(params.id);
+      return { task: { id: params.id } };
+    // Как и правка, не меняет данные задачи: снимки доски остаются прежними.
+    case 'tasks.task.delegate':
+      return { task: { id: params.taskId, responsibleId: params.userId } };
+
+    case 'crm.item.list': {
+      const raw = params as unknown as {
+        entityTypeId: number;
+        filter?: Record<string, unknown>;
+      };
+      const items = CRM_ITEMS[Number(raw.entityTypeId)] || [];
+      const filter = raw.filter || {};
+      const ids = filter['@id'] as number[] | undefined;
+      const like = Object.entries(filter).find(([key]) => key.startsWith('%'));
+      return {
+        items: items.filter((item) => {
+          if (ids) return ids.map(Number).includes(item.id);
+          if (like) {
+            const value = String(item[like[0].slice(1) as 'title'] || '').toLowerCase();
+            return value.includes(String(like[1]).toLowerCase());
+          }
+          return true;
+        }),
+      };
+    }
 
     // Ноль просроченных: иначе счётчик в меню попал бы во все снимки экранов.
     case 'tasks.task.counters.get':

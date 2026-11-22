@@ -909,17 +909,62 @@ export async function fetchTaskRelations(
   };
 }
 
-export async function fetchTaskFavorite(taskId: string): Promise<boolean> {
+/** Личное отношение к задаче: избранное, звук, наблюдение. У каждого своё, поэтому не из зеркала. */
+export type TaskPersonal = {
+  favorite: boolean;
+  muted: boolean;
+  watching: boolean;
+  /** Привязки к CRM в формате портала: D_12, C_5, CO_3, L_7, T8f_4. */
+  crm: string[];
+};
+
+export async function fetchTaskPersonal(taskId: string, userId: string): Promise<TaskPersonal> {
   const result = await bx24('tasks.task.get', {
     taskId,
     'select[0]': 'ID',
     'select[1]': 'FAVORITE',
+    'select[2]': 'IS_MUTED',
+    'select[3]': 'AUDITORS',
+    // Системное поле: без явного select портал его не отдаёт.
+    'select[4]': 'UF_CRM_TASK',
   });
-  return (result?.task || result)?.favorite === 'Y';
+  const task = result?.task || result || {};
+  return {
+    favorite: task.favorite === 'Y',
+    muted: task.isMuted === 'Y',
+    watching: (task.auditors || []).map(String).includes(String(userId)),
+    crm: Array.isArray(task.ufCrmTask) ? task.ufCrmTask.map(String) : [],
+  };
 }
 
 export async function setTaskFavorite(taskId: string, favorite: boolean): Promise<void> {
   await bx24(favorite ? 'tasks.task.favorite.add' : 'tasks.task.favorite.remove', { taskId });
+}
+
+export async function setTaskWatching(taskId: string, watching: boolean): Promise<void> {
+  await bx24(watching ? 'tasks.task.startwatch' : 'tasks.task.stopwatch', { taskId });
+  await taskInvalidate(taskId);
+}
+
+// У mute/unmute параметр называется id, а не taskId, как у остальных действий.
+export async function setTaskMuted(taskId: string, muted: boolean): Promise<void> {
+  await bx24(muted ? 'tasks.task.mute' : 'tasks.task.unmute', { id: taskId });
+}
+
+// Делегировать может исполнитель без права править задачу: обычная смена исполнителя
+// ему недоступна, а delegate оставляет его наблюдателем.
+export async function delegateTask(taskId: string, userId: string): Promise<void> {
+  await bx24('tasks.task.delegate', { taskId, userId });
+  await cacheInvalidateByPrefix('tasks:');
+  await taskInvalidate(taskId);
+}
+
+// Поле заменяется целиком: передаём весь список привязок.
+export async function setTaskCrm(taskId: string, crm: string[]): Promise<void> {
+  await bx24('tasks.task.update', {
+    taskId,
+    fields: JSON.stringify({ UF_CRM_TASK: crm }),
+  });
 }
 
 export type TaskCounters = { expired: number; newComments: number; mentioned: number };

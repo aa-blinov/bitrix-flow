@@ -34,7 +34,6 @@ import {
   Paperclip,
   ClipboardCheck,
   Pencil,
-  Star,
 } from 'lucide-react';
 import { Avatar } from '@/components/monos/Avatar';
 import { DateField } from '@/components/monos/DateField';
@@ -62,12 +61,17 @@ import { extractTaskTags, tagKey } from '@/lib/task-tags';
 import {
   fetchProjectMembers,
   fetchTaskById,
-  fetchTaskFavorite,
+  delegateTask,
   searchProjectTasks,
-  setTaskFavorite,
 } from '@/lib/bitrix24';
 import TaskHistory from '@/components/TaskHistory';
 import TaskRelations from '@/components/TaskRelations';
+import {
+  FavoriteButton,
+  TaskActionsMenu,
+  TaskCrmLinks,
+  useTaskPersonal,
+} from '@/components/TaskPersonal';
 import type { Bx24Task } from '@/lib/bitrix24';
 import { dateLocale, t } from '@/lib/i18n';
 
@@ -110,45 +114,6 @@ function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boo
         );
       })}
     </div>
-  );
-}
-
-// Избранное у каждого своё, поэтому читаем его токеном человека, а не из зеркала.
-function FavoriteButton({ taskId }: { taskId: string }) {
-  const [favorite, setFavorite] = useState<boolean | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void fetchTaskFavorite(taskId)
-      .then((value) => !cancelled && setFavorite(value))
-      .catch(() => !cancelled && setFavorite(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [taskId]);
-  const toggle = async () => {
-    const next = !favorite;
-    setFavorite(next);
-    try {
-      await setTaskFavorite(taskId, next);
-    } catch {
-      setFavorite(!next);
-    }
-  };
-  return (
-    <IconButton
-      label={favorite ? t('Убрать из избранного') : t('Добавить в избранное')}
-      aria-pressed={Boolean(favorite)}
-      variant="ghost"
-      size="sm"
-      disabled={favorite === null}
-      onClick={() => void toggle()}
-    >
-      <Star
-        size={14}
-        strokeWidth={1.7}
-        className={favorite ? 'fill-current text-warning-text' : undefined}
-      />
-    </IconButton>
   );
 }
 
@@ -414,6 +379,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   }, [task.id, actionsVersion]);
 
   const can = (action: string) => allowedActions?.[action] === true;
+  const personal = useTaskPersonal(task.id, String(currentUser.id));
+  // Исполнитель без права править задачу меняет исполнителя только делегированием.
+  const delegateOnly = can('delegate') && !can('edit');
+  const changeAssignee = async (userId: string) => {
+    if (!delegateOnly || !userId) return handleUpdateField('assigneeId', userId);
+    try {
+      setFieldError(null);
+      await delegateTask(task.id, userId);
+      await useKanbanStore.getState().loadTaskById(task.id);
+      setEditingField(null);
+    } catch (error) {
+      setFieldError(error instanceof Error ? error.message : t('Не удалось делегировать задачу'));
+    }
+  };
 
   const confirm = useConfirm();
   const removeTask = async () => {
@@ -862,7 +841,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             />
           )}
           <div className="ml-auto flex items-center gap-1">
-            <FavoriteButton taskId={task.id} />
+            <FavoriteButton taskId={task.id} state={personal} />
             {/* Заголовок окна — имя задачи: править его можно только здесь,
                 поэтому кнопка-карандаш стоит рядом с ним. */}
             <IconButton
@@ -876,16 +855,13 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             >
               <Pencil size={14} strokeWidth={1.7} />
             </IconButton>
-            {can('remove') && (
-              <IconButton
-                label={t('Удалить задачу')}
-                variant="ghost"
-                size="sm"
-                onClick={() => void removeTask()}
-              >
-                <Trash2 size={14} strokeWidth={1.7} />
-              </IconButton>
-            )}
+            <TaskActionsMenu
+              taskId={task.id}
+              state={personal}
+              onWatchChange={() => void useKanbanStore.getState().loadTaskById(task.id)}
+              onDelegate={can('delegate') ? () => setEditingField('assigneeId') : undefined}
+              onRemove={can('remove') ? () => void removeTask() : undefined}
+            />
             <IconButton label={t('Закрыть задачу')} variant="ghost" size="sm" onClick={onClose}>
               <X size={16} strokeWidth={1.7} />
             </IconButton>
@@ -1361,8 +1337,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         aria-label={t('Исполнитель')}
                         value={task.assigneeId || 'unassigned'}
                         onChange={(event) =>
-                          void handleUpdateField(
-                            'assigneeId',
+                          void changeAssignee(
                             event.target.value === 'unassigned' ? '' : event.target.value,
                           )
                         }
@@ -1626,6 +1601,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                   </div>
 
                   <TaskRelations taskId={task.id} projectId={task.projectId} />
+                  <TaskCrmLinks taskId={task.id} state={personal} />
                 </div>
               )}
             </Card>

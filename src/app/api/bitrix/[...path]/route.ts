@@ -161,6 +161,11 @@ const MUTATION_METHODS = new Set([
   'tasks.task.result.delete',
   'tasks.task.favorite.add',
   'tasks.task.favorite.remove',
+  'tasks.task.startwatch',
+  'tasks.task.stopwatch',
+  'tasks.task.mute',
+  'tasks.task.unmute',
+  'tasks.task.delegate',
 ]);
 const JSON_PAYLOAD_METHODS = new Set([
   'tasks.task.list',
@@ -227,8 +232,14 @@ async function refreshMirrorAfterMutation(
   result: any,
 ): Promise<void> {
   const taskId = mutatedTaskId(params, result);
-  // Избранное личное и в зеркале не живёт: синк задачи только задержал бы ответ.
-  if (!taskId || method.startsWith('tasks.task.favorite.')) return;
+  // Избранное и звук личные и в зеркале не живут: синк задачи только задержал бы ответ.
+  if (
+    !taskId ||
+    method.startsWith('tasks.task.favorite.') ||
+    method === 'tasks.task.mute' ||
+    method === 'tasks.task.unmute'
+  )
+    return;
   const { syncTaskMirror, removeTask } = await import('@/lib/task-mirror');
   if (method === 'tasks.task.delete') {
     await removeTask(memberId, taskId);
@@ -296,6 +307,12 @@ const ALLOWED_METHODS = new Set([
   'tasks.task.favorite.add',
   'tasks.task.favorite.remove',
   'tasks.task.counters.get',
+  // Наблюдать, без звука, делегировать: меню «…» карточки, как в портале.
+  'tasks.task.startwatch',
+  'tasks.task.stopwatch',
+  'tasks.task.mute',
+  'tasks.task.unmute',
+  'tasks.task.delegate',
 ]);
 
 async function handleRequest(req: NextRequest, method: string) {
