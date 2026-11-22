@@ -21,4 +21,10 @@ describe('deadline-buckets', () => {
     expect(bucketDeadline('none', now)).toBeNull();
     expect(bucketDeadline('overdue', now)).toBeUndefined();
   });
+  it('вечером перенос в «Сегодня» и «Неделю» не попадает в просрочку', () => {
+    // Воскресенье, 22 марта 2026, 21:00: и сегодня, и конец недели уже после 19:00.
+    const evening = new Date(2026, 2, 22, 21, 0);
+    for (const bucket of ['today', 'week'] as const)
+      expect(deadlineBucket(bucketDeadline(bucket, evening)!, evening)).toBe('today');
+  });
 });

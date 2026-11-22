@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import LoadingState from '@/components/LoadingState';
 import { Button } from '@/components/monos/Button';
 import { useConfirm } from '@/components/monos/confirm-dialog';
@@ -110,6 +110,17 @@ export default function ProjectGantt({
   };
 
   const x = (time: number) => ((time - (range?.start || 0)) / DAY) * DAY_WIDTH;
+
+  // Шкала начинается со старейшей задачи: в живом проекте это месяцы назад, и вид открывался
+  // на пустом июле. Прокручиваем к сегодняшнему дню, если он на шкале.
+  const scroller = useRef<HTMLDivElement>(null);
+  const rangeStart = range?.start;
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element || rangeStart === undefined) return;
+    const today = ((now - rangeStart) / DAY) * DAY_WIDTH;
+    element.scrollLeft = Math.max(0, today - element.clientWidth / 2);
+  }, [rangeStart, now]);
   const rowIndex = new Map(rows.map((row, index) => [row.task.id, index]));
   const days = range ? Array.from({ length: range.days }, (_, i) => range.start + i * DAY) : [];
   const width = days.length * DAY_WIDTH;
@@ -162,7 +173,7 @@ export default function ProjectGantt({
               </button>
             ))}
           </div>
-          <div className="min-w-0 flex-1 overflow-x-auto">
+          <div ref={scroller} className="min-w-0 flex-1 overflow-x-auto">
             <div className="relative" style={{ width }}>
               <div className="flex h-12 flex-col border-b border-line">
                 <div className="relative h-6">

@@ -38,10 +38,12 @@ export function bucketDeadline(
   now = new Date(),
 ): string | null | undefined {
   if (bucket === 'none') return null;
+  // Вечером 19:00 сегодня уже прошло, и карточка из «Сегодня» сразу уезжала в «Просрочено»
+  // (в воскресенье так же с «Неделей»): тогда срок конец дня.
   const at = (date: Date) => {
     const value = new Date(date);
     value.setHours(19, 0, 0, 0);
-    return value.toISOString();
+    return (value > now ? value : endOfDay(date)).toISOString();
   };
   if (bucket === 'today') return at(now);
   if (bucket === 'week') return at(endOfWeek(now));

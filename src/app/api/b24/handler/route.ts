@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from 'next/server';
+import { eventFields } from '@/lib/bitrix-event';
 import { saveDeadlineChanges } from '@/lib/deadline-changes';
 import { getDb } from '@/lib/mongo';
 import { invalidateByPrefix } from '@/lib/server-cache';
@@ -47,7 +48,7 @@ async function payload(req: NextRequest) {
 }
 
 function eventDetails(event: string, raw: any) {
-  const data = raw?.FIELDS_AFTER || raw?.fieldsAfter || raw || {};
+  const data = eventFields(raw);
   const taskId = String(
     data.TASK_ID || data.taskId || data.ID || data.id || raw?.TASK_ID || raw?.taskId || '',
   );
@@ -217,6 +218,13 @@ export async function POST(req: NextRequest) {
     }
 
     const raw = eventDetails(event, body.data);
+    // Название удалённой задачи портал не присылает, а зеркало сотрёт её в фоне: берём сейчас.
+    if (raw.type === 'task_deleted' && raw.taskId) {
+      const known = await db
+        .collection('task_mirror')
+        .findOne({ member_id: memberId, id: raw.taskId }, { projection: { 'data.title': 1 } });
+      if (known?.data?.title) raw.message = String(known.data.title);
+    }
     const now = new Date();
     invalidateByPrefix(`${memberId}:`);
     await db
