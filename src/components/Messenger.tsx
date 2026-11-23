@@ -101,6 +101,12 @@ const NOTIFY_LABELS = () => ({
 // Список с прошлого захода на страницу: при возврате в чаты он виден сразу, а свежий
 // приходит следом опросом. Без него каждый вход начинался с секунды пустой колонки.
 // Пишется только в эффекте, поэтому на сервере остаётся пустым и не делится между людьми.
+// Дата и счётчик строки уступают место меню «…» на десктопе.
+// Фокус мышью остаётся на строке и после закрытия меню, поэтому прячем по наведению,
+// открытому меню и фокусу с клавиатуры, а не по любому фокусу внутри строки.
+const UNDER_MENU =
+  'sm:group-hover:invisible sm:group-has-[[aria-expanded=true]]:invisible sm:group-has-[:focus-visible]:invisible';
+
 let lastList: { dialogs: Dialog[]; me: number; portal: string } | null = null;
 
 export default function Messenger() {
@@ -719,7 +725,10 @@ export default function Messenger() {
                               {dialog.title}
                             </span>
                           </span>
-                          <time className="shrink-0 text-xs text-ink-soft" dateTime={dialog.date}>
+                          <time
+                            className={`shrink-0 text-xs text-ink-soft ${UNDER_MENU}`}
+                            dateTime={dialog.date}
+                          >
                             {when(dialog.date)}
                           </time>
                         </span>
@@ -727,7 +736,7 @@ export default function Messenger() {
                           <span className="truncate text-xs text-ink-soft">
                             {dialog.lastMessage?.text}
                           </span>
-                          <span className="flex shrink-0 items-center gap-1">
+                          <span className={`flex shrink-0 items-center gap-1 ${UNDER_MENU}`}>
                             {dialog.muted && (
                               <BellOff
                                 className="size-3 text-ink-soft"
@@ -748,13 +757,13 @@ export default function Messenger() {
                         </span>
                       </span>
                     </button>
-                    {/* На десктопе меню появляется по наведению поверх даты: подложка цвета
-                        строки прячет дату под ним, а не смешивает два слоя. Строка светится
-                        по наведению на весь li и без плавного перехода: иначе под курсором
-                        на меню строка гасла, и подложка оставалась серым пятном. По центру через
+                    {/* На десктопе меню появляется по наведению на месте даты и счётчика,
+                        они в это время скрыты. Подложка их перекрывала не целиком: длинная
+                        дата торчала из-под неё, а под курсором на меню подложка оставалась
+                        серым пятном на погасшей строке. По центру через
                         my-auto, не transform: transform создаёт свой слой наложения, и открытое
                         меню уходило под следующую строку списка. */}
-                    <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit rounded-ui bg-surface-2 group-focus-within:block sm:pl-8 group-hover:block max-sm:block max-sm:bg-transparent">
+                    <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit group-hover:block group-has-[[aria-expanded=true]]:block group-has-[:focus-visible]:block max-sm:block">
                       <Menu
                         label={t('Действия с диалогом')}
                         align="end"
