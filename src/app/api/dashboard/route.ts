@@ -7,6 +7,7 @@ import { getAuthorizedPerson } from '@/lib/authorized-member';
 import { bx24OAuth } from '@/lib/oauth-client';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
+import { hoursSettings } from '@/lib/hours-settings';
 
 // Batch endpoint - загружает все данные для дашборда одним запросом
 export async function GET(req: NextRequest) {
@@ -79,11 +80,7 @@ export async function GET(req: NextRequest) {
       serverCache(`${memberId}:projects:dates`, () => fetchProjectDates(token), PROJECTS_TTL),
       // Без фильтра ACTIVE: портал отдаёт и неактивных, их имена нужны отчётам и истории.
       // ponytail: одна страница user.get, это 50 человек; листать, когда портал вырастет.
-      serverCache(
-        `${memberId}:users:all:v2`,
-        () => callBitrix24(token, 'user.get', {}),
-        PROJECTS_TTL,
-      ),
+      serverCache(`${memberId}:users:all:v3`, () => fetchPeople(token, memberId), PROJECTS_TTL),
       // «Я» это вошедший человек, а не владелец токена портала: его токеном и в его ключ кэша.
       serverCache(
         `${memberId}:user:current:${person.userId}`,
@@ -152,6 +149,37 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
+}
+
+// Неактивную экстранет-учётку (служебная 15) user.get не отдаёт ни без фильтра, ни с
+// ACTIVE: 'N', только по номеру. Поэтому дозапрашиваем по ID тех, кто встречается в задачах
+// зеркала и в настройках часов, но не пришёл списком: иначе в отчётах «#15» вместо имени.
+async function fetchPeople(token: any, memberId: string) {
+  const users: any[] = (await callBitrix24(token, 'user.get', {})) || [];
+  const known = new Set(users.map((user) => String(user.ID)));
+  const db = await getDb();
+  const filter = { member_id: memberId };
+  const mirror = db.collection('task_mirror');
+  const seen = await Promise.all([
+    mirror.distinct('data.responsibleId', filter),
+    mirror.distinct('data.responsible.id', filter),
+    mirror.distinct('data.createdBy', filter),
+    mirror.distinct('data.creator.id', filter),
+    hoursSettings().then((settings) => settings.excludedUserIds),
+  ]);
+  // ponytail: до 50 неизвестных за раз, это одна страница user.get.
+  const missing = [...new Set(seen.flat().map(String))]
+    .filter((id) => /^\d+$/.test(id) && id !== '0' && !known.has(id))
+    .slice(0, 50);
+  if (missing.length) {
+    const extra = await callBitrix24(
+      token,
+      'user.get',
+      Object.fromEntries(missing.map((id, index) => [`ID[${index}]`, id])),
+    ).catch(() => []);
+    users.push(...(extra || []));
+  }
+  return users;
 }
 
 // Активные идут в выбор людей, неактивные только в подписи: уволенного не назначить.
