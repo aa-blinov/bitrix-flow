@@ -906,11 +906,8 @@ export async function fetchTaskRelations(
 /** Название и статус задач по номерам, в том же порядке. */
 export async function fetchRelatedTasks(ids: string[]): Promise<RelatedTask[]> {
   const found = ids.length
-    ? await bx24('tasks.task.list', {
-        // Только массивом: строку «6235,6243» портал читает как одну первую задачу.
-        ...Object.fromEntries(ids.map((id, index) => [`filter[ID][${index}]`, id])),
-        ...RELATED_SELECT,
-      })
+    ? // Прокси разворачивает «6235,6243» в массив; напрямую портал прочитал бы одну первую.
+      await bx24('tasks.task.list', { 'filter[ID]': ids.join(','), ...RELATED_SELECT })
     : { tasks: [] };
   const byId = new Map<string, RelatedTask>(
     (found?.tasks || []).map((task: any) => [String(task.id), relatedTask(task)]),

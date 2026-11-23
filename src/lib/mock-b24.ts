@@ -888,11 +888,8 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         const tasks = all.filter((task) => (DEPENDS[String(task.id)] || []).includes(id));
         return { tasks, next: undefined, total: tasks.length };
       }
-      // Как на портале: несколько номеров только массивом, строка «1,2» значит одну задачу.
-      const ids = Object.keys(params)
-        .filter((key) => /^filter\[ID\](\[\d+\])?$/.test(key))
-        .map((key) => params[key]);
-      if (ids.length) {
+      if (params['filter[ID]']) {
+        const ids = params['filter[ID]'].split(',');
         const tasks = all.filter((task) => ids.includes(String(task.id)));
         return { tasks, next: undefined, total: tasks.length };
       }
