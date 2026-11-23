@@ -8,6 +8,7 @@ import { Button } from '@/components/monos/Button';
 import { IconButton } from '@/components/monos/IconButton';
 import { TextField } from '@/components/monos/TextField';
 import {
+  fetchRelatedTasks,
   fetchTaskRelations,
   searchProjectTasks,
   updateTaskFull,
@@ -47,7 +48,8 @@ function RelatedRow({ task, onRemove }: { task: RelatedTask; onRemove?: () => vo
 
 /**
  * «Связанные задачи» портала (поле DEPENDS_ON): от чего зависит задача и кто ждёт её.
- * Связи Ганта сюда не попадают: REST их не отдаёт.
+ * Ниже предшественники по Ганту, только для чтения: связи правятся на виде «Гант». Кого ждёт
+ * эта задача по Ганту, портал по одной задаче не отдаёт: фильтр есть только по зависимой.
  */
 export default function TaskRelations({
   taskId,
@@ -64,6 +66,25 @@ export default function TaskRelations({
   const [results, setResults] = useState<Bx24Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [gantt, setGantt] = useState<RelatedTask[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/projects/gantt?ids=${taskId}`)
+      .then((response) => (response.ok ? response.json() : { links: [] }))
+      .then(({ links }: { links?: { from: string; to: string }[] }) =>
+        fetchRelatedTasks(
+          (links || []).filter((link) => link.to === taskId).map((link) => link.from),
+        ),
+      )
+      .then((found) => {
+        if (!cancelled) setGantt(found);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   const load = useCallback(() => {
     fetchTaskRelations(taskId)
@@ -104,7 +125,9 @@ export default function TaskRelations({
   };
 
   const dependsOn = relations?.dependsOn || [];
-  const open = dependsOn.filter((task) => task.status && task.status !== DONE).length;
+  const open = [...dependsOn, ...gantt].filter(
+    (task) => task.status && task.status !== DONE,
+  ).length;
   const taken = new Set([taskId, ...dependsOn.map((task) => task.id)]);
 
   return (
@@ -133,6 +156,14 @@ export default function TaskRelations({
               }
             />
           ))}
+          {gantt.length > 0 && (
+            <>
+              <p className="pt-1 text-whisper text-ink-faint">{t('Ждёт по Ганту')}</p>
+              {gantt.map((task) => (
+                <RelatedRow key={task.id} task={task} />
+              ))}
+            </>
+          )}
           {relations.blocks.length > 0 && (
             <>
               <p className="pt-1 text-whisper text-ink-faint">{t('Эту задачу ждут')}</p>

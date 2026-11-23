@@ -897,20 +897,26 @@ export async function fetchTaskRelations(
     bx24('task.item.getdependson', { TASKID: taskId }),
     bx24('tasks.task.list', { 'filter[DEPENDS_ON]': taskId, ...RELATED_SELECT }),
   ]);
-  const dependsOnIds = (Array.isArray(ids) ? ids : []).map(String);
-  const found = dependsOnIds.length
-    ? await bx24('tasks.task.list', { 'filter[ID]': dependsOnIds.join(','), ...RELATED_SELECT })
+  return {
+    dependsOn: await fetchRelatedTasks((Array.isArray(ids) ? ids : []).map(String)),
+    blocks: (blocking?.tasks || []).map(relatedTask),
+  };
+}
+
+/** Название и статус задач по номерам, в том же порядке. */
+export async function fetchRelatedTasks(ids: string[]): Promise<RelatedTask[]> {
+  const found = ids.length
+    ? await bx24('tasks.task.list', {
+        // Только массивом: строку «6235,6243» портал читает как одну первую задачу.
+        ...Object.fromEntries(ids.map((id, index) => [`filter[ID][${index}]`, id])),
+        ...RELATED_SELECT,
+      })
     : { tasks: [] };
   const byId = new Map<string, RelatedTask>(
     (found?.tasks || []).map((task: any) => [String(task.id), relatedTask(task)]),
   );
-  return {
-    // Задача без доступа не находится списком, но связь с ней есть: показываем номер.
-    dependsOn: dependsOnIds.map(
-      (id) => byId.get(id) || { id, title: `#${id}`, status: '', groupId: '0' },
-    ),
-    blocks: (blocking?.tasks || []).map(relatedTask),
-  };
+  // Задача без доступа не находится списком, но связь с ней есть: показываем номер.
+  return ids.map((id) => byId.get(id) || { id, title: `#${id}`, status: '', groupId: '0' });
 }
 
 /** Личное отношение к задаче: избранное, звук, наблюдение. У каждого своё, поэтому не из зеркала. */

@@ -2,7 +2,9 @@
 // проект и теги из task_mirror. Портал не трогаем: списания уже собраны шедулером,
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
 import { hoursSettings } from './hours-settings';
-import { getDb } from './mongo';
+import { cacheGet, cacheSet, getDb } from './mongo';
+import { bx24OAuth } from './oauth-client';
+import { isMockEnabled } from './mock-b24';
 import {
   classAt,
   projectHourClass,
@@ -57,6 +59,24 @@ export type HoursReport = {
 // размывать доли классов, поэтому их убирают до агрегации, а не в интерфейсе.
 // Список задаёт админ в настройках, запасной вариант HOURS_EXCLUDED_USER_IDS.
 export const excludedUsers = async () => new Set((await hoursSettings()).excludedUserIds);
+
+// Неактивные учётки часов не списывают, а открытые задачи на них остаются: без фильтра они
+// висели в «ниже нормы» с нулём. Фильтр только ACTIVE: 'N', строку 'false' портал читает
+// как активных (проверено: 14 вместо 7). Сбой портала не прячет никого.
+export async function inactiveUsers(memberId: string): Promise<Set<string>> {
+  if (isMockEnabled()) return new Set();
+  const key = `users:inactive:${memberId}`;
+  const cached = await cacheGet<string[]>(key);
+  if (cached) return new Set(cached);
+  try {
+    const raw = await bx24OAuth(memberId, 'user.get', { ACTIVE: 'N' }, { parallel: true });
+    const ids = (Array.isArray(raw) ? raw : []).map((user: any) => String(user.ID));
+    await cacheSet(key, ids, 10 * 60);
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+}
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
 

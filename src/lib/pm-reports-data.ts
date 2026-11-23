@@ -2,7 +2,7 @@
 // понедельные списания, которые собирает шедулер. Портал на рендер отчёта не трогаем.
 import { portalTime, syncDeadlineChanges } from './deadline-changes';
 import { hoursSettings } from './hours-settings';
-import { excludedUsers, loadHours, mirrorProjectId, weekStarts } from './hours';
+import { excludedUsers, inactiveUsers, loadHours, mirrorProjectId, weekStarts } from './hours';
 import { getDb } from './mongo';
 import { isDay } from './report-period';
 import {
@@ -312,7 +312,7 @@ async function fromTasks(
   const recentFrom = shiftDay(from, -TEAM_LOOKBACK_DAYS);
   const { entries, coverage } = await loadEntries(memberId, weekStarts(recentFrom, to), all, weeks);
   const settings = await hoursSettings();
-  const excluded = new Set(settings.excludedUserIds);
+  const excluded = new Set([...settings.excludedUserIds, ...(await inactiveUsers(memberId))]);
   const userIds = [
     ...new Set([
       ...entries

@@ -9,7 +9,7 @@ import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { fetchTaskHistory, secondsToHours, type TaskHistoryEntry } from '@/lib/bitrix24';
 import { mapBitrixTaskStatus } from '@/lib/task-status';
 import { t } from '@/lib/i18n';
-import { useKanbanStore } from '@/store/kanban';
+import { useKanbanStore, useUserDirectory } from '@/store/kanban';
 import { STATUS_LABELS } from '@/types/bitrix';
 
 // Геттер, а не таблица на уровне модуля: язык известен только после монтирования.
@@ -52,7 +52,7 @@ const WITHOUT_VALUE = new Set(['NEW', 'DESCRIPTION', 'RESULT', 'RESULT_EDIT', 'R
 const SAME_VALUE = new Set(['CHECKLIST_ITEM_CHECK', 'CHECKLIST_ITEM_UNCHECK']);
 
 export default function TaskHistory({ taskId }: { taskId: string }) {
-  const users = useKanbanStore((state) => state.users);
+  const users = useUserDirectory();
   const projects = useKanbanStore((state) => state.projects);
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<TaskHistoryEntry[] | null>(null);

@@ -37,7 +37,7 @@ import { dateFormat, numberFormat, t } from '@/lib/i18n';
 import { FONT } from '@/components/monos/scale';
 import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { cn } from '@/lib/utils';
-import { useKanbanStore } from '@/store/kanban';
+import { useKanbanStore, useUserDirectory } from '@/store/kanban';
 import { useConfirm } from '@/components/monos/confirm-dialog';
 
 const ALL_CLASSES: HourClassOrUnassigned[] = [...HOUR_CLASSES, UNASSIGNED];
@@ -190,7 +190,7 @@ function HoursAnalyticsView() {
   const isMobile = useIsMobile();
   const memberId = useKanbanStore((state) => state.memberId);
   const projects = useKanbanStore((state) => state.projects);
-  const users = useKanbanStore((state) => state.users);
+  const users = useUserDirectory();
 
   const [report, setReport] = useState<HoursReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);

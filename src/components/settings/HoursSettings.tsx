@@ -10,7 +10,7 @@ import { TextField } from '@/components/monos/TextField';
 import { useTaskToasts } from '@/components/monos/toast';
 import LoadingState from '@/components/LoadingState';
 import { t } from '@/lib/i18n';
-import { useKanbanStore } from '@/store/kanban';
+import { useKanbanStore, useUserDirectory } from '@/store/kanban';
 
 type Settings = {
   excludedUserIds: string[];
@@ -28,6 +28,7 @@ const validHours = (value: string) => {
 export default function HoursSettings() {
   const toasts = useTaskToasts();
   const users = useKanbanStore((state) => state.users);
+  const directory = useUserDirectory();
   const [saved, setSaved] = useState<Settings | null>(null);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [daily, setDaily] = useState('8');
@@ -61,9 +62,9 @@ export default function HoursSettings() {
   }, [load]);
 
   const nameOf = useMemo(() => {
-    const names = new Map(users.map((user) => [String(user.id), user.name]));
+    const names = new Map(directory.map((user) => [String(user.id), user.name]));
     return (id: string) => names.get(id) || `#${id}`;
-  }, [users]);
+  }, [directory]);
   // В выпадашке только те, кого ещё нет в списке: второй раз одного человека не добавить.
   const choices = (taken: string[]) =>
     [...users]

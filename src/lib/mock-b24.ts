@@ -888,8 +888,11 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         const tasks = all.filter((task) => (DEPENDS[String(task.id)] || []).includes(id));
         return { tasks, next: undefined, total: tasks.length };
       }
-      if (params['filter[ID]']) {
-        const ids = params['filter[ID]'].split(',');
+      // Как на портале: несколько номеров только массивом, строка «1,2» значит одну задачу.
+      const ids = Object.keys(params)
+        .filter((key) => /^filter\[ID\](\[\d+\])?$/.test(key))
+        .map((key) => params[key]);
+      if (ids.length) {
         const tasks = all.filter((task) => ids.includes(String(task.id)));
         return { tasks, next: undefined, total: tasks.length };
       }
@@ -1029,6 +1032,11 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
       return Number(id);
     }
 
+    // batch REST v3: тело это массив вызовов, ответ массив их результатов по порядку.
+    case 'batch':
+      return (params as unknown as { method: string; query: Record<string, string> }[]).map(
+        (item) => mockHandle(item.method, item.query),
+      );
     case 'tasks.task.gantt.link.list': {
       const raw = params as unknown as { filter: [string, number] };
       const id = String(raw.filter?.[1] ?? '');

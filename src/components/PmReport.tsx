@@ -26,7 +26,7 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import type { Cell, ReportRow } from '@/lib/pm-reports';
 import type { ReportKind, ReportResponse } from '@/lib/pm-reports-data';
 import { cn } from '@/lib/utils';
-import { useKanbanStore } from '@/store/kanban';
+import { useKanbanStore, useUserDirectory } from '@/store/kanban';
 
 type Kind =
   | 'text'
@@ -950,7 +950,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
 
   const memberId = useKanbanStore((state) => state.memberId);
   const projects = useKanbanStore((state) => state.projects);
-  const users = useKanbanStore((state) => state.users);
+  const users = useUserDirectory();
   const [report, setReport] = useState<Response | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');

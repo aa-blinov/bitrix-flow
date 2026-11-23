@@ -1483,6 +1483,7 @@ export const EN: Record<string, string> = {
   'Не удалось сохранить связь': 'Could not save the link',
   'Ждёт задач: {0}': 'Waiting on {0}',
   'Эту задачу ждут': 'Waiting on this task',
+  'Ждёт по Ганту': 'Waits on (Gantt)',
   'Добавить связь: название или ID…': 'Add a link: title or ID…',
   'Добавить связанную задачу': 'Add a related task',
   'Аватар обновлён': 'Avatar updated',

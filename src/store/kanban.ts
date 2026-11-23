@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useMemo } from 'react';
 import { bitrixTaskTags, extractTaskTags, mergeTaskTags } from '@/lib/task-tags';
 import { BxTask, BxComment, BxTaskResult, TimeEntry, TaskStatus, Bx24User } from '@/types/bitrix';
 import type { Bx24TimeEntry, ProjectFields } from '@/lib/bitrix24';
@@ -94,6 +95,8 @@ interface KanbanStore {
   tasks: BxTask[];
   subtasks: Record<string, BxTask[]>;
   users: Bx24User[];
+  /** Неактивные учётки: только для подписей в отчётах и истории, в выбор людей не идут. */
+  formerUsers: Bx24User[];
   stages: Bx24Stage[];
   selectedProjectId: string | null;
   selectedTaskId: string | null;
@@ -311,6 +314,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
   tasks: [],
   subtasks: {},
   users: [],
+  formerUsers: [],
   stages: [],
   selectedProjectId: null,
   selectedTaskId: null,
@@ -395,6 +399,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           projects: projectsResult,
           projectDates,
           users: usersResult,
+          formerUsers,
           currentUser,
         } = await res.json();
 
@@ -402,13 +407,19 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
           projects: projectsResult || [],
           projectDatesAvailable: !!projectDates,
           users: usersResult || [],
+          formerUsers: formerUsers || [],
           currentUser: currentUser?.id ? currentUser : get().currentUser,
           isLoading: false,
         });
 
         if (typeof window !== 'undefined') {
           try {
-            persist.saveToStorage({ projects: projectsResult, users: usersResult, currentUser });
+            persist.saveToStorage({
+              projects: projectsResult,
+              users: usersResult,
+              formerUsers,
+              currentUser,
+            });
           } catch {}
         }
       } catch (err: any) {
@@ -1353,6 +1364,7 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
         memberId: localStorage.getItem('bitrix_member_id') || get().memberId,
         projects: data.projects || [],
         users: data.users || [],
+        formerUsers: data.formerUsers || [],
         currentUser: data.currentUser || get().currentUser,
         stages: data.stages ? (Object.values(data.stages).flat() as any[]) : [],
         // Route navigation may select a project before the layout effect restores
@@ -1392,3 +1404,10 @@ export const useKanbanStore = create<KanbanStore>((set, get) => ({
     }
   },
 }));
+
+/** Все люди портала для подписей, вместе с неактивными: иначе в отчётах «#15» вместо имени. */
+export function useUserDirectory(): Bx24User[] {
+  const users = useKanbanStore((state) => state.users);
+  const former = useKanbanStore((state) => state.formerUsers);
+  return useMemo(() => [...users, ...former], [users, former]);
+}

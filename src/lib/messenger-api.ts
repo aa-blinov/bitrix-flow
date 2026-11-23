@@ -22,7 +22,7 @@ export async function withMessenger(
   run: (
     call: (
       method: string,
-      params?: Record<string, unknown>,
+      params?: Record<string, unknown> | unknown[],
       mutation?: boolean,
       json?: boolean,
       v3?: boolean,
@@ -38,7 +38,7 @@ export async function withMessenger(
 
   const call = async (
     method: string,
-    params: Record<string, unknown> = {},
+    params: Record<string, unknown> | unknown[] = {},
     mutation = false,
     json = false,
     v3 = false,

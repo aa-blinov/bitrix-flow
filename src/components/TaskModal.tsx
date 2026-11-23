@@ -1,6 +1,6 @@
 'use client';
 import { Bx24User, BxFile, BxTask, PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
-import { convertBxTask, useKanbanStore } from '@/store/kanban';
+import { convertBxTask, useKanbanStore, useUserDirectory } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -74,6 +74,24 @@ import {
 } from '@/components/TaskPersonal';
 import type { Bx24Task } from '@/lib/bitrix24';
 import { dateLocale, t } from '@/lib/i18n';
+
+/** Родитель бывает в другом проекте или закрыт: в списке доски его нет, название берём из портала. */
+function ParentTitle({ id, known }: { id: string; known?: string }) {
+  const [loaded, setLoaded] = useState<{ id: string; title: string } | null>(null);
+  useEffect(() => {
+    if (known) return;
+    let cancelled = false;
+    fetchTaskById(id)
+      .then((parent) => {
+        if (!cancelled) setLoaded({ id, title: parent.title });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id, known]);
+  return <>{known || (loaded?.id === id && loaded.title) || `#${id}`}</>;
+}
 
 function FileAttachments({ files, attached }: { files?: BxFile[]; attached?: boolean }) {
   if (!files?.length) return null;
@@ -191,6 +209,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
       isLoadingTask: s.isLoadingTask,
     })),
   );
+  const directory = useUserDirectory();
 
   const router = useRouter();
   const toast = useToast();
@@ -1377,7 +1396,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                         onClick={() => setEditingField('creatorId')}
                       >
                         {task.creatorName ||
-                          users.find((user) => user.id === task.creatorId)?.name ||
+                          directory.find((user) => user.id === task.creatorId)?.name ||
                           t('Не указан')}
                       </button>
                     )}
@@ -1401,7 +1420,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             )
                           }
                         >
-                          {users.find((user) => user.id === id)?.name || `#${id}`}
+                          {directory.find((user) => user.id === id)?.name || `#${id}`}
                         </Chip>
                       ))}
                     </div>
@@ -1453,7 +1472,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                             )
                           }
                         >
-                          {users.find((user) => user.id === id)?.name || `#${id}`}
+                          {directory.find((user) => user.id === id)?.name || `#${id}`}
                         </Chip>
                       ))}
                     </div>
@@ -1551,8 +1570,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     {task.parentId && (
                       <div className="mb-2 flex items-center justify-between rounded-ui border border-line bg-surface-2 px-2 py-1 text-sm">
                         <span className="truncate">
-                          {tasks.find((candidate) => candidate.id === task.parentId)?.title ||
-                            `#${task.parentId}`}
+                          <ParentTitle
+                            id={task.parentId}
+                            known={tasks.find((candidate) => candidate.id === task.parentId)?.title}
+                          />
                         </span>
                         <IconButton
                           label={t('Убрать родительскую задачу')}

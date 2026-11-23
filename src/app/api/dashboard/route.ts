@@ -27,13 +27,7 @@ export async function GET(req: NextRequest) {
         finishDate: portalDay(g.PROJECT_DATE_FINISH),
       })),
       projectDates: true,
-      users: (rawUsers || []).map((u: any) => ({
-        id: u.ID,
-        name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
-        email: u.EMAIL,
-        icon: usableAvatar(u.PERSONAL_PHOTO),
-        userType: u.USER_TYPE,
-      })),
+      ...splitUsers(rawUsers),
       currentUser: rawCurrentUser
         ? {
             id: rawCurrentUser.ID,
@@ -83,9 +77,11 @@ export async function GET(req: NextRequest) {
     const [rawProjects, projectDates, rawUsers, rawCurrentUser] = await Promise.all([
       serverCache(`${memberId}:projects:all`, () => fetchAllProjects(token), PROJECTS_TTL),
       serverCache(`${memberId}:projects:dates`, () => fetchProjectDates(token), PROJECTS_TTL),
+      // Без фильтра ACTIVE: портал отдаёт и неактивных, их имена нужны отчётам и истории.
+      // ponytail: одна страница user.get, это 50 человек; листать, когда портал вырастет.
       serverCache(
-        `${memberId}:users:all`,
-        () => callBitrix24(token, 'user.get', { ACTIVE: 'true' }),
+        `${memberId}:users:all:v2`,
+        () => callBitrix24(token, 'user.get', {}),
         PROJECTS_TTL,
       ),
       // «Я» это вошедший человек, а не владелец токена портала: его токеном и в его ключ кэша.
@@ -109,13 +105,7 @@ export async function GET(req: NextRequest) {
       finishDate: projectDates?.[String(g.ID)]?.finish || '',
     }));
 
-    const users = (rawUsers || []).map((u: any) => ({
-      id: u.ID,
-      name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
-      email: u.EMAIL,
-      icon: usableAvatar(u.PERSONAL_PHOTO),
-      userType: u.USER_TYPE,
-    }));
+    const { users, formerUsers } = splitUsers(rawUsers);
 
     const currentUser = rawCurrentUser
       ? {
@@ -152,10 +142,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ projects, projectDates: !!projectDates, users, currentUser });
+    return NextResponse.json({
+      projects,
+      projectDates: !!projectDates,
+      users,
+      formerUsers,
+      currentUser,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
+}
+
+// Активные идут в выбор людей, неактивные только в подписи: уволенного не назначить.
+function splitUsers(raw: any[] | null) {
+  const users = (raw || []).map((u: any) => ({
+    id: u.ID,
+    name: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || u.EMAIL,
+    email: u.EMAIL,
+    icon: usableAvatar(u.PERSONAL_PHOTO),
+    userType: u.USER_TYPE,
+    active: u.ACTIVE !== false && u.ACTIVE !== 'N',
+  }));
+  return {
+    users: users.filter((user) => user.active).map(({ active: _active, ...user }) => user),
+    formerUsers: users.filter((user) => !user.active).map(({ id, name }) => ({ id, name })),
+  };
 }
 
 async function callBitrix24Response(token: any, method: string, params: Record<string, string>) {
