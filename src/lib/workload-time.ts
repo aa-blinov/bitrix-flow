@@ -149,7 +149,21 @@ export async function refreshStatus(
   return { refreshing, error: refreshing ? '' : String(failed?.last_error || '') };
 }
 
-export async function refreshWorkloadTime(memberId: string, start: string, end: string) {
+// Два «Обновить» подряд (вторая вкладка, коллега, ночной сбор) шли параллельно: оба
+// стирали и писали одну неделю, и последний перетирал первого. Повтор ждёт уже идущий сбор.
+// ponytail: склейка в памяти процесса, при нескольких экземплярах приложения нужен замок в Mongo.
+const running = new Map<string, Promise<Awaited<ReturnType<typeof collectWorkloadTime>>>>();
+
+export function refreshWorkloadTime(memberId: string, start: string, end: string) {
+  const key = `${memberId}:${start}:${end}`;
+  const pending = running.get(key);
+  if (pending) return pending;
+  const job = collectWorkloadTime(memberId, start, end).finally(() => running.delete(key));
+  running.set(key, job);
+  return job;
+}
+
+async function collectWorkloadTime(memberId: string, start: string, end: string) {
   const db = await getDb();
   await db
     .collection('workload_time_status')

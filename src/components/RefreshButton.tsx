@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/monos/Button';
 import { useToast } from '@/components/monos/toast';
@@ -31,11 +31,14 @@ export default function RefreshButton({
   busy?: boolean;
 }) {
   const [ownBusy, setBusy] = useState(false);
+  // Состояние меняется только после рендера, а ref сразу: двойной клик не успеет пройти дважды.
+  const lock = useRef(false);
   const busy = ownBusy || externalBusy;
   const toast = useToast();
 
   const click = async () => {
-    if (busy) return;
+    if (busy || lock.current) return;
+    lock.current = true;
     setBusy(true);
     const started = Date.now();
     try {
@@ -51,6 +54,7 @@ export default function RefreshButton({
         tone: 'danger',
       });
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   };
