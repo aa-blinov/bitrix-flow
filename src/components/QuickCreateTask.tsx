@@ -133,6 +133,8 @@ export default function QuickCreateTask({ defaultProjectId, initial, onClose }: 
             <SelectField
               variant="boxed"
               aria-label={t('Проект')}
+              // Без проекта по умолчанию поле было пустым, и кнопка «Создать» молча не работала.
+              placeholder={t('Выберите проект')}
               value={projectId}
               onChange={(event) => setProjectId(event.target.value)}
               options={projects.map((project) => ({ value: project.id, label: project.name }))}

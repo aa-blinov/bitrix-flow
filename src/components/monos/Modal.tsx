@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { FONT, PAD } from '@/components/monos/scale';
 import { IconButton } from './IconButton';
@@ -145,7 +146,10 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  // Порталом в body: кнопка окна часто живёт в шапке страницы, а у шапки backdrop-blur.
+  // Фильтр делает предка опорой для fixed, и окно центровалось по 80-пиксельной шапке,
+  // уезжая верхом за экран («Новая задача»). Плюс z-index шапки запирал окно под собой.
+  return createPortal(
     <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
       {closeOnBackdrop ? (
         <button
@@ -210,6 +214,7 @@ export function Modal({
 
         {footer ? <div className="mt-6 flex flex-wrap justify-end gap-3">{footer}</div> : null}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

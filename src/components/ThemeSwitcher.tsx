@@ -11,8 +11,8 @@ export default function ThemeSwitcher({ children }: { children?: React.ReactNode
   const { theme, mode, setTheme, setMode } = useTheme();
 
   return (
-    // В сайдбаре места мало, поэтому палитра стоит отдельной строкой: рядом с режимом
-    // она не влезала и ломала ширину панели. Под ней режим и то, что передали рядом (язык).
+    // В сайдбаре места мало, поэтому каждый выбор своей строкой: палитра, режим, язык.
+    // Режим с языком в одной строке не влезали, и «Тёмная» обрезалась вместе с подсветкой.
     <div className="flex flex-col gap-2">
       <SelectField
         aria-label={t('Палитра оформления')}
@@ -22,21 +22,19 @@ export default function ThemeSwitcher({ children }: { children?: React.ReactNode
         onChange={(event) => setTheme(event.target.value as (typeof THEME_NAMES)[number])}
         options={THEME_NAMES.map((name) => ({ value: name, label: THEME_LABELS[name] }))}
       />
-      <div className="flex items-center gap-2">
-        <SegmentedControl
-          size="sm"
-          label={t('Режим оформления')}
-          value={mode === 'auto' ? 'auto' : mode}
-          onChange={(value) => setMode(value as 'light' | 'dark' | 'auto')}
-          options={[
-            { value: 'auto', label: t('Системная') },
-            { value: 'light', label: t('Светлая') },
-            { value: 'dark', label: t('Тёмная') },
-          ]}
-          className="min-w-0 flex-1 [&>button]:flex-1"
-        />
-        {children}
-      </div>
+      <SegmentedControl
+        size="sm"
+        label={t('Режим оформления')}
+        value={mode === 'auto' ? 'auto' : mode}
+        onChange={(value) => setMode(value as 'light' | 'dark' | 'auto')}
+        options={[
+          { value: 'auto', label: t('Системная') },
+          { value: 'light', label: t('Светлая') },
+          { value: 'dark', label: t('Тёмная') },
+        ]}
+        className="w-full [&>button]:flex-1"
+      />
+      {children}
     </div>
   );
 }

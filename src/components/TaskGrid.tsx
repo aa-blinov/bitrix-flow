@@ -102,6 +102,7 @@ import {
 } from '@/lib/task-filters';
 import LoadingState from '@/components/LoadingState';
 import { t } from '@/lib/i18n';
+import { pageNumbers as paginationNumbers } from '@/lib/pagination';
 
 // Поле прямо в строке таблицы: тихое до наведения, без заливки и рамки.
 const cellFieldClass = '[&_input]:border-transparent [&_input]:hover:border-line';
@@ -1411,20 +1412,7 @@ export default function TaskGrid({
     : !hasNarrowingFilter && totalCount
       ? totalPageCount
       : pageCount;
-  const pageNumbers = Array.from(
-    new Set(
-      [1, page - 1, page, page + 1, visiblePageCount].filter(
-        (value) => value >= 1 && value <= visiblePageCount,
-      ),
-    ),
-  )
-    .sort((left, right) => left - right)
-    // Пропуск без знака читался как опечатка («1 2 4»): одну страницу дописываем, больше
-    // одной отмечаем многоточием (0 в списке).
-    .flatMap((number, index, list) => {
-      const gap = index ? number - list[index - 1] : 1;
-      return gap === 2 ? [number - 1, number] : gap > 2 ? [0, number] : [number];
-    });
+  const pageNumbers = paginationNumbers(page, visiblePageCount);
   const goToPage = (nextPage: number) => {
     if (loadPage && nextPage <= pageCount) {
       setPage(nextPage);

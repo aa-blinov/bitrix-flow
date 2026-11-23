@@ -7,6 +7,7 @@ import { Card } from '@/components/monos/Card';
 import { Button } from '@/components/monos/Button';
 import LoadingState from '@/components/LoadingState';
 import BitrixText from '@/components/BitrixText';
+import { pageNumbers } from '@/lib/pagination';
 import PageHeader from '@/components/PageHeader';
 import PortalNotifications from '@/components/PortalNotifications';
 import { SegmentedControl } from '@/components/monos/SegmentedControl';
@@ -93,13 +94,6 @@ async function fetchPage(
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
   return { notifications: data.notifications || [], total: Number(data.total) || 0 };
-}
-
-// Те же номера, что в пейджере задач: первая, соседние, последняя.
-function pageNumbers(page: number, pageCount: number) {
-  return [...new Set([1, page - 1, page, page + 1, pageCount])]
-    .filter((value) => value >= 1 && value <= pageCount)
-    .sort((left, right) => left - right);
 }
 
 export default function NotificationsPage() {
@@ -358,18 +352,28 @@ export default function NotificationsPage() {
                       >
                         {t('Назад')}
                       </Button>
-                      {pageNumbers(page, pageCount).map((number) => (
-                        <Button
-                          key={number}
-                          variant={number === page ? 'secondary' : 'quiet'}
-                          size="sm"
-                          className="w-9 px-0"
-                          onClick={() => goToPage(number)}
-                          disabled={pageLoading}
-                        >
-                          {number}
-                        </Button>
-                      ))}
+                      {pageNumbers(page, pageCount).map((number, index) =>
+                        number === 0 ? (
+                          <span
+                            key={`gap-${index}`}
+                            aria-hidden
+                            className="w-6 text-center text-ink-faint"
+                          >
+                            …
+                          </span>
+                        ) : (
+                          <Button
+                            key={number}
+                            variant={number === page ? 'secondary' : 'quiet'}
+                            size="sm"
+                            className="w-9 px-0"
+                            onClick={() => goToPage(number)}
+                            disabled={pageLoading}
+                          >
+                            {number}
+                          </Button>
+                        ),
+                      )}
                       <Button
                         variant="secondary"
                         size="sm"
