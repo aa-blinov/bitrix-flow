@@ -770,13 +770,22 @@ test('меню: группы выплывают вправо и закрываю
 });
 
 test('мессенджер: пока фото грузится, на его месте заглушка с индикатором', async ({ page }) => {
+  // Фото отдаём только после проверки заглушки: с фиксированной задержкой под нагрузкой
+  // ответ иногда приходил раньше, чем тест успевал её увидеть.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
   await page.route(/\/api\/messenger\/file\?.*fileId=501/, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await held;
     await route.continue();
   });
   const chat = await openDmitry(page);
-  await expect(chat.getByRole('status', { name: 'Загрузка файла' })).toBeVisible();
-  await expect(chat.getByRole('status', { name: 'Загрузка файла' })).toHaveCount(0);
+  // В переписке две картинки: под нагрузкой фото.jpg тоже не успевает, и заглушек две.
+  const placeholder = chat
+    .getByRole('button', { name: /схема\.png/ })
+    .getByRole('status', { name: 'Загрузка файла' });
+  await expect(placeholder).toBeVisible();
+  release();
+  await expect(placeholder).toHaveCount(0);
   await expect(chat.getByRole('img', { name: 'схема.png' })).toBeVisible();
 });
 
