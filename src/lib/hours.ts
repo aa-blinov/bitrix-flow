@@ -60,21 +60,33 @@ export type HoursReport = {
 // Список задаёт админ в настройках, запасной вариант HOURS_EXCLUDED_USER_IDS.
 export const excludedUsers = async () => new Set((await hoursSettings()).excludedUserIds);
 
-// Неактивные учётки часов не списывают, а открытые задачи на них остаются: без фильтра они
-// висели в «ниже нормы» с нулём. Фильтр только ACTIVE: 'N', строку 'false' портал читает
-// как активных (проверено: 14 вместо 7). Сбой портала не прячет никого.
-export async function inactiveUsers(memberId: string): Promise<Set<string>> {
-  if (isMockEnabled()) return new Set();
-  const key = `users:inactive:${memberId}`;
+// Норму часов несут только активные сотрудники. Неактивные и внешние (экстранет, гости)
+// часов не списывают, а открытые задачи на них остаются: без фильтра они висели в «ниже
+// нормы» с нулём. Белый список, а не чёрный: неактивную экстранет-учётку портал списком
+// не отдаёт вовсе. null значит «портал не ответил», тогда не фильтруем никого.
+export async function staffUsers(memberId: string): Promise<Set<string> | null> {
+  if (isMockEnabled()) return null;
+  const key = `users:staff:${memberId}`;
   const cached = await cacheGet<string[]>(key);
   if (cached) return new Set(cached);
   try {
-    const raw = await bx24OAuth(memberId, 'user.get', { ACTIVE: 'N' }, { parallel: true });
-    const ids = (Array.isArray(raw) ? raw : []).map((user: any) => String(user.ID));
+    const ids: string[] = [];
+    // Портал отдаёт по 50; ACTIVE строкой 'true', а 'false' он тоже читает как активных.
+    for (let start = 0; start < 5000; start += 50) {
+      const page = await bx24OAuth(
+        memberId,
+        'user.get',
+        { ACTIVE: 'true', USER_TYPE: 'employee', start: String(start) },
+        { parallel: true },
+      );
+      const rows = Array.isArray(page) ? page : [];
+      ids.push(...rows.map((user: any) => String(user.ID)));
+      if (rows.length < 50) break;
+    }
     await cacheSet(key, ids, 10 * 60);
     return new Set(ids);
   } catch {
-    return new Set();
+    return null;
   }
 }
 

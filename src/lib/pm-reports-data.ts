@@ -2,7 +2,7 @@
 // понедельные списания, которые собирает шедулер. Портал на рендер отчёта не трогаем.
 import { portalTime, syncDeadlineChanges } from './deadline-changes';
 import { hoursSettings } from './hours-settings';
-import { excludedUsers, inactiveUsers, loadHours, mirrorProjectId, weekStarts } from './hours';
+import { excludedUsers, loadHours, staffUsers, mirrorProjectId, weekStarts } from './hours';
 import { getDb } from './mongo';
 import { isDay } from './report-period';
 import {
@@ -312,7 +312,8 @@ async function fromTasks(
   const recentFrom = shiftDay(from, -TEAM_LOOKBACK_DAYS);
   const { entries, coverage } = await loadEntries(memberId, weekStarts(recentFrom, to), all, weeks);
   const settings = await hoursSettings();
-  const excluded = new Set([...settings.excludedUserIds, ...(await inactiveUsers(memberId))]);
+  const excluded = new Set(settings.excludedUserIds);
+  const staff = await staffUsers(memberId);
   const userIds = [
     ...new Set([
       ...entries
@@ -320,7 +321,7 @@ async function fromTasks(
         .map((entry) => entry.userId),
       ...all.filter(isActive).map((task) => task.responsibleId),
     ]),
-  ].filter((id) => !future && id && id !== '0' && !excluded.has(id));
+  ].filter((id) => !future && id && id !== '0' && !excluded.has(id) && (!staff || staff.has(id)));
   const missing = coverage.missingWeeks.filter((week) => weeks.includes(week));
   const closedNoTime = closedWithoutTime(all, from, to);
   return {

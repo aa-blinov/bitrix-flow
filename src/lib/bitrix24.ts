@@ -291,27 +291,6 @@ async function bx24(method: string, params: Record<string, string> = {}): Promis
   return data.result;
 }
 
-// Пользователи (кеш 5 минут)
-export async function fetchUsers(): Promise<Bx24User[]> {
-  const cached = await cacheGet<Bx24User[]>('users:all');
-  if (cached) return cached;
-
-  try {
-    const result = await bx24('user.get', { ACTIVE: 'true' });
-    const users = (result || []).map((u: any): Bx24User => ({
-      id: u.ID,
-      name: `${u.NAME} ${u.LAST_NAME || ''}`.trim(),
-      email: u.EMAIL,
-      icon: u.PERSONAL_PHOTO,
-      userType: u.USER_TYPE,
-    }));
-    await cacheSet('users:all', users, 5 * 60);
-    return users;
-  } catch {
-    return [];
-  }
-}
-
 // Все проекты - кеш 5 минут в MongoDB
 export async function fetchProjectList(): Promise<Bx24Project[]> {
   const cached = await cacheGet<Bx24Project[]>('projects:list:v3');

@@ -78,9 +78,8 @@ export async function GET(req: NextRequest) {
     const [rawProjects, projectDates, rawUsers, rawCurrentUser] = await Promise.all([
       serverCache(`${memberId}:projects:all`, () => fetchAllProjects(token), PROJECTS_TTL),
       serverCache(`${memberId}:projects:dates`, () => fetchProjectDates(token), PROJECTS_TTL),
-      // Без фильтра ACTIVE: портал отдаёт и неактивных, их имена нужны отчётам и истории.
-      // ponytail: одна страница user.get, это 50 человек; листать, когда портал вырастет.
-      serverCache(`${memberId}:users:all:v3`, () => fetchPeople(token, memberId), PROJECTS_TTL),
+      // Без фильтра ACTIVE: портал отдаёт и неактивных, их имена нужны подписям в задачах.
+      serverCache(`${memberId}:users:all:v4`, () => fetchPeople(token, memberId), PROJECTS_TTL),
       // «Я» это вошедший человек, а не владелец токена портала: его токеном и в его ключ кэша.
       serverCache(
         `${memberId}:user:current:${person.userId}`,
@@ -102,7 +101,7 @@ export async function GET(req: NextRequest) {
       finishDate: projectDates?.[String(g.ID)]?.finish || '',
     }));
 
-    const { users, formerUsers } = splitUsers(rawUsers);
+    const { users, hiddenUsers } = splitUsers(rawUsers);
 
     const currentUser = rawCurrentUser
       ? {
@@ -143,7 +142,7 @@ export async function GET(req: NextRequest) {
       projects,
       projectDates: !!projectDates,
       users,
-      formerUsers,
+      hiddenUsers,
       currentUser,
     });
   } catch (err: any) {
@@ -155,7 +154,7 @@ export async function GET(req: NextRequest) {
 // ACTIVE: 'N', только по номеру. Поэтому дозапрашиваем по ID тех, кто встречается в задачах
 // зеркала и в настройках часов, но не пришёл списком: иначе в отчётах «#15» вместо имени.
 async function fetchPeople(token: any, memberId: string) {
-  const users: any[] = (await callBitrix24(token, 'user.get', {})) || [];
+  const users = await allPages(token, 'user.get');
   const known = new Set(users.map((user) => String(user.ID)));
   const db = await getDb();
   const filter = { member_id: memberId };
@@ -167,22 +166,20 @@ async function fetchPeople(token: any, memberId: string) {
     mirror.distinct('data.creator.id', filter),
     hoursSettings().then((settings) => settings.excludedUserIds),
   ]);
-  // ponytail: до 50 неизвестных за раз, это одна страница user.get.
-  const missing = [...new Set(seen.flat().map(String))]
-    .filter((id) => /^\d+$/.test(id) && id !== '0' && !known.has(id))
-    .slice(0, 50);
-  if (missing.length) {
-    const extra = await callBitrix24(
-      token,
-      'user.get',
-      Object.fromEntries(missing.map((id, index) => [`ID[${index}]`, id])),
-    ).catch(() => []);
-    users.push(...(extra || []));
-  }
-  return users;
+  const missing = [...new Set(seen.flat().map(String))].filter(
+    (id) => /^\d+$/.test(id) && id !== '0' && !known.has(id),
+  );
+  if (!missing.length) return users;
+  const extra = await allPages(
+    token,
+    'user.get',
+    Object.fromEntries(missing.map((id, index) => [`ID[${index}]`, id])),
+  ).catch(() => []);
+  return [...users, ...extra];
 }
 
-// Активные идут в выбор людей, неактивные только в подписи: уволенного не назначить.
+// В выбор людей и списки идут только активные сотрудники. Неактивные и внешние (экстранет,
+// гости по почте) остаются подписью к задачам, где они уже стоят, чтобы не было «#15».
 function splitUsers(raw: any[] | null) {
   const users = (raw || []).map((u: any) => ({
     id: u.ID,
@@ -193,8 +190,8 @@ function splitUsers(raw: any[] | null) {
     active: u.ACTIVE !== false && u.ACTIVE !== 'N',
   }));
   return {
-    users: users.filter((user) => user.active).map(({ active: _active, ...user }) => user),
-    formerUsers: users.filter((user) => !user.active).map(({ id, name }) => ({ id, name })),
+    users: users.filter(isStaff).map(({ active: _active, ...user }) => user),
+    hiddenUsers: users.filter((user) => !isStaff(user)).map(({ id, name }) => ({ id, name })),
   };
 }
 
@@ -209,29 +206,25 @@ async function callBitrix24Response(token: any, method: string, params: Record<s
   return data;
 }
 
-async function callBitrix24(
-  token: any,
-  method: string,
-  params: Record<string, string>,
-): Promise<any> {
-  return (await callBitrix24Response(token, method, params)).result;
-}
+const isStaff = (user: { active: boolean; userType?: string }) =>
+  user.active && user.userType !== 'extranet' && user.userType !== 'email';
 
-async function fetchAllProjects(token: any) {
-  const projects: any[] = [];
+// Портал отдаёт по 50 записей и номер следующей страницы в next. visited спасает от
+// петли, если портал вернёт тот же next.
+async function allPages(token: any, method: string, params: Record<string, string> = {}) {
+  const items: any[] = [];
   const visited = new Set<number>();
-  let start = 0;
-
-  while (!visited.has(start)) {
+  for (let start = 0; !visited.has(start);) {
     visited.add(start);
-    const data = await callBitrix24Response(token, 'sonet_group.get', { start: String(start) });
-    projects.push(...(data.result || []));
+    const data = await callBitrix24Response(token, method, { ...params, start: String(start) });
+    items.push(...(data.result || []));
     if (data.next === undefined || data.next === null) break;
     start = Number(data.next);
   }
-
-  return projects;
+  return items;
 }
+
+const fetchAllProjects = (token: any) => allPages(token, 'sonet_group.get');
 
 // sonet_group.get сроков проекта не отдаёт (проверено на живом портале), их знает только
 // socialnetwork.api, а ему нужно право socialnetwork. Без права возвращаем null, и интерфейс

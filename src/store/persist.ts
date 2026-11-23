@@ -10,7 +10,7 @@ interface CacheData {
   filtersPanelOpen?: boolean;
   projects?: any[];
   users?: any[];
-  formerUsers?: any[];
+  hiddenUsers?: any[];
   currentUser?: { id: string; name: string; photo?: string };
   stages?: Record<string, any[]>;
   selectedProjectId?: string;
