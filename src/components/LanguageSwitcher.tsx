@@ -12,6 +12,8 @@ export default function LanguageSwitcher() {
     <SegmentedControl
       label={t('Язык интерфейса')}
       size="sm"
+      // Своей строкой под режимом оформления: кнопки на всю ширину, как у режима.
+      className="w-full [&>button]:flex-1"
       options={[
         { value: 'ru', label: 'RU' },
         { value: 'en', label: 'EN' },
