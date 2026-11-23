@@ -52,8 +52,14 @@ export const EN: Record<string, string> = {
   '. Нажмите «Обновить факт», чтобы повторить.': '. Press "Refresh actuals" to try again.',
   '/ — поиск, n — новая задача, g затем h/t/m/c — переходы, ? — эта подсказка':
     '/ search, n new task, g then h/t/m/c go to a page, ? this hint',
-  'Real-time обновления через webhook': 'Real-time updates via webhook',
-  'Webhook больше НЕ используется': 'Webhook is NOT used anymore',
+  'Запросы идут от вашего имени и с вашими правами в портале':
+    'Requests run on your behalf, with your portal permissions',
+  'Изменения из портала приходят событиями, без перезагрузки':
+    'Portal changes arrive as events, no reload needed',
+  'Доступ продлевается сам, входить заново не нужно':
+    'Access renews itself, no need to sign in again',
+  'Ключи доступа хранятся только на сервере приложения':
+    'Access keys are stored on the app server only',
   'Webhook подтверждает доставку событий, но сам по себе не создаёт доступ к данным в этом браузере.':
     'A webhook confirms event delivery, but by itself it does not grant access to data in this browser.',
   '[kanban] {0} задач(а) вне известных стадий — проверь task.stages.get':
@@ -73,7 +79,6 @@ export const EN: Record<string, string> = {
   '· продолжение': '· continued',
   '· факт': '· actual',
   '» не найдены': '" not found',
-  'Автоматический refresh токена': 'Automatic token refresh',
   Активные: 'Active',
   Архив: 'Archive',
   'Архив (': 'Archive (',
@@ -89,7 +94,6 @@ export const EN: Record<string, string> = {
   'Без срока': 'No due date',
   'Без фазы': 'No phase',
   'Остальные фазы': 'Other phases',
-  'Безопасное хранение в MongoDB': 'Secure storage in MongoDB',
   'Браузер не разрешил уведомления: включите их в настройках сайта.':
     'The browser did not allow notifications: enable them in the site settings.',
   Был: 'Was online',
@@ -268,7 +272,6 @@ export const EN: Record<string, string> = {
   'Записи удалятся безвозвратно, сами задачи в Битриксе не изменятся.':
     'The records will be deleted permanently; the tasks in Bitrix itself will not change.',
   Запись: 'Entry',
-  'Запросы от вашего имени (нет лимитов)': 'Requests on your behalf (no limits)',
   'Защищённый доступ': 'Protected access',
   'Звук отключён': 'Muted',
   'Здесь пока пусто — создайте первую задачу.': 'Nothing here yet: create the first task.',

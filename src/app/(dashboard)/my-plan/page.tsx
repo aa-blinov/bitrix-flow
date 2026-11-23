@@ -78,7 +78,7 @@ export default function MyPlanPage() {
       ) : !stages ? (
         <LoadingState />
       ) : (
-        <div className="mt-4 flex gap-3 overflow-x-auto px-4 pb-4 lg:px-6">
+        <div className="mt-4 flex items-start gap-3 overflow-x-auto px-4 pb-4 lg:px-6">
           {stages.map((stage) => (
             <section
               key={stage.id}
@@ -95,7 +95,8 @@ export default function MyPlanPage() {
                 if (dragId) void move(dragId, stage.id);
                 setDragId(null);
               }}
-              className={`flex w-72 shrink-0 flex-col rounded-ui border bg-surface p-2 ${
+              // Колонка прокручивается сама: сотня нераспланированных тянула страницу на шесть экранов.
+              className={`flex max-h-[calc(100dvh-8rem)] w-72 shrink-0 flex-col rounded-ui border bg-surface p-2 ${
                 over === stage.id ? 'border-accent' : 'border-line'
               }`}
             >
@@ -103,7 +104,7 @@ export default function MyPlanPage() {
                 {stage.title}
                 <span className="text-xs font-normal text-ink-soft">{stage.tasks.length}</span>
               </h2>
-              <div className="flex min-h-16 flex-col gap-1.5">
+              <div className="-mr-1 flex min-h-16 flex-col gap-1.5 overflow-y-auto pr-1">
                 {stage.tasks.map((task) => (
                   <button
                     key={task.id}

@@ -69,7 +69,17 @@ export function Avatar({ name, src, alt, size = 'md', status, className }: Avata
         className,
       )}
     >
-      <span className="inline-flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-line bg-surface-2 text-ink-soft">
+      <span className="relative inline-flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-line bg-surface-2 text-ink-soft">
+        {/* Инициалы лежат под картинкой всегда: CDN портала отвечает и по 20 секунд, и
+            всё это время на месте аватарки был пустой круг, а не инициалы. */}
+        <span
+          role={src && !failed ? undefined : 'img'}
+          aria-label={src && !failed ? undefined : label}
+          aria-hidden={src && !failed ? true : undefined}
+          className="select-none font-bold uppercase tracking-wide"
+        >
+          {initials}
+        </span>
         {src && !failed ? (
           // next/image здесь не подходит: набор рисует картинку как обычную
           // картинку в круге и при ошибке откатывается к инициалам.
@@ -77,18 +87,10 @@ export function Avatar({ name, src, alt, size = 'md', status, className }: Avata
           <img
             src={src}
             alt={alt || name || ''}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             onError={() => setFailedSrc(src)}
           />
-        ) : (
-          <span
-            role="img"
-            aria-label={label}
-            className="select-none font-bold uppercase tracking-wide"
-          >
-            {initials}
-          </span>
-        )}
+        ) : null}
       </span>
       {status ? (
         <span

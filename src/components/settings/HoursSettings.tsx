@@ -63,8 +63,14 @@ export default function HoursSettings() {
 
   const nameOf = useMemo(() => {
     const names = new Map(directory.map((user) => [String(user.id), user.name]));
-    return (id: string) => names.get(id) || `#${id}`;
-  }, [directory]);
+    const staff = new Set(users.map((user) => String(user.id)));
+    // Служебная учётка бывает тёзкой живого человека (у Блинова есть неактивная #15):
+    // без номера казалось, что из отчётов исключён он сам.
+    return (id: string) => {
+      const name = names.get(id);
+      return !name ? `#${id}` : staff.has(id) ? name : `${name} #${id}`;
+    };
+  }, [directory, users]);
   // В выпадашке только те, кого ещё нет в списке: второй раз одного человека не добавить.
   const choices = (taken: string[]) =>
     [...users]

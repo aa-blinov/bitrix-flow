@@ -455,7 +455,10 @@ function HoursAnalyticsView() {
             >
               <History size={14} />
             </button>
-          ) : null}
+          ) : (
+            // Место под кнопку держим и без класса: иначе выбор в этих строках шире остальных.
+            <span aria-hidden className="w-3.5 shrink-0" />
+          )}
         </div>
       ),
     [assignProjectClass, backfillProjectClass, savingTask, report],

@@ -284,9 +284,11 @@ export default function NotificationsPage() {
                               <span className="text-xs text-ink-soft">{typeLabel}</span>
                             )}
                           </div>
-                          <p className="mt-1 text-sm text-ink-soft">
+                          {/* Уведомление это превью: целый отчёт о PR в комментарии растягивал ленту
+                          на два десятка экранов. Полный текст в задаче, куда ведёт карточка. */}
+                          <div className="mt-1 line-clamp-6 text-sm text-ink-soft">
                             <BitrixText text={item.message} />
-                          </p>
+                          </div>
                           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
                             {item.taskId && (
                               <span>

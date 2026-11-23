@@ -542,11 +542,11 @@ export default function SortableNav({
                 aria-expanded={expanded}
                 aria-controls={`nav-${group.key}`}
                 onClick={() => (wide ? toggleFlyout(group.key) : toggle(group.key))}
+                // Подсветка и поворот стрелки через lg:, а не через wide: wide известен только
+                // после гидрации, и до неё широкое меню показывало раскрытую стрелку без подсветки.
                 className={`flex min-h-9 w-full items-center gap-2.5 rounded-ui px-2.5 text-sm transition-colors duration-fast hover:bg-surface hover:text-ink max-sm:min-h-11 ${
-                  wide && (expanded || activeSection === group.key)
-                    ? 'bg-surface text-ink'
-                    : 'text-ink-soft'
-                }`}
+                  wide && expanded ? 'bg-surface text-ink' : 'text-ink-soft'
+                } ${activeSection === group.key ? 'lg:bg-surface lg:text-ink' : ''}`}
               >
                 <Icon size={16} strokeWidth={1.7} />
                 <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
@@ -555,7 +555,7 @@ export default function SortableNav({
                   size={14}
                   strokeWidth={1.7}
                   aria-hidden
-                  className={`transition-transform duration-fast ${expanded && !wide ? 'rotate-90' : ''}`}
+                  className={`transition-transform duration-fast ${expanded && !wide ? 'max-lg:rotate-90' : ''}`}
                 />
               </button>
               {/* lg:hidden: до гидрации на широком экране раскрытая группа не мелькает в списке. */}

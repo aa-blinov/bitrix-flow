@@ -30,7 +30,9 @@ export default function ConnectionStatus() {
   return (
     <div
       role="status"
-      className="sticky top-0 z-modal flex items-center justify-center gap-2 border-b border-line bg-surface px-4 py-1.5 text-xs text-warning-text"
+      // Внизу поверх страницы, а не полосой сверху: сверху она съезжала на шапку сайдбара
+      // и обрезала логотип, а короткий сбой сети на минуту сдвигал всю вёрстку.
+      className="fixed bottom-4 left-1/2 z-modal flex -translate-x-1/2 items-center gap-2 rounded-ui border border-line bg-surface px-4 py-2 text-xs text-warning-text shadow-overlay"
     >
       <WifiOff className="size-3.5" strokeWidth={1.7} />
       {browserOffline

@@ -1417,7 +1417,14 @@ export default function TaskGrid({
         (value) => value >= 1 && value <= visiblePageCount,
       ),
     ),
-  ).sort((left, right) => left - right);
+  )
+    .sort((left, right) => left - right)
+    // Пропуск без знака читался как опечатка («1 2 4»): одну страницу дописываем, больше
+    // одной отмечаем многоточием (0 в списке).
+    .flatMap((number, index, list) => {
+      const gap = index ? number - list[index - 1] : 1;
+      return gap === 2 ? [number - 1, number] : gap > 2 ? [0, number] : [number];
+    });
   const goToPage = (nextPage: number) => {
     if (loadPage && nextPage <= pageCount) {
       setPage(nextPage);
@@ -2692,21 +2699,27 @@ export default function TaskGrid({
               >
                 {t('Назад')}
               </Button>
-              {pageNumbers.map((number) => (
-                <Button
-                  key={number}
-                  variant={number === page ? 'primary' : 'secondary'}
-                  size="sm"
-                  className="w-9 px-0"
-                  onClick={() => goToPage(number)}
-                  disabled={
-                    isServerPageLoading ||
-                    (!loadPage && number > loadedPageCount && number !== page + 1)
-                  }
-                >
-                  {number}
-                </Button>
-              ))}
+              {pageNumbers.map((number, index) =>
+                number === 0 ? (
+                  <span key={`gap-${index}`} aria-hidden className="w-6 text-center text-ink-faint">
+                    …
+                  </span>
+                ) : (
+                  <Button
+                    key={number}
+                    variant={number === page ? 'primary' : 'secondary'}
+                    size="sm"
+                    className="w-9 px-0"
+                    onClick={() => goToPage(number)}
+                    disabled={
+                      isServerPageLoading ||
+                      (!loadPage && number > loadedPageCount && number !== page + 1)
+                    }
+                  >
+                    {number}
+                  </Button>
+                ),
+              )}
               <Button
                 variant="secondary"
                 size="sm"
