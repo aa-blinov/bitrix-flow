@@ -114,7 +114,7 @@ export default function AccountsPage() {
             </Button>
           </Notice>
         ) : !accounts ? (
-          <LoadingState label={t('Загрузка…')} />
+          <LoadingState />
         ) : (
           <Card padding="none">
             <ul className="divide-y divide-line">

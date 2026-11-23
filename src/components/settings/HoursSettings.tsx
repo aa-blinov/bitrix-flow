@@ -127,7 +127,7 @@ export default function HoursSettings() {
           </Button>
         </Notice>
       ) : !saved ? (
-        <LoadingState label={t('Загрузка…')} />
+        <LoadingState compact />
       ) : (
         <>
           {saved.source === 'env' && (

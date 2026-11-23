@@ -127,7 +127,7 @@ export default function TaskHistory({ taskId }: { taskId: string }) {
               </Button>
             </p>
           ) : !entries ? (
-            <LoadingState className="min-h-24 bg-transparent" />
+            <LoadingState compact />
           ) : entries.length === 0 ? (
             <p className="py-4 text-center text-sm text-ink-soft">{t('Изменений пока нет')}</p>
           ) : (

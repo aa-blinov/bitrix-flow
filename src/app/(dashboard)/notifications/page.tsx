@@ -246,7 +246,7 @@ export default function NotificationsPage() {
               </p>
             )}
             {loading ? (
-              <LoadingState className="min-h-72 bg-transparent" />
+              <LoadingState />
             ) : items.length ? (
               <div className="space-y-2">
                 {items.map((item) => {

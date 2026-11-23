@@ -402,18 +402,14 @@ export default function ProjectPage() {
   }
 
   if (projects.length === 0) {
-    return <LoadingState className="min-h-screen" />;
+    return <LoadingState />;
   }
 
   if (!currentProject) {
     // Пока список проектов ещё грузится, «не найден» — ложь: показаем загрузку,
     // а не тупик с кнопкой «На главную».
     if (isLoading && projects.length === 0) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-canvas">
-          <LoadingState className="w-full max-w-md bg-transparent" />
-        </div>
-      );
+      return <LoadingState />;
     }
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">

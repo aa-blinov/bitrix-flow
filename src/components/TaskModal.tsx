@@ -1926,7 +1926,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
             className="max-h-80 space-y-3 overflow-y-auto bg-surface-2/40 p-3 sm:p-4"
           >
             {isLoadingTask && task.comments.length === 0 ? (
-              <LoadingState className="min-h-24 bg-transparent" />
+              <LoadingState compact />
             ) : task.comments.length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-soft">{t('Комментариев пока нет')}</p>
             ) : (

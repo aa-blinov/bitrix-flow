@@ -98,10 +98,15 @@ const NOTIFY_LABELS = () => ({
   off: t('Без звука'),
 });
 
+// Список с прошлого захода на страницу: при возврате в чаты он виден сразу, а свежий
+// приходит следом опросом. Без него каждый вход начинался с секунды пустой колонки.
+// Пишется только в эффекте, поэтому на сервере остаётся пустым и не делится между людьми.
+let lastList: { dialogs: Dialog[]; me: number; portal: string } | null = null;
+
 export default function Messenger() {
-  const [dialogs, setDialogs] = useState<Dialog[] | null>(null);
-  const [me, setMe] = useState(0);
-  const [portal, setPortal] = useState('');
+  const [dialogs, setDialogs] = useState<Dialog[] | null>(() => lastList?.dialogs ?? null);
+  const [me, setMe] = useState(() => lastList?.me ?? 0);
+  const [portal, setPortal] = useState(() => lastList?.portal ?? '');
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'all' | DialogKind>('all');
   const [query, setQuery] = useState('');
@@ -191,7 +196,8 @@ export default function Messenger() {
   const dialogsRef = useRef<Dialog[] | null>(null);
   useEffect(() => {
     dialogsRef.current = dialogs;
-  }, [dialogs]);
+    if (dialogs) lastList = { dialogs, me, portal };
+  }, [dialogs, me, portal]);
   // Загрузки первой страницы идут по одной: при частых событиях и медленном портале
   // каждый новый запрос отменял бы ответ прошлого, и список застывал бы. Просьба во
   // время запроса ставит ещё один проход после него.
@@ -666,7 +672,7 @@ export default function Messenger() {
             )}
             {dialogs === null ? (
               error ? null : (
-                <LoadingState className="min-h-40 bg-transparent" />
+                <LoadingState compact className="min-h-40" />
               )
             ) : visible.length === 0 ? (
               <p className="p-4 text-sm text-ink-soft">
@@ -688,7 +694,7 @@ export default function Messenger() {
                       onClick={() => setActiveId(dialog.id)}
                       // На телефоне меню «…» видно всегда: строка оставляет ему место справа,
                       // иначе кнопка ложилась поверх даты последнего сообщения.
-                      className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-fast hover:bg-surface-2 max-sm:pr-12 ${
+                      className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left group-hover:bg-surface-2 max-sm:pr-12 ${
                         dialog.id === activeId ? 'bg-surface-2' : ''
                       }`}
                     >
@@ -743,7 +749,9 @@ export default function Messenger() {
                       </span>
                     </button>
                     {/* На десктопе меню появляется по наведению поверх даты: подложка цвета
-                        строки прячет дату под ним, а не смешивает два слоя. По центру через
+                        строки прячет дату под ним, а не смешивает два слоя. Строка светится
+                        по наведению на весь li и без плавного перехода: иначе под курсором
+                        на меню строка гасла, и подложка оставалась серым пятном. По центру через
                         my-auto, не transform: transform создаёт свой слой наложения, и открытое
                         меню уходило под следующую строку списка. */}
                     <div className="absolute top-0 right-1 bottom-0 my-auto hidden h-fit rounded-ui bg-surface-2 group-focus-within:block sm:pl-8 group-hover:block max-sm:block max-sm:bg-transparent">

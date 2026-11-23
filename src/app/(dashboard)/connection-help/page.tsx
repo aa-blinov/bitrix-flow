@@ -27,7 +27,7 @@ export default function ConnectionHelpPage() {
   }, []);
 
   if (state === 'checking') {
-    return <LoadingState className="min-h-screen bg-canvas" />;
+    return <LoadingState />;
   }
 
   return (

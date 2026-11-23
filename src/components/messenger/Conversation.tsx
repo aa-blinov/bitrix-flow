@@ -1649,7 +1649,7 @@ export default function Conversation({
         )}
         {messages === null ? (
           error ? null : (
-            <LoadingState className="min-h-40 bg-transparent" />
+            <LoadingState compact className="min-h-40" />
           )
         ) : (
           messages.map((message) => {

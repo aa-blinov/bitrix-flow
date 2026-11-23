@@ -112,7 +112,7 @@ export function DrivePicker({
         </nav>
         <div className="max-h-72 overflow-y-auto rounded-ui border border-line">
           {items === null ? (
-            <LoadingState className="min-h-32 bg-transparent" />
+            <LoadingState compact className="min-h-32" />
           ) : items.length === 0 ? (
             <p className="p-3 text-sm text-ink-soft">{t('Папка пуста')}</p>
           ) : (

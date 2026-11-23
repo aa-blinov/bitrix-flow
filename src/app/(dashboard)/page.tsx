@@ -239,7 +239,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="divide-y divide-line">
-            {isBootstrapping && <LoadingState className="min-h-60 bg-transparent" />}
+            {isBootstrapping && <LoadingState compact className="min-h-60" />}
             {!isBootstrapping &&
               filteredProjects.map((project) => {
                 const progressPercent =

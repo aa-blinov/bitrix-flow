@@ -511,7 +511,7 @@ export default function TeamWorkload() {
           {summaryError ? (
             <p className="p-6 text-sm text-danger-text">{summaryError}</p>
           ) : !summary ? (
-            <LoadingState className="min-h-80 bg-transparent" />
+            <LoadingState />
           ) : (
             <div ref={fade.ref} className={`overflow-x-auto ${fade.className}`}>
               {/* На телефоне сетка уже: дня хватает и на 90px, а «итоги» прячем в

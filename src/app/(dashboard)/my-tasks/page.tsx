@@ -45,7 +45,7 @@ function MyTasksInner() {
 
       <div className="mt-4">
         {!currentUser.id ? (
-          <LoadingState className="min-h-[60vh] bg-transparent lg:px-6" />
+          <LoadingState />
         ) : (
           <TaskGrid
             showProject

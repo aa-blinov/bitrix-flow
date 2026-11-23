@@ -894,7 +894,7 @@ function HoursAnalyticsView() {
         {error ? (
           <Notice tone="danger">{error}</Notice>
         ) : isLoading && !report ? (
-          <LoadingState className="min-h-72 bg-transparent" />
+          <LoadingState />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

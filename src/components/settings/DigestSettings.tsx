@@ -142,7 +142,7 @@ export default function DigestSettings() {
           </Button>
         </Notice>
       ) : !config ? (
-        <LoadingState label={t('Загрузка…')} />
+        <LoadingState compact />
       ) : (
         <>
           {config.source === 'env' && (

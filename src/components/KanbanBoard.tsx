@@ -911,9 +911,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       </div>
 
       {/* Board */}
-      {(!boardReady || (isLoading && !filteredTasks.length)) && (
-        <LoadingState className="min-h-72 flex-1 bg-transparent" />
-      )}
+      {(!boardReady || (isLoading && !filteredTasks.length)) && <LoadingState className="flex-1" />}
       {/* На телефоне горизонтальный скролл колонок неудобен: показываем
           вертикальные секции по фазам, перенос — из меню карточки. */}
       {isMobile && boardReady && (!isLoading || filteredTasks.length > 0) && (

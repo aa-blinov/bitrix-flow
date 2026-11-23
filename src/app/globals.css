@@ -245,6 +245,10 @@ body {
 .animate-fade-in {
   animation: fadeIn var(--ui-duration-base) ease-out;
 }
+/* Лоадер виден, только если загрузка дольше четверти секунды: иначе он вспыхивал. */
+.animate-loader-in {
+  animation: fadeIn 160ms ease-out 250ms both;
+}
 .animate-slide-up {
   animation: slideUp var(--ui-duration-base) cubic-bezier(0.2, 0.8, 0.2, 1);
 }

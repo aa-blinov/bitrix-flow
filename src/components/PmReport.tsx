@@ -1189,7 +1189,7 @@ function PmReportView({ kind }: { kind: ReportKind }) {
         ) : meta.needsProject && !projectId ? (
           <Notice>{t('Выберите проект, чтобы построить отчёт.')}</Notice>
         ) : isLoading && !report ? (
-          <LoadingState className="min-h-72 bg-transparent" />
+          <LoadingState />
         ) : report ? (
           <div
             // Пока считается новый период или проект, прежние цифры бледные и не нажимаются:

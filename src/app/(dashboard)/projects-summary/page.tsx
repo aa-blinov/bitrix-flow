@@ -475,7 +475,7 @@ export default function ProjectsSummaryPage() {
           {error ? (
             <p className="p-6 text-sm text-danger-text">{error}</p>
           ) : isLoading ? (
-            <LoadingState className="min-h-72 bg-transparent" />
+            <LoadingState />
           ) : (
             <>
               <div className="divide-y divide-line md:hidden">

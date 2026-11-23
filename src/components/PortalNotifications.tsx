@@ -135,7 +135,7 @@ export default function PortalNotifications({ onUnread }: { onUnread?: (count: n
     setLoadingMore(false);
   }
 
-  if (items === null) return <LoadingState className="min-h-40 bg-transparent" />;
+  if (items === null) return <LoadingState compact className="min-h-40" />;
 
   return (
     <div className="space-y-2">

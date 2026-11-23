@@ -243,7 +243,7 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1"
           >
             {!isRehydrated ? null : projectsLoading ? (
-              <LoadingState className="min-h-24 bg-transparent" />
+              <LoadingState compact />
             ) : sortedProjects.length > 0 ? (
               <>
                 {/* Задачи вне проектов иначе не увидеть: в Bitrix у них нет

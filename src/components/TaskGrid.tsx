@@ -2154,9 +2154,7 @@ export default function TaskGrid({
               ? t('Показано задач: {0}', String(effectiveTotal ?? tasks.length))
               : ''}
           </p>
-          {!serverPageReady && !serverPageError && (
-            <LoadingState className="min-h-72 bg-transparent" />
-          )}
+          {!serverPageReady && !serverPageError && <LoadingState />}
           {serverPageReady && tasks.length === 0 && !serverPageError && (
             <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
               <div className="rounded-full bg-surface-2 p-3 text-ink-faint">
