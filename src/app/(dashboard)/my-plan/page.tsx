@@ -9,9 +9,16 @@ import type { PlanStage } from '@/app/api/my-plan/route';
 
 const DUE = dateFormat({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+// Пишется только в эффекте, поэтому на сервере остаётся пустым и не делится между людьми.
+let lastPlan: PlanStage[] | null = null;
+
 /** «Мой план» портала: личный канбан со своими колонками, у каждого свой. */
 export default function MyPlanPage() {
-  const [stages, setStages] = useState<PlanStage[] | null>(null);
+  const [stages, setStages] = useState<PlanStage[] | null>(() => lastPlan);
+  // План с прошлого захода виден сразу, свежий из портала (полсекунды) приходит следом.
+  useEffect(() => {
+    if (stages) lastPlan = stages;
+  }, [stages]);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState('');
   const [dragId, setDragId] = useState<string | null>(null);
