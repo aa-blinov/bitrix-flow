@@ -274,8 +274,22 @@ async function sourceVersion(db: Db, memberId: string) {
   return JSON.stringify([mirror, tasks]);
 }
 
+// Колонки канбана просят задачи пачкой одновременно: каждая считала отпечаток сама, и девять
+// одинаковых агрегаций по обеим коллекциям выстраивались в очередь. Одновременные запросы
+// ждут один подсчёт; следующий запрос после него считает заново, так что свежесть та же.
+const counting = new Map<string, Promise<string>>();
+
+function currentVersion(db: Db, memberId: string) {
+  let job = counting.get(memberId);
+  if (!job) {
+    job = sourceVersion(db, memberId).finally(() => counting.delete(memberId));
+    counting.set(memberId, job);
+  }
+  return job;
+}
+
 async function ensureMerged(db: Db, memberId: string) {
-  const version = await sourceVersion(db, memberId);
+  const version = await currentVersion(db, memberId);
   if (built.get(memberId) === version) return;
   // Параллельные запросы при одной и той же смене ждут одну сборку, а не запускают свою.
   let job = pending.get(memberId);
