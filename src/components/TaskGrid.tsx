@@ -4,6 +4,7 @@
 // interactive client model; they intentionally update local state after mount.
 /* eslint-disable react-hooks/set-state-in-effect */
 
+import { setTaskInUrl } from '@/lib/task-url';
 import {
   Fragment,
   memo,
@@ -64,7 +65,7 @@ import { cn, getBitrixTaskUrl, toLocalInputValue } from '@/lib/utils';
 import { formatBitrixDateTime } from '@/lib/bitrix-markup';
 import { useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import TaskModal from './TaskModal';
 import { Badge } from '@/components/monos/Badge';
 import { DateField } from '@/components/monos/DateField';
@@ -165,23 +166,8 @@ function GridHead({
 // держит selectedTaskId, и страница /all-tasks зеркалит searchParam в него
 // через useEffect — этот хук просто пишет в URL, остальное делает она.
 function useTaskUrl() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const openTask = useCallback(
-    (id: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('task', id);
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
-  const closeTask = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('task');
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+  const openTask = useCallback((id: string) => setTaskInUrl(id), []);
+  const closeTask = useCallback(() => setTaskInUrl(null), []);
   return { openTask, closeTask };
 }
 const inputDate = (value?: string) => toLocalInputValue(value, 'date');

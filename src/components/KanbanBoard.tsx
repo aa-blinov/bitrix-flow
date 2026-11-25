@@ -1,4 +1,5 @@
 'use client';
+import { setTaskInUrl } from '@/lib/task-url';
 import { useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
 import { STATUS_LABELS, BxTask } from '@/types/bitrix';
@@ -26,7 +27,7 @@ import { convertBxTask } from '@/store/kanban';
 import { fetchTaskById, type Bx24Stage } from '@/lib/bitrix24';
 import TaskModal from './TaskModal';
 import RefreshButton from '@/components/RefreshButton';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Pencil, Plus, Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { DateField } from '@/components/monos/DateField';
 import { Badge } from '@/components/monos/Badge';
@@ -159,9 +160,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
       loadTaskById: s.loadTaskById,
     })),
   );
-  const router = useRouter();
   const toast = useToast();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   // Задача, которую мы только что открыли: пока адрес не обновился, её нельзя
   // закрывать — иначе карточка мигнёт и перечитается из портала дважды.
@@ -171,19 +170,14 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     (taskId: string) => {
       pendingTaskRef.current = taskId;
       setSelectedTask(taskId);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('task', taskId);
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      setTaskInUrl(taskId);
     },
-    [pathname, router, searchParams, setSelectedTask],
+    [setSelectedTask],
   );
   const closeTask = useCallback(() => {
     setSelectedTask(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('task');
-    const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams, setSelectedTask]);
+    setTaskInUrl(null);
+  }, [setSelectedTask]);
 
   // Кнопка «назад» убирает задачу из адреса — карточку надо закрыть. Раньше
   // это делал эффект страницы проекта, но он же закрывал её и в момент

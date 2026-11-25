@@ -1,4 +1,5 @@
 'use client';
+import { setTaskInUrl } from '@/lib/task-url';
 import { useKanbanStore } from '@/store/kanban';
 import { useShallow } from 'zustand/react/shallow';
 import { PRIORITY_LABELS, STATUS_LABELS } from '@/types/bitrix';
@@ -100,17 +101,8 @@ function SearchPageContent() {
     tasks.find((task) => task.id === selectedTaskId) ||
     searchResults.find((task) => task.id === selectedTaskId);
 
-  const openTask = (taskId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('task', taskId);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  };
-  const closeTask = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('task');
-    const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  };
+  const openTask = (taskId: string) => setTaskInUrl(taskId);
+  const closeTask = () => setTaskInUrl(null);
 
   return (
     <div className="min-h-screen bg-canvas">
