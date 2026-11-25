@@ -20,7 +20,7 @@ jobs:
       # на платную лицензию и требует GITLEAKS_LICENSE secret. Без секрета
       # шаг валится, как только GitHub API упрётся в rate limit и проверка
       # лицензии перестаёт пропускаться автоматически.
-      - uses: gitleaks/gitleaks-action@v1.6.0
+      - uses: gitleaks/gitleaks-action@v3.0.0
 
   quality:
     runs-on: ubuntu-latest
