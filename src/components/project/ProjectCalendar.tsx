@@ -45,7 +45,7 @@ export default function ProjectCalendar({
   toolbar: ReactNode;
 }) {
   const { tasks, failed } = useProjectTasks(projectId);
-  const { open, modal } = useTaskModal();
+  const { open, modal } = useTaskModal(tasks);
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);

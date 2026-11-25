@@ -51,15 +51,28 @@ export function useProjectTasks(projectId: string) {
 }
 
 /** Карточка задачи поверх вида: задача кладётся в общий стор, чтобы карточка могла её править. */
-export function useTaskModal() {
+export function useTaskModal(known?: BxTask[] | null) {
   const [taskId, setTaskId] = useState<string | null>(null);
   const task = useKanbanStore((state) =>
     taskId ? state.tasks.find((item) => item.id === taskId) : undefined,
   );
-  const open = useCallback(async (id: string) => {
-    await useKanbanStore.getState().loadTaskById(id);
-    setTaskId(id);
-  }, []);
+  const open = useCallback(
+    async (id: string) => {
+      // Задача вида уже есть: окно открывается сразу, права и детали догружает само.
+      // Раньше ждали задачу из портала, и окно появлялось через 0,3–1 с после клика.
+      const found = known?.find((item) => item.id === id);
+      if (found) {
+        const missing = (list: BxTask[]) =>
+          list.some((item) => item.id === id) ? list : [...list, found];
+        useKanbanStore.setState((state) => ({
+          tasks: missing(state.tasks),
+          allTasks: missing(state.allTasks),
+        }));
+      } else await useKanbanStore.getState().loadTaskById(id);
+      setTaskId(id);
+    },
+    [known],
+  );
   const modal = task ? (
     <TaskModal
       task={task}

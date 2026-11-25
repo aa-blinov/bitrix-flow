@@ -33,7 +33,7 @@ export default function DeadlineBoard({
   toolbar: ReactNode;
 }) {
   const { tasks, setTasks, failed } = useProjectTasks(projectId);
-  const { open, modal } = useTaskModal();
+  const { open, modal } = useTaskModal(tasks);
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<DeadlineBucket | null>(null);
   const [error, setError] = useState('');

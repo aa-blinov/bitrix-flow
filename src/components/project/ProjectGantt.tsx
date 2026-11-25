@@ -30,7 +30,7 @@ export default function ProjectGantt({
   toolbar: ReactNode;
 }) {
   const { tasks, failed } = useProjectTasks(projectId);
-  const { open, modal } = useTaskModal();
+  const { open, modal } = useTaskModal(tasks);
   const confirm = useConfirm();
   const [links, setLinks] = useState<GanttLink[]>([]);
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
