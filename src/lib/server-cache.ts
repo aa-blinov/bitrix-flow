@@ -32,6 +32,9 @@ export async function serverCache<T>(
 function load<T>(key: string, fetcher: () => Promise<T>, ttl: number): Promise<T> {
   const request = fetcher()
     .then((data) => {
+      // Ключи с версией данных (часы) копились бы вечно: выбрасываем протухшие.
+      if (cache.size > 200)
+        for (const [old, entry] of cache) if (entry.expires < Date.now()) cache.delete(old);
       cache.set(key, { data, expires: Date.now() + ttl });
       return data;
     })

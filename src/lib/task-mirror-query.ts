@@ -279,7 +279,7 @@ async function sourceVersion(db: Db, memberId: string) {
 // ждут один подсчёт; следующий запрос после него считает заново, так что свежесть та же.
 const counting = new Map<string, Promise<string>>();
 
-function currentVersion(db: Db, memberId: string) {
+export function currentVersion(db: Db, memberId: string) {
   let job = counting.get(memberId);
   if (!job) {
     job = sourceVersion(db, memberId).finally(() => counting.delete(memberId));

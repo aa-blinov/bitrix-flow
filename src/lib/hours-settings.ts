@@ -1,5 +1,6 @@
 // Настройки учёта часов: кого не считать и какая норма. Меняет админ в интерфейсе
 // (app_settings), пока там пусто, служебные учётки берутся из HOURS_EXCLUDED_USER_IDS.
+import { invalidateByPrefix } from '@/lib/server-cache';
 import { getDb } from './mongo';
 
 export type HoursSettings = {
@@ -60,4 +61,6 @@ export async function saveHoursSettings(settings: Omit<HoursSettings, 'source'>)
   )
     .collection<Doc>('app_settings')
     .updateOne({ _id: ID }, { $set: { ...settings, updatedAt: new Date() } }, { upsert: true });
+  // Исключённые учётки и норма меняют любой отчёт часов: кэш расчётов сразу недействителен.
+  invalidateByPrefix('hours:');
 }

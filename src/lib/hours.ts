@@ -1,6 +1,9 @@
 // Факт часов для аналитики: списания из понедельных документов workload_time_task,
 // проект и теги из task_mirror. Портал не трогаем: списания уже собраны шедулером,
 // а запрос в Bitrix на каждый рендер дашборда упёрся бы в лимиты.
+import { createHash } from 'node:crypto';
+import { currentVersion } from '@/lib/task-mirror-query';
+import { serverCache } from '@/lib/server-cache';
 import { hoursSettings } from './hours-settings';
 import { cacheGet, cacheSet, getDb } from './mongo';
 import { bx24OAuth } from './oauth-client';
@@ -112,7 +115,32 @@ export function weekStarts(from: string, to: string): string[] {
   return weeks;
 }
 
+// Аналитика, отчёты и дашборды просят одни и те же часы пачкой, а каждый расчёт читал всё
+// зеркало с описаниями (теги классов), ~250 мс. Ключ кэша это отпечаток всего, от чего
+// зависят часы: зеркало задач (теги, проекты), периоды классов и ключевые слова проектов.
+// Изменилось что-то из этого, и ключ новый, расчёт честный. Списания и настройки учёта
+// сбрасывают кэш сами (refreshWorkloadTime, saveHoursSettings).
 export async function loadHours(memberId: string, from: string, to: string): Promise<HoursReport> {
+  const db = await getDb();
+  const [mirror, periods, projects] = await Promise.all([
+    currentVersion(db, memberId),
+    db.collection('project_class_periods').find({ member_id: memberId }).toArray(),
+    db
+      .collection('projects')
+      .find({ member_id: memberId }, { projection: { _id: 0, id: 1, keywords: 1 } })
+      .toArray(),
+  ]);
+  const version = createHash('sha1')
+    .update(JSON.stringify([mirror, periods, projects]))
+    .digest('hex');
+  return serverCache(
+    `hours:${memberId}:${from}:${to}:${version}`,
+    () => readHours(memberId, from, to),
+    60_000,
+  );
+}
+
+async function readHours(memberId: string, from: string, to: string): Promise<HoursReport> {
   const db = await getDb();
   const weeks = weekStarts(from, to);
   const docs = await db

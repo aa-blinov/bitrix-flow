@@ -1,4 +1,5 @@
 import { getDb } from './mongo';
+import { invalidateByPrefix } from './server-cache';
 import { bx24OAuth } from './oauth-client';
 import { portalDay } from './planned-hours';
 
@@ -158,7 +159,10 @@ export function refreshWorkloadTime(memberId: string, start: string, end: string
   const key = `${memberId}:${start}:${end}`;
   const pending = running.get(key);
   if (pending) return pending;
-  const job = collectWorkloadTime(memberId, start, end).finally(() => running.delete(key));
+  const job = collectWorkloadTime(memberId, start, end).finally(() => {
+    running.delete(key);
+    invalidateByPrefix(`hours:${memberId}:`);
+  });
   running.set(key, job);
   return job;
 }
