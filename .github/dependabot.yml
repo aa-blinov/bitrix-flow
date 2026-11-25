@@ -16,6 +16,9 @@ updates:
         # The bump workflow in aa-blinov/golden-repo opens that pull request
         # instead, and it arrives on its own.
         patterns: ['*', '!aa-blinov/golden-repo']
+    ignore:
+      # Закреплён на последней MIT-версии (см. ci.yml): с 2.0 нужна лицензия, с 3.0 ещё и токен.
+      - dependency-name: gitleaks/gitleaks-action
 
   - package-ecosystem: pip
     directory: /
@@ -32,8 +35,23 @@ updates:
       interval: weekly
     labels: [dependencies, javascript]
     groups:
+      # Мажоры отдельными PR: одна пачка с TypeScript 7 и Playwright 1.65 падала целиком,
+      # и вместе с ней застревали безопасные минорные обновления.
       npm:
         patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      # Версия Playwright привязана к образу mcr.microsoft.com/playwright и эталонам
+      # скриншотов: обновляется вручную вместе с ними.
+      - dependency-name: '@playwright/test'
+      - dependency-name: playwright
+      # Типы держим на версии Node с прода (Dockerfile, CI), иначе в коде появится API,
+      # которого на сервере нет.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+      # typescript-eslint ещё не поддерживает TypeScript 7.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: gomod
     directory: /
@@ -58,3 +76,7 @@ updates:
     schedule:
       interval: weekly
     labels: [dependencies, docker]
+    ignore:
+      # Node меняем вручную и только на LTS, вместе с CI: dependabot предлагал нечётную 25.
+      - dependency-name: node
+        update-types: [version-update:semver-major]

@@ -119,6 +119,7 @@ export default function Notifications({
     const timestamp = new Date(item.createdAt || item.created_at || 0).getTime();
     return Number.isFinite(timestamp) && timestamp > seenAt;
   }).length;
+  const unreadBadge = unreadCount > 99 ? '99+' : String(unreadCount);
 
   const onEvent = useCallback(
     (event: Notice) => {
@@ -162,11 +163,18 @@ export default function Notifications({
       // Панель по умолчанию в 288 px с полями: список шириной 320 внутри неё обрезался справа.
       panelClassName="w-80 max-h-none overflow-y-visible p-0"
       trigger={
-        <IconButton label={t('Уведомления')} variant="ghost" size="sm" className="relative">
+        // Видимый счётчик входит в имя кнопки: иначе голосом «нажми 2» её не найти, и axe
+        // (label-content-name-mismatch) считает это ошибкой.
+        <IconButton
+          label={unreadCount > 0 ? t('Уведомления: {0}', unreadBadge) : t('Уведомления')}
+          variant="ghost"
+          size="sm"
+          className="relative"
+        >
           <Bell size={16} strokeWidth={1.7} />
           {unreadCount > 0 ? (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-canvas">
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadBadge}
             </span>
           ) : null}
         </IconButton>

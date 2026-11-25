@@ -797,6 +797,7 @@ export const EN: Record<string, string> = {
   'Убрать тег {0}': 'Remove tag {0}',
   'Убрать фильтр «{0}»': 'Remove the "{0}" filter',
   Уведомления: 'Notifications',
+  'Уведомления: {0}': 'Notifications: {0}',
   Увеличить: 'Zoom in',
   'Удаление задачи': 'Deleting a task',
   Удаления: 'Deletions',

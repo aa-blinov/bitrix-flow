@@ -351,7 +351,6 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             trigger={
               <button
                 type="button"
-                aria-label={t('Профиль и настройки')}
                 className="flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-ui px-1.5 text-left transition-colors duration-fast hover:bg-surface"
               >
                 {photo && failedPhoto !== photo ? (
@@ -362,7 +361,10 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                     onError={() => setFailedPhoto(photo)}
                   />
                 ) : (
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-ink">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-ink"
+                  >
                     {currentUser.id ? getInitials(currentUser.name) : '…'}
                   </span>
                 )}
@@ -370,6 +372,9 @@ export default function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                   {currentUser.id ? currentUser.name : '…'}
                 </span>
+                {/* Имя кнопки начинается с видимого имени человека: голосовой ввод ищет
+                    кнопку по тому, что видно на экране. */}
+                <span className="sr-only">{t('Профиль и настройки')}</span>
                 {/* Стрелка показывает, куда откроется панель. */}
                 {wide ? (
                   <ChevronRight size={14} strokeWidth={1.7} className="shrink-0 text-ink-muted" />
