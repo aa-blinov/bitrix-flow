@@ -798,6 +798,10 @@ export const EN: Record<string, string> = {
   'Убрать фильтр «{0}»': 'Remove the "{0}" filter',
   Уведомления: 'Notifications',
   'Уведомления: {0}': 'Notifications: {0}',
+  'Не удалось добавить упомянутых в наблюдатели: {0}':
+    'Could not add mentioned people as observers: {0}',
+  'Не удалось добавить упомянутых в наблюдатели. Попробуйте ещё раз.':
+    'Could not add mentioned people as observers. Please try again.',
   Увеличить: 'Zoom in',
   'Удаление задачи': 'Deleting a task',
   Удаления: 'Deletions',

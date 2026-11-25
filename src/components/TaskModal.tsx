@@ -559,6 +559,20 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     setCommentError(null);
     setIsSendingComment(true);
     try {
+      await addMentionedAsAuditors(text);
+    } catch (error) {
+      // Без доступа к задаче упомянутый получил бы уведомление, но открыть её не смог бы:
+      // комментарий не отправляем, текст остаётся в поле.
+      setComment((current) => current || text);
+      setCommentError(
+        error instanceof Error && error.message
+          ? t('Не удалось добавить упомянутых в наблюдатели: {0}', error.message)
+          : t('Не удалось добавить упомянутых в наблюдатели. Попробуйте ещё раз.'),
+      );
+      setIsSendingComment(false);
+      return;
+    }
+    try {
       await addComment(task.id, text);
     } catch {
       setComment((current) => current || text);
@@ -566,6 +580,41 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     } finally {
       setIsSendingComment(false);
     }
+  };
+
+  // Упомянутый, которого нет в задаче, сначала становится наблюдателем, а потом уже видит
+  // комментарий: иначе уведомление ведёт в задачу, к которой у него нет доступа.
+  const addMentionedAsAuditors = async (text: string) => {
+    const mentioned = [...text.matchAll(/\[USER=(\d+)\]/gi)].map((match) => match[1]);
+    const members = (from: {
+      creatorId?: string;
+      assigneeId?: string;
+      responsibleId?: string;
+      accompliceIds?: string[];
+      auditorIds?: string[];
+    }) =>
+      new Set(
+        [
+          from.creatorId,
+          from.assigneeId,
+          from.responsibleId,
+          ...(from.accompliceIds || []),
+          ...(from.auditorIds || []),
+        ]
+          .filter(Boolean)
+          .map(String),
+      );
+    if (!mentioned.some((id) => !members(task).has(id))) return;
+    // Наблюдатели в портале пишутся целым списком: берём свежий из портала, чтобы не
+    // стереть тех, кого добавили после открытия карточки.
+    const fresh = await fetchTaskById(task.id);
+    const inTask = members(fresh);
+    const missing = [...new Set(mentioned.filter((id) => !inTask.has(id)))];
+    if (!missing.length) return;
+    await updateTaskField(task.id, 'auditorIds', [
+      ...(fresh.auditorIds || []).map(String),
+      ...missing,
+    ]);
   };
 
   const handleAddResult = async () => {
@@ -1374,33 +1423,6 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                     />
                   </div>
 
-                  {/* Assignee */}
-                  <div>
-                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
-                      <User size={12} strokeWidth={1.7} /> {t('Исполнитель')}
-                    </p>
-                    {editingField === 'assigneeId' ? (
-                      <SelectField
-                        variant="boxed"
-                        aria-label={t('Исполнитель')}
-                        value={task.assigneeId || 'unassigned'}
-                        onChange={(event) =>
-                          void changeAssignee(
-                            event.target.value === 'unassigned' ? '' : event.target.value,
-                          )
-                        }
-                        options={assigneeOptions}
-                      />
-                    ) : (
-                      <p
-                        className="-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium text-ink hover:bg-surface-2"
-                        onClick={() => setEditingField('assigneeId')}
-                      >
-                        {task.assigneeName || t('Не назначен')}
-                      </p>
-                    )}
-                  </div>
-
                   {/* Постановщик принимает задачу и получает о ней уведомления: его меняют,
                       когда задача переходит к другому руководителю. Пустым он не бывает. */}
                   <div>
@@ -1428,6 +1450,33 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                           directory.find((user) => user.id === task.creatorId)?.name ||
                           t('Не указан')}
                       </button>
+                    )}
+                  </div>
+
+                  {/* Assignee */}
+                  <div>
+                    <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
+                      <User size={12} strokeWidth={1.7} /> {t('Исполнитель')}
+                    </p>
+                    {editingField === 'assigneeId' ? (
+                      <SelectField
+                        variant="boxed"
+                        aria-label={t('Исполнитель')}
+                        value={task.assigneeId || 'unassigned'}
+                        onChange={(event) =>
+                          void changeAssignee(
+                            event.target.value === 'unassigned' ? '' : event.target.value,
+                          )
+                        }
+                        options={assigneeOptions}
+                      />
+                    ) : (
+                      <p
+                        className="-mx-1 cursor-pointer rounded-ui px-1 py-0.5 text-sm font-medium text-ink hover:bg-surface-2"
+                        onClick={() => setEditingField('assigneeId')}
+                      >
+                        {task.assigneeName || t('Не назначен')}
+                      </p>
                     )}
                   </div>
 

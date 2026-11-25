@@ -66,6 +66,47 @@ test('постановщик виден в карточке и меняется'
   await expect(dialog.getByRole('button', { name: 'Мария Орлова', exact: true })).toBeVisible();
 });
 
+test('упомянутый не из задачи сначала становится наблюдателем, потом уходит комментарий', async ({
+  page,
+}) => {
+  // Свежая задача из портала: наблюдатель Дмитрий уже есть и не должен потеряться.
+  await page.route('**/api/bitrix/tasks.task.get**', (route) =>
+    route.fulfill({
+      json: {
+        result: {
+          task: {
+            id: '101',
+            title: 'Перевести справочники на GraphQL',
+            status: '2',
+            groupId: '10',
+            responsibleId: '1',
+            createdBy: '1',
+            accomplices: [],
+            auditors: ['2'],
+          },
+        },
+      },
+    }),
+  );
+  await page.goto('/all-tasks');
+  await settle(page);
+  await page.getByRole('button', { name: 'Перевести справочники на GraphQL' }).first().click();
+  const dialog = page.getByRole('dialog');
+  const order: string[] = [];
+  page.on('request', (request) => {
+    const url = request.url();
+    const body = decodeURIComponent(request.postData() || '');
+    if (url.includes('/api/bitrix/tasks.task.update') && body.includes('AUDITORS'))
+      order.push(`auditors ${body.match(/"AUDITORS":\[[^\]]*\]/)?.[0]}`);
+    if (url.includes('/api/bitrix/tasks.task.chat.message.send')) order.push('comment');
+  });
+  const input = dialog.getByRole('textbox', { name: 'Комментарий' });
+  await input.fill('глянь @Мар');
+  await dialog.getByRole('button', { name: 'Мария Орлова' }).click();
+  await input.press('Shift+Enter');
+  await expect.poll(() => order).toEqual(['auditors "AUDITORS":["2","3"]', 'comment']);
+});
+
 test('кнопки статуса задачи пропускает прокси', async ({ page }) => {
   // Прокси пускает только методы из белого списка; «Начать», «Отложить» и
   // остальные кнопки статуса туда не попали и отвечали METHOD_NOT_ALLOWED.
