@@ -71,6 +71,9 @@ function getStageDotColor(hex: string): string {
 
 type KanbanStagePage = { tasks: BxTask[]; total: number; loading: boolean; next: number | null };
 const KANBAN_OFFSET_STEP = '50';
+// Колонки с прошлого захода на доску: при возврате они видны сразу, свежие приходят следом.
+// Раньше каждый вход начинался со спиннера на полсекунды и больше. Пишется только в эффекте.
+const boardCache = new Map<string, Record<string, KanbanStagePage>>();
 // Фолбэк для проектов без настроенных фаз: константа на модуль, чтобы ссылка
 // на массив не менялась при каждом рендере доски.
 const DEFAULT_STAGES: Bx24Stage[] = [
@@ -429,11 +432,20 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     },
     [deferredSearch, taskFilters, kanbanSort, selectedProjectId, stageQueries],
   );
+  // Доска с теми же проектом, фазами, фильтрами и сортировкой: только тогда прошлые
+  // колонки годятся как первый кадр.
+  const boardKey = `${selectedProjectId}|${stageSignature}|${JSON.stringify(taskFilters)}|${deferredSearch}|${kanbanSort}`;
   useEffect(() => {
     if (!selectedProjectId || !stageKey) return;
     const requestVersion = ++stageRequestVersion.current;
-    setBoardReady(false);
-    startTransition(() => setStagePages({}));
+    const cached = boardCache.get(boardKey);
+    if (cached) {
+      setStagePages(cached);
+      setBoardReady(true);
+    } else {
+      setBoardReady(false);
+      startTransition(() => setStagePages({}));
+    }
     // Колонок может быть больше, чем фаз в проекте: к «Новым» добавляется
     // запрос задач без фазы, а сверху — колонка «Без фазы» для фазы, которой
     // доска не знает.
@@ -448,7 +460,13 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     };
     if (!requests.length) reveal();
     requests.forEach((request) => void request.then(reveal).catch(reveal));
+    // boardKey меняется вместе с loadStagePage и stageSignature, отдельно не нужен.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadStagePage, selectedProjectId, stageKey, stageSignature]);
+  useEffect(() => {
+    if (boardReady && !Object.values(stagePages).some((page) => page.loading))
+      boardCache.set(boardKey, stagePages);
+  }, [boardKey, boardReady, stagePages]);
 
   // Событие портала (SSE → tasksVersion): зеркало в Mongo уже обновлено,
   // доска тихо перечитывает свои колонки. Без этого правки с портала не
