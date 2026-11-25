@@ -39,7 +39,7 @@ Tailwind не зависят, поэтому расхождение безоби
 `BITRIX24_REDIRECT_URI`. Bitrix24 должен достучаться до `/api/b24/handler`, чтобы доставлять
 события.
 
-Нужны Node.js 20 и MongoDB 7: те же версии, что в Dockerfile и CI.
+Нужны Node.js 24 и MongoDB 7: те же версии, что в Dockerfile и CI.
 
 ## Что умеет
 
@@ -195,7 +195,7 @@ events_stream    -> /api/events (SSE) -> React
 
 ## Разработка
 
-Нужны Node.js 20, MongoDB 7 и npm. Для UI-тестов дополнительно нужен Docker: эталоны
+Нужны Node.js 24, MongoDB 7 и npm. Для UI-тестов дополнительно нужен Docker: эталоны
 сверяются в образе Playwright, а не в локальном Chrome.
 
 ### Команды

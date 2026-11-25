@@ -48,7 +48,7 @@ npm run test:ui                 # seed + Playwright, системный Chrome
 docker compose --env-file .env.local up -d --build
 ```
 
-Версии: Node.js 20 (Dockerfile и CI), MongoDB 7 (compose), Playwright 1.63.0
+Версии: Node.js 24 LTS (Dockerfile и CI; в 20 AsyncLocalStorage Next и Sentry шёл через async_hooks, и девять параллельных запросов колонок канбана шли 250–310 мс против 160 на 24), MongoDB 7 (compose), Playwright 1.63.0
 (`mcr.microsoft.com/playwright:v1.63.0-noble`).
 
 ## Where things live
