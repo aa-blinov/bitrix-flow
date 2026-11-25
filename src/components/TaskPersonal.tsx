@@ -17,21 +17,38 @@ import {
 import { CRM_TYPE_LABELS, type CrmLink } from '@/lib/crm-links';
 import { t } from '@/lib/i18n';
 
+// Последнее известное по задаче: повторно открытая карточка показывает звёздочку и CRM
+// сразу, а свежее приходит следом.
+const known = new Map<string, TaskPersonal>();
+
 /** Избранное, звук, наблюдение и CRM: у каждого своё, читаем токеном человека. */
 export function useTaskPersonal(taskId: string, userId: string) {
-  const [personal, setPersonal] = useState<TaskPersonal | null>(null);
+  const key = `${userId}:${taskId}`;
+  const [state, setState] = useState<{ key: string; value: TaskPersonal } | null>(null);
+  const personal = state?.key === key ? state.value : (known.get(key) ?? null);
+  const setPersonal = (update: (current: TaskPersonal | null) => TaskPersonal | null) =>
+    setState((current) => {
+      const value = update(current?.key === key ? current.value : (known.get(key) ?? null));
+      if (!value) return current;
+      known.set(key, value);
+      return { key, value };
+    });
   useEffect(() => {
     let cancelled = false;
+    const apply = (value: TaskPersonal) => {
+      if (cancelled) return;
+      known.set(key, value);
+      setState({ key, value });
+    };
     void fetchTaskPersonal(taskId, userId)
-      .then((value) => !cancelled && setPersonal(value))
+      .then(apply)
       .catch(
-        () =>
-          !cancelled && setPersonal({ favorite: false, muted: false, watching: false, crm: [] }),
+        () => !known.has(key) && apply({ favorite: false, muted: false, watching: false, crm: [] }),
       );
     return () => {
       cancelled = true;
     };
-  }, [taskId, userId]);
+  }, [key, taskId, userId]);
 
   // Правка видна сразу, а при отказе портала откатывается.
   const change = async (patch: Partial<TaskPersonal>, run: () => Promise<void>) => {
@@ -41,7 +58,7 @@ export function useTaskPersonal(taskId: string, userId: string) {
       await run();
       return true;
     } catch {
-      setPersonal(before);
+      setPersonal(() => before);
       return false;
     }
   };
@@ -144,12 +161,13 @@ async function fetchCrm(params: string): Promise<CrmLink[]> {
 /** «Элементы CRM» портала: сделки, контакты, компании и лиды, к которым привязана задача. */
 export function TaskCrmLinks({ taskId, state }: { taskId: string; state: Personal }) {
   const codes = state.personal?.crm;
+  const list = codes ?? [];
   const [links, setLinks] = useState<CrmLink[]>([]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CrmLink[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const key = (codes || []).join(',');
+  const key = list.join(',');
   useEffect(() => {
     if (!key) {
       setLinks([]);
@@ -193,14 +211,15 @@ export function TaskCrmLinks({ taskId, state }: { taskId: string; state: Persona
     if (!ok) setError(t('Не удалось сохранить привязку к CRM'));
   };
 
-  if (!codes) return null;
+  // Пока настройки задачи грузятся, блок уже стоит на своём месте с выключенным полем:
+  // раньше он появлялся через полсекунды и сдвигал вниз всё, что под ним.
   return (
     <div>
       <p className="mb-1.5 flex items-center gap-1.5 text-whisper font-bold uppercase tracking-widest text-ink-faint">
         <Briefcase size={12} strokeWidth={1.7} /> {t('CRM')}
       </p>
       <div className="space-y-1.5">
-        {codes.map((code) => {
+        {list.map((code) => {
           const link = links.find((item) => item.code === code) || { code, typeId: 0, title: '' };
           return (
             <div
@@ -215,7 +234,7 @@ export function TaskCrmLinks({ taskId, state }: { taskId: string; state: Persona
                 label={t('Отвязать {0}', link.title || code)}
                 variant="ghost"
                 size="sm"
-                onClick={() => void save(codes.filter((item) => item !== code))}
+                onClick={() => void save(list.filter((item) => item !== code))}
               >
                 <X size={14} strokeWidth={1.7} />
               </IconButton>
@@ -230,11 +249,12 @@ export function TaskCrmLinks({ taskId, state }: { taskId: string; state: Persona
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('Привязать сделку, контакт, компанию…')}
           aria-label={t('Привязать элемент CRM')}
+          disabled={!codes}
         />
         {query && results.length > 0 && (
           <div className="absolute z-menu mt-1 max-h-48 w-full overflow-y-auto rounded-ui border border-line bg-canvas p-1 shadow-overlay">
             {results
-              .filter((candidate) => !codes.includes(candidate.code))
+              .filter((candidate) => !list.includes(candidate.code))
               .map((candidate) => (
                 <Button
                   key={candidate.code}
@@ -243,7 +263,7 @@ export function TaskCrmLinks({ taskId, state }: { taskId: string; state: Persona
                   className="h-auto w-full justify-start px-2 py-1.5 text-left"
                   onClick={() => {
                     setQuery('');
-                    void save([...codes, candidate.code], candidate);
+                    void save([...list, candidate.code], candidate);
                   }}
                 >
                   {crmTypeLabel(candidate)}: {candidate.title || candidate.code}

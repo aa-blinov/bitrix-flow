@@ -73,7 +73,14 @@ import {
   useTaskPersonal,
 } from '@/components/TaskPersonal';
 import type { Bx24Task } from '@/lib/bitrix24';
-import { dateLocale, t } from '@/lib/i18n';
+import { dateFormat, dateLocale, t } from '@/lib/i18n';
+
+// Дата записи времени приходит из портала сырой строкой ISO с поясом.
+const ENTRY_DATE = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
+const entryDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : ENTRY_DATE.format(date);
+};
 
 /** Родитель бывает в другом проекте или закрыт: в списке доски его нет, название берём из портала. */
 function ParentTitle({ id, known }: { id: string; known?: string }) {
@@ -1693,7 +1700,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
                       <span className="font-medium text-info-text">
                         {entry.hours} {t('ч')}
                       </span>
-                      <span className="text-whisper text-ink-faint">{entry.date}</span>
+                      <span className="text-whisper text-ink-faint">{entryDate(entry.date)}</span>
                       <span className="flex items-center gap-1">
                         <IconButton
                           label={t('Изменить запись времени')}

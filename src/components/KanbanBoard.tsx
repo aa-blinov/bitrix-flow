@@ -1111,17 +1111,18 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
                       stages={allStages}
                       onMoveToStage={(taskId, stageId) => void moveCardToStage(taskId, stageId)}
                       onClick={() => {
-                        // Сначала полная задача: карточке нужны права на действия
-                        // и теги. Открывать раньше — значит перечитывать её
-                        // ещё раз уже в самой карточке.
-                        void (async () => {
-                          try {
-                            await loadTaskById(task.id);
-                          } catch {
-                            // Не открываем карточку вслепую: откроем как есть.
-                          }
-                          openTask(task.id);
-                        })();
+                        // Карточка открывается сразу задачей колонки, а права и детали
+                        // догружает сама. Раньше ждали полную задачу из портала, и окно
+                        // появлялось через 0,3–1 с после клика, хотя всё нужное уже было.
+                        // В оба списка, как loadTaskById: колонки сверяются с allTasks, и
+                        // без него фаза, сменённая в карточке, не переносила задачу на доске.
+                        const missing = (list: BxTask[]) =>
+                          list.some((item) => item.id === task.id) ? list : [...list, task];
+                        useKanbanStore.setState((state) => ({
+                          tasks: missing(state.tasks),
+                          allTasks: missing(state.allTasks),
+                        }));
+                        openTask(task.id);
                       }}
                       isDragging={draggedTask === task.id}
                     />
