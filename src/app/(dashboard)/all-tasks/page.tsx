@@ -16,12 +16,11 @@ import QuickCreateTask from '@/components/QuickCreateTask';
 import { t } from '@/lib/i18n';
 
 function AllTasksInner() {
-  const { projects, loadProjects, currentUser, selectedTaskId, setSelectedTask } = useKanbanStore(
+  const { projects, loadProjects, currentUser, setSelectedTask } = useKanbanStore(
     useShallow((s) => ({
       projects: s.projects,
       loadProjects: s.loadProjects,
       currentUser: s.currentUser,
-      selectedTaskId: s.selectedTaskId,
       setSelectedTask: s.setSelectedTask,
     })),
   );
@@ -66,10 +65,12 @@ function AllTasksInner() {
   // URL — единый источник правды для открытой задачи: клик/закрытие в TaskGrid
   // пишет ?task=<id>, back/forward браузера приводят нас сюда, мы отражаем
   // состояние в zustand. Если в URL ничего нет — закрываем модалку.
+  // Только на смену адреса («назад», ссылка): клик по задаче выставляет её сам, сразу. Если
+  // бы эффект следил и за выбором, он закрывал бы карточку, пока адрес ещё не обновился.
   useEffect(() => {
     const next = taskFromUrl || null;
-    if (next !== selectedTaskId) setSelectedTask(next);
-  }, [taskFromUrl, selectedTaskId, setSelectedTask]);
+    if (next !== useKanbanStore.getState().selectedTaskId) setSelectedTask(next);
+  }, [taskFromUrl, setSelectedTask]);
 
   // Ссылка из отчёта или дашборда ведёт на задачу, которой нет на загруженной странице
   // списка: грид ищет карточку только среди загруженных, поэтому дочитываем её по id.

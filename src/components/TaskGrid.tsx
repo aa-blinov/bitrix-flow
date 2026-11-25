@@ -166,8 +166,16 @@ function GridHead({
 // держит selectedTaskId, и страница /all-tasks зеркалит searchParam в него
 // через useEffect — этот хук просто пишет в URL, остальное делает она.
 function useTaskUrl() {
-  const openTask = useCallback((id: string) => setTaskInUrl(id), []);
-  const closeTask = useCallback(() => setTaskInUrl(null), []);
+  // Карточку выставляем сразу, а адрес догоняет: раньше её открывал эффект страницы уже
+  // после того, как роутер перерисует весь список под новый адрес.
+  const openTask = useCallback((id: string) => {
+    useKanbanStore.getState().setSelectedTask(id);
+    setTaskInUrl(id);
+  }, []);
+  const closeTask = useCallback(() => {
+    useKanbanStore.getState().setSelectedTask(null);
+    setTaskInUrl(null);
+  }, []);
   return { openTask, closeTask };
 }
 const inputDate = (value?: string) => toLocalInputValue(value, 'date');

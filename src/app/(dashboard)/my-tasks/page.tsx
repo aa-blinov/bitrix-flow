@@ -15,7 +15,6 @@ function MyTasksInner() {
   const projects = useKanbanStore((state) => state.projects);
   const loadProjects = useKanbanStore((state) => state.loadProjects);
   const currentUser = useKanbanStore((state) => state.currentUser);
-  const selectedTaskId = useKanbanStore((state) => state.selectedTaskId);
   const setSelectedTask = useKanbanStore((state) => state.setSelectedTask);
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') || 'all';
@@ -30,10 +29,12 @@ function MyTasksInner() {
     else if (projects.length === 0) void loadProjects();
   }, [currentUser.id, loadProjects, projects.length]);
 
+  // Только на смену адреса («назад», ссылка): клик по задаче выставляет её сам, сразу. Если
+  // бы эффект следил и за выбором, он закрывал бы карточку, пока адрес ещё не обновился.
   useEffect(() => {
     const next = taskFromUrl || null;
-    if (next !== selectedTaskId) setSelectedTask(next);
-  }, [taskFromUrl, selectedTaskId, setSelectedTask]);
+    if (next !== useKanbanStore.getState().selectedTaskId) setSelectedTask(next);
+  }, [taskFromUrl, setSelectedTask]);
 
   return (
     <div className="min-h-screen bg-canvas pb-12">
