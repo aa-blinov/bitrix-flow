@@ -435,8 +435,12 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
   // Доска с теми же проектом, фазами, фильтрами и сортировкой: только тогда прошлые
   // колонки годятся как первый кадр.
   const boardKey = `${selectedProjectId}|${stageSignature}|${JSON.stringify(taskFilters)}|${deferredSearch}|${kanbanSort}`;
+  // Пока фильтры экрана не переключились на этот проект, в сторе ещё фильтры прошлого экрана:
+  // доска уходила за колонками с ними, промахивалась мимо кэша и сразу грузила второй раз.
+  const filtersScope = useKanbanStore((s) => s.taskFiltersScope);
+  const ownFilters = filtersScope === `project:${selectedProjectId}`;
   useEffect(() => {
-    if (!selectedProjectId || !stageKey) return;
+    if (!selectedProjectId || !stageKey || !ownFilters) return;
     const requestVersion = ++stageRequestVersion.current;
     const cached = boardCache.get(boardKey);
     if (cached) {
@@ -462,7 +466,7 @@ export default function KanbanBoard({ toolbar }: { toolbar?: ReactNode }) {
     requests.forEach((request) => void request.then(reveal).catch(reveal));
     // boardKey меняется вместе с loadStagePage и stageSignature, отдельно не нужен.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadStagePage, selectedProjectId, stageKey, stageSignature]);
+  }, [loadStagePage, selectedProjectId, stageKey, stageSignature, ownFilters]);
   useEffect(() => {
     if (boardReady && !Object.values(stagePages).some((page) => page.loading))
       boardCache.set(boardKey, stagePages);
