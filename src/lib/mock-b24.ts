@@ -1030,10 +1030,28 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
     }
 
     // batch REST v3: тело это массив вызовов, ответ массив их результатов по порядку.
-    case 'batch':
+    case 'batch': {
+      // Классический batch: команды строками «метод?запрос», ответы по ключам в result.
+      const cmd = (params as { cmd?: Record<string, string> }).cmd;
+      if (cmd) {
+        const result: Record<string, unknown> = {};
+        for (const [key, line] of Object.entries(cmd)) {
+          const [name, search = ''] = line.split('?');
+          const nested: Record<string, any> = {};
+          for (const [path, value] of new URLSearchParams(search)) {
+            const keys = path.split(/[[\]]+/).filter(Boolean);
+            let node = nested;
+            keys.slice(0, -1).forEach((part) => (node = node[part] ||= {}));
+            node[keys[keys.length - 1]] = value;
+          }
+          result[key] = mockHandle(name, nested);
+        }
+        return { result };
+      }
       return (params as unknown as { method: string; query: Record<string, string> }[]).map(
         (item) => mockHandle(item.method, item.query),
       );
+    }
     case 'tasks.task.gantt.link.list': {
       const raw = params as unknown as { filter: [string, number] };
       const id = String(raw.filter?.[1] ?? '');

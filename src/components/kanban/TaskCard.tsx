@@ -204,6 +204,8 @@ export function TaskCard({
           {task.chatId && (
             <Link
               href={`/messenger?dialog=chat${task.chatId}`}
+              // Ссылка в каждой строке: предзагрузка тянула страницу чата на все 50 задач сразу.
+              prefetch={false}
               onClick={(event) => event.stopPropagation()}
               className="flex items-center gap-1 hover:text-ink"
               aria-label={t('Чат задачи {0}', task.title)}

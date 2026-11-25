@@ -543,6 +543,8 @@ const EditableTitle = memo(function EditableTitle({
           {task.chatId && (
             <Link
               href={`/messenger?dialog=chat${task.chatId}`}
+              // Ссылка в каждой строке: предзагрузка тянула страницу чата на все 50 задач сразу.
+              prefetch={false}
               className="flex items-center gap-1 transition-colors duration-fast hover:text-ink"
               onClick={(event) => event.stopPropagation()}
               aria-label={t('Чат задачи {0}', String(task.id))}

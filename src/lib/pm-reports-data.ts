@@ -1,5 +1,6 @@
 // Загрузка для отчётов ПМ. Источники те же, что у аналитики часов: зеркало задач и
 // понедельные списания, которые собирает шедулер. Портал на рендер отчёта не трогаем.
+import { serverCache } from '@/lib/server-cache';
 import { portalTime, syncDeadlineChanges } from './deadline-changes';
 import { hoursSettings } from './hours-settings';
 import { excludedUsers, loadHours, staffUsers, mirrorProjectId, weekStarts } from './hours';
@@ -97,7 +98,14 @@ async function hasMirror(memberId: string) {
   );
 }
 
-export async function loadTasks(memberId: string): Promise<ReportTask[]> {
+// Виджеты дашборда и отчёты просят задачи пачкой одновременно: каждый перечитывал всё
+// зеркало (~3 тыс. документов). Одновременные запросы склеиваются, результат живёт 15 с.
+// ponytail: кэш в памяти процесса, при нескольких экземплярах у каждого свой.
+export function loadTasks(memberId: string): Promise<ReportTask[]> {
+  return serverCache(`${memberId}:report-tasks`, () => readTasks(memberId), 15_000);
+}
+
+async function readTasks(memberId: string): Promise<ReportTask[]> {
   const db = await getDb();
   const keys = ['group', 'groupId', 'GROUP_ID', ...Object.values(FIELDS).flat()];
   const docs = await db
@@ -113,10 +121,22 @@ export async function loadTasks(memberId: string): Promise<ReportTask[]> {
   // Задача, которую зеркало ещё не догнало, уже лежит в tasks: без неё новая задача
   // проекта до сверки не видна ни в «В работе», ни в закрытых, даже без списаний.
   const known = new Set(mirrored.map((task) => task.id));
-  const recent = await db
+  // Сначала только номера: полные данные всех задач из tasks весили ~8 МБ и 300 мс на
+  // каждый отчёт, а нужны обычно единицы, которых зеркало ещё не догнало.
+  const ids = await db
     .collection('tasks')
-    .find({ member_id: memberId }, { projection: { id: 1, groupId: 1, data: 1 } })
+    .find({ member_id: memberId }, { projection: { id: 1 } })
     .toArray();
+  const missing = [...new Set(ids.map((doc) => doc.id).filter((id) => !known.has(text(id))))];
+  const recent = missing.length
+    ? await db
+        .collection('tasks')
+        .find(
+          { member_id: memberId, id: { $in: missing } },
+          { projection: { id: 1, groupId: 1, data: 1 } },
+        )
+        .toArray()
+    : [];
   const extra = recent
     .filter((doc) => !known.has(text(doc.id)))
     .map((doc) => toReportTask(doc.id, doc.data || {}, text(doc.groupId) || '0'));

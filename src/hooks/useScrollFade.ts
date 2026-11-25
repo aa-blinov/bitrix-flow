@@ -11,7 +11,9 @@ export function useScrollFade<T extends HTMLElement>(deps: unknown[] = []) {
     const el = ref.current;
     if (!el) return;
     const update = () => setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
-    update();
+    // Первый замер делает сам ResizeObserver после раскладки. Ручной вызов здесь читал
+    // scrollWidth посреди коммита и заставлял браузер синхронно раскладывать всю таблицу
+    // (самая дорогая функция в профиле списка задач).
     el.addEventListener('scroll', update, { passive: true });
     const observer = new ResizeObserver(update);
     observer.observe(el);
