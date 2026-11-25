@@ -13,18 +13,26 @@ function fromBase64Url(value: string): Uint8Array {
   return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
 }
 
+// Ключ импортируется один раз на секрет: подпись проверяется на каждом запросе.
+let signingKey: { secret: string; key: Promise<CryptoKey> } | null = null;
+
 async function sign(value: string): Promise<string> {
   const secret = process.env.AUTH_SESSION_SECRET;
   if (!secret) throw new Error('AUTH_SESSION_SECRET is not configured');
 
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
+  if (signingKey?.secret !== secret)
+    signingKey = {
+      secret,
+      key: crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      ),
+    };
+  const key = await signingKey.key;
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(value));
   return toBase64Url(new Uint8Array(signature));
 }

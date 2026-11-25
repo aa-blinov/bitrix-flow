@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 import { isMockEnabled } from '@/lib/mock-b24';
 import { postBitrixJson } from '@/lib/bitrix-request';
@@ -185,26 +185,46 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ statuses: await readMirror() });
   }
 
-  try {
-    const token = await getMemberToken(memberId);
-    if (!token?.access_token || !token.domain)
-      return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
-    await ensureStatusList((method, params) => listElements(token, method, params as any));
-    // Список портала не отдаёт время правки элемента: его помнит только зеркало.
-    // Без этого «Обновлено» в форме всегда показывало момент открытия страницы.
-    const [mirror, fresh] = await Promise.all([readMirror(), fetchStatuses(token)]);
-    const known = new Map(mirror.map((row) => [row.projectId, row.updatedAt]));
-    const statuses = fresh.map((row) => ({
-      ...row,
-      updatedAt: known.get(row.projectId) || '',
-    }));
-    await writeMirror(statuses, true);
-    return NextResponse.json({ statuses });
-  } catch (error) {
-    // Портал недоступен — отдаём зеркало, чтобы сводка оставалась читаемой.
-    console.warn('[project-status] список недоступен, читаем зеркало:', error);
-    return NextResponse.json({ statuses: await readMirror() });
+  const token = await getMemberToken(memberId).catch(() => null);
+  if (!token?.access_token || !token.domain)
+    return NextResponse.json({ error: 'NO_TOKEN' }, { status: 401 });
+  // Чтение списка из портала это несколько запросов подряд, до 2,5 с на каждый заход.
+  // Зеркало отдаём сразу, а свежий список забираем в фоне: свои правки и так пишутся в
+  // оба места, чужие из портала видны со следующего захода.
+  const mirror = await readMirror();
+  if (mirror.length) {
+    after(() => refreshStatuses(token, memberId));
+    return NextResponse.json({ statuses: mirror });
   }
+  return NextResponse.json({ statuses: await refreshStatuses(token, memberId) });
+}
+
+const refreshing = new Map<string, Promise<Awaited<ReturnType<typeof readMirror>>>>();
+
+function refreshStatuses(token: Parameters<typeof fetchStatuses>[0], memberId: string) {
+  let job = refreshing.get(memberId);
+  if (job) return job;
+  job = (async () => {
+    try {
+      await ensureStatusList((method, params) => listElements(token, method, params as any));
+      // Список портала не отдаёт время правки элемента: его помнит только зеркало.
+      // Без этого «Обновлено» в форме всегда показывало момент открытия страницы.
+      const [mirror, fresh] = await Promise.all([readMirror(), fetchStatuses(token)]);
+      const known = new Map(mirror.map((row) => [row.projectId, row.updatedAt]));
+      const statuses = fresh.map((row) => ({
+        ...row,
+        updatedAt: known.get(row.projectId) || '',
+      }));
+      await writeMirror(statuses, true);
+      return statuses;
+    } catch (error) {
+      // Портал недоступен — отдаём зеркало, чтобы сводка оставалась читаемой.
+      console.warn('[project-status] список недоступен, читаем зеркало:', error);
+      return readMirror();
+    }
+  })().finally(() => refreshing.delete(memberId));
+  refreshing.set(memberId, job);
+  return job;
 }
 
 // Удаление статуса проекта. Сначала портал, потом зеркало: раньше зеркало

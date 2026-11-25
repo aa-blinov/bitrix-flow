@@ -73,18 +73,36 @@ export async function GET(req: NextRequest) {
 
   // Параллельно загружаем все что нужно для дашборда
   const PROJECTS_TTL = 5 * 60 * 1000;
+  // После пяти минут отдаём прежний справочник и обновляем его в фоне, а не ждём портал.
+  const PROJECTS_STALE = 60 * 60 * 1000;
 
   try {
     const [rawProjects, projectDates, rawUsers, rawCurrentUser] = await Promise.all([
-      serverCache(`${memberId}:projects:all`, () => fetchAllProjects(token), PROJECTS_TTL),
-      serverCache(`${memberId}:projects:dates`, () => fetchProjectDates(token), PROJECTS_TTL),
+      serverCache(
+        `${memberId}:projects:all`,
+        () => fetchAllProjects(token),
+        PROJECTS_TTL,
+        PROJECTS_STALE,
+      ),
+      serverCache(
+        `${memberId}:projects:dates`,
+        () => fetchProjectDates(token),
+        PROJECTS_TTL,
+        PROJECTS_STALE,
+      ),
       // Без фильтра ACTIVE: портал отдаёт и неактивных, их имена нужны подписям в задачах.
-      serverCache(`${memberId}:users:all:v4`, () => fetchPeople(token, memberId), PROJECTS_TTL),
+      serverCache(
+        `${memberId}:users:all:v4`,
+        () => fetchPeople(token, memberId),
+        PROJECTS_TTL,
+        PROJECTS_STALE,
+      ),
       // «Я» это вошедший человек, а не владелец токена портала: его токеном и в его ключ кэша.
       serverCache(
         `${memberId}:user:current:${person.userId}`,
         () => bx24OAuth(memberId, 'user.current', {}, { parallel: true, asUser: person.userId }),
         PROJECTS_TTL,
+        PROJECTS_STALE,
       ),
     ]);
 

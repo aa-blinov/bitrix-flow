@@ -31,14 +31,19 @@ export async function createStoredSession(
 // Сессии без user_id остались от входа общим паролем и больше не принимаются.
 export async function getActiveSessionUser(sessionId: string): Promise<AppUser | null> {
   const db = await getDb();
+  const hash = sessionHash(sessionId);
   const found = await db
     .collection('sessions')
-    .findOneAndUpdate(
-      { session_hash: sessionHash(sessionId), expiresAt: { $gt: new Date() } },
-      { $set: { last_seen_at: new Date() } },
-      { returnDocument: 'after' },
-    );
+    .findOne({ session_hash: hash, expiresAt: { $gt: new Date() } });
   if (!found?.user_id) return null;
+  // Отметка «был в сети» раз в минуту и без ожидания: запись на каждый запрос ставила
+  // одновременные запросы страницы в очередь на один и тот же документ сессии.
+  const seen = found.last_seen_at instanceof Date ? found.last_seen_at.getTime() : 0;
+  if (Date.now() - seen > 60_000)
+    void db
+      .collection('sessions')
+      .updateOne({ session_hash: hash }, { $set: { last_seen_at: new Date() } })
+      .catch(() => {});
   const user = await findUserById(String(found.user_id));
   return user && !user.blocked ? user : null;
 }
