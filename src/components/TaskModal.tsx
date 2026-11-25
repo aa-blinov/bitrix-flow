@@ -77,6 +77,19 @@ import { dateFormat, dateLocale, t } from '@/lib/i18n';
 
 // Дата записи времени приходит из портала сырой строкой ISO с поясом.
 const ENTRY_DATE = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
+// Пока права из портала не пришли, в шапке стоят обычные для статуса кнопки, выключенные:
+// раньше они появлялись через секунду и сдвигали выбор фазы.
+const USUAL_ACTIONS: Record<string, string[]> = {
+  new: ['start', 'defer', 'complete'],
+  in_progress: ['pause', 'defer', 'complete'],
+  testing: ['approve', 'disapprove', 'defer'],
+  deferred: ['renew', 'complete'],
+  done: ['renew'],
+};
+
+// Права с прошлого открытия: повторно открытая карточка сразу с рабочими кнопками.
+const knownActions = new Map<string, Record<string, boolean>>();
+
 const entryDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : ENTRY_DATE.format(date);
@@ -257,7 +270,7 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const [actionsVersion, setActionsVersion] = useState(0);
   const [allowedActions, setAllowedActions] = useState<Record<string, boolean> | null>(
-    task.actions || null,
+    task.actions || knownActions.get(task.id) || null,
   );
   const [focusConflict, setFocusConflict] = useState<BxTask | null>(null);
   const userLabel = (user: Bx24User) =>
@@ -389,7 +402,9 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     }
     void fetchTaskById(task.id)
       .then((freshTask) => {
-        if (!cancelled) setAllowedActions(freshTask.actions || {});
+        if (cancelled) return;
+        knownActions.set(task.id, freshTask.actions || {});
+        setAllowedActions(freshTask.actions || {});
       })
       .catch(() => {
         if (!cancelled) setAllowedActions({});
@@ -404,7 +419,10 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
     // падало с «Действие не доступно».
   }, [task.id, actionsVersion]);
 
-  const can = (action: string) => allowedActions?.[action] === true;
+  const can = (action: string) =>
+    allowedActions
+      ? allowedActions[action] === true
+      : (USUAL_ACTIONS[task.status] || []).includes(action);
   const personal = useTaskPersonal(task.id, String(currentUser.id));
   // Исполнитель без права править задачу меняет исполнителя только делегированием.
   const delegateOnly = can('delegate') && !can('edit');
@@ -739,7 +757,11 @@ export default function TaskModal({ task, onClose }: { task: BxTask; onClose: ()
         <div className="sticky -top-6 z-10 sm:-top-8 -mx-6 mb-4 flex flex-wrap items-center gap-2 border-b border-line bg-canvas px-6 py-2 sm:-mx-8 sm:px-8">
           <span className="text-whisper text-ink-faint">#{task.id}</span>
           <Badge tone={statusTone(task.status)}>{STATUS_LABELS[task.status] || task.status}</Badge>
-          <div className="flex shrink-0 flex-wrap items-center gap-1">
+          <div
+            className={`flex shrink-0 flex-wrap items-center gap-1 ${allowedActions ? '' : 'opacity-50'}`}
+            inert={!allowedActions}
+            aria-busy={!allowedActions || undefined}
+          >
             {/* Отложенную Битрикс не «стартует», а возвращает в «Новая» (renew)
                 или завершает: раньше тут ждали start, и шапка была пустой. */}
             {task.status === 'deferred' && (
