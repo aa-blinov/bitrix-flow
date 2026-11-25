@@ -1,5 +1,6 @@
 'use client';
 
+import { lastDialogs, rememberDialogs } from '@/components/messenger/dialog-cache';
 import { AtSign, Bell, BellOff, CheckCheck, Ellipsis, Pin, SquarePen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/monos/Avatar';
@@ -98,21 +99,16 @@ const NOTIFY_LABELS = () => ({
   off: t('Без звука'),
 });
 
-// Список с прошлого захода на страницу: при возврате в чаты он виден сразу, а свежий
-// приходит следом опросом. Без него каждый вход начинался с секунды пустой колонки.
-// Пишется только в эффекте, поэтому на сервере остаётся пустым и не делится между людьми.
 // Дата и счётчик строки уступают место меню «…» на десктопе.
 // Фокус мышью остаётся на строке и после закрытия меню, поэтому прячем по наведению,
 // открытому меню и фокусу с клавиатуры, а не по любому фокусу внутри строки.
 const UNDER_MENU =
   'sm:group-hover:invisible sm:group-has-[[aria-expanded=true]]:invisible sm:group-has-[:focus-visible]:invisible';
 
-let lastList: { dialogs: Dialog[]; me: number; portal: string } | null = null;
-
 export default function Messenger() {
-  const [dialogs, setDialogs] = useState<Dialog[] | null>(() => lastList?.dialogs ?? null);
-  const [me, setMe] = useState(() => lastList?.me ?? 0);
-  const [portal, setPortal] = useState(() => lastList?.portal ?? '');
+  const [dialogs, setDialogs] = useState<Dialog[] | null>(() => lastDialogs()?.dialogs ?? null);
+  const [me, setMe] = useState(() => lastDialogs()?.me ?? 0);
+  const [portal, setPortal] = useState(() => lastDialogs()?.portal ?? '');
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'all' | DialogKind>('all');
   const [query, setQuery] = useState('');
@@ -202,7 +198,7 @@ export default function Messenger() {
   const dialogsRef = useRef<Dialog[] | null>(null);
   useEffect(() => {
     dialogsRef.current = dialogs;
-    if (dialogs) lastList = { dialogs, me, portal };
+    if (dialogs) rememberDialogs({ dialogs, me, portal });
   }, [dialogs, me, portal]);
   // Загрузки первой страницы идут по одной: при частых событиях и медленном портале
   // каждый новый запрос отменял бы ответ прошлого, и список застывал бы. Просьба во

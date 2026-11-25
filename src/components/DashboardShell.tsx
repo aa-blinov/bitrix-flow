@@ -7,6 +7,7 @@ import { useKanbanStore } from '@/store/kanban';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSSE } from '@/hooks/useSSE';
+import { primeDialogs } from '@/components/messenger/dialog-cache';
 
 export default function DashboardShell({
   children,
@@ -37,6 +38,17 @@ export default function DashboardShell({
 
   const pathname = usePathname();
   const router = useRouter();
+
+  // Чаты загружаем заранее, когда браузер свободен: список отдаёт портал за полсекунду, и
+  // первый вход в «Сообщения» начинался с пустой колонки.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const run = () => primeDialogs();
+      if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 5000 });
+      else run();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Проверять подключение на каждой смене маршрута незачем: ответ один и тот
   // же, а запрос уходил по три раза за одно открытие проекта.
