@@ -72,6 +72,18 @@ const AXE_PATH = path.resolve(process.cwd(), 'node_modules/axe-core/axe.min.js')
 type AxeViolation = { id: string; impact: string | null; nodes: string[] };
 
 async function audit(page: Page): Promise<AxeViolation[]> {
+  // Окно проявляется анимацией: посреди неё axe видел полупрозрачный текст и считал контраст
+  // смешанных цветов (4.37 вместо 4.5 у инициалов в настройках чата). Ждём конечные анимации,
+  // бесконечные (крутилки) не в счёт.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getTiming().iterations === Infinity,
+      ),
+  );
   await page.addScriptTag({ path: AXE_PATH });
   return page.evaluate(async () => {
     const axe = (
