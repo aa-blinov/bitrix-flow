@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { refreshToken as refreshPortalToken } from '@/lib/oauth-client';
 import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
@@ -628,49 +629,17 @@ async function callBitrix24(
   throw lastError;
 }
 
+// Обновление токена общее с остальным приложением: своя копия тратила тот же refresh_token
+// параллельно с фоном и роняла запросы.
 async function refreshToken(token: any): Promise<string | null> {
-  if (!token.refresh_token) return null;
-
-  const CLIENT_ID = process.env.BITRIX24_CLIENT_ID || '';
-  const CLIENT_SECRET = process.env.BITRIX24_CLIENT_SECRET || '';
-
   try {
-    const res = await fetch('https://oauth.bitrix.info/oauth/token/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        refresh_token: token.refresh_token,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.error) return null;
-
-    const db = await getDb();
-    // Токен человека обновляется в его записи, токен портала в своей.
-    await db
-      .collection(token.user_id ? 'person_tokens' : 'user_tokens')
-      .updateOne(
-        token.user_id
-          ? { member_id: token.member_id, user_id: token.user_id }
-          : { member_id: token.member_id },
-        {
-          $set: {
-            access_token: data.access_token,
-            refresh_token: data.refresh_token,
-            expires_in: data.expires_in,
-            updated_at: new Date(),
-          },
-        },
-      );
-
-    // Очищаем кеш чтобы перезагрузить
+    const fresh = await refreshPortalToken(
+      String(token.member_id),
+      token.access_token,
+      token.user_id ? String(token.user_id) : undefined,
+    );
     invalidateByPrefix(token.member_id);
-
-    return data.access_token;
+    return fresh;
   } catch {
     return null;
   }

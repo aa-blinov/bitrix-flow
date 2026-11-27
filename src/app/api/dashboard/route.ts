@@ -4,7 +4,7 @@ import { getDb } from '@/lib/mongo';
 import { serverCache, invalidateByPrefix } from '@/lib/server-cache';
 import { postBitrixJson } from '@/lib/bitrix-request';
 import { getAuthorizedPerson } from '@/lib/authorized-member';
-import { bx24OAuth } from '@/lib/oauth-client';
+import { bx24OAuth, refreshToken as refreshPortalToken } from '@/lib/oauth-client';
 import { sessionCookie } from '@/lib/session';
 import { isMockEnabled, mockHandle } from '@/lib/mock-b24';
 import { hoursSettings } from '@/lib/hours-settings';
@@ -288,37 +288,18 @@ async function callBitrix24WithToken(token: any, method: string, params: Record<
   return postBitrixJson(url, params);
 }
 
+// Обновление токена общее с остальным приложением: своя копия тратила тот же refresh_token
+// параллельно с фоном и роняла запросы.
 async function refreshToken(token: any): Promise<string | null> {
-  if (!token.refresh_token) return null;
-  const clientId = process.env.BITRIX24_CLIENT_ID;
-  const clientSecret = process.env.BITRIX24_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  const response = await fetch('https://oauth.bitrix.info/oauth/token/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: token.refresh_token,
-    }),
-  });
-  const result = await response.json();
-  if (result.error || !result.access_token) return null;
-
-  const db = await getDb();
-  await db.collection('user_tokens').updateOne(
-    { member_id: token.member_id },
-    {
-      $set: {
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
-        expires_in: result.expires_in,
-        updated_at: new Date(),
-      },
-    },
-  );
-  invalidateByPrefix(`${token.member_id}:`);
-  return result.access_token;
+  try {
+    const fresh = await refreshPortalToken(
+      String(token.member_id),
+      token.access_token,
+      token.user_id ? String(token.user_id) : undefined,
+    );
+    invalidateByPrefix(`${token.member_id}:`);
+    return fresh;
+  } catch {
+    return null;
+  }
 }

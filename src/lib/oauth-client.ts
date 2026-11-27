@@ -15,7 +15,26 @@ function tokenSource(member_id: string, asUser?: string) {
     : { collection: 'user_tokens', filter: { member_id } };
 }
 
-async function refreshToken(
+// Параллельные запросы с протухшим токеном (доска спринтов шлёт три сразу, а прокси задач, дашборд
+// и фон обновляли токен портала каждый своей копией) тратили один refresh_token: портал выдаёт
+// новый первому, остальным отказ, и экран падал. Обновление токена только здесь, одно на токен,
+// остальные ждут его. ponytail: в пределах процесса, приложение одно.
+const refreshing = new Map<string, Promise<string>>();
+
+export function refreshToken(
+  member_id: string,
+  rejected?: string,
+  asUser?: string,
+): Promise<string> {
+  const key = `${member_id}:${asUser || ''}:${rejected || ''}`;
+  const running = refreshing.get(key);
+  if (running) return running;
+  const next = refreshTokenOnce(member_id, rejected, asUser).finally(() => refreshing.delete(key));
+  refreshing.set(key, next);
+  return next;
+}
+
+async function refreshTokenOnce(
   member_id: string,
   rejected?: string,
   asUser?: string,
@@ -47,7 +66,13 @@ async function refreshToken(
 
   const newTokens = await res.json();
 
-  if (newTokens.error) throw new Error(newTokens.error_description);
+  if (newTokens.error) {
+    // refresh_token уже потратил кто-то другой (второй контейнер на деплое, вход заново): если
+    // в базе появился новый токен, он и есть ответ.
+    const fresh = await db.collection(source.collection).findOne(source.filter);
+    if (fresh?.access_token && fresh.access_token !== token.access_token) return fresh.access_token;
+    throw new Error(newTokens.error_description || newTokens.error);
+  }
 
   await db.collection(source.collection).updateOne(source.filter, {
     $set: {
