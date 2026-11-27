@@ -2145,6 +2145,20 @@ test('токен MCP: выпуск в настройках, поиск, реес
     await client.close();
   }
 
+  // Агрегаты: те же цифры, что на экранах отчётов, часов и нагрузки, с подписями вместо кодов.
+  const period = { from: '2026-01-01', to: '2026-03-31' };
+  const planFact = await tool('report', { kind: 'plan-fact', ...period });
+  expect(planFact.tiles[0]).toMatchObject({ name: 'План', value: 22.5 });
+  expect(planFact.tables[0].rows[0]).toMatchObject({ state: 'Открыта', deltaShare: '-12.5%' });
+  const byProject = planFact.tables[0].byProject as { name: string; count: number }[];
+  expect(byProject.reduce((sum, item) => sum + item.count, 0)).toBe(planFact.tables[0].total);
+  const byClass = await tool('hours', { ...period, group_by: 'class' });
+  expect(byClass.totalHours).toBe(27);
+  expect(byClass.groups[0]).toMatchObject({ name: 'коммерция', hours: 16 });
+  const load = await tool('workload', { week: '2026-02-25' });
+  expect(load.week).toEqual({ from: '2026-02-23', to: '2026-03-01' });
+  expect(load.people[0]).toMatchObject({ name: 'Анна Кузнецова', week: { tasks: 2, hours: 11 } });
+
   // Строка токена: имя лежит в своём блоке, кнопка отзыва рядом с ним.
   const row = page.getByText(name, { exact: true }).locator('xpath=../..');
   await row.getByRole('button', { name: 'Отозвать' }).click();

@@ -56,10 +56,10 @@ export async function POST(req: NextRequest) {
         capabilities: { tools: {} },
         serverInfo: { name: 'bitrixflow', version },
         instructions:
-          'Задачи и проекты Bitrix24 из BitrixFlow: поиск и карточки задач, личный план, реестр ' +
-          'проектов со статусами и метриками. Записи только в реестр: update_project_status и ' +
-          'delete_project_status. ' +
-          'Ответы несут ссылку url в BitrixFlow.',
+          'Состояние работы в Bitrix24 через BitrixFlow: задачи и личный план, реестр проектов со ' +
+          'статусами и метриками, часы (hours), нагрузка (workload) и отчёты ПМ (report). Людей ' +
+          'по имени находит find_user, себя whoami. Записи только в реестр: update_project_status ' +
+          'и delete_project_status. Ответы несут ссылку url в BitrixFlow.',
       });
     }
     case 'ping':

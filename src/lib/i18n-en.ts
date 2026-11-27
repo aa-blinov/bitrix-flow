@@ -1719,8 +1719,8 @@ export const EN: Record<string, string> = {
   'Подключение MCP': 'MCP connection',
   '{0} просит доступ к BitrixFlow от имени {1}.':
     '{0} asks for access to BitrixFlow on behalf of {1}.',
-  'Чтение задач, личного плана и реестра проектов. Записывать клиент сможет только статусы проектов в реестре, задачи он не изменит.':
-    'Read access to tasks, the personal plan and the project registry. The client can only write project statuses in the registry, it cannot change tasks.',
+  'Чтение задач, личного плана, реестра проектов, часов, нагрузки и отчётов. Записывать клиент сможет только статусы проектов в реестре, задачи он не изменит.':
+    'Read access to tasks, the personal plan, the project registry, hours, workload and reports. The client can only write project statuses in the registry, it cannot change tasks.',
   'После согласия вы вернётесь на {0}.': 'After you allow access you will return to {0}.',
   Разрешить: 'Allow',
   Отклонить: 'Deny',

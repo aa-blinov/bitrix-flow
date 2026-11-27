@@ -12,6 +12,17 @@ import {
   GET as statusGet,
   PUT as statusPut,
 } from '@/app/api/projects/status/route';
+import { GET as reportGet } from '@/app/api/reports/[kind]/route';
+import { GET as hoursGet } from '@/app/api/analytics/hours/route';
+import { GET as workloadGet } from '@/app/api/workload/summary/route';
+import { HOUR_CLASS_TAG, type HourClass } from '@/lib/hour-class';
+import type { HourRow } from '@/lib/hours';
+import { mondayFor } from '@/lib/planned-hours';
+import { PM_REPORTS, PRESETS, REASON, STATE, STATUS } from '@/lib/pm-report-meta';
+import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
+import { REPORT_KINDS, type ReportKind } from '@/lib/pm-reports-data';
+import type { ReportRow } from '@/lib/pm-reports';
+import { isDay } from '@/lib/report-period';
 import { getDb } from '@/lib/mongo';
 import { getSessionPerson } from '@/lib/people';
 import { STATUS_OPTIONS, type ProjectStatus } from '@/lib/project-status';
@@ -211,6 +222,55 @@ const STATUS_FIELDS = {
   owner_id: { key: 'ownerId', description: 'ID ответственного сейчас, его даёт find_user' },
 } as const;
 
+// Справочник людей и проектов для подписей: отчёты и часы отдают только ID.
+async function names(cookie: string) {
+  const directory = (await callRoute(dashboard, '/api/dashboard', cookie)) as Directory;
+  const projects = new Map((directory.projects || []).map((p) => [String(p.id), p.name]));
+  const people = peopleOf(directory);
+  return {
+    project: (value: unknown) =>
+      String(value ?? '') === NO_PROJECT_ID
+        ? NO_PROJECT_NAME
+        : value
+          ? projects.get(String(value)) || `#${value}`
+          : null,
+    person: (value: unknown) => (value ? people.get(String(value)) || `#${value}` : null),
+  };
+}
+
+// Период по умолчанию как у экрана отчёта; свой период проверяется той же функцией, что в роуте.
+function period(args: Args, preset: keyof typeof PRESETS) {
+  const from = typeof args.from === 'string' ? args.from : '';
+  const to = typeof args.to === 'string' ? args.to : '';
+  if (!from && !to) return PRESETS[preset]();
+  if (!isDay(from) || !isDay(to) || from > to)
+    throw new ToolError('from и to в формате YYYY-MM-DD, from не позже to');
+  return { from, to };
+}
+
+const HOUR_CLASS_LABEL = (value: string) =>
+  value in HOUR_CLASS_TAG ? HOUR_CLASS_TAG[value as HourClass].replace(/^часы-/, '') : 'без класса';
+
+function countBy(rows: ReportRow[], key: string, name: (value: unknown) => string | null) {
+  if (!rows.some((row) => key in row)) return undefined;
+  const counts = new Map<string, number>();
+  for (const row of rows)
+    counts.set(String(row[key] ?? ''), (counts.get(String(row[key] ?? '')) || 0) + 1);
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 15)
+    .map(([value, count]) => ({ name: name(value) || 'Не назначен', count }));
+}
+
+const REPORT_LEGEND = REPORT_KINDS.map(
+  (kind) => `${kind}: ${PM_REPORTS[kind].title()}. ${PM_REPORTS[kind].description()}`,
+).join('\n');
+
+const PERIOD_PROPS = {
+  from: { type: 'string', description: 'Начало периода, YYYY-MM-DD' },
+  to: { type: 'string', description: 'Конец периода, YYYY-MM-DD' },
+};
+
 export const TOOLS: Tool[] = [
   {
     name: 'search_tasks',
@@ -219,7 +279,9 @@ export const TOOLS: Tool[] = [
       'проекте и исполнителе или по номеру (лучшие совпадения первыми) и/или по фильтрам: ' +
       'исполнитель, проект, статус, срок. Без query работает как список по фильтрам, сначала ' +
       'свежие (с фильтром срока: ближайшие сроки первыми). ID людей даёт find_user, свой ID whoami. ' +
-      'Описание задачи отдаёт get_task.',
+      'Описание задачи отдаёт get_task. Для вопросов про зависшие задачи, перерасход, сроки ' +
+      'закрытия и закрытые без списаний бери report: там готовый расчёт по последней активности, ' +
+      'а не перебор задач.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -588,6 +650,279 @@ export const TOOLS: Tool[] = [
         })
         .slice(0, 20)
         .map((user) => ({ id: String(user.id), name: user.name, email: user.email || null }));
+    },
+  },
+
+  {
+    name: 'report',
+    description:
+      'Отчёт ПМ, те же цифры, что на экране «Отчёты». Плитки это итоги, таблицы это строки по ' +
+      'задачам или людям (по умолчанию первые 30, total показывает сколько всего). Без периода ' +
+      'берётся период экрана по умолчанию. Виды:\n' +
+      REPORT_LEGEND,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: [...REPORT_KINDS] },
+        ...PERIOD_PROPS,
+        project_id: { type: 'string', description: 'ID проекта (для client обязателен)' },
+        idle_days: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Для stale: сколько дней без активности считать зависанием, по умолчанию 14',
+        },
+        limit: { type: 'integer', minimum: 1, maximum: 200, default: 30 },
+      },
+      required: ['kind'],
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
+      const kind = String(args.kind) as ReportKind;
+      if (!REPORT_KINDS.includes(kind))
+        throw new ToolError(`kind: одно из ${REPORT_KINDS.join(', ')}`);
+      const meta = PM_REPORTS[kind];
+      const range = period(args, meta.defaultPeriod);
+      const params: Record<string, string> = { ...range };
+      if (args.project_id !== undefined) {
+        if (!id(args.project_id)) throw new ToolError('project_id должен быть числом');
+        params.project = id(args.project_id);
+      }
+      if (meta.needsProject && !params.project)
+        throw new ToolError('Этот отчёт строится по одному проекту: передай project_id');
+      if (args.idle_days !== undefined)
+        params.days = String(Math.trunc(Number(args.idle_days)) || 14);
+      const [data, label] = await Promise.all([
+        callRoute(
+          (req) => reportGet(req, { params: Promise.resolve({ kind }) }),
+          `/api/reports/${kind}`,
+          cookie,
+          params,
+        ),
+        names(cookie),
+      ]);
+      const limit = Math.min(200, Math.max(1, Math.trunc(Number(args.limit)) || 30));
+      const tileMeta = new Map(meta.tiles.map((tile) => [tile.id, tile]));
+      return {
+        report: meta.title(),
+        period: range,
+        project: params.project ? label.project(params.project) : null,
+        tiles: (data.tiles || []).map((tile: { id: string; value: number | null }) => ({
+          name: tileMeta.get(tile.id)?.label() || tile.id,
+          value:
+            tileMeta.get(tile.id)?.kind === 'percent' && typeof tile.value === 'number'
+              ? `${Math.round(tile.value * 1000) / 10}%`
+              : tile.value,
+          unit: tileMeta.get(tile.id)?.kind === 'percent' ? undefined : tileMeta.get(tile.id)?.kind,
+          hint: tileMeta.get(tile.id)?.hint?.() || undefined,
+        })),
+        tables: (data.tables || []).map((table: { id: string; rows: ReportRow[] }) => {
+          const tableMeta = meta.tables.find((item) => item.id === table.id);
+          return {
+            title: tableMeta?.title() || table.id,
+            columns: Object.fromEntries(
+              (tableMeta?.columns || []).map((column) => [column.id, column.label()]),
+            ),
+            total: table.rows.length,
+            // Раскладка по всем строкам, а не по показанным: на «сколько у кого» агенту не
+            // нужно тянуть сотни строк и считать самому.
+            byProject: countBy(table.rows, 'projectId', label.project),
+            byResponsible: countBy(table.rows, 'responsibleId', label.person),
+            rows: table.rows.slice(0, limit).map((row) => {
+              const { filters: _filters, ...rest } = row;
+              const out: Record<string, unknown> = { ...rest };
+              // Коды ячеек в слова, как на экране: open, idle и 0.125 модель читала буквально.
+              for (const column of tableMeta?.columns || []) {
+                const value = row[column.id];
+                if (value === null || value === undefined) continue;
+                if (column.kind === 'status') out[column.id] = STATUS[String(value)]?.() || value;
+                if (column.kind === 'state') out[column.id] = STATE[String(value)]?.() || value;
+                if (column.kind === 'reasons')
+                  out[column.id] = String(value)
+                    .split(',')
+                    .map((reason) => REASON[reason]?.() || reason)
+                    .join(', ');
+                if (column.kind === 'percent' && typeof value === 'number')
+                  out[column.id] = `${Math.round(value * 1000) / 10}%`;
+              }
+              if ('projectId' in row) out.project = label.project(row.projectId);
+              if ('responsibleId' in row) out.responsible = label.person(row.responsibleId);
+              if ('userId' in row) out.user = label.person(row.userId);
+              if (row.taskId) out.url = taskLink(String(row.taskId));
+              return out;
+            }),
+          };
+        }),
+        notes: [...(data.notes || []), ...(meta.notes ? [meta.notes()] : [])],
+      };
+    },
+  },
+  {
+    name: 'hours',
+    description:
+      'Списанные часы за период с разбивкой: по проектам, людям, классам часов (коммерция, ' +
+      'брак, внутреннее, пресейл, прочее), месяцам или задачам. Те же данные, что в «Аналитике ' +
+      'часов»; служебные учётки исключены. Без периода текущий месяц.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...PERIOD_PROPS,
+        group_by: {
+          type: 'string',
+          enum: ['project', 'user', 'class', 'month', 'task'],
+          default: 'project',
+        },
+        project_id: { type: 'string', description: 'Только этот проект' },
+        user_id: { type: 'string', description: 'Только этот человек' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+      },
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
+      const range = period(args, 'month');
+      const groupBy = typeof args.group_by === 'string' ? args.group_by : 'project';
+      if (!['project', 'user', 'class', 'month', 'task'].includes(groupBy))
+        throw new ToolError('group_by: project, user, class, month или task');
+      const [data, label] = await Promise.all([
+        callRoute(hoursGet, '/api/analytics/hours', cookie, range),
+        names(cookie),
+      ]);
+      const rows = ((data.rows || []) as HourRow[]).filter(
+        (row) =>
+          (args.project_id === undefined || row.projectId === id(args.project_id)) &&
+          (args.user_id === undefined || row.userId === id(args.user_id)),
+      );
+      const groups = new Map<string, { name: string | null; hours: number; extra?: object }>();
+      for (const row of rows) {
+        const key =
+          groupBy === 'project'
+            ? row.projectId
+            : groupBy === 'user'
+              ? row.userId
+              : groupBy === 'class'
+                ? row.hourClass
+                : groupBy === 'month'
+                  ? row.month
+                  : row.taskId;
+        const group = groups.get(key) || {
+          name:
+            groupBy === 'project'
+              ? label.project(row.projectId)
+              : groupBy === 'user'
+                ? label.person(row.userId)
+                : groupBy === 'class'
+                  ? HOUR_CLASS_LABEL(row.hourClass)
+                  : groupBy === 'task'
+                    ? decodeEntities(row.task)
+                    : row.month,
+          hours: 0,
+          ...(groupBy === 'task'
+            ? { extra: { project: label.project(row.projectId), url: taskLink(row.taskId) } }
+            : {}),
+        };
+        group.hours += row.hours;
+        groups.set(key, group);
+      }
+      const round = (value: number) => Math.round(value * 100) / 100;
+      const limit = Math.min(200, Math.max(1, Math.trunc(Number(args.limit)) || 50));
+      const sorted = [...groups.entries()]
+        .map(([key, group]) => ({
+          id: key,
+          name: group.name,
+          hours: round(group.hours),
+          ...group.extra,
+        }))
+        .sort((a, b) => (groupBy === 'month' ? a.id.localeCompare(b.id) : b.hours - a.hours));
+      const plans = data.projectPlans || {};
+      return {
+        period: range,
+        totalHours: round(rows.reduce((sum, row) => sum + row.hours, 0)),
+        groups: sorted
+          .slice(0, limit)
+          .map((group) =>
+            groupBy === 'project' && plans[group.id] !== undefined
+              ? { ...group, planHours: round(plans[group.id]) }
+              : group,
+          ),
+        totalGroups: sorted.length,
+        // Неполные данные надо видеть: без этого агент выдаст заниженные часы за точные.
+        warnings: [
+          ...(data.missingWeeks?.length
+            ? [`Нет собранных списаний за недели: ${data.missingWeeks.join(', ')}`]
+            : []),
+          ...(data.partialWeeks?.length
+            ? [`Недели собраны с пропусками, часы занижены: ${data.partialWeeks.join(', ')}`]
+            : []),
+          ...(data.refreshing ? ['Идёт сбор списаний из портала, цифры могут обновиться'] : []),
+        ],
+        collectedAt: data.oldestCollectedAt || data.collectedAt || null,
+      };
+    },
+  },
+  {
+    name: 'workload',
+    description:
+      'Нагрузка команды на неделю по срокам открытых задач: у кого сколько задач и оценённых ' +
+      'часов приходится на каждый день недели, сколько просрочено и сколько без срока. Те же ' +
+      'цифры, что на экране «Нагрузка». Неделя с понедельника, по умолчанию текущая.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        week: { type: 'string', description: 'Любой день нужной недели, YYYY-MM-DD' },
+        project_id: { type: 'string', description: 'Только этот проект' },
+      },
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
+      const day =
+        typeof args.week === 'string'
+          ? args.week
+          : new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+      if (!isDay(day)) throw new ToolError('week в формате YYYY-MM-DD');
+      const start = mondayFor(day);
+      const params: Record<string, string> = { start };
+      if (args.project_id !== undefined) {
+        if (!id(args.project_id)) throw new ToolError('project_id должен быть числом');
+        params.projectId = id(args.project_id);
+      }
+      const [data, label] = await Promise.all([
+        callRoute(workloadGet, '/api/workload/summary', cookie, params),
+        names(cookie),
+      ]);
+      type Bucket = { userId: string; count: number; hours: number; day?: string };
+      const people = new Map<string, Record<string, any>>();
+      const personOf = (userId: string) => {
+        if (!people.has(userId))
+          people.set(userId, {
+            id: userId,
+            name: userId === 'unassigned' ? 'Не назначен' : label.person(userId),
+            week: { tasks: 0, hours: 0 },
+            days: {} as Record<string, { tasks: number; hours: number }>,
+            overdue: { tasks: 0, hours: 0 },
+            noDeadline: { tasks: 0, hours: 0 },
+          });
+        return people.get(userId)!;
+      };
+      for (const bucket of (data.days || []) as Bucket[]) {
+        const entry = personOf(bucket.userId);
+        entry.days[bucket.day!] = { tasks: bucket.count, hours: bucket.hours };
+        entry.week.tasks += bucket.count;
+        entry.week.hours += bucket.hours;
+      }
+      for (const bucket of (data.overdue || []) as Bucket[])
+        personOf(bucket.userId).overdue = { tasks: bucket.count, hours: bucket.hours };
+      for (const bucket of (data.noDeadline || []) as Bucket[])
+        personOf(bucket.userId).noDeadline = { tasks: bucket.count, hours: bucket.hours };
+      return {
+        week: {
+          from: start,
+          to: new Date(new Date(`${start}T12:00:00Z`).getTime() + 6 * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+        },
+        project: params.projectId ? label.project(params.projectId) : null,
+        people: [...people.values()].sort((a, b) => b.week.hours - a.week.hours),
+        note: 'Часы это оценки задач со сроком в этот день; задачи без оценки считаются в tasks, но не в hours.',
+      };
     },
   },
 ];
