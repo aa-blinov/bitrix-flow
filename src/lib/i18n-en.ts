@@ -1719,8 +1719,8 @@ export const EN: Record<string, string> = {
   'Подключение MCP': 'MCP connection',
   '{0} просит доступ к BitrixFlow от имени {1}.':
     '{0} asks for access to BitrixFlow on behalf of {1}.',
-  'Только чтение: поиск задач, карточки задач и личный план. Изменять задачи клиент не сможет.':
-    'Read only: task search, task cards and the personal plan. The client cannot change tasks.',
+  'Чтение задач, личного плана и реестра проектов. Записывать клиент сможет только статусы проектов в реестре, задачи он не изменит.':
+    'Read access to tasks, the personal plan and the project registry. The client can only write project statuses in the registry, it cannot change tasks.',
   'После согласия вы вернётесь на {0}.': 'After you allow access you will return to {0}.',
   Разрешить: 'Allow',
   Отклонить: 'Deny',
@@ -1733,8 +1733,8 @@ export const EN: Record<string, string> = {
   Отозвать: 'Revoke',
   'Доступ отозван': 'Access revoked',
   'Токены MCP': 'MCP tokens',
-  'Доступ ИИ-агентов к задачам BitrixFlow на чтение. Коннекторы claude.ai и ChatGPT подключаются по адресу сервера сами, CLI и IDE берут личный токен':
-    'Read access to BitrixFlow tasks for AI agents. claude.ai and ChatGPT connectors connect with the server address on their own, CLI and IDE clients use a personal token',
+  'Доступ ИИ-агентов к задачам и реестру проектов BitrixFlow. Коннекторы claude.ai и ChatGPT подключаются по адресу сервера сами, CLI и IDE берут личный токен':
+    'AI agent access to BitrixFlow tasks and the project registry. claude.ai and ChatGPT connectors connect with the server address on their own, CLI and IDE clients use a personal token',
   'Адрес сервера': 'Server address',
   'Название токена': 'Token name',
   'Выпустить токен': 'Issue token',

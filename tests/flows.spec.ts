@@ -2087,7 +2087,7 @@ test('настройки часов: служебная учётка и своя
   }
 });
 
-test('токен MCP: выпуск в настройках, поиск задачи и отзыв', async ({ page }) => {
+test('токен MCP: выпуск в настройках, поиск, реестр проектов и отзыв', async ({ page, testDb }) => {
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Токены MCP' })).toBeVisible();
   // Имя уникальное: seed не чистит токены, и строка прошлого прогона дала бы два совпадения.
@@ -2110,6 +2110,34 @@ test('токен MCP: выпуск в настройках, поиск зада�
   expect(JSON.parse((await found.json()).result.content[0].text).tasks[0].title).toContain(
     'GraphQL',
   );
+
+  // Реестр: частичная правка через MCP видна в карточке проекта вместе с историей.
+  const tool = async (name: string, args: object) =>
+    JSON.parse(
+      (await (await rpc({ method: 'tools/call', params: { name, arguments: args } })).json()).result
+        .content[0].text,
+    );
+  const client = new MongoClient(process.env.TEST_MONGO_URL || 'mongodb://127.0.0.1:27018');
+  try {
+    await tool('update_project_status', {
+      project_id: '12',
+      status: 'В работе',
+      step: 'Разобрать',
+    });
+    await tool('update_project_status', { project_id: '12', risk: 'Нет владельца' });
+    const project = await tool('get_project', { project_id: '12' });
+    expect(project.registry).toMatchObject({
+      status: 'В работе',
+      step: 'Разобрать',
+      risk: 'Нет владельца',
+    });
+    expect(project.history).toHaveLength(2);
+  } finally {
+    // Сводка статусов снимается в других тестах: запись проекта 12 их бы сдвинула.
+    await client.db(testDb).collection('project_status').deleteOne({ projectId: '12' });
+    await client.db(testDb).collection('project_status_history').deleteMany({ projectId: '12' });
+    await client.close();
+  }
 
   // Строка токена: имя лежит в своём блоке, кнопка отзыва рядом с ним.
   const row = page.getByText(name, { exact: true }).locator('xpath=../..');

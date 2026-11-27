@@ -91,7 +91,7 @@ export default function McpTokens() {
         <h2 className="text-base font-semibold text-ink">{t('Токены MCP')}</h2>
         <p className="mt-1 text-sm text-ink-soft">
           {t(
-            'Доступ ИИ-агентов к задачам BitrixFlow на чтение. Коннекторы claude.ai и ChatGPT подключаются по адресу сервера сами, CLI и IDE берут личный токен',
+            'Доступ ИИ-агентов к задачам и реестру проектов BitrixFlow. Коннекторы claude.ai и ChatGPT подключаются по адресу сервера сами, CLI и IDE берут личный токен',
           )}
         </p>
       </div>

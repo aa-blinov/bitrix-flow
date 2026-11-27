@@ -56,19 +56,20 @@ export async function POST(req: NextRequest) {
         capabilities: { tools: {} },
         serverInfo: { name: 'bitrixflow', version },
         instructions:
-          'Задачи и проекты Bitrix24 из зеркала BitrixFlow, только чтение. Ответ get_task и ' +
-          'search_tasks несёт ссылку url на задачу в BitrixFlow.',
+          'Задачи и проекты Bitrix24 из BitrixFlow: поиск и карточки задач, личный план, реестр ' +
+          'проектов со статусами и метриками. Единственная запись это update_project_status. ' +
+          'Ответы несут ссылку url в BitrixFlow.',
       });
     }
     case 'ping':
       return reply(id, {});
     case 'tools/list':
       return reply(id, {
-        tools: TOOLS.map(({ name, description, inputSchema }) => ({
+        tools: TOOLS.map(({ name, description, inputSchema, annotations }) => ({
           name,
           description,
           inputSchema,
-          annotations: { readOnlyHint: true, openWorldHint: false },
+          annotations: { readOnlyHint: true, openWorldHint: false, ...annotations },
         })),
       });
     case 'tools/call': {
