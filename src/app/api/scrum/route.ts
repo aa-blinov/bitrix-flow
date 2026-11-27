@@ -6,6 +6,7 @@ import {
   isSize,
   loadBoard,
   moveTask,
+  setScrum,
   setSize,
   type Call,
 } from '@/lib/scrum';
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
   if (!projectId) return bad('BAD_PROJECT');
   return withMessenger(req, async (rawCall, _memberId, userId) => {
     const call = rawCall as Call;
+    if (body?.action === 'setScrum')
+      return NextResponse.json({
+        scrum: await setScrum(call, projectId, userId, body.on === true),
+      });
     if (!(await isScrum(call, projectId))) return bad('NOT_SCRUM');
     switch (body?.action) {
       case 'createSprint':

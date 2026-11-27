@@ -146,7 +146,9 @@ docker compose --env-file .env.local up -d --build
 - **Спринты живут в скраме Битрикса.** Своей сущности нет: `src/lib/scrum.ts` собирает доску из
   `tasks.api.scrum.*` и зеркала. Скрамом группу делает `SCRUM_MASTER_ID`, а `sonet_group.create`
   его игнорирует, нужен `sonet_group.update`. Задачам, созданным до перевода в скрам,
-  `scrum.task.update` без `createdBy` отвечает «Item not created».
+  `scrum.task.update` без `createdBy` отвечает «Item not created». Флаг портал ставит и коллабе,
+  и группе без прав на скрам, а бэклог потом «Access denied», поэтому включение без бэклога
+  откатывается. Выключение (`SCRUM_MASTER_ID=0`) спринты и бэклог не стирает.
 - **OAuth MCP живёт рядом с CSP.** Боевой Caddy ставит `form-action 'self'`, поэтому согласие на
   `/oauth/authorize` не редиректит формой, а получает адрес JSON-ом и уходит по нему сам. Адрес
   возврата сверяется с зарегистрированным до любого перехода, схемы вроде `javascript:` отклоняет

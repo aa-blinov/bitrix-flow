@@ -1769,6 +1769,18 @@ export const EN: Record<string, string> = {
     'No tasks in this sprint yet. Move them from the backlog.',
   'Спринт создан': 'Sprint created',
   'Новый спринт': 'New sprint',
+  'Включить скрам?': 'Turn on scrum?',
+  'Выключить скрам?': 'Turn off scrum?',
+  'Проект в Битриксе станет скрамом: появятся бэклог и спринты, скрам-мастером станете вы. Задачи останутся на месте.':
+    'The Bitrix project becomes a scrum: a backlog and sprints appear, and you become the scrum master. Tasks stay where they are.',
+  'Вкладка «Спринты» пропадёт. Спринты, бэклог и размеры задач останутся в Битриксе и вернутся, если включить скрам снова.':
+    'The Sprints tab disappears. Sprints, the backlog and task sizes stay in Bitrix and come back if you turn scrum on again.',
+  Включить: 'Turn on',
+  Выключить: 'Turn off',
+  'Не удалось переключить скрам: {0}': 'Could not switch scrum: {0}',
+  'Скрам: спринты и размер задач': 'Scrum: sprints and task sizes',
+  'Меняет проект в Битриксе сразу, без кнопки «Сохранить».':
+    'Changes the Bitrix project right away, without the Save button.',
   'Не удалось загрузить спринты.': 'Could not load sprints.',
   'задач {0}, очков {1}': '{0} tasks, {1} pts',
   'очков {0}, задач {1}': '{0} pts, {1} tasks',

@@ -2436,3 +2436,28 @@ test('спринты: вкладка только у скрама, план сп
   );
   await expect(backlog.getByText('Обновить зависимости')).toBeVisible();
 });
+
+test('скрам включается и выключается в настройках проекта', async ({ page }) => {
+  await page.goto('/projects/17');
+  await expect(page.getByRole('tab', { name: 'Канбан' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Спринты' })).toHaveCount(0);
+
+  const toggle = async (label: 'Включить' | 'Выключить') => {
+    await page.getByRole('button', { name: 'Настройки проекта' }).first().click();
+    await page.getByRole('switch', { name: 'Скрам: спринты и размер задач' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: label }).click();
+    await expect(
+      page.getByRole('switch', { name: 'Скрам: спринты и размер задач' }),
+    ).toHaveAttribute('aria-checked', String(label === 'Включить'));
+    await page.keyboard.press('Escape');
+  };
+
+  await toggle('Включить');
+  await page.getByRole('tab', { name: 'Спринты' }).click();
+  await expect(page.getByRole('region', { name: 'Бэклог' })).toBeVisible();
+
+  // Выключение уводит со вкладки, которой больше нет: тест оставляет мок как был.
+  await toggle('Выключить');
+  await expect(page.getByRole('tab', { name: 'Спринты' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Канбан' })).toHaveAttribute('aria-selected', 'true');
+});

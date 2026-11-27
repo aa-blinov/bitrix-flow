@@ -184,7 +184,8 @@ async function ensureBacklog(call: Call, projectId: string, userId: string) {
     true,
     true,
   );
-  return String(created?.id);
+  if (!created?.id) throw new Error('BACKLOG_NOT_CREATED');
+  return String(created.id);
 }
 
 export async function createSprint(call: Call, projectId: string, userId: string, name?: string) {
@@ -243,4 +244,33 @@ export async function setSize(
   const fields: Record<string, unknown> = { storyPoints: size, createdBy: Number(userId) };
   if (!known?.entityId) fields.entityId = Number(await ensureBacklog(call, projectId, userId));
   return call('tasks.api.scrum.task.update', { id: Number(taskId), fields }, true, true);
+}
+
+/**
+ * Включает и выключает скрам у группы. Права проверяет портал: менять группу может её владелец,
+ * модератор или админ портала. Выключение не стирает спринты, бэклог и размеры: при повторном
+ * включении они возвращаются (проверено на портале).
+ */
+export async function setScrum(call: Call, projectId: string, userId: string, on: boolean) {
+  const update = (master: number) =>
+    call(
+      'sonet_group.update',
+      { GROUP_ID: Number(projectId), SCRUM_MASTER_ID: master },
+      true,
+      true,
+    );
+  if (!on) {
+    await update(0);
+    return false;
+  }
+  await update(Number(userId));
+  // Флаг портал ставит и коллабе, и группе, где у человека нет прав на скрам, а бэклог потом не
+  // создаётся («Access denied»). Без бэклога скрам не работает, поэтому откатываем флаг.
+  try {
+    await ensureBacklog(call, projectId, userId);
+  } catch (error) {
+    await update(0).catch(() => {});
+    throw error;
+  }
+  return true;
 }

@@ -22,6 +22,7 @@ import { DateField } from '@/components/monos/DateField';
 import { IconButton } from '@/components/monos/IconButton';
 import { Modal } from '@/components/monos/Modal';
 import { SelectField } from '@/components/monos/SelectField';
+import { Switch } from '@/components/monos/Switch';
 import { TextArea } from '@/components/monos/TextArea';
 import { TextField } from '@/components/monos/TextField';
 import LoadingState from '@/components/LoadingState';
@@ -397,6 +398,41 @@ export default function ProjectPage() {
     }
   }
 
+  const [scrumBusy, setScrumBusy] = useState(false);
+  async function toggleScrum(on: boolean) {
+    const agreed = await confirm({
+      title: on ? t('Включить скрам?') : t('Выключить скрам?'),
+      description: on
+        ? t(
+            'Проект в Битриксе станет скрамом: появятся бэклог и спринты, скрам-мастером станете вы. Задачи останутся на месте.',
+          )
+        : t(
+            'Вкладка «Спринты» пропадёт. Спринты, бэклог и размеры задач останутся в Битриксе и вернутся, если включить скрам снова.',
+          ),
+      confirmLabel: on ? t('Включить') : t('Выключить'),
+    });
+    if (!agreed) return;
+    setScrumBusy(true);
+    setSettingsError('');
+    try {
+      const response = await fetch('/api/scrum', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action: 'setScrum', on }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || data?.error || `HTTP_${response.status}`);
+      setScrum(Boolean(data?.scrum));
+      if (!data?.scrum && view === 'sprints') setView('kanban');
+    } catch (error) {
+      setSettingsError(
+        t('Не удалось переключить скрам: {0}', error instanceof Error ? error.message : ''),
+      );
+    } finally {
+      setScrumBusy(false);
+    }
+  }
+
   function openSettings() {
     if (!currentProject) return;
     setName(currentProject.name);
@@ -718,6 +754,14 @@ export default function ProjectPage() {
                 setSettingsError('');
               }}
             />
+          </div>
+          <div className="space-y-1">
+            <Switch checked={scrum} disabled={scrumBusy} onChange={(on) => void toggleScrum(on)}>
+              {t('Скрам: спринты и размер задач')}
+            </Switch>
+            <p className="text-xs text-ink-soft">
+              {t('Меняет проект в Битриксе сразу, без кнопки «Сохранить».')}
+            </p>
           </div>
           {settingsError && (
             <p role="alert" className="text-sm text-danger-text">

@@ -811,6 +811,8 @@ const CRM_ITEMS: Record<
 // Состояние живёт до перезапуска сервера, как и остальные правки мока.
 const SCRUM_GROUP = '12';
 const SCRUM_BACKLOG = 1;
+// Скрам включают и выключают в тестах настройками проекта: держим до перезапуска сервера.
+const SCRUM_GROUPS = new Set([SCRUM_GROUP]);
 const SPRINTS: {
   id: number;
   groupId: number;
@@ -847,15 +849,19 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
         ? {
             ID: Number(groupId),
             NAME: project.NAME,
-            SCRUM_MASTER_ID: groupId === SCRUM_GROUP ? 1 : 0,
+            SCRUM_MASTER_ID: SCRUM_GROUPS.has(groupId) ? 1 : 0,
           }
         : null;
     }
     case 'tasks.api.scrum.backlog.get':
-    case 'tasks.api.scrum.backlog.add':
-      return String((params as any).id ?? (params as any).fields?.groupId) === SCRUM_GROUP
-        ? { id: SCRUM_BACKLOG, groupId: Number(SCRUM_GROUP) }
-        : null;
+    case 'tasks.api.scrum.backlog.add': {
+      const groupId = String((params as any).id ?? (params as any).fields?.groupId);
+      if (!SCRUM_GROUPS.has(groupId)) return null;
+      return {
+        id: groupId === SCRUM_GROUP ? SCRUM_BACKLOG : 100 + Number(groupId),
+        groupId: Number(groupId),
+      };
+    }
     case 'tasks.api.scrum.sprint.list': {
       const groupId = Number((params as any).filter?.GROUP_ID);
       return SPRINTS.filter((sprint) => sprint.groupId === groupId);
@@ -921,8 +927,12 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
 
     // Правка живёт до перезапуска сервера: тестам хватает, чтобы перечитанный список её показал.
     case 'sonet_group.update': {
-      const project = PROJECTS.find((item) => item.ID === params.GROUP_ID);
+      const project = PROJECTS.find((item) => item.ID === String(params.GROUP_ID));
       if (!project) return null;
+      if (params.SCRUM_MASTER_ID !== undefined) {
+        if (Number(params.SCRUM_MASTER_ID) > 0) SCRUM_GROUPS.add(project.ID);
+        else SCRUM_GROUPS.delete(project.ID);
+      }
       for (const key of [
         'NAME',
         'DESCRIPTION',
