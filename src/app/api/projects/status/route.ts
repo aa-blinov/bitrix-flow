@@ -260,9 +260,17 @@ export async function DELETE(req: NextRequest) {
   }
 
   const db = await getDb();
-  await db.collection('project_status').deleteOne({ projectId });
-  await db.collection('project_status_history').deleteMany({ projectId });
-  return NextResponse.json({ ok: true });
+  const removed = await db.collection('project_status').findOneAndDelete({ projectId });
+  // История остаётся: удаление это тоже событие проекта, и после него видно, что было и кто
+  // снёс. Раньше история стиралась вместе с записью, и удалённый статус пропадал бесследно.
+  if (removed)
+    await db.collection('project_status_history').insertOne({
+      projectId,
+      memberId,
+      changes: [{ field: 'Запись', from: String(removed.status || ''), to: 'удалена' }],
+      at: new Date(),
+    });
+  return NextResponse.json({ ok: true, deleted: Boolean(removed) });
 }
 
 export async function PUT(req: NextRequest) {

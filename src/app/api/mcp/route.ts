@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
         serverInfo: { name: 'bitrixflow', version },
         instructions:
           'Задачи и проекты Bitrix24 из BitrixFlow: поиск и карточки задач, личный план, реестр ' +
-          'проектов со статусами и метриками. Единственная запись это update_project_status. ' +
+          'проектов со статусами и метриками. Записи только в реестр: update_project_status и ' +
+          'delete_project_status. ' +
           'Ответы несут ссылку url в BitrixFlow.',
       });
     }

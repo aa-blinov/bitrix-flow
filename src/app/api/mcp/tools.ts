@@ -7,7 +7,11 @@ import { GET as tasksAll } from '@/app/api/tasks/all/route';
 import { GET as myPlan } from '@/app/api/my-plan/route';
 import { GET as dashboard } from '@/app/api/dashboard/route';
 import { GET as projectsSummary } from '@/app/api/projects/summary/route';
-import { GET as statusGet, PUT as statusPut } from '@/app/api/projects/status/route';
+import {
+  DELETE as statusDelete,
+  GET as statusGet,
+  PUT as statusPut,
+} from '@/app/api/projects/status/route';
 import { getDb } from '@/lib/mongo';
 import { getSessionPerson } from '@/lib/people';
 import { STATUS_OPTIONS, type ProjectStatus } from '@/lib/project-status';
@@ -35,7 +39,7 @@ async function callRoute(
   path: string,
   cookie: string,
   params: Record<string, string> = {},
-  write?: { method: 'PUT'; body: unknown },
+  write?: { method: 'PUT' | 'DELETE'; body?: unknown },
 ) {
   const url = new URL(path, 'http://mcp.local');
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -44,9 +48,9 @@ async function callRoute(
       method: write?.method || 'GET',
       headers: {
         cookie: `${sessionCookie.name}=${cookie}`,
-        ...(write ? { 'content-type': 'application/json' } : {}),
+        ...(write?.body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
-      body: write ? JSON.stringify(write.body) : undefined,
+      body: write?.body !== undefined ? JSON.stringify(write.body) : undefined,
     }),
   );
   const body = await response.json().catch(() => null);
@@ -417,6 +421,40 @@ export const TOOLS: Tool[] = [
           `${projectId}: ${Object.keys(changes).join(',')}`,
         );
       return { project: project.name, saved: saved.status, url: project.url };
+    },
+  },
+
+  {
+    name: 'delete_project_status',
+    description:
+      'Удалить запись проекта из реестра статусов: из списка портала и из BitrixFlow. Сам проект ' +
+      'и задачи не трогает. История правок остаётся, в неё пишется событие удаления. Чтобы ' +
+      'только очистить поля, используй update_project_status с пустыми строками.',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: 'string', description: 'ID проекта (группы Битрикса)' } },
+      required: ['project_id'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async run(args, cookie) {
+      const projectId = id(args.project_id);
+      if (!projectId) throw new ToolError('project_id должен быть числом');
+      const { statuses } = await callRoute(statusGet, '/api/projects/status', cookie);
+      if (!(statuses as ProjectStatus[]).some((row) => row.projectId === projectId))
+        throw new ToolError('У проекта нет записи в реестре');
+      await callRoute(
+        statusDelete,
+        '/api/projects/status',
+        cookie,
+        { project_id: projectId },
+        {
+          method: 'DELETE',
+        },
+      );
+      const person = await getSessionPerson(cookie);
+      if (person) await audit(person.user.username, 'mcp-project-status-delete', projectId);
+      return { deleted: projectId };
     },
   },
 ];

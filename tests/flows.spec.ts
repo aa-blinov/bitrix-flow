@@ -2132,6 +2132,12 @@ test('токен MCP: выпуск в настройках, поиск, реес
       risk: 'Нет владельца',
     });
     expect(project.history).toHaveLength(2);
+    // Удаление снимает запись, но история остаётся и получает событие удаления.
+    expect(await tool('delete_project_status', { project_id: '12' })).toEqual({ deleted: '12' });
+    const after = await tool('get_project', { project_id: '12' });
+    expect(after.registry).toBeNull();
+    expect(after.history[0].changes[0]).toMatchObject({ field: 'Запись', to: 'удалена' });
+    expect(after.history).toHaveLength(3);
   } finally {
     // Сводка статусов снимается в других тестах: запись проекта 12 их бы сдвинула.
     await client.db(testDb).collection('project_status').deleteOne({ projectId: '12' });
