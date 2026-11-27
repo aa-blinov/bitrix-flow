@@ -2393,3 +2393,46 @@ test('шаблоны: задача по шаблону и регулярный �
     .click();
   await expect(page.getByRole('dialog', { name: 'Еженедельный отчёт заказчику' })).toBeVisible();
 });
+
+test('спринты: вкладка только у скрама, план спринта размером и переносом', async ({ page }) => {
+  // Обычный проект: вкладки нет.
+  await page.goto('/projects/10');
+  await expect(page.getByRole('tab', { name: 'Канбан' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Спринты' })).toHaveCount(0);
+
+  await page.goto('/projects/12');
+  await page.getByRole('tab', { name: 'Спринты' }).click();
+  const backlog = page.getByRole('region', { name: 'Бэклог' });
+  await expect(backlog.getByText('Обновить зависимости')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Новый спринт' }).click();
+  await expect(page.getByText('Спринт создан')).toBeVisible();
+
+  await choose(
+    page,
+    page.getByRole('combobox', { name: 'Размер задачи Обновить зависимости' }),
+    'L',
+  );
+  await expect(backlog.getByText('задач 1, очков 5')).toBeVisible();
+
+  // Новый спринт последний в списке переноса.
+  await page.getByRole('combobox', { name: 'Куда перенести Обновить зависимости' }).click();
+  await page
+    .getByRole('listbox')
+    .getByRole('option', { name: /Спринт/ })
+    .last()
+    .click();
+  await expect(backlog.getByText('Бэклог пуст.')).toBeVisible();
+  await expect(page.getByText('Готово задач 0 из 1, очков 0 из 5').last()).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Ёмкость по людям' }).first()).toContainText(
+    'Анна Кузнецова: очков 5, задач 1',
+  );
+
+  // Обратно в бэклог: тест оставляет данные мока как были.
+  await choose(
+    page,
+    page.getByRole('combobox', { name: 'Куда перенести Обновить зависимости' }),
+    'backlog',
+  );
+  await expect(backlog.getByText('Обновить зависимости')).toBeVisible();
+});

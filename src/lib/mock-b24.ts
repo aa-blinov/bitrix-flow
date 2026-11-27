@@ -807,6 +807,31 @@ const CRM_ITEMS: Record<
   4: [{ id: 2, title: 'ООО Ромашка' }],
 };
 
+// Скрам для UI-тестов: «Внутренний бэклог» (12) это скрам с бэклогом 1 и активным спринтом.
+// Состояние живёт до перезапуска сервера, как и остальные правки мока.
+const SCRUM_GROUP = '12';
+const SCRUM_BACKLOG = 1;
+const SPRINTS: {
+  id: number;
+  groupId: number;
+  name: string;
+  status: string;
+  dateStart: string;
+  dateEnd: string;
+}[] = [
+  {
+    id: 2,
+    groupId: 12,
+    name: 'Спринт 1',
+    status: 'active',
+    dateStart: '2026-11-23T00:00:00+03:00',
+    dateEnd: '2026-11-29T23:59:59+03:00',
+  },
+];
+const SCRUM_ITEMS = new Map<number, { entityId: number; storyPoints: string }>([
+  [107, { entityId: SCRUM_BACKLOG, storyPoints: 'M' }],
+]);
+
 export function isMockEnabled(): boolean {
   return ON;
 }
@@ -815,6 +840,81 @@ export function mockHandle(method: string, params: Record<string, string>): unkn
   if (!ON) return null;
 
   switch (method) {
+    case 'socialnetwork.api.workgroup.get': {
+      const groupId = String((params as any).params?.groupId ?? '');
+      const project = PROJECTS.find((item) => item.ID === groupId);
+      return project
+        ? {
+            ID: Number(groupId),
+            NAME: project.NAME,
+            SCRUM_MASTER_ID: groupId === SCRUM_GROUP ? 1 : 0,
+          }
+        : null;
+    }
+    case 'tasks.api.scrum.backlog.get':
+    case 'tasks.api.scrum.backlog.add':
+      return String((params as any).id ?? (params as any).fields?.groupId) === SCRUM_GROUP
+        ? { id: SCRUM_BACKLOG, groupId: Number(SCRUM_GROUP) }
+        : null;
+    case 'tasks.api.scrum.sprint.list': {
+      const groupId = Number((params as any).filter?.GROUP_ID);
+      return SPRINTS.filter((sprint) => sprint.groupId === groupId);
+    }
+    case 'tasks.api.scrum.sprint.add': {
+      const fields = (params as any).fields;
+      const sprint = {
+        id: Math.max(...SPRINTS.map((item) => item.id), SCRUM_BACKLOG) + 1,
+        groupId: Number(fields.groupId),
+        name: String(fields.name),
+        status: String(fields.status || 'planned'),
+        dateStart: String(fields.dateStart),
+        dateEnd: String(fields.dateEnd),
+      };
+      SPRINTS.push(sprint);
+      return sprint;
+    }
+    case 'tasks.api.scrum.sprint.start': {
+      const sprint = SPRINTS.find((item) => item.id === Number((params as any).id));
+      if (
+        !sprint ||
+        SPRINTS.some((item) => item.groupId === sprint.groupId && item.status === 'active')
+      )
+        return null;
+      sprint.status = 'active';
+      return sprint;
+    }
+    case 'tasks.api.scrum.sprint.complete': {
+      const sprint = SPRINTS.find(
+        (item) => item.groupId === Number((params as any).id) && item.status === 'active',
+      );
+      if (!sprint) return null;
+      sprint.status = 'completed';
+      // Как портал: незавершённые задачи спринта уходят в бэклог.
+      for (const [taskId, item] of SCRUM_ITEMS)
+        if (
+          item.entityId === sprint.id &&
+          Object.values(ALL_TASKS)
+            .flat()
+            .find((task) => String(task.id) === String(taskId))?.status !== '5'
+        )
+          item.entityId = SCRUM_BACKLOG;
+      return sprint;
+    }
+    case 'tasks.api.scrum.task.get': {
+      const item = SCRUM_ITEMS.get(Number((params as any).id));
+      return item ? { ...item, groupId: Number(SCRUM_GROUP) } : null;
+    }
+    case 'tasks.api.scrum.task.update': {
+      const taskId = Number((params as any).id);
+      const fields = (params as any).fields || {};
+      const current = SCRUM_ITEMS.get(taskId);
+      if (!current && !fields.entityId) return null;
+      SCRUM_ITEMS.set(taskId, {
+        entityId: Number(fields.entityId ?? current?.entityId),
+        storyPoints: String(fields.storyPoints ?? current?.storyPoints ?? ''),
+      });
+      return true;
+    }
     case 'sonet_group.get.json':
     case 'sonet_group.get':
       return PROJECTS;

@@ -10,6 +10,7 @@ import DeadlineBoard from '@/components/project/DeadlineBoard';
 import ProjectCalendar from '@/components/project/ProjectCalendar';
 import ProjectFeed from '@/components/project/ProjectFeed';
 import ProjectGantt from '@/components/project/ProjectGantt';
+import ProjectSprints from '@/components/project/ProjectSprints';
 import { CalendarRange, ChevronRight, Ellipsis, FolderKanban, Settings, Users } from 'lucide-react';
 import { fetchTaskGridPage } from '@/lib/task-grid-page';
 import TaskGrid, { type TaskGridPageQuery } from '@/components/TaskGrid';
@@ -92,6 +93,13 @@ const VIEW_TABS = [
       return t('Лента');
     },
   },
+  // Только у скрам-проектов Битрикса: у обычной группы спринтов нет.
+  {
+    id: 'sprints',
+    get label() {
+      return t('Спринты');
+    },
+  },
 ];
 const VIEW_IDS = VIEW_TABS.map((tab) => tab.id);
 
@@ -118,6 +126,18 @@ export default function ProjectPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState<{ id: string; role: ProjectRole }[]>([]);
   const memberIds = useMemo(() => members.map((member) => member.id), [members]);
+  const [scrum, setScrum] = useState(false);
+  useEffect(() => {
+    if (projectId === NO_PROJECT_ID) return;
+    let alive = true;
+    fetch(`/api/scrum?projectId=${projectId}&check=1`)
+      .then((response) => (response.ok ? response.json() : { scrum: false }))
+      .then((data) => alive && setScrum(Boolean(data?.scrum)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [projectId]);
 
   const {
     projects,
@@ -423,7 +443,7 @@ export default function ProjectPage() {
 
   const viewTabs = (
     <Tabs
-      items={VIEW_TABS}
+      items={scrum ? VIEW_TABS : VIEW_TABS.filter((tab) => tab.id !== 'sprints')}
       value={effectiveView}
       onChange={setView}
       label={t('Вид проекта')}
@@ -716,6 +736,8 @@ export default function ProjectPage() {
           <ProjectGantt projectId={projectId} toolbar={viewTabs} />
         ) : effectiveView === 'feed' ? (
           <ProjectFeed projectId={projectId} toolbar={viewTabs} />
+        ) : effectiveView === 'sprints' ? (
+          <ProjectSprints projectId={projectId} toolbar={viewTabs} />
         ) : effectiveView === 'kanban' ? (
           // Пока стор не переключился на проект из адреса, доска успевала запросить
           // теги и колонки прошлого проекта.

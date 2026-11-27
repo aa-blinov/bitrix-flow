@@ -1719,8 +1719,8 @@ export const EN: Record<string, string> = {
   'Подключение MCP': 'MCP connection',
   '{0} просит доступ к BitrixFlow от имени {1}.':
     '{0} asks for access to BitrixFlow on behalf of {1}.',
-  'Чтение задач, личного плана, реестра проектов, часов, нагрузки и отчётов. Записывать клиент сможет только статусы проектов в реестре, задачи он не изменит.':
-    'Read access to tasks, the personal plan, the project registry, hours, workload and reports. The client can only write project statuses in the registry, it cannot change tasks.',
+  'Чтение задач, личного плана, реестра проектов, часов, нагрузки и отчётов. Записывать клиент сможет только статусы проектов в реестре и план спринта (перенос задач и их размер), сами задачи он не изменит.':
+    'Read access to tasks, the personal plan, the project registry, hours, workload and reports. The client can only write project statuses in the registry and the sprint plan (moving tasks and their size), it cannot change the tasks themselves.',
   'После согласия вы вернётесь на {0}.': 'After you allow access you will return to {0}.',
   Разрешить: 'Allow',
   Отклонить: 'Deny',
@@ -1746,4 +1746,31 @@ export const EN: Record<string, string> = {
   'Использован {0}': 'Used {0}',
   'Ещё не использовался': 'Not used yet',
   'Токенов пока нет.': 'No tokens yet.',
+  Спринты: 'Sprints',
+  Идёт: 'In progress',
+  Запланирован: 'Planned',
+  Завершён: 'Completed',
+  'Размер задачи {0}': 'Size of task {0}',
+  'Куда перенести {0}': 'Move {0} to',
+  Бэклог: 'Backlog',
+  'Ёмкость по людям': 'Capacity by person',
+  'Сначала завершите текущий спринт': 'Complete the current sprint first',
+  'Спринт запущен': 'Sprint started',
+  Запустить: 'Start',
+  'Завершить «{0}»?': 'Complete "{0}"?',
+  'Незакрытые задачи ({0}) вернутся в бэклог. Это действие в Битриксе, отменить его нельзя.':
+    'Unfinished tasks ({0}) go back to the backlog. This happens in Bitrix24 and cannot be undone.',
+  'Спринт завершён': 'Sprint completed',
+  'Прогресс {0}': 'Progress of {0}',
+  'Готово задач {0} из {1}, очков {2} из {3}': 'Done {0} of {1} tasks, {2} of {3} pts',
+  'без размера: {0}': 'unsized: {0}',
+  'оценка {0} ч': 'estimate {0} h',
+  'В спринте пока нет задач. Перенесите их из бэклога.':
+    'No tasks in this sprint yet. Move them from the backlog.',
+  'Спринт создан': 'Sprint created',
+  'Новый спринт': 'New sprint',
+  'Не удалось загрузить спринты.': 'Could not load sprints.',
+  'задач {0}, очков {1}': '{0} tasks, {1} pts',
+  'очков {0}, задач {1}': '{0} pts, {1} tasks',
+  'Бэклог пуст.': 'The backlog is empty.',
 };

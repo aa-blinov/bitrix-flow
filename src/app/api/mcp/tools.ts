@@ -23,6 +23,8 @@ import { NO_PROJECT_ID, NO_PROJECT_NAME } from '@/lib/no-project';
 import { REPORT_KINDS, type ReportKind } from '@/lib/pm-reports-data';
 import type { ReportRow } from '@/lib/pm-reports';
 import { isDay } from '@/lib/report-period';
+import { GET as scrumGet, POST as scrumPost } from '@/app/api/scrum/route';
+import { SIZES, type ScrumBoard } from '@/lib/scrum-shared';
 import { getDb } from '@/lib/mongo';
 import { getSessionPerson } from '@/lib/people';
 import { STATUS_OPTIONS, type ProjectStatus } from '@/lib/project-status';
@@ -50,7 +52,7 @@ async function callRoute(
   path: string,
   cookie: string,
   params: Record<string, string> = {},
-  write?: { method: 'PUT' | 'DELETE'; body?: unknown },
+  write?: { method: 'PUT' | 'POST' | 'DELETE'; body?: unknown },
 ) {
   const url = new URL(path, 'http://mcp.local');
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -953,6 +955,124 @@ export const TOOLS: Tool[] = [
         people: [...people.values()].sort((a, b) => b.week.hours - a.week.hours),
         note: 'Часы это оценки задач со сроком в этот день; задачи без оценки считаются в tasks, но не в hours.',
       };
+    },
+  },
+
+  {
+    name: 'sprint_board',
+    description:
+      'Спринты скрам-проекта Битрикса: активный и запланированные спринты (даты, задачи, ' +
+      'прогресс, ёмкость по людям в очках и часах оценки) и бэклог. Размер задач футболками ' +
+      'XS, S, M, L, XL; очки XS=1, S=2, M=3, L=5, XL=8. У обычного проекта спринтов нет.',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: 'string', description: 'ID скрам-проекта' } },
+      required: ['project_id'],
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
+      const projectId = id(args.project_id);
+      if (!projectId) throw new ToolError('project_id должен быть числом');
+      const board = (await callRoute(scrumGet, '/api/scrum', cookie, { projectId })) as ScrumBoard;
+      if (!board.scrum) throw new ToolError('Проект не скрам: спринтов у него нет');
+      const task = (item: Extract<ScrumBoard, { scrum: true }>['backlog'][number]) => ({
+        id: item.id,
+        title: decodeEntities(item.title),
+        size: item.size,
+        done: item.done,
+        responsible: item.responsible || null,
+        estimateHours: item.estimateHours || undefined,
+        url: taskLink(item.id),
+      });
+      return {
+        sprints: board.sprints.map((sprint) => ({
+          id: sprint.id,
+          name: sprint.name,
+          status: sprint.status,
+          dateStart: sprint.dateStart,
+          dateEnd: sprint.dateEnd,
+          stats: sprint.stats,
+          tasks: sprint.tasks.map(task),
+        })),
+        backlog: { stats: board.backlogStats, tasks: board.backlog.map(task) },
+      };
+    },
+  },
+  {
+    name: 'move_task_to_sprint',
+    description:
+      'Перенести задачу скрам-проекта в спринт (sprint_id из sprint_board) или обратно в бэклог ' +
+      '(to: "backlog"). Так собирается план спринта; запуск и завершение спринта делает человек в BitrixFlow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+        task_id: { type: 'string' },
+        to: { type: 'string', description: 'ID спринта или backlog' },
+      },
+      required: ['project_id', 'task_id', 'to'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    async run(args, cookie) {
+      const to = args.to === 'backlog' ? 'backlog' : id(args.to);
+      if (!id(args.project_id) || !id(args.task_id) || !to)
+        throw new ToolError('project_id и task_id числа, to это ID спринта или backlog');
+      await callRoute(
+        scrumPost,
+        '/api/scrum',
+        cookie,
+        {},
+        {
+          method: 'POST',
+          body: {
+            action: 'moveTask',
+            projectId: id(args.project_id),
+            taskId: id(args.task_id),
+            to,
+          },
+        },
+      );
+      return { moved: id(args.task_id), to };
+    },
+  },
+  {
+    name: 'set_task_size',
+    description:
+      'Оценить задачу скрам-проекта футболкой: XS, S, M, L, XL, пустая строка снимает оценку.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'string' },
+        task_id: { type: 'string' },
+        size: { type: 'string', enum: [...SIZES, ''] },
+      },
+      required: ['project_id', 'task_id', 'size'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    async run(args, cookie) {
+      const size = String(args.size ?? '');
+      if (!id(args.project_id) || !id(args.task_id))
+        throw new ToolError('project_id и task_id числа');
+      if (size && !(SIZES as readonly string[]).includes(size))
+        throw new ToolError(`size: одно из ${SIZES.join(', ')} или пустая строка`);
+      await callRoute(
+        scrumPost,
+        '/api/scrum',
+        cookie,
+        {},
+        {
+          method: 'POST',
+          body: {
+            action: 'setSize',
+            projectId: id(args.project_id),
+            taskId: id(args.task_id),
+            size,
+          },
+        },
+      );
+      return { task: id(args.task_id), size: size || null };
     },
   },
 ];

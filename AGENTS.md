@@ -141,7 +141,12 @@ docker compose --env-file .env.local up -d --build
   выдаёт токену обычную серверную сессию владельца, с ней тулы из `src/app/api/mcp/tools.ts` зовут
   `GET` существующих роутов в процессе. Новый тул это вызов роута, а не копия его логики. Цель MCP
   это ответы о состоянии работы, сырой Битрикс уже есть в bx24 MCP. Записи только в реестр
-  проектов (`update_project_status`, `delete_project_status`); новые записи только по решению.
+  проектов (`update_project_status`, `delete_project_status`) и план спринта
+  (`move_task_to_sprint`, `set_task_size`); новые записи только по решению.
+- **Спринты живут в скраме Битрикса.** Своей сущности нет: `src/lib/scrum.ts` собирает доску из
+  `tasks.api.scrum.*` и зеркала. Скрамом группу делает `SCRUM_MASTER_ID`, а `sonet_group.create`
+  его игнорирует, нужен `sonet_group.update`. Задачам, созданным до перевода в скрам,
+  `scrum.task.update` без `createdBy` отвечает «Item not created».
 - **OAuth MCP живёт рядом с CSP.** Боевой Caddy ставит `form-action 'self'`, поэтому согласие на
   `/oauth/authorize` не редиректит формой, а получает адрес JSON-ом и уходит по нему сам. Адрес
   возврата сверяется с зарегистрированным до любого перехода, схемы вроде `javascript:` отклоняет
