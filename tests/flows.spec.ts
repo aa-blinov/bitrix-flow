@@ -2087,6 +2087,38 @@ test('настройки часов: служебная учётка и своя
   }
 });
 
+test('токен MCP: выпуск в настройках, поиск задачи и отзыв', async ({ page }) => {
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Токены MCP' })).toBeVisible();
+  // Имя уникальное: seed не чистит токены, и строка прошлого прогона дала бы два совпадения.
+  const name = `UI-тест ${Date.now()}`;
+  await page.getByLabel('Название токена').fill(name);
+  await page.getByRole('button', { name: 'Выпустить токен' }).click();
+  const token = (await page.getByText(/^bf_[\w-]{43}$/).textContent()) || '';
+  expect(token).toMatch(/^bf_/);
+
+  // Токен работает без куки: так его использует клиент MCP.
+  const rpc = (body: object) =>
+    page.request.post('/api/mcp', {
+      headers: { authorization: `Bearer ${token}`, cookie: '' },
+      data: { jsonrpc: '2.0', id: 1, ...body },
+    });
+  const found = await rpc({
+    method: 'tools/call',
+    params: { name: 'search_tasks', arguments: { query: 'GraphQL' } },
+  });
+  expect(JSON.parse((await found.json()).result.content[0].text).tasks[0].title).toContain(
+    'GraphQL',
+  );
+
+  // Строка токена: имя лежит в своём блоке, кнопка отзыва рядом с ним.
+  const row = page.getByText(name, { exact: true }).locator('xpath=../..');
+  await row.getByRole('button', { name: 'Отозвать' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Отозвать' }).click();
+  await expect(page.getByText('Доступ отозван')).toBeVisible();
+  expect((await rpc({ method: 'ping' })).status()).toBe(401);
+});
+
 test('мессенджер: «Прочитать все» гасит счётчики одним запросом', async ({ page }) => {
   const calls: unknown[] = [];
   page.on('request', (request) => {

@@ -11,6 +11,17 @@ const PUBLIC_PATHS = new Set([
   '/install',
   // Проверка живости нужна docker/мониторингу, у которых сессии нет.
   '/api/health',
+  // Клиент MCP приходит с Bearer-токеном, а не с кукой: роут проверяет токен сам.
+  '/api/mcp',
+  // OAuth для коннекторов MCP: discovery, регистрация клиента и обмен кода открыты по
+  // спецификации. Доступ даёт только согласие, а оно требует сессии (/oauth/authorize).
+  '/.well-known/oauth-protected-resource',
+  '/.well-known/oauth-protected-resource/api/mcp',
+  '/.well-known/oauth-authorization-server',
+  '/api/mcp-oauth/resource',
+  '/api/mcp-oauth/server',
+  '/api/mcp-oauth/register',
+  '/api/mcp-oauth/token',
 ]);
 
 export async function proxy(request: NextRequest) {

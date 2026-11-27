@@ -59,6 +59,14 @@ async function setupIndexes(database: Db) {
     ['task_sync_jobs', { member_id: 1, status: 1, next_run_at: 1 }],
     ['sessions', { session_hash: 1 }, { unique: true }],
     ['sessions', { expiresAt: 1 }, { expireAfterSeconds: 0 }],
+    ['mcp_tokens', { hash: 1 }, { unique: true }],
+    ['mcp_tokens', { user_id: 1 }],
+    ['mcp_tokens', { refresh_hash: 1 }, { unique: true, sparse: true }],
+    ['mcp_tokens', { refresh_expires_at: 1 }, { expireAfterSeconds: 0 }],
+    ['oauth_clients', { client_id: 1 }, { unique: true }],
+    ['oauth_clients', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    ['oauth_codes', { hash: 1 }, { unique: true }],
+    ['oauth_codes', { expires_at: 1 }, { expireAfterSeconds: 0 }],
     // Поток событий и история уведомлений росли без границ (4655 и 3976
     // записей, ни одного индекса): SSE и колокольчик читали их полным сканом.
     ['events_stream', { member_id: 1, _id: 1 }],

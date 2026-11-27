@@ -120,8 +120,14 @@ export async function deleteUser(id: string) {
   return result.deletedCount > 0;
 }
 
+// Токены MCP уходят вместе с сессиями: блокировка, сброс пароля и понижение роли не должны
+// оставлять доступ через клиента MCP, выпущенный до этого.
 export async function revokeUserSessions(id: string) {
-  await (await getDb()).collection('sessions').deleteMany({ user_id: id });
+  const db = await getDb();
+  await Promise.all([
+    db.collection('sessions').deleteMany({ user_id: id }),
+    db.collection('mcp_tokens').deleteMany({ user_id: id }),
+  ]);
 }
 
 export async function markLogin(id: ObjectId) {

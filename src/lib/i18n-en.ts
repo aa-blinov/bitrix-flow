@@ -1070,8 +1070,8 @@ export const EN: Record<string, string> = {
     'The new owner will be able to rename the chat and manage members. You will stay a regular member.',
   Передать: 'Transfer',
   Настройки: 'Settings',
-  'Общие настройки BitrixFlow для всей команды. Меняет только администратор':
-    'BitrixFlow settings for the whole team. Only an administrator can change them',
+  'Общие настройки команды меняет администратор, токены MCP у каждого свои':
+    'Team settings are changed by an administrator, MCP tokens are personal',
   'Настройки часов сохранены': 'Hours settings saved',
   'Учёт часов': 'Time tracking',
   'Кого не считать в часах и какая норма в отчёте «Списание часов»':
@@ -1710,4 +1710,40 @@ export const EN: Record<string, string> = {
   'Число месяца': 'Day of month',
   'Портал сам будет создавать задачу по этому шаблону, начиная с сегодняшнего дня.':
     'The portal will create a task from this template on its own, starting today.',
+  'Учётная запись не привязана к Битриксу: войдите через Битрикс и повторите подключение.':
+    'The account is not linked to Bitrix24: sign in with Bitrix24 and connect again.',
+  'Клиент не зарегистрирован или адрес возврата не совпадает. Начните подключение заново.':
+    'The client is not registered or the return address does not match. Start the connection again.',
+  'Запрос на подключение неполный. Начните подключение заново.':
+    'The connection request is incomplete. Start the connection again.',
+  'Подключение MCP': 'MCP connection',
+  '{0} просит доступ к BitrixFlow от имени {1}.':
+    '{0} asks for access to BitrixFlow on behalf of {1}.',
+  'Только чтение: поиск задач, карточки задач и личный план. Изменять задачи клиент не сможет.':
+    'Read only: task search, task cards and the personal plan. The client cannot change tasks.',
+  'После согласия вы вернётесь на {0}.': 'After you allow access you will return to {0}.',
+  Разрешить: 'Allow',
+  Отклонить: 'Deny',
+  'Отозвать доступ можно в настройках, в разделе «Токены MCP».':
+    'You can revoke access in Settings, under "MCP tokens".',
+  'Не удалось выпустить токен': 'Could not issue the token',
+  'Отозвать доступ «{0}»?': 'Revoke access "{0}"?',
+  'Клиент MCP с этим доступом перестанет работать сразу.':
+    'The MCP client using this access stops working immediately.',
+  Отозвать: 'Revoke',
+  'Доступ отозван': 'Access revoked',
+  'Токены MCP': 'MCP tokens',
+  'Доступ ИИ-агентов к задачам BitrixFlow на чтение. Коннекторы claude.ai и ChatGPT подключаются по адресу сервера сами, CLI и IDE берут личный токен':
+    'Read access to BitrixFlow tasks for AI agents. claude.ai and ChatGPT connectors connect with the server address on their own, CLI and IDE clients use a personal token',
+  'Адрес сервера': 'Server address',
+  'Название токена': 'Token name',
+  'Выпустить токен': 'Issue token',
+  'Скопируйте токен сейчас: второй раз его не показать.':
+    'Copy the token now: it cannot be shown again.',
+  'Коннектор OAuth': 'OAuth connector',
+  'Личный токен': 'Personal token',
+  'Выпущен {0}': 'Issued {0}',
+  'Использован {0}': 'Used {0}',
+  'Ещё не использовался': 'Not used yet',
+  'Токенов пока нет.': 'No tokens yet.',
 };
