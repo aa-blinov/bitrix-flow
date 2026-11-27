@@ -2,7 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongo';
 import { isMockEnabled } from '@/lib/mock-b24';
 import { postBitrixJson } from '@/lib/bitrix-request';
-import { getAuthorizedMemberId } from '@/lib/authorized-member';
+import { getAuthorizedMemberId, getAuthorizedPerson } from '@/lib/authorized-member';
 import { sessionCookie } from '@/lib/session';
 type TokenRef = { access_token: string; domain: string };
 
@@ -133,8 +133,11 @@ const TRACKED_FIELDS: { key: keyof ProjectStatus; label: string }[] = [
   { key: 'ownerId', label: 'Ответственный' },
 ];
 
+// userId это человек, сделавший правку. Раньше писался только memberId, а он один на весь
+// портал, и по истории нельзя было понять, кто менял статус.
 async function appendHistory(
   memberId: string,
+  userId: string,
   previous: ProjectStatus | null,
   next: ProjectStatus,
 ): Promise<void> {
@@ -151,6 +154,7 @@ async function appendHistory(
   await db.collection('project_status_history').insertOne({
     projectId: next.projectId,
     memberId,
+    userId,
     changes,
     at: new Date(),
   });
@@ -173,6 +177,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       timeline: rows.map((row) => ({
         memberId: String(row.memberId || ''),
+        userId: String(row.userId || ''),
         changes: row.changes || [],
         at: row.at instanceof Date ? row.at.toISOString() : String(row.at),
       })),
@@ -230,8 +235,9 @@ function refreshStatuses(token: Parameters<typeof fetchStatuses>[0], memberId: s
 // Удаление статуса проекта. Сначала портал, потом зеркало: раньше зеркало
 // чистилось первым, и при сбое портала запись пропадала с экрана, оставаясь в Битриксе.
 export async function DELETE(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+  const { memberId, userId } = person;
 
   const projectId = req.nextUrl.searchParams.get('project_id');
   if (!projectId || !/^\d+$/.test(projectId)) {
@@ -267,6 +273,7 @@ export async function DELETE(req: NextRequest) {
     await db.collection('project_status_history').insertOne({
       projectId,
       memberId,
+      userId,
       changes: [{ field: 'Запись', from: String(removed.status || ''), to: 'удалена' }],
       at: new Date(),
     });
@@ -274,8 +281,9 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const memberId = await getAuthorizedMemberId(req.cookies.get(sessionCookie.name)?.value);
-  if (!memberId) return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+  const person = await getAuthorizedPerson(req.cookies.get(sessionCookie.name)?.value);
+  if (!person) return NextResponse.json({ error: 'AUTHORIZATION_REQUIRED' }, { status: 401 });
+  const { memberId, userId } = person;
 
   let values: ReturnType<typeof validateStatusPayload>;
   try {
@@ -293,7 +301,7 @@ export async function PUT(req: NextRequest) {
     await db
       .collection('project_status')
       .updateOne({ projectId: values.projectId }, { $set: record }, { upsert: true });
-    await appendHistory(memberId, before, record);
+    await appendHistory(memberId, userId, before, record);
     return NextResponse.json({ status: record });
   }
 
@@ -332,7 +340,7 @@ export async function PUT(req: NextRequest) {
       });
     }
     const before = (await readMirror()).find((row) => row.projectId === values.projectId) || null;
-    await appendHistory(memberId, before, record);
+    await appendHistory(memberId, userId, before, record);
     await writeMirror([record]);
     return NextResponse.json({ status: record });
   } catch (error) {

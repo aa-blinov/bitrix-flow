@@ -120,9 +120,18 @@ type Directory = {
     startDate?: string;
     finishDate?: string;
   }[];
-  users: { id: string | number; name: string }[];
+  users: { id: string | number; name: string; email?: string }[];
   hiddenUsers?: { id: string | number; name: string }[];
+  currentUser?: { id: string | number; name: string } | null;
 };
+
+const peopleOf = (directory: Directory) =>
+  new Map(
+    [...(directory.users || []), ...(directory.hiddenUsers || [])].map((user) => [
+      String(user.id),
+      user.name,
+    ]),
+  );
 type Summary = { id: string; [key: string]: unknown };
 
 // Реестр собирается из трёх роутов интерфейса: справочник проектов и людей, статусы из списка
@@ -138,55 +147,53 @@ async function loadProjects(cookie: string) {
       }>
     ).catch(() => ({ projects: [] as Summary[] })),
   ]);
-  const people = new Map(
-    [...(directory.users || []), ...(directory.hiddenUsers || [])].map((user) => [
-      String(user.id),
-      user.name,
-    ]),
-  );
+  const people = peopleOf(directory);
   const status = new Map((statuses.statuses || []).map((row) => [row.projectId, row]));
   const metrics = new Map((summary.projects || []).map((row) => [String(row.id), row]));
-  return (directory.projects || []).map((project) => {
-    const id = String(project.id);
-    const record = status.get(id);
-    const stats = metrics.get(id);
-    return {
-      id,
-      name: project.name,
-      archived: Boolean(project.isArchived),
-      startDate: project.startDate || null,
-      finishDate: project.finishDate || null,
-      registry: record
-        ? {
-            client: record.client,
-            status: record.status,
-            goal: record.goal,
-            state: record.state,
-            step: record.step,
-            stepDeadline: record.stepDeadline || null,
-            risk: record.risk,
-            owner: record.ownerId
-              ? { id: record.ownerId, name: people.get(record.ownerId) || null }
-              : null,
-            updatedAt: record.updatedAt || null,
-          }
-        : null,
-      tasks: stats
-        ? {
-            total: stats.leafTaskCount,
-            completed: stats.completed,
-            inProgress: stats.inProgress,
-            overdue: stats.overdue,
-            noDeadline: stats.noDeadline,
-            progress: stats.progress,
-            plannedHours: stats.plannedHours,
-            actualHours: stats.actualHours,
-            lastChange: stats.changedAt || null,
-          }
-        : null,
-      url: projectLink(id),
-    };
-  });
+  return Object.assign(
+    (directory.projects || []).map((project) => {
+      const id = String(project.id);
+      const record = status.get(id);
+      const stats = metrics.get(id);
+      return {
+        id,
+        name: project.name,
+        archived: Boolean(project.isArchived),
+        startDate: project.startDate || null,
+        finishDate: project.finishDate || null,
+        registry: record
+          ? {
+              client: record.client,
+              status: record.status,
+              goal: record.goal,
+              state: record.state,
+              step: record.step,
+              stepDeadline: record.stepDeadline || null,
+              risk: record.risk,
+              owner: record.ownerId
+                ? { id: record.ownerId, name: people.get(record.ownerId) || null }
+                : null,
+              updatedAt: record.updatedAt || null,
+            }
+          : null,
+        tasks: stats
+          ? {
+              total: stats.leafTaskCount,
+              completed: stats.completed,
+              inProgress: stats.inProgress,
+              overdue: stats.overdue,
+              noDeadline: stats.noDeadline,
+              progress: stats.progress,
+              plannedHours: stats.plannedHours,
+              actualHours: stats.actualHours,
+              lastChange: stats.changedAt || null,
+            }
+          : null,
+        url: projectLink(id),
+      };
+    }),
+    { people },
+  );
 }
 
 const short = (value: string, max = 300) =>
@@ -201,34 +208,66 @@ const STATUS_FIELDS = {
   step: { key: 'step', description: 'Ближайший шаг' },
   step_deadline: { key: 'stepDeadline', description: 'Срок шага, YYYY-MM-DD' },
   risk: { key: 'risk', description: 'Главный риск' },
-  owner_id: { key: 'ownerId', description: 'ID пользователя Битрикса, ответственного сейчас' },
+  owner_id: { key: 'ownerId', description: 'ID ответственного сейчас, его даёт find_user' },
 } as const;
 
 export const TOOLS: Tool[] = [
   {
     name: 'search_tasks',
     description:
-      'Поиск задач Bitrix24 по словам в названии, описании, проекте и исполнителе, или по номеру. ' +
-      'Читает зеркало BitrixFlow, лучшие совпадения первыми. Описание задачи отдаёт get_task.',
+      'Поиск и выборка задач Bitrix24 из зеркала BitrixFlow. По словам в названии, описании, ' +
+      'проекте и исполнителе или по номеру (лучшие совпадения первыми) и/или по фильтрам: ' +
+      'исполнитель, проект, статус, срок. Без query работает как список по фильтрам, сначала ' +
+      'свежие (с фильтром срока: ближайшие сроки первыми). ID людей даёт find_user, свой ID whoami. ' +
+      'Описание задачи отдаёт get_task.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Слова или номер задачи' },
-        project_id: { type: 'string', description: 'Ограничить проектом (ID группы)' },
+        responsible_id: {
+          type: 'string',
+          description: 'ID исполнителя, можно несколько через запятую',
+        },
+        project_id: { type: 'string', description: 'ID проекта (группы)' },
+        status: {
+          type: 'string',
+          enum: ['active', 'new', 'in_progress', 'testing', 'done', 'deferred'],
+          description: 'active это все незавершённые; testing это ждёт контроля',
+        },
+        deadline: {
+          type: 'string',
+          enum: ['overdue', 'week', 'none'],
+          description:
+            'overdue просрочены, week срок в ближайшие 7 дней, none без срока (незавершённые)',
+        },
         limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
       },
-      required: ['query'],
       additionalProperties: false,
     },
     async run(args, cookie) {
       const query = typeof args.query === 'string' ? args.query.trim().slice(0, 200) : '';
-      if (!query) throw new ToolError('query обязателен');
-      const params: Record<string, string> = {
-        query,
-        rank: 'true',
-        limit: String(limitOf(args.limit, 20)),
-      };
-      if (id(args.project_id)) params.projectId = id(args.project_id);
+      const params: Record<string, string> = { limit: String(limitOf(args.limit, 20)) };
+      if (query) Object.assign(params, { query, rank: 'true' });
+      if (args.responsible_id !== undefined) {
+        const ids = String(args.responsible_id)
+          .split(',')
+          .map((item) => id(item.trim()));
+        if (!ids.length || ids.some((item) => !item))
+          throw new ToolError('responsible_id: числовые ID через запятую');
+        params.assigneeId = ids.join(',');
+      }
+      if (args.project_id !== undefined) {
+        if (!id(args.project_id)) throw new ToolError('project_id должен быть числом');
+        params.projectId = id(args.project_id);
+      }
+      if (typeof args.status === 'string') params.status = args.status;
+      if (typeof args.deadline === 'string') {
+        params.deadline = args.deadline;
+        if (!query && args.deadline !== 'none')
+          Object.assign(params, { sortKey: 'deadline', sortDirection: 'asc' });
+      }
+      if (Object.keys(params).length === 1)
+        throw new ToolError('Нужен query или хотя бы один фильтр');
       const data = await callRoute(tasksAll, '/api/tasks/all', cookie, params);
       return { total: data.total, tasks: (data.tasks || []).map(compactTask) };
     },
@@ -263,13 +302,51 @@ export const TOOLS: Tool[] = [
   {
     name: 'my_plan',
     description:
-      'Личный план владельца токена («Мой план» Bitrix24): стадии и незавершённые задачи в каждой.',
+      'Личный план владельца токена («Мой план» Bitrix24): стадии и незавершённые задачи в каждой. ' +
+      'В план попадают все задачи, где человек участник, не только исполнитель: поле mine ' +
+      'показывает, исполнитель ли он сам, responsible это кто исполняет.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     async run(_args, cookie) {
-      const data = await callRoute(myPlan, '/api/my-plan', cookie);
+      const [data, person] = await Promise.all([
+        callRoute(myPlan, '/api/my-plan', cookie),
+        getSessionPerson(cookie),
+      ]);
+      // План портала отдаёт только номер и название. Исполнителя берём из зеркала: без него
+      // агент советовал человеку чужие задачи, где тот лишь постановщик или наблюдатель.
+      const ids = (data.stages || []).flatMap((stage: any) => stage.tasks.map((t: any) => t.id));
+      const mirrored = person
+        ? await (
+            await getDb()
+          )
+            .collection('task_mirror')
+            .find(
+              { member_id: person.memberId, id: { $in: ids } },
+              {
+                projection: {
+                  id: 1,
+                  'data.responsible': 1,
+                  'data.responsibleId': 1,
+                  'data.status': 1,
+                },
+              },
+            )
+            .toArray()
+        : [];
+      const byId = new Map(mirrored.map((doc) => [String(doc.id), doc.data || {}]));
       return (data.stages || []).map((stage: any) => ({
         stage: stage.title,
-        tasks: stage.tasks.map((task: any) => ({ ...task, url: taskLink(task.id) })),
+        tasks: stage.tasks.map((task: any) => {
+          const known = byId.get(String(task.id));
+          const responsibleId = String(known?.responsible?.id || known?.responsibleId || '');
+          return {
+            ...task,
+            title: decodeEntities(String(task.title || '')),
+            status: known?.status ? mapBitrixTaskStatus(String(known.status)) : undefined,
+            responsible: known?.responsible?.name || null,
+            mine: responsibleId ? responsibleId === person?.userId : null,
+            url: taskLink(task.id),
+          };
+        }),
       }));
     },
   },
@@ -338,7 +415,15 @@ export const TOOLS: Tool[] = [
       ]);
       const project = projects.find((item) => item.id === projectId);
       if (!project) throw new ToolError('Проект не найден');
-      return { ...project, history: (history.timeline || []).slice(0, 30) };
+      // Старые записи истории знают только портал: для них «кто» неизвестен.
+      const timeline = (history.timeline || []).slice(0, 30).map((entry: any) => ({
+        at: entry.at,
+        by: entry.userId
+          ? { id: entry.userId, name: projects.people.get(entry.userId) || null }
+          : null,
+        changes: entry.changes,
+      }));
+      return { ...project, history: timeline };
     },
   },
   {
@@ -455,6 +540,54 @@ export const TOOLS: Tool[] = [
       const person = await getSessionPerson(cookie);
       if (person) await audit(person.user.username, 'mcp-project-status-delete', projectId);
       return { deleted: projectId };
+    },
+  },
+
+  {
+    name: 'whoami',
+    description:
+      'Кто владелец токена: ID и имя в Битриксе. Нужен для вопросов «мои задачи», «где я ответственный».',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    async run(_args, cookie) {
+      const person = await getSessionPerson(cookie);
+      if (!person) throw new ToolError('MEMBER_ID_REQUIRED');
+      const directory = (await callRoute(dashboard, '/api/dashboard', cookie)) as Directory;
+      return {
+        id: person.userId,
+        name: peopleOf(directory).get(person.userId) || person.user.display_name || null,
+        login: person.user.username,
+        role: person.user.role,
+      };
+    },
+  },
+  {
+    name: 'find_user',
+    description:
+      'Найти сотрудника портала по имени, фамилии или почте и получить его ID: для фильтра ' +
+      'search_tasks и поля owner_id в update_project_status.',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Имя, фамилия или почта' } },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
+      const words = (typeof args.query === 'string' ? args.query : '')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!words.length) throw new ToolError('query обязателен');
+      const directory = (await callRoute(dashboard, '/api/dashboard', cookie)) as Directory;
+      const norm = (value: string) => value.toLowerCase().replace(/ё/g, 'е');
+      // Каждое слово должно встретиться: «юлия поп» находит «Юлия Попондопуло».
+      return (directory.users || [])
+        .filter((user) => {
+          const hay = norm(`${user.name} ${user.email || ''}`);
+          return words.every((word) => hay.includes(word));
+        })
+        .slice(0, 20)
+        .map((user) => ({ id: String(user.id), name: user.name, email: user.email || null }));
     },
   },
 ];
