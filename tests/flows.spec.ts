@@ -2155,6 +2155,9 @@ test('токен MCP: выпуск в настройках, поиск, реес
   const byClass = await tool('hours', { ...period, group_by: 'class' });
   expect(byClass.totalHours).toBe(27);
   expect(byClass.groups[0]).toMatchObject({ name: 'коммерция', hours: 16 });
+  const plan = await tool('my_plan', { limit: 1 });
+  expect(plan[0].total).toBeGreaterThan(1);
+  expect(plan[0].tasks).toHaveLength(1);
   const load = await tool('workload', { week: '2026-02-25' });
   expect(load.week).toEqual({ from: '2026-02-23', to: '2026-03-01' });
   expect(load.people[0]).toMatchObject({ name: 'Анна Кузнецова', week: { tasks: 2, hours: 11 } });

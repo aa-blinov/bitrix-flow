@@ -366,9 +366,27 @@ export const TOOLS: Tool[] = [
     description:
       'Личный план владельца токена («Мой план» Bitrix24): стадии и незавершённые задачи в каждой. ' +
       'В план попадают все задачи, где человек участник, не только исполнитель: поле mine ' +
-      'показывает, исполнитель ли он сам, responsible это кто исполняет.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    async run(_args, cookie) {
+      'показывает, исполнитель ли он сам, responsible это кто исполняет. В стадии задачи идут ' +
+      'по сроку, без срока в конце; total и mine считают всю стадию, а не показанное.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        only_mine: {
+          type: 'boolean',
+          default: false,
+          description: 'Только задачи, где владелец токена сам исполнитель',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 200,
+          default: 30,
+          description: 'Сколько задач показать в каждой стадии',
+        },
+      },
+      additionalProperties: false,
+    },
+    async run(args, cookie) {
       const [data, person] = await Promise.all([
         callRoute(myPlan, '/api/my-plan', cookie),
         getSessionPerson(cookie),
@@ -395,21 +413,33 @@ export const TOOLS: Tool[] = [
             .toArray()
         : [];
       const byId = new Map(mirrored.map((doc) => [String(doc.id), doc.data || {}]));
-      return (data.stages || []).map((stage: any) => ({
-        stage: stage.title,
-        tasks: stage.tasks.map((task: any) => {
-          const known = byId.get(String(task.id));
-          const responsibleId = String(known?.responsible?.id || known?.responsibleId || '');
-          return {
-            ...task,
-            title: decodeEntities(String(task.title || '')),
-            status: known?.status ? mapBitrixTaskStatus(String(known.status)) : undefined,
-            responsible: known?.responsible?.name || null,
-            mine: responsibleId ? responsibleId === person?.userId : null,
-            url: taskLink(task.id),
-          };
-        }),
-      }));
+      const limit = Math.min(200, Math.max(1, Math.trunc(Number(args.limit)) || 30));
+      // Без срока в конец: портал сортирует по сроку, но пустой срок ставит первым.
+      const due = (task: { deadline: string }) => Date.parse(task.deadline) || Infinity;
+      return (data.stages || []).map((stage: any) => {
+        const tasks = stage.tasks
+          .map((task: any) => {
+            const known = byId.get(String(task.id));
+            const responsibleId = String(known?.responsible?.id || known?.responsibleId || '');
+            return {
+              ...task,
+              deadline: task.deadline || null,
+              title: decodeEntities(String(task.title || '')),
+              status: known?.status ? mapBitrixTaskStatus(String(known.status)) : undefined,
+              responsible: known?.responsible?.name || null,
+              mine: responsibleId ? responsibleId === person?.userId : null,
+              url: taskLink(task.id),
+            };
+          })
+          .sort((left: any, right: any) => due(left) - due(right));
+        const shown = args.only_mine === true ? tasks.filter((task: any) => task.mine) : tasks;
+        return {
+          stage: stage.title,
+          total: tasks.length,
+          mine: tasks.filter((task: any) => task.mine).length,
+          tasks: shown.slice(0, limit),
+        };
+      });
     },
   },
 
